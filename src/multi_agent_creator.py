@@ -11,6 +11,7 @@ TOPIC = os.getenv("TOPIC", "").strip()
 OUTPUT_DIR = Path("data/reports")
 LIVE_SNAPSHOT = Path("data/live/market_snapshot.json")
 NEWS_SNAPSHOT = Path("data/live/news_snapshot.json")
+STRATEGY_MEMORY = Path("analytics/strategy_memory.json")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -40,6 +41,10 @@ Evidence rules:
 Content goal:
 Create something genuinely useful and interesting for Binance Square readers, not generic market commentary.
 Favor a specific insight, strong hook, clear context, and a thoughtful closing question.
+
+Learning rules:
+- Use the supplied strategy memory as a soft preference, not as proof that a topic will perform.
+- Never sacrifice evidence quality, originality, or factual caution to imitate past winners.
 
 Return ONLY valid JSON with this exact top-level structure:
 {
@@ -133,6 +138,7 @@ def main() -> None:
     client = genai.Client(api_key=api_key)
     live_context = load_json(LIVE_SNAPSHOT)
     news_context = load_json(NEWS_SNAPSHOT)
+    strategy_memory = load_json(STRATEGY_MEMORY)
 
     if not live_context and not news_context and not TOPIC:
         raise RuntimeError("No market/news context and no TOPIC supplied")
@@ -149,6 +155,8 @@ def main() -> None:
         + json.dumps(live_context, ensure_ascii=False, indent=2)
         + "\n\nNEWS-DISCOVERY SNAPSHOT:\n"
         + json.dumps(news_context, ensure_ascii=False, indent=2)
+        + "\n\nSTRATEGY MEMORY (soft guidance only):\n"
+        + json.dumps(strategy_memory, ensure_ascii=False, indent=2)
         + "\n\nExecute the research → skeptical critique → senior editor → visual planning pipeline in ONE response."
     )
 
@@ -172,6 +180,7 @@ def main() -> None:
         "topic_instruction": topic_instruction,
         "live_market_snapshot": live_context,
         "news_discovery_snapshot": news_context,
+        "strategy_memory": strategy_memory,
         "research": research,
         "critique": critique,
         "draft": draft,
@@ -195,6 +204,7 @@ def main() -> None:
         "strongest_signal": research.get("strongest_signal"),
         "visual_requested": bool(visual_plan.get("use_visual")),
         "visual_type": visual_plan.get("type"),
+        "strategy_memory_samples": strategy_memory.get("sample_size", 0),
         "gemini_requests_used": 1,
     }, indent=2, ensure_ascii=False))
 
