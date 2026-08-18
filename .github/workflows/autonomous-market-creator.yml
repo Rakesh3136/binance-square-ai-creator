@@ -20,7 +20,7 @@ concurrency:
 jobs:
   create-draft:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,11 +30,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install Gemini SDK
         run: pip install --disable-pip-version-check "google-genai>=1.0.0"
 
       - name: Scan live Binance market
         run: python src/live_market_scanner.py
+
+      - name: Scan crypto news feeds
+        run: python src/news_scanner.py
 
       - name: Run autonomous multi-agent creator
         env:
@@ -43,11 +46,11 @@ jobs:
           TOPIC: ${{ inputs.topic }}
         run: python src/multi_agent_creator.py
 
-      - name: Save market snapshot and draft
+      - name: Save market, news and draft reports
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/live/ data/reports/
           git diff --cached --quiet && exit 0
-          git commit -m "Add autonomous market research and draft"
+          git commit -m "Add autonomous market and news research draft"
           git push
