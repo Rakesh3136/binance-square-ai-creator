@@ -1,23 +1,49 @@
 import json
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-BINANCE_BASE = "https://api.binance.com"
+# Binance documents data-api.binance.vision as the dedicated unauthenticated
+# public market-data endpoint. GitHub-hosted runners can receive HTTP 451 from
+# api.binance.com because of regional/service restrictions, so use the market-data
+# domain first and keep a couple of documented public endpoints as fallbacks.
+BINANCE_BASES = [
+    "https://data-api.binance.vision",
+    "https://api-gcp.binance.com",
+    "https://api1.binance.com",
+    "https://api2.binance.com",
+]
 OUTPUT = Path("data/live/market_snapshot.json")
 QUOTE = os.getenv("MARKET_QUOTE", "USDT")
 TOP_N = int(os.getenv("MARKET_TOP_N", "40"))
 
 
 def get_json(path: str, params: dict | None = None):
-    url = BINANCE_BASE + path
+    last_error = None
+    query = ""
     if params:
-        url += "?" + urllib.parse.urlencode(params)
-    request = urllib.request.Request(url, headers={"User-Agent": "binance-square-ai-creator/1.0"})
-    with urllib.request.urlopen(request, timeout=20) as response:
-        return json.loads(response.read().decode("utf-8"))
+        query = "?" + urllib.parse.urlencode(params)
+
+    for base in BINANCE_BASES:
+        url = base + path + query
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "binance-square-ai-creator/1.0",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except (urllib.error.HTTPError, urllib.error.URLError) as exc:
+            last_error = exc
+            continue
+
+    raise RuntimeError(f"All Binance public market-data endpoints failed: {last_error}")
 
 
 def main() -> None:
