@@ -7,18 +7,78 @@ from pathlib import Path
 from google import genai
 
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
-TOPIC = os.getenv("TOPIC", "")
+TOPIC = os.getenv("TOPIC", "").strip()
 OUTPUT_DIR = Path("data/reports")
 LIVE_SNAPSHOT = Path("data/live/market_snapshot.json")
 NEWS_SNAPSHOT = Path("data/live/news_snapshot.json")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def call_agent(client: genai.Client, system: str, prompt: str) -> str:
+def call_creator(client: genai.Client, prompt: str) -> str:
+    """One Gemini request per run to stay inside the free-tier quota."""
     interaction = client.interactions.create(
         model=MODEL,
         input=prompt,
-        system_instruction=system,
+        system_instruction="""You are the autonomous intelligence core of an elite Binance Square creator.
+
+Work as THREE internal roles in a single response:
+1) RESEARCH LEAD — identify the strongest content opportunity from the supplied market/news context.
+2) SKEPTICAL CRITIC — challenge weak assumptions, causal claims, missing context, stale evidence, and hype.
+3) SENIOR EDITOR — produce the strongest original Binance Square draft after the critique.
+
+Do not reveal hidden chain-of-thought. Provide concise conclusions, evidence requirements, and the final output.
+
+Evidence rules:
+- Market figures supplied in the context are observations, not predictions.
+- RSS/news items are discovery leads, not automatically verified facts.
+- Never invent live prices, statistics, partnerships, breaking news, dates, quotes, or sources.
+- Preserve source URLs from the supplied context.
+- Distinguish verified facts, observations, inference, and unknowns.
+- Do not copy or closely paraphrase source articles.
+- Do not guarantee profits, create fake urgency, encourage reckless trading, impersonate sources, or coordinate market manipulation.
+
+Content goal:
+Create something genuinely useful and interesting for Binance Square readers, not generic market commentary.
+Favor a specific insight, strong hook, clear context, and a thoughtful closing question.
+
+Return ONLY valid JSON with this exact top-level structure:
+{
+  "research": {
+    "thesis": "...",
+    "strongest_signal": "...",
+    "market_observations": [],
+    "news_leads": [],
+    "source_urls": [],
+    "audience_questions": [],
+    "possible_angles": [],
+    "risks": [],
+    "live_verification_needed": [],
+    "opportunity_score": 0
+  },
+  "critique": {
+    "strongest_angle": "...",
+    "weak_points": [],
+    "missing_context": [],
+    "source_verification_plan": [],
+    "required_checks": [],
+    "counterpoints": [],
+    "safer_wording": [],
+    "revised_opportunity_score": 0
+  },
+  "draft": {
+    "title": "...",
+    "post": "...",
+    "hook": "...",
+    "key_takeaway": "...",
+    "discussion_question": "...",
+    "hashtags": [],
+    "source_links": [],
+    "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
+    "quality_score": 0
+  }
+}
+
+Scores are editorial/content scores from 0-100, never investment-return scores.""",
     )
     text = (interaction.output_text or "").strip()
     if not text:
@@ -37,43 +97,16 @@ def parse_json(text: str) -> dict:
             return value
     except json.JSONDecodeError:
         pass
-    return {"raw": text}
+    raise RuntimeError("Gemini returned output that was not valid JSON")
 
 
 def load_json(path: Path) -> dict:
     if not path.exists():
         return {}
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-RESEARCH_SYSTEM = """You are the Research Agent for an elite Binance Square creator.
-Use the supplied market snapshot and news-discovery snapshot.
-Market numbers are observations from the supplied timestamped source.
-RSS news items are discovery leads, NOT verified facts. Treat article summaries as leads and preserve source URLs.
-Never invent live prices, statistics, breaking news, partnerships, or sources.
-Find the strongest content-worthy story by combining market signal + credible news context + audience usefulness.
-Separate facts, observations, inference, and unknowns.
-Return JSON with: thesis, strongest_signal, market_observations, news_leads, source_urls, audience_questions, possible_angles, risks, live_verification_needed, opportunity_score.
-Opportunity score is 0-100 for content value, not investment potential."""
-
-CRITIC_SYSTEM = """You are the Skeptical Analyst, Fact-Caution Agent, and Source-Integrity Editor.
-Challenge the research brief.
-Check whether the proposed causal explanation is actually supported by the supplied market observations and news leads.
-Treat RSS items as leads until verified; distinguish reporting from primary-source confirmation.
-Identify weak assumptions, misleading causal claims, overhyped wording, missing context, stale items, and what cannot be concluded from the supplied data.
-Do not invent replacement facts. Do not reveal hidden chain-of-thought.
-Return JSON with: strongest_angle, weak_points, missing_context, source_verification_plan, required_checks, counterpoints, safer_wording, revised_opportunity_score."""
-
-WRITER_SYSTEM = """You are the Senior Binance Square Editor.
-Create an original, useful post from the supplied research and critique.
-Do not copy or closely paraphrase source articles. Add a distinct explanatory angle.
-Only use numbers and concrete claims present in the supplied research context and label unresolved items as unverified.
-Clearly distinguish observation from interpretation.
-Never guarantee profits, create fake urgency, impersonate sources, coordinate manipulation, or encourage reckless trading.
-Use a strong first line, short readable paragraphs, concrete insight, and a thoughtful closing question.
-Include source URLs when useful, but do not pretend a secondary article is a primary source.
-Return JSON with: title, post, hook, key_takeaway, discussion_question, hashtags, source_links, publication_status, quality_score.
-Quality score is 0-100 for editorial quality, not investment return."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Invalid JSON in {path}: {exc}") from exc
 
 
 def main() -> None:
@@ -88,41 +121,28 @@ def main() -> None:
     if not live_context and not news_context and not TOPIC:
         raise RuntimeError("No market/news context and no TOPIC supplied")
 
-    topic_instruction = TOPIC or "Choose the single strongest Binance Square content opportunity from the live market and news-discovery snapshots."
-    research_text = call_agent(
-        client,
-        RESEARCH_SYSTEM,
-        "Topic instruction:\n" + topic_instruction
-        + "\n\nLIVE MARKET SNAPSHOT:\n" + json.dumps(live_context, ensure_ascii=False, indent=2)
-        + "\n\nNEWS-DISCOVERY SNAPSHOT:\n" + json.dumps(news_context, ensure_ascii=False, indent=2),
+    topic_instruction = TOPIC or (
+        "Choose the single strongest Binance Square content opportunity from the live market and "
+        "news-discovery snapshots. Prefer a specific, evidence-aware story over a generic price recap."
     )
-    research = parse_json(research_text)
 
-    critique_text = call_agent(
-        client,
-        CRITIC_SYSTEM,
-        "Review this research against the supplied market and news context:\n\nRESEARCH:\n"
-        + json.dumps(research, ensure_ascii=False, indent=2)
+    prompt = (
+        "TOPIC INSTRUCTION:\n"
+        + topic_instruction
         + "\n\nLIVE MARKET SNAPSHOT:\n"
         + json.dumps(live_context, ensure_ascii=False, indent=2)
         + "\n\nNEWS-DISCOVERY SNAPSHOT:\n"
-        + json.dumps(news_context, ensure_ascii=False, indent=2),
+        + json.dumps(news_context, ensure_ascii=False, indent=2)
+        + "\n\nExecute the research → skeptical critique → senior editor pipeline in ONE response."
     )
-    critique = parse_json(critique_text)
 
-    writer_text = call_agent(
-        client,
-        WRITER_SYSTEM,
-        "Create the final draft using this research and critique. Do not invent missing live facts.\n\nRESEARCH:\n"
-        + json.dumps(research, ensure_ascii=False, indent=2)
-        + "\n\nCRITIQUE:\n"
-        + json.dumps(critique, ensure_ascii=False, indent=2)
-        + "\n\nSOURCE MARKET SNAPSHOT:\n"
-        + json.dumps(live_context, ensure_ascii=False, indent=2)
-        + "\n\nSOURCE NEWS SNAPSHOT:\n"
-        + json.dumps(news_context, ensure_ascii=False, indent=2),
-    )
-    draft = parse_json(writer_text)
+    result = parse_json(call_creator(client, prompt))
+    research = result.get("research", {})
+    critique = result.get("critique", {})
+    draft = result.get("draft", {})
+
+    if draft.get("publication_status") != "DRAFT_ONLY_NOT_PUBLISHED":
+        draft["publication_status"] = "DRAFT_ONLY_NOT_PUBLISHED"
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -134,6 +154,7 @@ def main() -> None:
         "critique": critique,
         "draft": draft,
         "status": "DRAFT_ONLY_NOT_PUBLISHED",
+        "gemini_requests_used": 1,
     }
 
     slug_source = topic_instruction if TOPIC else str(research.get("strongest_signal") or "autonomous-market-opportunity")
@@ -149,7 +170,7 @@ def main() -> None:
         "quality_score": draft.get("quality_score"),
         "opportunity_score": research.get("opportunity_score"),
         "strongest_signal": research.get("strongest_signal"),
-        "news_leads_used": len(research.get("news_leads", [])) if isinstance(research.get("news_leads"), list) else 0,
+        "gemini_requests_used": 1,
     }, indent=2, ensure_ascii=False))
 
 
