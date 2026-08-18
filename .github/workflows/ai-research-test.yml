@@ -1,0 +1,43 @@
+name: AI Research Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Topic to research"
+        required: true
+        default: "Bitcoin market overview"
+
+permissions:
+  contents: write
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install OpenAI SDK
+        run: pip install --disable-pip-version-check "openai>=1.0.0,<2"
+
+      - name: Run research agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TOPIC: ${{ inputs.topic }}
+          OPENAI_MODEL: gpt-5.6
+        run: python src/research_test.py
+
+      - name: Save research report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/reports/
+          git diff --cached --quiet && exit 0
+          git commit -m "Add AI research report"
+          git push
