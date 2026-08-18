@@ -1,0 +1,96 @@
+name: Publish Latest Draft to Binance Square
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_publish:
+        description: "Set to true only when you explicitly want to publish the latest draft"
+        required: true
+        type: boolean
+        default: false
+      mode:
+        description: "Publishing mode"
+        required: true
+        type: choice
+        options:
+          - text
+          - image
+        default: text
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stop unless publishing is explicitly confirmed
+        if: ${{ inputs.confirm_publish != true }}
+        run: |
+          echo "Publishing not confirmed. This workflow is in dry-run safety mode."
+          echo "Set confirm_publish=true only when you are ready to publish."
+
+      - name: Set up Node.js
+        if: ${{ inputs.confirm_publish == true }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download official Binance Square skill
+        if: ${{ inputs.confirm_publish == true }}
+        run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
+
+      - name: Locate latest draft
+        if: ${{ inputs.confirm_publish == true }}
+        id: draft
+        shell: bash
+        run: |
+          DRAFT=$(find data/reports -type f -name '*multi-agent.json' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          if [ -z "$DRAFT" ]; then
+            echo "No multi-agent draft found." >&2
+            exit 1
+          fi
+          echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
+          echo "Using draft: $DRAFT"
+
+      - name: Extract publishable post
+        if: ${{ inputs.confirm_publish == true }}
+        env:
+          DRAFT_PATH: ${{ steps.draft.outputs.path }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          src = Path(os.environ['DRAFT_PATH'])
+          data = json.loads(src.read_text(encoding='utf-8'))
+          draft = data.get('draft') or {}
+          post = (draft.get('post') or '').strip()
+          if not post:
+              raise SystemExit('Draft has no publishable post text')
+          Path('/tmp/square-post.txt').write_text(post, encoding='utf-8')
+          print('Title:', draft.get('title', ''))
+          print('Post preview:\n' + post[:2000])
+          PY
+
+      - name: Publish text post using official Binance skill
+        if: ${{ inputs.confirm_publish == true && inputs.mode == 'text' }}
+        env:
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
+        run: |
+          node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat /tmp/square-post.txt)"
+
+      - name: Publish image post using official Binance skill
+        if: ${{ inputs.confirm_publish == true && inputs.mode == 'image' }}
+        env:
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
+        run: |
+          IMAGE=$(find data/visuals -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
+          if [ -z "$IMAGE" ]; then
+            echo "No generated visual found; use text mode or run the creator first." >&2
+            exit 1
+          fi
+          node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --text "$(cat /tmp/square-post.txt)" --images "$IMAGE"
