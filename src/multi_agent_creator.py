@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from google import genai
-from google.genai import types
 
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 TOPIC = os.getenv("TOPIC", "Bitcoin market overview")
@@ -14,16 +13,12 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def call_agent(client: genai.Client, system: str, prompt: str, max_tokens: int = 5000) -> str:
-    response = client.models.generate_content(
+    interaction = client.interactions.create(
         model=MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system,
-            temperature=0.7,
-            max_output_tokens=max_tokens,
-        ),
+        input=prompt,
+        system_instruction=system,
     )
-    text = (response.text or "").strip()
+    text = (interaction.output_text or "").strip()
     if not text:
         raise RuntimeError("Gemini returned an empty response")
     return text
