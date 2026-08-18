@@ -24,7 +24,7 @@ def call_creator(client: genai.Client, prompt: str) -> str:
 Work as THREE internal roles in a single response:
 1) RESEARCH LEAD — identify the strongest content opportunity from the supplied market/news context.
 2) SKEPTICAL CRITIC — challenge weak assumptions, causal claims, missing context, stale evidence, and hype.
-3) SENIOR EDITOR — produce the strongest original Binance Square draft after the critique.
+3) SENIOR EDITOR — produce the strongest original Binance Square draft after the critique and decide whether a useful visual should accompany it.
 
 Do not reveal hidden chain-of-thought. Provide concise conclusions, evidence requirements, and the final output.
 
@@ -75,8 +75,24 @@ Return ONLY valid JSON with this exact top-level structure:
     "source_links": [],
     "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
     "quality_score": 0
+  },
+  "visual_plan": {
+    "use_visual": false,
+    "type": "none",
+    "title": "...",
+    "purpose": "...",
+    "data_points": [],
+    "caption": "...",
+    "alt_text": "..."
   }
 }
+
+For visual_plan:
+- use_visual=true only when a visual adds real information.
+- type must be one of: market_bar_chart, market_comparison, market_range_chart, news_timeline, text_card, none.
+- Use only data present in the supplied snapshots; never invent numbers.
+- Prefer charts or comparisons for market-data stories and a timeline for multi-event news stories.
+- If the story cannot be visualized honestly from the supplied context, set use_visual=false and type=none.
 
 Scores are editorial/content scores from 0-100, never investment-return scores.""",
     )
@@ -133,16 +149,22 @@ def main() -> None:
         + json.dumps(live_context, ensure_ascii=False, indent=2)
         + "\n\nNEWS-DISCOVERY SNAPSHOT:\n"
         + json.dumps(news_context, ensure_ascii=False, indent=2)
-        + "\n\nExecute the research → skeptical critique → senior editor pipeline in ONE response."
+        + "\n\nExecute the research → skeptical critique → senior editor → visual planning pipeline in ONE response."
     )
 
     result = parse_json(call_creator(client, prompt))
     research = result.get("research", {})
     critique = result.get("critique", {})
     draft = result.get("draft", {})
+    visual_plan = result.get("visual_plan", {})
 
-    if draft.get("publication_status") != "DRAFT_ONLY_NOT_PUBLISHED":
-        draft["publication_status"] = "DRAFT_ONLY_NOT_PUBLISHED"
+    draft["publication_status"] = "DRAFT_ONLY_NOT_PUBLISHED"
+    if visual_plan.get("use_visual") not in (True, False):
+        visual_plan["use_visual"] = False
+    if visual_plan.get("type") not in {
+        "market_bar_chart", "market_comparison", "market_range_chart", "news_timeline", "text_card", "none"
+    }:
+        visual_plan["type"] = "none"
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -153,6 +175,7 @@ def main() -> None:
         "research": research,
         "critique": critique,
         "draft": draft,
+        "visual_plan": visual_plan,
         "status": "DRAFT_ONLY_NOT_PUBLISHED",
         "gemini_requests_used": 1,
     }
@@ -170,6 +193,8 @@ def main() -> None:
         "quality_score": draft.get("quality_score"),
         "opportunity_score": research.get("opportunity_score"),
         "strongest_signal": research.get("strongest_signal"),
+        "visual_requested": bool(visual_plan.get("use_visual")),
+        "visual_type": visual_plan.get("type"),
         "gemini_requests_used": 1,
     }, indent=2, ensure_ascii=False))
 
