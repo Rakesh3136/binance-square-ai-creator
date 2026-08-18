@@ -1,0 +1,43 @@
+name: AI Creator Test (Gemini)
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Topic for the creator"
+        required: true
+        default: "Bitcoin market overview"
+
+permissions:
+  contents: write
+
+jobs:
+  create-draft:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Gemini SDK
+        run: pip install --disable-pip-version-check "google-genai>=1.0.0"
+
+      - name: Run multi-agent creator
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.6-flash
+          TOPIC: ${{ inputs.topic }}
+        run: python src/multi_agent_creator.py
+
+      - name: Save draft report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/reports/
+          git diff --cached --quiet && exit 0
+          git commit -m "Add Gemini multi-agent creator draft"
+          git push
