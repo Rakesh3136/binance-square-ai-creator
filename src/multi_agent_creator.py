@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,11 +17,14 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def call_creator(client: genai.Client, prompt: str) -> str:
-    """One Gemini request per run to stay inside the free-tier quota."""
-    interaction = client.interactions.create(
-        model=MODEL,
-        input=prompt,
-        system_instruction="""You are the autonomous intelligence core of an elite Binance Square creator.
+    """One Gemini request per run, with bounded retry for transient rate limits."""
+    last_error = None
+    for attempt in range(2):
+        try:
+            interaction = client.interactions.create(
+                model=MODEL,
+                input=prompt,
+                system_instruction="""You are the autonomous intelligence core of an elite Binance Square creator.
 
 Work as THREE internal roles in a single response:
 1) RESEARCH LEAD — identify the strongest content opportunity from the supplied market/news context.
@@ -100,11 +104,19 @@ For visual_plan:
 - If the story cannot be visualized honestly from the supplied context, set use_visual=false and type=none.
 
 Scores are editorial/content scores from 0-100, never investment-return scores.""",
-    )
-    text = (interaction.output_text or "").strip()
-    if not text:
-        raise RuntimeError("Gemini returned an empty response")
-    return text
+            )
+            text = (interaction.output_text or "").strip()
+            if not text:
+                raise RuntimeError("Gemini returned an empty response")
+            return text
+        except Exception as exc:
+            last_error = exc
+            if "429" not in str(exc) or attempt == 1:
+                raise
+            wait_seconds = 25
+            print(f"Gemini rate limit reached; waiting {wait_seconds}s before retrying...")
+            time.sleep(wait_seconds)
+    raise RuntimeError(f"Gemini request failed: {last_error}")
 
 
 def parse_json(text: str) -> dict:
