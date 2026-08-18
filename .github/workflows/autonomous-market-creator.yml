@@ -77,10 +77,12 @@ jobs:
             exit 0
           fi
 
+          export DRAFT
           python - <<'PY'
-          import json, os
-          from pathlib import Path
+          import json
+          import os
           from datetime import datetime, timezone
+          from pathlib import Path
 
           draft_path = Path(os.environ["DRAFT"])
           data = json.loads(draft_path.read_text(encoding="utf-8"))
@@ -96,8 +98,7 @@ jobs:
           )
           use_visual = bool(visual.get("use_visual"))
 
-          # Autonomous publishing is enabled only for strong drafts.
-          # These are editorial thresholds, not investment-return scores.
+          # Strong editorial gate: this is a content-quality rule, not an earnings guarantee.
           publish = quality >= 85 and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
 
           Path("/tmp/publish_gate.json").write_text(json.dumps({
@@ -120,8 +121,6 @@ jobs:
               "opportunity_score": opportunity,
           }, indent=2))
           PY
-        env:
-          DRAFT: ${{ steps.gate.outputs.draft }}
 
       - name: Locate latest draft for publishing
         if: ${{ steps.gate.outputs.publish == 'true' }}
@@ -161,7 +160,7 @@ jobs:
         run: |
           IMAGE=$(find data/visuals -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
           if [ -z "$IMAGE" ]; then
-            echo "Visual requested but no image exists; skipping autonomous publication." >&2
+            echo "Visual requested but no image exists; refusing to publish." >&2
             exit 1
           fi
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --text "$(cat /tmp/square-post.txt)" --images "$IMAGE" | tee /tmp/publish-result.txt
