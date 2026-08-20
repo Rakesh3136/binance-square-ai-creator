@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       topic:
-        description: "Optional topic; leave blank to let the AI choose the strongest live market opportunity"
+        description: "Optional topic; leave blank to let the AI choose the strongest live opportunity"
         required: false
         default: ""
   schedule:
-    - cron: "17 */3 * * *"
+    - cron: "17 */2 * * *"
 
 permissions:
   contents: write
@@ -36,7 +36,7 @@ jobs:
       - name: Scan live Binance market
         run: python src/live_market_scanner.py
 
-      - name: Scan crypto news feeds
+      - name: Scan crypto, macro and regulatory news
         run: python src/news_scanner.py
 
       - name: Run autonomous multi-agent creator
