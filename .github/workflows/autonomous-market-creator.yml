@@ -8,7 +8,7 @@ on:
         required: false
         default: ""
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 */3 * * *"
 
 permissions:
   contents: write
@@ -97,8 +97,6 @@ jobs:
               float(critique.get("revised_opportunity_score") or 0),
           )
           use_visual = bool(visual.get("use_visual"))
-
-          # Strong editorial gate: this is a content-quality rule, not an earnings guarantee.
           publish = quality >= 85 and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
 
           Path("/tmp/publish_gate.json").write_text(json.dumps({
