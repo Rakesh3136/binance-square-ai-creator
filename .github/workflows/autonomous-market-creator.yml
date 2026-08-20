@@ -8,7 +8,8 @@ on:
         required: false
         default: ""
   schedule:
-    - cron: "17 */2 * * *"
+    # Frequent monitoring, but publishing is opportunity-driven rather than time-driven.
+    - cron: "7,37 * * * *"
 
 permissions:
   contents: write
@@ -39,7 +40,59 @@ jobs:
       - name: Scan crypto, macro and regulatory news
         run: python src/news_scanner.py
 
+      - name: Decide whether this is a real publishing opportunity
+        id: opportunity
+        env:
+          TOPIC: ${{ inputs.topic }}
+        shell: bash
+        run: |
+          export TOPIC
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          if os.environ.get("TOPIC", "").strip():
+              publish_research = True
+              reason = "manual topic"
+          else:
+              market = json.loads(Path("data/live/market_snapshot.json").read_text(encoding="utf-8"))
+              news = json.loads(Path("data/live/news_snapshot.json").read_text(encoding="utf-8"))
+
+              top = (market.get("top_content_signals") or [None])[0] or {}
+              market_score = float(top.get("content_signal_score") or 0)
+
+              now = datetime.now(timezone.utc)
+              recent_news = 0
+              for item in news.get("articles") or []:
+                  value = item.get("published_at")
+                  if not value:
+                      continue
+                  try:
+                      dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                      if (now - dt).total_seconds() <= 45 * 60:
+                          recent_news += 1
+                  except ValueError:
+                      continue
+
+              # Cheap pre-filter: Gemini is used only when there is evidence of
+              # a meaningful market/news event. This protects the free Gemini quota.
+              publish_research = market_score >= 65 or recent_news > 0
+              reason = f"market_score={market_score:.1f}, recent_news={recent_news}"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"research={'true' if publish_research else 'false'}\n")
+              out.write(f"reason={reason}\n")
+
+          print(json.dumps({
+              "run_ai_research": publish_research,
+              "reason": reason,
+          }, indent=2))
+          PY
+
       - name: Run autonomous multi-agent creator
+        if: ${{ steps.opportunity.outputs.research == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -47,9 +100,11 @@ jobs:
         run: python src/multi_agent_creator.py
 
       - name: Render visual when requested
+        if: ${{ steps.opportunity.outputs.research == 'true' }}
         run: python src/visual_renderer.py
 
       - name: Save market, news, draft and visuals
+        if: ${{ steps.opportunity.outputs.research == 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -59,14 +114,17 @@ jobs:
           git push
 
       - name: Set up Node.js for publishing
+        if: ${{ steps.opportunity.outputs.research == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Download official Binance Square skill
+        if: ${{ steps.opportunity.outputs.research == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
 
       - name: Evaluate autonomous publishing gate
+        if: ${{ steps.opportunity.outputs.research == 'true' }}
         id: gate
         shell: bash
         run: |
