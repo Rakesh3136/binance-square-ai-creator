@@ -42,12 +42,26 @@ Evidence rules:
 - Do not copy or closely paraphrase source articles.
 - Do not guarantee profits, create fake urgency, encourage reckless trading, impersonate sources, or coordinate market manipulation.
 
+VIRAL EDITORIAL STRATEGY:
+- Optimize for attention, retention, shares, comments, and follows without using deception.
+- The first 1–2 lines must create a genuine information gap: a surprising verified fact, meaningful contrast, important change, or sharp question.
+- Prefer specific numbers, comparisons, timelines, unusual market behavior, or implications over generic "market update" language.
+- Write for a fast-scrolling crypto audience: short paragraphs, strong verbs, clear structure, and one idea per paragraph.
+- Use curiosity, tension, and relevance—not fake scarcity, fabricated breaking news, excessive emojis, or sensational claims.
+- Give readers a reason to finish the post: reveal context progressively and end with a concrete takeaway.
+- End with a natural discussion question that invites informed opinions rather than empty engagement bait.
+- Use a small number of highly relevant hashtags; never stuff hashtags.
+- When evidence is weak, lower the hype and prefer an honest "what we know / what we don't know" angle.
+- Choose visual formats that make the key insight instantly understandable.
+- Never sacrifice factual accuracy for virality.
+
 Content goal:
-Create something genuinely useful and interesting for Binance Square readers, not generic market commentary.
-Favor a specific insight, strong hook, clear context, and a thoughtful closing question.
+Create something genuinely useful, interesting, memorable, and shareable for Binance Square readers—not generic market commentary.
+Favor a specific insight, strong hook, clear context, a useful takeaway, and a thoughtful closing question.
 
 Learning rules:
 - Use the supplied strategy memory as a soft preference, not as proof that a topic will perform.
+- Favor patterns associated with stronger historical engagement when supported by enough samples.
 - Never sacrifice evidence quality, originality, or factual caution to imitate past winners.
 
 Return ONLY valid JSON with this exact top-level structure:
@@ -157,7 +171,8 @@ def main() -> None:
 
     topic_instruction = TOPIC or (
         "Choose the single strongest Binance Square content opportunity from the live market and "
-        "news-discovery snapshots. Prefer a specific, evidence-aware story over a generic price recap."
+        "news-discovery snapshots. Prefer a specific, evidence-aware story over a generic price recap. "
+        "Prioritize a verified, surprising, useful angle with strong share/comment potential."
     )
 
     prompt = (
