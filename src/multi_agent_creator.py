@@ -55,6 +55,17 @@ VIRAL EDITORIAL STRATEGY:
 - Choose visual formats that make the key insight instantly understandable.
 - Never sacrifice factual accuracy for virality.
 
+REALISTIC VISUAL STANDARD:
+- Any chart or market image must be grounded in the supplied real Binance data.
+- Never invent, estimate, interpolate, or visually fabricate OHLC, volume, price levels, percentages, timestamps, or other market figures.
+- For a single-asset price/momentum story, prefer type=candlestick_chart when real 1h OHLCV candles are available for that symbol.
+- Candlestick charts must use the supplied candles_1h data only. Do not label an image as volume unless actual volume data is present.
+- Use market_bar_chart or market_comparison only for factual comparisons supported by the snapshot.
+- Use market_range_chart only when the displayed range is directly supported by observed high/low data.
+- Use news_timeline for multi-event news stories and text_card only when a chart would not add truthful information.
+- If the required data is missing, set use_visual=false instead of making up a chart.
+- Visual titles, captions, and alt text must accurately describe what is actually shown.
+
 Content goal:
 Create something genuinely useful, interesting, memorable, and shareable for Binance Square readers—not generic market commentary.
 Favor a specific insight, strong hook, clear context, a useful takeaway, and a thoughtful closing question.
@@ -112,8 +123,9 @@ Return ONLY valid JSON with this exact top-level structure:
 
 For visual_plan:
 - use_visual=true only when a visual adds real information.
-- type must be one of: market_bar_chart, market_comparison, market_range_chart, news_timeline, text_card, none.
+- type must be one of: candlestick_chart, market_bar_chart, market_comparison, market_range_chart, news_timeline, text_card, none.
 - Use only data present in the supplied snapshots; never invent numbers.
+- For a single-asset market story, prefer candlestick_chart and put the exact symbol in data_points when candles_1h are available.
 - Prefer charts or comparisons for market-data stories and a timeline for multi-event news stories.
 - If the story cannot be visualized honestly from the supplied context, set use_visual=false and type=none.
 
@@ -197,7 +209,7 @@ def main() -> None:
     if visual_plan.get("use_visual") not in (True, False):
         visual_plan["use_visual"] = False
     if visual_plan.get("type") not in {
-        "market_bar_chart", "market_comparison", "market_range_chart", "news_timeline", "text_card", "none"
+        "candlestick_chart", "market_bar_chart", "market_comparison", "market_range_chart", "news_timeline", "text_card", "none"
     }:
         visual_plan["type"] = "none"
 
@@ -218,22 +230,24 @@ def main() -> None:
 
     slug_source = topic_instruction if TOPIC else str(research.get("strongest_signal") or "autonomous-market-opportunity")
     safe_name = "".join(c.lower() if c.isalnum() else "-" for c in slug_source).strip("-")[:80] or "market-opportunity"
-    path = OUTPUT_DIR / f"{safe_name}-multi-agent.json"
-    path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    output = OUTPUT_DIR / f"{safe_name}-multi-agent.json"
+    output.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
     print(json.dumps({
-        "status": report["status"],
+        "status": "DRAFT_ONLY_NOT_PUBLISHED",
         "model": MODEL,
         "topic_instruction": topic_instruction,
-        "report": str(path),
-        "quality_score": draft.get("quality_score"),
-        "opportunity_score": research.get("opportunity_score"),
-        "strongest_signal": research.get("strongest_signal"),
-        "visual_requested": bool(visual_plan.get("use_visual")),
-        "visual_type": visual_plan.get("type"),
-        "strategy_memory_samples": strategy_memory.get("sample_size", 0),
+        "report": str(output),
+        "quality_score": draft.get("quality_score", 0),
+        "opportunity_score": max(
+            float(research.get("opportunity_score") or 0),
+            float(critique.get("revised_opportunity_score") or 0),
+        ),
+        "strongest_signal": research.get("strongest_signal", ""),
+        "visual_requested": visual_plan.get("use_visual", False),
+        "visual_type": visual_plan.get("type", "none"),
         "gemini_requests_used": 1,
-    }, indent=2, ensure_ascii=False))
+    }, indent=2))
 
 
 if __name__ == "__main__":
