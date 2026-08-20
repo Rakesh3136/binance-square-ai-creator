@@ -19,6 +19,7 @@ BINANCE_BASES = [
 OUTPUT = Path("data/live/market_snapshot.json")
 QUOTE = os.getenv("MARKET_QUOTE", "USDT")
 TOP_N = int(os.getenv("MARKET_TOP_N", "40"))
+CANDLE_COUNT = int(os.getenv("MARKET_CANDLE_COUNT", "24"))
 
 
 def get_json(path: str, params: dict | None = None):
@@ -44,6 +45,28 @@ def get_json(path: str, params: dict | None = None):
             continue
 
     raise RuntimeError(f"All Binance public market-data endpoints failed: {last_error}")
+
+
+def fetch_1h_candles(symbol: str) -> list[dict]:
+    """Fetch real Binance 1h OHLCV candles for a visual, with no synthetic values."""
+    raw = get_json(
+        "/api/v3/klines",
+        {"symbol": symbol, "interval": "1h", "limit": CANDLE_COUNT},
+    )
+    candles = []
+    for row in raw:
+        try:
+            candles.append({
+                "open_time": int(row[0]),
+                "open": float(row[1]),
+                "high": float(row[2]),
+                "low": float(row[3]),
+                "close": float(row[4]),
+                "volume": float(row[5]),
+            })
+        except (TypeError, ValueError, IndexError):
+            continue
+    return candles
 
 
 def main() -> None:
@@ -80,15 +103,26 @@ def main() -> None:
     top_losers = sorted(candidates, key=lambda x: x["price_change_percent"])[:10]
     highest_volume = sorted(candidates, key=lambda x: x["quote_volume_usdt"], reverse=True)[:10]
 
+    # Attach real OHLCV data only to the strongest content candidates. This keeps
+    # the snapshot useful for research while avoiding hundreds of extra API calls.
+    candle_failures = []
+    for signal in movers[:6]:
+        try:
+            signal["candles_1h"] = fetch_1h_candles(signal["symbol"])
+        except Exception as exc:
+            signal["candles_1h"] = []
+            candle_failures.append({"symbol": signal["symbol"], "error": str(exc)})
+
     snapshot = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "source": "Binance Spot public 24hr ticker endpoint",
+        "source": "Binance Spot public 24hr ticker + public 1h klines endpoints",
         "quote": QUOTE,
         "top_content_signals": movers,
         "top_gainers": top_gainers,
         "top_losers": top_losers,
         "highest_volume": highest_volume,
-        "note": "Market figures are observations for content research, not trading advice or price predictions.",
+        "candle_failures": candle_failures,
+        "note": "Market figures are observations for content research, not trading advice or price predictions. Candles are real Binance OHLCV observations; no synthetic price data is generated.",
     }
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -96,6 +130,8 @@ def main() -> None:
         "status": "OK",
         "symbols_scanned": len(candidates),
         "top_signal": movers[0] if movers else None,
+        "candles_attached": sum(1 for x in movers[:6] if x.get("candles_1h")),
+        "candle_failures": candle_failures,
         "output": str(OUTPUT),
     }, indent=2))
 
