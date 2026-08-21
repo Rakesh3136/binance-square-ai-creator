@@ -49,15 +49,13 @@ jobs:
            python - <<'PY'
             import json
             from pathlib import Path
-
            p = Path("data/live/editorial_preflight.json")
            d = json.loads(p.read_text())
            d["run_ai"] = True
            d["reason"] = "manual_topic"
             p.write_text(json.dumps(d, indent=2))
              PY
-        fi
-
+             fi
       - name: Run AI only for a real opportunity
         if: ${{ hashFiles('data/live/editorial_preflight.json') != '' }}
         env:
