@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       topic:
-        description: "Optional topic; leave blank to let the AI choose the strongest live opportunity"
+        description: "Optional topic; leave blank for autonomous selection"
         required: false
         default: ""
   schedule:
-    # Frequent monitoring, but publishing is opportunity-driven rather than time-driven.
+    # Frequent cheap monitoring. AI calls and publishing remain opportunity-driven.
     - cron: "7,37 * * * *"
 
 permissions:
@@ -19,19 +19,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  create-draft:
+  creator:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install creator dependencies
+      - name: Install dependencies
         run: pip install --disable-pip-version-check "google-genai>=1.0.0" matplotlib
 
       - name: Scan live Binance market
@@ -40,154 +40,85 @@ jobs:
       - name: Scan crypto, macro and regulatory news
         run: python src/news_scanner.py
 
-      - name: Decide whether this is a real publishing opportunity
-        id: opportunity
+      - name: Human-like editorial preflight
         env:
           TOPIC: ${{ inputs.topic }}
-        shell: bash
         run: |
-          export TOPIC
-          python - <<'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
-          from pathlib import Path
+          python src/editorial_preflight.py
+          if [ -n "$TOPIC" ]; then
+            python - <<'PY'
+            import json
+            from pathlib import Path
+            p=Path('data/live/editorial_preflight.json')
+            d=json.loads(p.read_text())
+            d['run_ai']=True
+            d['reason']='manual_topic'
+            p.write_text(json.dumps(d, indent=2))
+            PY
+          fi
 
-          if os.environ.get("TOPIC", "").strip():
-              publish_research = True
-              reason = "manual topic"
-          else:
-              market = json.loads(Path("data/live/market_snapshot.json").read_text(encoding="utf-8"))
-              news = json.loads(Path("data/live/news_snapshot.json").read_text(encoding="utf-8"))
-
-              top = (market.get("top_content_signals") or [None])[0] or {}
-              market_score = float(top.get("content_signal_score") or 0)
-
-              now = datetime.now(timezone.utc)
-              recent_news = 0
-              for item in news.get("articles") or []:
-                  value = item.get("published_at")
-                  if not value:
-                      continue
-                  try:
-                      dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-                      if (now - dt).total_seconds() <= 45 * 60:
-                          recent_news += 1
-                  except ValueError:
-                      continue
-
-              # Cheap pre-filter: Gemini is used only when there is evidence of
-              # a meaningful market/news event. This protects the free Gemini quota.
-              publish_research = market_score >= 65 or recent_news > 0
-              reason = f"market_score={market_score:.1f}, recent_news={recent_news}"
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-              out.write(f"research={'true' if publish_research else 'false'}\n")
-              out.write(f"reason={reason}\n")
-
-          print(json.dumps({
-              "run_ai_research": publish_research,
-              "reason": reason,
-          }, indent=2))
-          PY
-
-      - name: Run autonomous multi-agent creator
-        if: ${{ steps.opportunity.outputs.research == 'true' }}
+      - name: Run AI only for a real opportunity
+        if: ${{ hashFiles('data/live/editorial_preflight.json') != '' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
+          GEMINI_DAILY_BUDGET: "8"
           TOPIC: ${{ inputs.topic }}
-        run: python src/multi_agent_creator.py
-
-      - name: Render visual when requested
-        if: ${{ steps.opportunity.outputs.research == 'true' }}
-        run: python src/visual_renderer.py
-
-      - name: Save market, news, draft and visuals
-        if: ${{ steps.opportunity.outputs.research == 'true' }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live/ data/reports/ data/visuals/
-          git diff --cached --quiet && exit 0
-          git commit -m "Add autonomous research draft and visual"
-          git push
+          RUN_AI=$(python -c "import json; print(str(json.load(open('data/live/editorial_preflight.json')).get('run_ai',False)).lower())")
+          if [ "$RUN_AI" != "true" ]; then
+            echo '{"status":"NO_OPPORTUNITY"}' > data/live/creator_status.json
+            exit 0
+          fi
+          python src/safe_creator_runner.py
 
-      - name: Set up Node.js for publishing
-        if: ${{ steps.opportunity.outputs.research == 'true' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      - name: Render visual
+        if: ${{ hashFiles('data/live/creator_status.json') != '' }}
+        run: |
+          STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
+          if [ "$STATUS" = "AI_SUCCESS" ]; then python src/visual_renderer.py; fi
 
-      - name: Download official Binance Square skill
-        if: ${{ steps.opportunity.outputs.research == 'true' }}
-        run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
-
-      - name: Evaluate autonomous publishing gate
-        if: ${{ steps.opportunity.outputs.research == 'true' }}
+      - name: Evaluate publication gate
         id: gate
         shell: bash
         run: |
-          DRAFT=$(find data/reports -type f -name '*multi-agent.json' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          if [ -z "$DRAFT" ]; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "No draft found; skipping publish."
-            exit 0
-          fi
-
-          export DRAFT
           python - <<'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
+          import json, os
           from pathlib import Path
+          status = json.loads(Path('data/live/creator_status.json').read_text()) if Path('data/live/creator_status.json').exists() else {}
+          if status.get('status') != 'AI_SUCCESS':
+              print(json.dumps({'publish': False, 'reason': status.get('reason', 'no fresh AI draft')}))
+              open(os.environ['GITHUB_OUTPUT'],'a').write('publish=false\n')
+              raise SystemExit(0)
 
-          draft_path = Path(os.environ["DRAFT"])
-          data = json.loads(draft_path.read_text(encoding="utf-8"))
-          research = data.get("research") or {}
-          critique = data.get("critique") or {}
-          draft = data.get("draft") or {}
-          visual = data.get("visual_plan") or {}
+          drafts = sorted(Path('data/reports').glob('*multi-agent.json'), key=lambda p:p.stat().st_mtime, reverse=True)
+          draft = drafts[0] if drafts else None
+          if not draft or (Path.cwd().stat().st_mtime - draft.stat().st_mtime) > 1200:
+              print(json.dumps({'publish': False, 'reason': 'no fresh draft'}))
+              open(os.environ['GITHUB_OUTPUT'],'a').write('publish=false\n')
+              raise SystemExit(0)
 
-          quality = float(draft.get("quality_score") or 0)
-          opportunity = max(
-              float(research.get("opportunity_score") or 0),
-              float(critique.get("revised_opportunity_score") or 0),
-          )
-          use_visual = bool(visual.get("use_visual"))
-          publish = quality >= 85 and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
-
-          Path("/tmp/publish_gate.json").write_text(json.dumps({
-              "generated_at": datetime.now(timezone.utc).isoformat(),
-              "draft": str(draft_path),
-              "quality_score": quality,
-              "opportunity_score": opportunity,
-              "use_visual": use_visual,
-              "publish": publish,
-          }, indent=2), encoding="utf-8")
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+          data=json.loads(draft.read_text())
+          r=data.get('research') or {}; c=data.get('critique') or {}; d=data.get('draft') or {}; v=data.get('visual_plan') or {}
+          quality=float(d.get('quality_score') or 0)
+          opportunity=max(float(r.get('opportunity_score') or 0), float(c.get('revised_opportunity_score') or 0))
+          publish=quality>=85 and opportunity>=80 and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' and bool((d.get('post') or '').strip())
+          Path('/tmp/publish_gate.json').write_text(json.dumps({'draft':str(draft),'quality_score':quality,'opportunity_score':opportunity,'publish':publish},indent=2))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
               out.write(f"publish={'true' if publish else 'false'}\n")
-              out.write(f"mode={'image' if use_visual else 'text'}\n")
-
-          print(json.dumps({
-              "publish": publish,
-              "mode": "image" if use_visual else "text",
-              "quality_score": quality,
-              "opportunity_score": opportunity,
-          }, indent=2))
+              out.write(f"mode={'image' if v.get('use_visual') else 'text'}\n")
+          print(json.dumps({'publish':publish,'quality_score':quality,'opportunity_score':opportunity,'mode':'image' if v.get('use_visual') else 'text'},indent=2))
           PY
 
-      - name: Locate latest draft for publishing
+      - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
         id: draft
-        shell: bash
         run: |
-          DRAFT=$(find data/reports -type f -name '*multi-agent.json' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$DRAFT" || (echo "No draft found" >&2; exit 1)
+          DRAFT=$(find data/reports -type f -name '*multi-agent.json' -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          test -n "$DRAFT" || (echo "No fresh draft" >&2; exit 1)
           echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
 
-      - name: Extract publishable post
+      - name: Extract post
         if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
@@ -195,66 +126,75 @@ jobs:
           python - <<'PY'
           import json, os
           from pathlib import Path
-          data = json.loads(Path(os.environ['DRAFT_PATH']).read_text(encoding='utf-8'))
-          post = ((data.get('draft') or {}).get('post') or '').strip()
-          if not post:
-              raise SystemExit('Draft has no publishable post text')
+          d=json.loads(Path(os.environ['DRAFT_PATH']).read_text())
+          post=((d.get('draft') or {}).get('post') or '').strip()
+          if not post: raise SystemExit('No publishable post')
           Path('/tmp/square-post.txt').write_text(post, encoding='utf-8')
           PY
 
-      - name: Publish text post autonomously
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
-        env:
-          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
-        run: |
-          node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat /tmp/square-post.txt)" | tee /tmp/publish-result.txt
+      - name: Setup Node
+        if: ${{ steps.gate.outputs.publish == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-      - name: Publish image post autonomously
+      - name: Download official Binance Square skill
+        if: ${{ steps.gate.outputs.publish == 'true' }}
+        run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
+
+      - name: Publish image post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          IMAGE=$(find data/visuals -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
-          if [ -z "$IMAGE" ]; then
-            echo "Visual requested but no image exists; refusing to publish." >&2
-            exit 1
-          fi
+          IMAGE=$(find data/visuals -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          test -n "$IMAGE" || (echo "No fresh visual; refusing to publish" >&2; exit 1)
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --text "$(cat /tmp/square-post.txt)" --images "$IMAGE" | tee /tmp/publish-result.txt
 
-      - name: Save publication record
+      - name: Publish text post
+        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
+        env:
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
+        run: node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat /tmp/square-post.txt)" | tee /tmp/publish-result.txt
+
+      - name: Record publication metadata
         if: ${{ steps.gate.outputs.publish == 'true' && success() }}
+        env:
+          DRAFT_PATH: ${{ steps.draft.outputs.path }}
+          MODE: ${{ steps.gate.outputs.mode }}
         run: |
-          mkdir -p analytics
           python - <<'PY'
-          import json
-          import re
+          import json, os, re
           from datetime import datetime, timezone
           from pathlib import Path
-
-          result = Path('/tmp/publish-result.txt').read_text(encoding='utf-8') if Path('/tmp/publish-result.txt').exists() else ''
-          match = re.search(r'ID:\s*(\S+)', result)
-          link = None
-          for line in result.splitlines():
-              if line.startswith('Link:'):
-                  link = line.split('Link:', 1)[1].strip()
-                  break
-
-          record = {
-              'published_at': datetime.now(timezone.utc).isoformat(),
-              'post_id': match.group(1) if match else None,
-              'link': link,
-              'mode': 'image' if '${{ steps.gate.outputs.mode }}' == 'image' else 'text',
-              'status': 'PUBLISHED_AUTONOMOUSLY',
+          d=json.loads(Path(os.environ['DRAFT_PATH']).read_text())
+          result=Path('/tmp/publish-result.txt').read_text(encoding='utf-8')
+          m=re.search(r'ID:\s*(\S+)',result)
+          link=next((x.split('Link:',1)[1].strip() for x in result.splitlines() if x.startswith('Link:')),None)
+          r=d.get('research') or {}; draft=d.get('draft') or {}; visual=d.get('visual_plan') or {}
+          record={
+            'published_at':datetime.now(timezone.utc).isoformat(),
+            'post_id':m.group(1) if m else None,
+            'link':link,
+            'topic':str(r.get('strongest_signal') or '')[:200],
+            'format':os.environ['MODE'],
+            'hook':draft.get('hook',''),
+            'quality_score':draft.get('quality_score',0),
+            'opportunity_score':max(float(r.get('opportunity_score') or 0),float((d.get('critique') or {}).get('revised_opportunity_score') or 0)),
+            'visual_type':visual.get('type','none'),
+            'status':'PUBLISHED_AUTONOMOUSLY'
           }
-          path = Path('analytics/publication_log.jsonl')
-          with path.open('a', encoding='utf-8') as f:
-              f.write(json.dumps(record, ensure_ascii=False) + '\n')
-          print(json.dumps(record, indent=2))
+          p=Path('analytics/publication_log.jsonl'); p.parent.mkdir(exist_ok=True)
+          with p.open('a',encoding='utf-8') as f: f.write(json.dumps(record,ensure_ascii=False)+'\n')
+          print(json.dumps(record,indent=2,ensure_ascii=False))
           PY
 
+      - name: Save state
+        if: ${{ always() }}
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add analytics/publication_log.jsonl
+          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl
           git diff --cached --quiet && exit 0
-          git commit -m "Log autonomous Square publication"
+          git commit -m "Run autonomous editorial engine"
           git push
