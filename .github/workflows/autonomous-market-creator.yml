@@ -45,7 +45,9 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
-          GEMINI_DAILY_BUDGET: "8"
+          # 20 matches the currently observed Gemini free-tier request ceiling.
+          # The preflight gate still prevents weak/repetitive opportunities from consuming requests.
+          GEMINI_DAILY_BUDGET: "20"
           TOPIC: ${{ inputs.topic }}
         run: |
           RUN_AI=$(python -c "import json; print(str(json.load(open('data/live/editorial_preflight.json')).get('run_ai',False)).lower())")
@@ -109,5 +111,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl src/workflow_helpers.py src/manual_topic_override.py
           git diff --cached --quiet && exit 0
-          git commit -m "Fix autonomous creator workflow shell handling"
+          git commit -m "Expand daily AI budget and keep dynamic editorial gate"
           git push
