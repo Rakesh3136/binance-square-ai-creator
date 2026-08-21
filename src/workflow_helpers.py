@@ -38,18 +38,22 @@ def main():
         with open(os.environ["GITHUB_OUTPUT"], "a") as out:
             out.write(f"publish={'true' if publish else 'false'}\n")
             out.write(f"mode={'image' if v.get('use_visual') else 'text'}\n")
-        print(json.dumps({"publish": publish, "quality_score": quality, "opportunity_score": opportunity, "mode": "image" if v.get('use_visual') else 'text'}, indent=2))
+        print(json.dumps({"publish": publish, "quality_score": quality, "opportunity_score": opportunity, "mode": "image" if v.get('use_visual') else "text"}, indent=2))
     elif cmd == "extract":
         d = load(os.environ["DRAFT_PATH"])
         post = ((d.get("draft") or {}).get("post") or "").strip()
-        if not post: raise SystemExit("No publishable post")
+        if not post:
+            raise SystemExit("No publishable post")
         Path("/tmp/square-post.txt").write_text(post, encoding="utf-8")
     elif cmd == "record":
         d = load(os.environ["DRAFT_PATH"])
         result = Path("/tmp/publish-result.txt").read_text(encoding="utf-8")
         m = re.search(r"ID:\s*(\S+)", result)
         link = next((x.split("Link:", 1)[1].strip() for x in result.splitlines() if x.startswith("Link:")), None)
-        r, draft, visual = d.get("research") or {}, d.get("draft") or {}, d.get("visual_plan") or {}
+        r = d.get("research") or {}
+        draft = d.get("draft") or {}
+        visual = d.get("visual_plan") or {}
+        selected = d.get("selected_editorial_lane") or {}
         strongest = str(r.get("strongest_signal") or "")[:200]
         symbol_match = re.search(r"\b([A-Z]{2,10})USDT\b", strongest.upper())
         symbol = symbol_match.group(1) if symbol_match else None
@@ -58,9 +62,25 @@ def main():
                 if re.search(rf"(?<![A-Z0-9])\$?{candidate}(?![A-Z0-9])", strongest.upper()):
                     symbol = candidate
                     break
-        record = {"published_at": datetime.now(timezone.utc).isoformat(), "post_id": m.group(1) if m else None, "link": link, "symbol": symbol, "topic": strongest, "format": os.environ["MODE"], "hook": draft.get("hook", ""), "quality_score": draft.get("quality_score", 0), "opportunity_score": max(float(r.get("opportunity_score") or 0), float((d.get("critique") or {}).get("revised_opportunity_score") or 0)), "visual_type": visual.get("type", "none"), "status": "PUBLISHED_AUTONOMOUSLY"}
-        p = Path("analytics/publication_log.jsonl"); p.parent.mkdir(exist_ok=True)
-        with p.open("a", encoding="utf-8") as f: f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        record = {
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "post_id": m.group(1) if m else None,
+            "link": link,
+            "symbol": symbol,
+            "topic": strongest,
+            "content_category": selected.get("category") or "unknown",
+            "selected_lane_symbol": selected.get("symbol"),
+            "format": os.environ["MODE"],
+            "hook": draft.get("hook", ""),
+            "quality_score": draft.get("quality_score", 0),
+            "opportunity_score": max(float(r.get("opportunity_score") or 0), float((d.get("critique") or {}).get("revised_opportunity_score") or 0)),
+            "visual_type": visual.get("type", "none"),
+            "status": "PUBLISHED_AUTONOMOUSLY",
+        }
+        p = Path("analytics/publication_log.jsonl")
+        p.parent.mkdir(exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
         print(json.dumps(record, indent=2, ensure_ascii=False))
 
 
