@@ -41,21 +41,12 @@ jobs:
         run: python src/news_scanner.py
 
       - name: Human-like editorial preflight
-        env:
-          TOPIC: ${{ inputs.topic }}
-        run: |
-          python src/editorial_preflight.py
-          if [ -n "$TOPIC" ]; then
-           python - <<'PY'
-            import json
-            from pathlib import Path
-           p = Path("data/live/editorial_preflight.json")
-           d = json.loads(p.read_text())
-           d["run_ai"] = True
-           d["reason"] = "manual_topic"
-            p.write_text(json.dumps(d, indent=2))
-             PY
-             fi
+      id: preflight
+      run: |
+        python - << 'PY'
+        import json
+        # your python code...
+        PY
       - name: Run AI only for a real opportunity
         if: ${{ hashFiles('data/live/editorial_preflight.json') != '' }}
         env:
