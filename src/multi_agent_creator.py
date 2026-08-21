@@ -12,12 +12,12 @@ TOPIC = os.getenv("TOPIC", "").strip()
 OUTPUT_DIR = Path("data/reports")
 LIVE_SNAPSHOT = Path("data/live/market_snapshot.json")
 NEWS_SNAPSHOT = Path("data/live/news_snapshot.json")
+PREFLIGHT = Path("data/live/editorial_preflight.json")
 STRATEGY_MEMORY = Path("analytics/strategy_memory.json")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def call_creator(client: genai.Client, prompt: str) -> str:
-    """One Gemini request per run, with bounded retry for transient rate limits."""
     last_error = None
     for attempt in range(2):
         try:
@@ -33,6 +33,15 @@ Work as THREE internal roles in a single response:
 
 Do not reveal hidden chain-of-thought. Provide concise conclusions, evidence requirements, and the final output.
 
+EDITORIAL DIVERSITY IS A CORE OBJECTIVE:
+- Do not become an XRP, BTC, ETH, or any-single-coin account.
+- Treat the selected editorial lane as a direction, not a command to use one asset.
+- Rotate naturally among top gainers, top losers, unusual volume, high volatility, new listings, BTC/ETH market context, and fresh macro/regulatory/news stories.
+- If the selected lane is top gainers or losers, compare several candidates and choose the most interesting evidence-backed example.
+- If the selected lane is new listings, use only a symbol whose real onboard date is supplied. Never invent that a coin is new.
+- If fresh news is materially stronger than the market lane, choose the news story.
+- Avoid publishing two near-identical stories simply because the same asset remains volatile.
+
 Evidence rules:
 - Market figures supplied in the context are observations, not predictions.
 - RSS/news items are discovery leads, not automatically verified facts.
@@ -45,112 +54,37 @@ Evidence rules:
 VIRAL EDITORIAL STRATEGY — optimize for real engagement, not fake hype:
 - Optimize in this order: stop-scroll attention -> read-through -> meaningful comment -> share/save -> follow.
 - The opening 1–2 lines must create a genuine information gap using a verified surprising fact, sharp contrast, important change, or concrete question.
-- Prefer specific numbers, comparisons, timelines, unusual market behavior, or implications over generic "market update" language.
-- Write for a fast-scrolling crypto audience: short paragraphs, strong verbs, clear structure, and one idea per paragraph.
+- Prefer specific numbers, comparisons, timelines, unusual market behavior, or implications over generic market updates.
 - Build tension progressively: hook -> evidence -> why it matters -> what to watch next -> reader question.
-- Put the most interesting verified fact early, but do not reveal every implication in the first sentence.
-- Make the reader feel there is a useful payoff for finishing the post.
-- End with ONE specific, easy-to-answer question tied directly to the evidence. Prefer questions that create two or three defensible viewpoints, e.g. continuation vs pullback, catalyst vs coincidence, or risk vs opportunity. Never ask generic "What do you think?" questions.
-- Give readers a reason to follow by making the account's value proposition clear through the content itself: timely market evidence, useful context, and repeatable analysis. Do not explicitly beg for follows.
-- If a follow CTA is used, keep it natural and secondary to the analysis.
-- Use a small number of highly relevant hashtags; normally 2–4 maximum. Never hashtag-stuff.
-- Use curiosity, tension, and relevance—not fake scarcity, fabricated breaking news, excessive emojis, or sensational claims.
-- Never manufacture a statistic, liquidation amount, trader identity, quote, price target, or causal explanation to improve engagement.
-- Never optimize for empty comments such as "yes/no" unless the binary choice is genuinely supported by the evidence.
-- Avoid repetitive openings, repetitive CTA wording, and recycled sentence patterns across runs.
-- Prefer a distinctive angle over copying whatever topic is currently popular.
-- When evidence is weak, lower the hype and prefer an honest "what we know / what we don't know" angle.
+- End with ONE specific, easy-to-answer question tied directly to the evidence.
+- Give readers a reason to follow through consistently useful analysis, not begging.
+- Use 2–4 relevant hashtags maximum.
+- Use curiosity and relevance—not fabricated breaking news, excessive emojis, or sensational claims.
+- Avoid repetitive openings, CTA wording, sentence patterns, and the same coin unless evidence truly warrants it.
+- When evidence is weak, lower the hype and prefer an honest what-we-know/what-we-don't-know angle.
 - Never sacrifice factual accuracy for virality.
 
 POST QUALITY GATE:
-Before returning the draft, silently check:
-1) Can the first two lines stand alone as a compelling hook?
-2) Is there at least one concrete verified fact or observation?
-3) Does the post explain why that fact matters?
-4) Is the interpretation clearly separated from the observation?
-5) Is there one useful takeaway or watch item?
-6) Is the closing question specific enough to generate an informed reply?
-7) Does the post give a credible reason to follow this account over time?
-8) Is the language original rather than a source rewrite?
-If any answer is no, revise the draft before returning JSON.
+Silently verify that the hook is compelling, the post contains concrete evidence, the interpretation is separated from observation, there is a useful takeaway, the question can generate informed replies, and the content is original.
 
 REALISTIC VISUAL STANDARD:
 - Any chart or market image must be grounded in the supplied real Binance data.
-- Never invent, estimate, interpolate, or visually fabricate OHLC, volume, price levels, percentages, timestamps, or other market figures.
-- For a single-asset price/momentum story, prefer type=candlestick_chart when real 1h OHLCV candles are available for that symbol.
-- Candlestick charts must use the supplied candles_1h data only. Do not label an image as volume unless actual volume data is present.
+- Never invent OHLC, volume, price levels, percentages, timestamps, or other market figures.
+- For a single-asset price/momentum story, prefer type=candlestick_chart when real 1h OHLCV candles are available.
 - Use market_bar_chart or market_comparison only for factual comparisons supported by the snapshot.
-- Use market_range_chart only when the displayed range is directly supported by observed high/low data.
-- Use news_timeline for multi-event news stories and text_card only when a chart would not add truthful information.
-- If the required data is missing, set use_visual=false instead of making up a chart.
-- Visual titles, captions, and alt text must accurately describe what is actually shown.
-- A visual should communicate one clear insight on a phone screen; avoid decorative fake dashboards, invented labels, or misleading axes.
-
-Content goal:
-Create something genuinely useful, interesting, memorable, and shareable for Binance Square readers—not generic market commentary.
-Favor a specific insight, strong hook, clear context, a useful takeaway, and a thoughtful closing question.
-The objective is sustained audience growth: readers should learn something now and have a reason to return for the next evidence-based update.
-
-Learning rules:
-- Use the supplied strategy memory as a soft preference, not as proof that a topic will perform.
-- Favor patterns associated with stronger historical engagement when supported by enough samples.
-- Never sacrifice evidence quality, originality, or factual caution to imitate past winners.
-- Do not overfit to one post's views; treat small samples as noisy.
+- Use news_timeline for multi-event news stories.
+- If required data is missing, set use_visual=false.
+- Visuals must communicate one clear insight on a phone screen; no decorative fake dashboards.
 
 Return ONLY valid JSON with this exact top-level structure:
 {
-  "research": {
-    "thesis": "...",
-    "strongest_signal": "...",
-    "market_observations": [],
-    "news_leads": [],
-    "source_urls": [],
-    "audience_questions": [],
-    "possible_angles": [],
-    "risks": [],
-    "live_verification_needed": [],
-    "opportunity_score": 0
-  },
-  "critique": {
-    "strongest_angle": "...",
-    "weak_points": [],
-    "missing_context": [],
-    "source_verification_plan": [],
-    "required_checks": [],
-    "counterpoints": [],
-    "safer_wording": [],
-    "revised_opportunity_score": 0
-  },
-  "draft": {
-    "title": "...",
-    "post": "...",
-    "hook": "...",
-    "key_takeaway": "...",
-    "discussion_question": "...",
-    "hashtags": [],
-    "source_links": [],
-    "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
-    "quality_score": 0
-  },
-  "visual_plan": {
-    "use_visual": false,
-    "type": "none",
-    "title": "...",
-    "purpose": "...",
-    "data_points": [],
-    "caption": "...",
-    "alt_text": "..."
-  }
+  "research": {"thesis":"...","strongest_signal":"...","market_observations":[],"news_leads":[],"source_urls":[],"audience_questions":[],"possible_angles":[],"risks":[],"live_verification_needed":[],"opportunity_score":0},
+  "critique": {"strongest_angle":"...","weak_points":[],"missing_context":[],"source_verification_plan":[],"required_checks":[],"counterpoints":[],"safer_wording":[],"revised_opportunity_score":0},
+  "draft": {"title":"...","post":"...","hook":"...","key_takeaway":"...","discussion_question":"...","hashtags":[],"source_links":[],"publication_status":"DRAFT_ONLY_NOT_PUBLISHED","quality_score":0},
+  "visual_plan": {"use_visual":false,"type":"none","title":"...","purpose":"...","data_points":[],"caption":"...","alt_text":"..."}
 }
 
-For visual_plan:
-- use_visual=true only when a visual adds real information.
-- type must be one of: candlestick_chart, market_bar_chart, market_comparison, market_range_chart, news_timeline, text_card, none.
-- Use only data present in the supplied snapshots; never invent numbers.
-- For a single-asset market story, prefer candlestick_chart and put the exact symbol in data_points when candles_1h are available.
-- Prefer charts or comparisons for market-data stories and a timeline for multi-event news stories.
-- If the story cannot be visualized honestly from the supplied context, set use_visual=false and type=none.
-
+visual_plan.type must be one of: candlestick_chart, market_bar_chart, market_comparison, market_range_chart, news_timeline, text_card, none.
 Scores are editorial/content scores from 0-100, never investment-return scores.""",
             )
             text = (interaction.output_text or "").strip()
@@ -198,26 +132,26 @@ def main() -> None:
     client = genai.Client(api_key=api_key)
     live_context = load_json(LIVE_SNAPSHOT)
     news_context = load_json(NEWS_SNAPSHOT)
+    preflight = load_json(PREFLIGHT)
     strategy_memory = load_json(STRATEGY_MEMORY)
 
     if not live_context and not news_context and not TOPIC:
         raise RuntimeError("No market/news context and no TOPIC supplied")
 
-    topic_instruction = TOPIC or (
-        "Choose the single strongest Binance Square content opportunity from the live market and "
-        "news-discovery snapshots. Prefer a specific, evidence-aware story over a generic price recap. "
-        "Prioritize a verified, surprising, useful angle with strong share/comment potential."
-    )
+    selected = preflight.get("selected_opportunity") or {}
+    if TOPIC:
+        topic_instruction = TOPIC
+    elif selected:
+        topic_instruction = selected.get("instruction") or "Choose the strongest evidence-based opportunity across all supplied market and news lanes."
+    else:
+        topic_instruction = "Choose the strongest evidence-based opportunity across all supplied market and news lanes."
 
     prompt = (
-        "TOPIC INSTRUCTION:\n"
-        + topic_instruction
-        + "\n\nLIVE MARKET SNAPSHOT:\n"
-        + json.dumps(live_context, ensure_ascii=False, indent=2)
-        + "\n\nNEWS-DISCOVERY SNAPSHOT:\n"
-        + json.dumps(news_context, ensure_ascii=False, indent=2)
-        + "\n\nSTRATEGY MEMORY (soft guidance only):\n"
-        + json.dumps(strategy_memory, ensure_ascii=False, indent=2)
+        "TOPIC / EDITORIAL LANE INSTRUCTION:\n" + topic_instruction
+        + "\n\nPREFLIGHT DECISION:\n" + json.dumps(preflight, ensure_ascii=False, indent=2)
+        + "\n\nLIVE MARKET SNAPSHOT:\n" + json.dumps(live_context, ensure_ascii=False, indent=2)
+        + "\n\nNEWS-DISCOVERY SNAPSHOT:\n" + json.dumps(news_context, ensure_ascii=False, indent=2)
+        + "\n\nSTRATEGY MEMORY (soft guidance only):\n" + json.dumps(strategy_memory, ensure_ascii=False, indent=2)
         + "\n\nExecute the research → skeptical critique → senior editor → visual planning pipeline in ONE response."
     )
 
@@ -226,19 +160,16 @@ def main() -> None:
     critique = result.get("critique", {})
     draft = result.get("draft", {})
     visual_plan = result.get("visual_plan", {})
-
     draft["publication_status"] = "DRAFT_ONLY_NOT_PUBLISHED"
-    if visual_plan.get("use_visual") not in (True, False):
-        visual_plan["use_visual"] = False
-    if visual_plan.get("type") not in {
-        "candlestick_chart", "market_bar_chart", "market_comparison", "market_range_chart", "news_timeline", "text_card", "none"
-    }:
+    visual_plan["use_visual"] = visual_plan.get("use_visual") is True
+    if visual_plan.get("type") not in {"candlestick_chart", "market_bar_chart", "market_comparison", "market_range_chart", "news_timeline", "text_card", "none"}:
         visual_plan["type"] = "none"
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "model": MODEL,
         "topic_instruction": topic_instruction,
+        "selected_editorial_lane": selected,
         "live_market_snapshot": live_context,
         "news_discovery_snapshot": news_context,
         "strategy_memory": strategy_memory,
@@ -249,25 +180,17 @@ def main() -> None:
         "status": "DRAFT_ONLY_NOT_PUBLISHED",
         "gemini_requests_used": 1,
     }
-
-    slug_source = topic_instruction if TOPIC else str(research.get("strongest_signal") or "autonomous-market-opportunity")
+    slug_source = TOPIC or str(research.get("strongest_signal") or selected.get("category") or "autonomous-market-opportunity")
     safe_name = "".join(c.lower() if c.isalnum() else "-" for c in slug_source).strip("-")[:80] or "market-opportunity"
     output = OUTPUT_DIR / f"{safe_name}-multi-agent.json"
     output.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-
     print(json.dumps({
-        "status": "DRAFT_ONLY_NOT_PUBLISHED",
-        "model": MODEL,
-        "topic_instruction": topic_instruction,
-        "report": str(output),
-        "quality_score": draft.get("quality_score", 0),
-        "opportunity_score": max(
-            float(research.get("opportunity_score") or 0),
-            float(critique.get("revised_opportunity_score") or 0),
-        ),
+        "status": "DRAFT_ONLY_NOT_PUBLISHED", "model": MODEL,
+        "topic_instruction": topic_instruction, "selected_editorial_lane": selected,
+        "report": str(output), "quality_score": draft.get("quality_score", 0),
+        "opportunity_score": max(float(research.get("opportunity_score") or 0), float(critique.get("revised_opportunity_score") or 0)),
         "strongest_signal": research.get("strongest_signal", ""),
-        "visual_requested": visual_plan.get("use_visual", False),
-        "visual_type": visual_plan.get("type", "none"),
+        "visual_requested": visual_plan.get("use_visual", False), "visual_type": visual_plan.get("type", "none"),
         "gemini_requests_used": 1,
     }, indent=2))
 
