@@ -15,6 +15,7 @@ NEWS_FRESH_MINUTES = 35
 MEMORY_REPEAT_PENALTY = 18.0
 MEMORY_HARD_BLOCK_COUNT = 3
 CATEGORY_REPEAT_PENALTY = 14.0
+ASSET_COOLDOWN_HOURS = 12
 
 
 def load(path):
@@ -26,7 +27,18 @@ def load(path):
         return {}
 
 
-def recent_publications(known_symbols):
+def extract_symbols(text):
+    text = str(text or "").upper()
+    found = set()
+    for token in re.findall(r"(?<![A-Z0-9])\$?[A-Z][A-Z0-9]{1,11}(?:USDT)?(?![A-Z0-9])", text):
+        clean = token.replace("$", "")
+        base = clean[:-4] if clean.endswith("USDT") else clean
+        if 2 <= len(base) <= 10:
+            found.add(base)
+    return found
+
+
+def recent_publications():
     rows = []
     if not PUBLICATIONS.exists():
         return rows
@@ -37,14 +49,8 @@ def recent_publications(known_symbols):
             dt = datetime.fromisoformat(str(row.get("published_at", "")).replace("Z", "+00:00"))
             if dt < cutoff:
                 continue
-            raw = str(row.get("symbol") or row.get("topic") or "").upper()
-            matched = None
-            for symbol in known_symbols:
-                base = symbol[:-4] if symbol.endswith("USDT") else symbol
-                if re.search(rf"(?<![A-Z0-9])\$?{re.escape(base)}(?![A-Z0-9])", raw):
-                    matched = symbol
-                    break
-            rows.append({**row, "_matched_symbol": matched or raw})
+            raw = " ".join(str(row.get(k) or "") for k in ("symbol", "selected_lane_symbol", "topic"))
+            rows.append({**row, "_symbols": extract_symbols(raw), "_dt": dt})
         except Exception:
             continue
     return rows
@@ -66,9 +72,7 @@ def add_market_candidate(pool, category, item, score_boost=0.0):
     if not symbol:
         return
     raw_score = float(item.get("content_signal_score") or 0)
-    if category == "top_gainers":
-        raw_score = min(100.0, abs(float(item.get("price_change_percent") or 0)) * 4.5 + float(item.get("intraday_range_percent") or 0))
-    elif category == "top_losers":
+    if category in {"top_gainers", "top_losers"}:
         raw_score = min(100.0, abs(float(item.get("price_change_percent") or 0)) * 4.5 + float(item.get("intraday_range_percent") or 0))
     elif category == "volume_leaders":
         raw_score = min(100.0, float(item.get("content_signal_score") or 0) + 10.0)
@@ -77,9 +81,7 @@ def add_market_candidate(pool, category, item, score_boost=0.0):
         raw_score = min(100.0, float(item.get("content_signal_score") or 0) + age_bonus)
     raw_score = min(100.0, raw_score + score_boost)
     pool.append({
-        "type": "market",
-        "category": category,
-        "topic": symbol,
+        "type": "market", "category": category, "topic": symbol,
         "raw_score": round(raw_score, 2),
         "reason": {
             "top_gainers": "largest positive movers",
@@ -96,107 +98,93 @@ def main():
     market = load(MARKET)
     news = load(NEWS)
     memory = load(MEMORY)
+    publications = recent_publications()
 
     market_items = market.get("top_content_signals") or []
-    known_symbols = {str(item.get("symbol") or "").upper() for item in market_items if item.get("symbol")}
-    publications = recent_publications(known_symbols)
-    publication_counts = Counter(str(r.get("_matched_symbol") or "").upper() for r in publications)
-    category_counts = Counter(str(r.get("content_category") or "").lower() for r in publications if r.get("content_category"))
+    publication_counts = Counter()
+    category_counts = Counter()
+    last_asset_time = {}
+    for row in publications:
+        for symbol in row.get("_symbols", set()):
+            publication_counts[symbol] += 1
+            last_asset_time[symbol] = max(last_asset_time.get(symbol, datetime.min.replace(tzinfo=timezone.utc)), row["_dt"])
+        if row.get("content_category"):
+            category_counts[str(row["content_category"]).lower()] += 1
     memory_counts = memory_topics(memory)
 
     pool = []
-    for item in (market.get("top_gainers") or [])[:6]:
-        add_market_candidate(pool, "top_gainers", item)
-    for item in (market.get("top_losers") or [])[:6]:
-        add_market_candidate(pool, "top_losers", item)
-    for item in (market.get("highest_volume") or [])[:6]:
-        add_market_candidate(pool, "volume_leaders", item)
-    for item in (market.get("new_listing_market") or [])[:6]:
-        add_market_candidate(pool, "new_listings", item, score_boost=5.0)
+    for item in (market.get("top_gainers") or [])[:10]: add_market_candidate(pool, "top_gainers", item)
+    for item in (market.get("top_losers") or [])[:10]: add_market_candidate(pool, "top_losers", item)
+    for item in (market.get("highest_volume") or [])[:10]: add_market_candidate(pool, "volume_leaders", item)
+    for item in (market.get("new_listing_market") or [])[:10]: add_market_candidate(pool, "new_listings", item, 5.0)
+    for item in sorted(market_items, key=lambda x: float(x.get("intraday_range_percent") or 0), reverse=True)[:8]: add_market_candidate(pool, "high_volatility", item, 3.0)
+    for item in [x for x in market_items if str(x.get("symbol") or "") in {"BTCUSDT", "ETHUSDT"}]: add_market_candidate(pool, "BTC_ETH_market_context", item, 4.0)
 
-    # Include high-volatility names that may not be top gainers/losers.
-    for item in sorted(market_items, key=lambda x: float(x.get("intraday_range_percent") or 0), reverse=True)[:5]:
-        add_market_candidate(pool, "high_volatility", item, score_boost=3.0)
-
-    # Explicit major-asset context is a separate editorial lane.
-    majors = [x for x in market_items if str(x.get("symbol") or "") in {"BTCUSDT", "ETHUSDT"}]
-    for item in majors:
-        add_market_candidate(pool, "BTC_ETH_market_context", item, score_boost=4.0)
-
-    unique = {}
-    for candidate in pool:
-        key = (candidate["category"], candidate["topic"])
-        unique[key] = candidate
+    unique = {(c["category"], c["topic"]): c for c in pool}
     pool = list(unique.values())
 
+    now = datetime.now(timezone.utc)
     for candidate in pool:
-        symbol = candidate["topic"]
-        base = symbol[:-4] if symbol.endswith("USDT") else symbol
-        pub_penalty = min(50.0, publication_counts.get(symbol, 0) * 20.0)
+        base = candidate["topic"][:-4] if candidate["topic"].endswith("USDT") else candidate["topic"]
+        recent_count = publication_counts.get(base, 0)
+        cooldown = last_asset_time.get(base)
+        cooldown_active = bool(cooldown and now - cooldown < timedelta(hours=ASSET_COOLDOWN_HOURS))
+        pub_penalty = min(55.0, recent_count * 22.0)
         mem_penalty = min(54.0, memory_counts.get(base, 0) * MEMORY_REPEAT_PENALTY)
-        cat_penalty = min(28.0, category_counts.get(candidate["category"], 0) * CATEGORY_REPEAT_PENALTY)
-        candidate["recent_count"] = publication_counts.get(symbol, 0)
+        cat_penalty = min(35.0, category_counts.get(candidate["category"], 0) * CATEGORY_REPEAT_PENALTY)
+        candidate["recent_count"] = recent_count
         candidate["memory_count"] = memory_counts.get(base, 0)
         candidate["category_recent_count"] = category_counts.get(candidate["category"], 0)
-        candidate["adjusted_score"] = round(candidate["raw_score"] - pub_penalty - mem_penalty - cat_penalty, 2)
-        candidate["repeated"] = candidate["recent_count"] >= 2 or candidate["memory_count"] >= MEMORY_HARD_BLOCK_COUNT
+        candidate["cooldown_active"] = cooldown_active
+        candidate["adjusted_score"] = round(candidate["raw_score"] - pub_penalty - mem_penalty - cat_penalty - (45.0 if cooldown_active else 0.0), 2)
+        candidate["repeated"] = recent_count >= 2 or memory_counts.get(base, 0) >= MEMORY_HARD_BLOCK_COUNT or cooldown_active
 
     fresh_news = 0
     for article in news.get("articles") or []:
         try:
             dt = datetime.fromisoformat(str(article.get("published_at", "")).replace("Z", "+00:00"))
-            if datetime.now(timezone.utc) - dt <= timedelta(minutes=NEWS_FRESH_MINUTES):
+            if now - dt <= timedelta(minutes=NEWS_FRESH_MINUTES):
                 fresh_news += 1
         except Exception:
             continue
 
-    # Do not let a single asset dominate the editorial calendar. Breaking news
-    # is the only automatic override for a hard repetition block.
-    news_override = fresh_news > 0
-    eligible = [c for c in pool if (not c["repeated"] or news_override)]
+    # Pick the strongest candidate while actively preferring a different asset/category.
+    eligible = [c for c in pool if not c["repeated"]]
+    if not eligible:
+        eligible = [c for c in pool if c["adjusted_score"] > 0]
     best = max(eligible, key=lambda x: x["adjusted_score"], default=None)
     market_ok = bool(best and best["adjusted_score"] >= MIN_MARKET_SCORE)
     run_ai = market_ok or fresh_news > 0
     reason = "fresh_news" if fresh_news > 0 and not market_ok else ("strong_market_opportunity" if market_ok else "no_strong_opportunity")
 
+    selected = None
     if best:
-        selected_opportunity = {
-            "category": best["category"],
-            "symbol": best["topic"],
-            "reason": best["reason"],
+        selected = {
+            "category": best["category"], "symbol": best["topic"], "reason": best["reason"],
             "instruction": (
-                f"Prioritize the {best['category'].replace('_', ' ')} angle. Use {best['topic']} only if the supplied evidence makes it the strongest example. "
-                "You may choose a different asset inside the same category if it creates a materially stronger evidence-based story."
+                f"Use the {best['category'].replace('_', ' ')} lane as the starting point, but compare the supplied candidates. "
+                f"Do not publish {best['topic']} merely because it has the highest raw score; avoid any asset recently covered. "
+                "Prefer a materially different asset, angle, and format when the evidence supports it. Fresh news may override market repetition."
             ),
         }
-    else:
-        selected_opportunity = None
 
     result = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "run_ai": run_ai,
-        "reason": reason,
-        "selected_opportunity": selected_opportunity,
-        "candidate_pool": sorted(pool, key=lambda x: x["adjusted_score"], reverse=True)[:18],
-        "best_market_candidate": best,
-        "fresh_news_count": fresh_news,
-        "recent_topic_counts": dict(publication_counts),
-        "recent_category_counts": dict(category_counts),
-        "memory_topic_counts": dict(memory_counts),
-        "strategy_memory_loaded": bool(memory),
+        "generated_at": now.isoformat(), "run_ai": run_ai, "reason": reason,
+        "selected_opportunity": selected,
+        "candidate_pool": sorted(pool, key=lambda x: x["adjusted_score"], reverse=True)[:24],
+        "best_market_candidate": best, "fresh_news_count": fresh_news,
+        "recent_topic_counts": dict(publication_counts), "recent_category_counts": dict(category_counts),
+        "memory_topic_counts": dict(memory_counts), "strategy_memory_loaded": bool(memory),
         "rules": {
-            "min_market_score": MIN_MARKET_SCORE,
-            "memory_repeat_penalty": MEMORY_REPEAT_PENALTY,
-            "memory_hard_block_count": MEMORY_HARD_BLOCK_COUNT,
-            "category_repeat_penalty": CATEGORY_REPEAT_PENALTY,
-            "breaking_news_override": news_override,
+            "min_market_score": MIN_MARKET_SCORE, "asset_cooldown_hours": ASSET_COOLDOWN_HOURS,
+            "memory_repeat_penalty": MEMORY_REPEAT_PENALTY, "memory_hard_block_count": MEMORY_HARD_BLOCK_COUNT,
+            "category_repeat_penalty": CATEGORY_REPEAT_PENALTY, "breaking_news_override": fresh_news > 0,
             "editorial_lanes": ["top_gainers", "top_losers", "volume_leaders", "new_listings", "high_volatility", "BTC_ETH_market_context", "news_and_macro"],
         },
     }
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    return 0
 
 
 if __name__ == "__main__":
