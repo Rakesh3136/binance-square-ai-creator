@@ -5,7 +5,9 @@ from pathlib import Path
 
 STATUS = Path("data/live/creator_status.json")
 USAGE = Path("analytics/ai_usage.json")
-DAILY_LIMIT = int(os.getenv("GEMINI_DAILY_BUDGET", "8"))
+# Keep this aligned with the currently observed Gemini free-tier request ceiling.
+# The workflow can lower it via GEMINI_DAILY_BUDGET without changing code.
+DAILY_LIMIT = int(os.getenv("GEMINI_DAILY_BUDGET", "20"))
 
 
 def load(path, default):
