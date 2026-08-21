@@ -33,12 +33,13 @@ def main():
         r, c, d, v = data.get("research") or {}, data.get("critique") or {}, data.get("draft") or {}, data.get("visual_plan") or {}
         quality = float(d.get("quality_score") or 0)
         opportunity = max(float(r.get("opportunity_score") or 0), float(c.get("revised_opportunity_score") or 0))
-        publish = quality >= 85 and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED" and bool((d.get("post") or "").strip())
+        post = str(d.get("post") or "").strip()
+        publish = quality >= 85 and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED" and bool(post)
         Path("/tmp/publish_gate.json").write_text(json.dumps({"draft": str(draft), "quality_score": quality, "opportunity_score": opportunity, "publish": publish}, indent=2))
         with open(os.environ["GITHUB_OUTPUT"], "a") as out:
             out.write(f"publish={'true' if publish else 'false'}\n")
             out.write(f"mode={'image' if v.get('use_visual') else 'text'}\n")
-        print(json.dumps({"publish": publish, "quality_score": quality, "opportunity_score": opportunity, "mode": "image" if v.get('use_visual') else "text"}, indent=2))
+        print(json.dumps({"publish": publish, "quality_score": quality, "opportunity_score": opportunity, "mode": "image" if v.get('use_visual') else "text", "editorial_style": d.get("editorial_style", "")}, indent=2))
     elif cmd == "extract":
         d = load(os.environ["DRAFT_PATH"])
         post = ((d.get("draft") or {}).get("post") or "").strip()
@@ -54,9 +55,17 @@ def main():
         draft = d.get("draft") or {}
         visual = d.get("visual_plan") or {}
         selected = d.get("selected_editorial_lane") or {}
-        strongest = str(r.get("strongest_signal") or "")[:200]
-        symbol_match = re.search(r"\b([A-Z]{2,10})USDT\b", strongest.upper())
-        symbol = symbol_match.group(1) if symbol_match else None
+        strongest = str(r.get("strongest_signal") or "")[:300]
+        symbol = None
+        lane_symbol = str(selected.get("symbol") or "").upper()
+        lane_match = re.search(r"\b([A-Z0-9]{2,12})USDT\b", lane_symbol)
+        if lane_match:
+            symbol = lane_match.group(1)
+        elif lane_symbol and re.fullmatch(r"[A-Z0-9]{2,10}", lane_symbol):
+            symbol = lane_symbol
+        if not symbol:
+            symbol_match = re.search(r"\b([A-Z]{2,10})USDT\b", strongest.upper())
+            symbol = symbol_match.group(1) if symbol_match else None
         if not symbol:
             for candidate in ("BTC", "ETH", "BNB", "XRP", "SOL", "DOGE", "ADA", "AVAX", "LINK", "TRX", "SUI", "TON", "DOT", "LTC", "BCH", "UNI", "XLM", "HBAR", "SHIB"):
                 if re.search(rf"(?<![A-Z0-9])\$?{candidate}(?![A-Z0-9])", strongest.upper()):
@@ -71,6 +80,7 @@ def main():
             "content_category": selected.get("category") or "unknown",
             "selected_lane_symbol": selected.get("symbol"),
             "format": os.environ["MODE"],
+            "editorial_style": draft.get("editorial_style", ""),
             "hook": draft.get("hook", ""),
             "quality_score": draft.get("quality_score", 0),
             "opportunity_score": max(float(r.get("opportunity_score") or 0), float((d.get("critique") or {}).get("revised_opportunity_score") or 0)),
