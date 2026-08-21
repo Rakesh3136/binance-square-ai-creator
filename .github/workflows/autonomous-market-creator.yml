@@ -8,7 +8,6 @@ on:
         required: false
         default: ""
   schedule:
-    # Frequent cheap monitoring. AI calls and publishing remain opportunity-driven.
     - cron: "7,37 * * * *"
 
 permissions:
@@ -25,29 +24,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install dependencies
         run: pip install --disable-pip-version-check "google-genai>=1.0.0" matplotlib
-
       - name: Scan live Binance market
         run: python src/live_market_scanner.py
-
       - name: Scan crypto, macro and regulatory news
         run: python src/news_scanner.py
-
       - name: Human-like editorial preflight
-      id: preflight
-      run: |
-        python - << 'PY'
-        import json
-        # your python code...
-        PY
-       fi
+        env:
+          TOPIC: ${{ inputs.topic }}
+        run: |
+          python src/editorial_preflight.py
+          if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
       - name: Run AI only for a real opportunity
         if: ${{ hashFiles('data/live/editorial_preflight.json') != '' }}
         env:
@@ -62,45 +54,15 @@ jobs:
             exit 0
           fi
           python src/safe_creator_runner.py
-
       - name: Render visual
         if: ${{ hashFiles('data/live/creator_status.json') != '' }}
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
           if [ "$STATUS" = "AI_SUCCESS" ]; then python src/visual_renderer.py; fi
-
       - name: Evaluate publication gate
         id: gate
         shell: bash
-        run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-          status = json.loads(Path('data/live/creator_status.json').read_text()) if Path('data/live/creator_status.json').exists() else {}
-          if status.get('status') != 'AI_SUCCESS':
-              print(json.dumps({'publish': False, 'reason': status.get('reason', 'no fresh AI draft')}))
-              open(os.environ['GITHUB_OUTPUT'],'a').write('publish=false\n')
-              raise SystemExit(0)
-
-          drafts = sorted(Path('data/reports').glob('*multi-agent.json'), key=lambda p:p.stat().st_mtime, reverse=True)
-          draft = drafts[0] if drafts else None
-          if not draft or (Path.cwd().stat().st_mtime - draft.stat().st_mtime) > 1200:
-              print(json.dumps({'publish': False, 'reason': 'no fresh draft'}))
-              open(os.environ['GITHUB_OUTPUT'],'a').write('publish=false\n')
-              raise SystemExit(0)
-
-          data=json.loads(draft.read_text())
-          r=data.get('research') or {}; c=data.get('critique') or {}; d=data.get('draft') or {}; v=data.get('visual_plan') or {}
-          quality=float(d.get('quality_score') or 0)
-          opportunity=max(float(r.get('opportunity_score') or 0), float(c.get('revised_opportunity_score') or 0))
-          publish=quality>=85 and opportunity>=80 and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' and bool((d.get('post') or '').strip())
-          Path('/tmp/publish_gate.json').write_text(json.dumps({'draft':str(draft),'quality_score':quality,'opportunity_score':opportunity,'publish':publish},indent=2))
-          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-              out.write(f"publish={'true' if publish else 'false'}\n")
-              out.write(f"mode={'image' if v.get('use_visual') else 'text'}\n")
-          print(json.dumps({'publish':publish,'quality_score':quality,'opportunity_score':opportunity,'mode':'image' if v.get('use_visual') else 'text'},indent=2))
-          PY
-
+        run: python src/workflow_helpers.py gate
       - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
         id: draft
@@ -108,31 +70,19 @@ jobs:
           DRAFT=$(find data/reports -type f -name '*multi-agent.json' -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
           test -n "$DRAFT" || (echo "No fresh draft" >&2; exit 1)
           echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
-
       - name: Extract post
         if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
-        run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-          d=json.loads(Path(os.environ['DRAFT_PATH']).read_text())
-          post=((d.get('draft') or {}).get('post') or '').strip()
-          if not post: raise SystemExit('No publishable post')
-          Path('/tmp/square-post.txt').write_text(post, encoding='utf-8')
-          PY
-
+        run: python src/workflow_helpers.py extract
       - name: Setup Node
         if: ${{ steps.gate.outputs.publish == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Download official Binance Square skill
         if: ${{ steps.gate.outputs.publish == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
-
       - name: Publish image post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         env:
@@ -141,51 +91,23 @@ jobs:
           IMAGE=$(find data/visuals -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
           test -n "$IMAGE" || (echo "No fresh visual; refusing to publish" >&2; exit 1)
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --text "$(cat /tmp/square-post.txt)" --images "$IMAGE" | tee /tmp/publish-result.txt
-
       - name: Publish text post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat /tmp/square-post.txt)" | tee /tmp/publish-result.txt
-
       - name: Record publication metadata
         if: ${{ steps.gate.outputs.publish == 'true' && success() }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
           MODE: ${{ steps.gate.outputs.mode }}
-        run: |
-          python - <<'PY'
-          import json, os, re
-          from datetime import datetime, timezone
-          from pathlib import Path
-          d=json.loads(Path(os.environ['DRAFT_PATH']).read_text())
-          result=Path('/tmp/publish-result.txt').read_text(encoding='utf-8')
-          m=re.search(r'ID:\s*(\S+)',result)
-          link=next((x.split('Link:',1)[1].strip() for x in result.splitlines() if x.startswith('Link:')),None)
-          r=d.get('research') or {}; draft=d.get('draft') or {}; visual=d.get('visual_plan') or {}
-          record={
-            'published_at':datetime.now(timezone.utc).isoformat(),
-            'post_id':m.group(1) if m else None,
-            'link':link,
-            'topic':str(r.get('strongest_signal') or '')[:200],
-            'format':os.environ['MODE'],
-            'hook':draft.get('hook',''),
-            'quality_score':draft.get('quality_score',0),
-            'opportunity_score':max(float(r.get('opportunity_score') or 0),float((d.get('critique') or {}).get('revised_opportunity_score') or 0)),
-            'visual_type':visual.get('type','none'),
-            'status':'PUBLISHED_AUTONOMOUSLY'
-          }
-          p=Path('analytics/publication_log.jsonl'); p.parent.mkdir(exist_ok=True)
-          with p.open('a',encoding='utf-8') as f: f.write(json.dumps(record,ensure_ascii=False)+'\n')
-          print(json.dumps(record,indent=2,ensure_ascii=False))
-          PY
-
+        run: python src/workflow_helpers.py record
       - name: Save state
         if: ${{ always() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl
+          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl src/workflow_helpers.py src/manual_topic_override.py
           git diff --cached --quiet && exit 0
-          git commit -m "Run autonomous editorial engine"
+          git commit -m "Fix autonomous creator workflow shell handling"
           git push
