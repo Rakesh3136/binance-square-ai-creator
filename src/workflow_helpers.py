@@ -62,6 +62,7 @@ def main():
         draft = d.get("draft") or {}
         visual = d.get("visual_plan") or {}
         selected = d.get("selected_editorial_lane") or {}
+        engagement = d.get("engagement_strategy") or {}
         strongest = str(r.get("strongest_signal") or "")[:300]
         symbol = None
         lane_symbol = str(selected.get("symbol") or "").upper()
@@ -89,6 +90,10 @@ def main():
             "format": os.environ["MODE"],
             "editorial_style": draft.get("editorial_style", ""),
             "hook": draft.get("hook", ""),
+            "discussion_question": draft.get("discussion_question", ""),
+            "experiment_id": engagement.get("experiment_id") or selected.get("experiment_id"),
+            "experiment_format": (engagement.get("experiment") or {}).get("format"),
+            "timing_hypothesis": (d.get("distribution_strategy") or {}).get("timing_hypothesis"),
             "quality_score": draft.get("quality_score", 0),
             "opportunity_score": max(float(r.get("opportunity_score") or 0), float((d.get("critique") or {}).get("revised_opportunity_score") or 0)),
             "visual_type": visual.get("type", "none"),
