@@ -6,6 +6,7 @@ on:
     paths:
       - "src/self_engineer.py"
       - "config/self_engineer_policy.json"
+      - "tests/test_self_engineering.py"
       - ".github/workflows/self-engineering.yml"
   schedule:
     - cron: "17 3 * * *"
@@ -16,12 +17,12 @@ permissions:
 
 concurrency:
   group: creator-self-engineering
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   engineer:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +42,7 @@ jobs:
           python src/analytics_optimizer.py || true
           python src/creator_intelligence.py || true
 
-      - name: Run bounded self-engineering agent
+      - name: Run autonomous business-layer engineer
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
