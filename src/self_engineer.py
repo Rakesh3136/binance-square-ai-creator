@@ -9,9 +9,11 @@ OUTPUT_PATH=ROOT/"data/live/self_engineering_report.json"
 IMMUTABLE={"config/self_engineer_policy.json","src/self_engineer.py","tests/test_self_engineering.py"}
 MAX_CONTEXT_CHARS=7000
 
+
 def load(path, default):
     try: return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
     except Exception: return default
+
 
 def api_json(method,url,token,payload=None):
     headers={"Accept":"application/vnd.github+json","Authorization":f"Bearer {token}","X-GitHub-Api-Version":"2022-11-28","Content-Type":"application/json","User-Agent":"binance-square-self-engineer"}
@@ -19,11 +21,13 @@ def api_json(method,url,token,payload=None):
     with urlopen(Request(url,data=body,headers=headers,method=method),timeout=30) as r:
         raw=r.read().decode(); return json.loads(raw) if raw else {}
 
+
 def gemini_generate(prompt):
     from google import genai
     client=genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     response=client.models.generate_content(model=os.getenv("GEMINI_MODEL","gemini-3.6-flash"),contents=prompt)
     return str(getattr(response,"text","") or "")
+
 
 def parse_json(text):
     text=text.strip()
@@ -34,6 +38,7 @@ def parse_json(text):
         if not m: raise ValueError("LLM did not return JSON")
         return json.loads(m.group(0))
 
+
 def context():
     names=["src/editorial_preflight.py","src/engagement_engine.py","src/creator_intelligence.py","src/multi_agent_creator.py","src/visual_renderer.py"]
     out=[]
@@ -42,8 +47,10 @@ def context():
         if p.exists(): out.append(f"\n---{n}---\n{p.read_text(encoding='utf-8')[:MAX_CONTEXT_CHARS]}")
     return "".join(out)
 
+
 def diagnostics():
     return {"strategy_memory":load(ROOT/"analytics/strategy_memory.json",{}),"patterns":load(ROOT/"data/intelligence/creator_patterns.json",{}),"feedback":load(ROOT/"data/live/feedback_strategy.json",{}),"preflight":load(ROOT/"data/live/editorial_preflight.json",{})}
+
 
 def build_prompt(policy):
     return f"""You are the autonomous engineering scientist for a crypto content business.
@@ -62,6 +69,28 @@ SOURCE:\n{context()}
 
 Return JSON only: {{"decision":"CHANGE|NO_CHANGE","title":"...","reason":"...","expected_metric":"reply_rate|follower_rate|reliability|diversity|evidence_quality|revenue","files":[{{"path":"src/...py","content":"complete file"}}]}}"""
 
+
+def contains_credential_literal(content, blocked_tokens):
+    # Environment-variable names are safe and are expected in creator code.
+    # Reject only actual-looking credential assignments, private-key material,
+    # or suspicious bearer/JWT literals. This prevents false positives when the
+    # proposed source legitimately contains os.getenv("GEMINI_API_KEY").
+    private_key=re.search(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",content,re.I)
+    if private_key: return True
+    jwt=re.search(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",content)
+    if jwt: return True
+    for token in blocked_tokens:
+        pattern=rf"(?:^|[\s,;(]){re.escape(token)}(?:\s*[:=]\s*|\s*\.setdefault\(\s*)['\"]([^'\"]+)['\"]"
+        for m in re.finditer(pattern,content,re.I):
+            value=m.group(1)
+            if value and not value.startswith(("$","${","os.getenv","env(")) and len(value)>=16:
+                return True
+    generic=(
+        r"(?:api[_-]?key|secret|access[_-]?token|private[_-]?key)\s*=\s*['\"][A-Za-z0-9_\-+/=]{24,}['\"]"
+    )
+    return bool(re.search(generic,content,re.I))
+
+
 def validate(proposal,policy):
     if not isinstance(proposal,dict): raise ValueError("proposal must be object")
     if proposal.get("decision")!="CHANGE": return False,"NO_CHANGE"
@@ -74,12 +103,14 @@ def validate(proposal,policy):
         if not path or not isinstance(content,str): raise ValueError("invalid file")
         if path in IMMUTABLE or any(path.startswith(x) for x in blocked): raise ValueError(f"blocked path: {path}")
         if not any(path==x or path.startswith(x) for x in policy.get("allowed_prefixes",[])): raise ValueError(f"path not allowed: {path}")
-        if any(t in content for t in tokens): raise ValueError(f"secret-like token in {path}")
+        if contains_credential_literal(content,tokens): raise ValueError(f"credential-like literal in {path}")
     return True,"CHANGE"
+
 
 def delta(old,new):
     import difflib
     return sum(1 for x in difflib.unified_diff(old.splitlines(),new.splitlines()) if (x.startswith("+") or x.startswith("-")) and not x.startswith(("+++","---")))
+
 
 def validate_code():
     for cmd in ([sys.executable,"-m","compileall","-q","src"],[sys.executable,"tests/test_self_engineering.py"]):
@@ -87,7 +118,9 @@ def validate_code():
         if p.returncode: return False,p.stderr[-2000:]
     return True,"validation passed"
 
+
 def git(*args): return subprocess.run(["git",*args],cwd=ROOT,text=True,capture_output=True,check=True).stdout.strip()
+
 
 def publish_change(proposal):
     token=os.environ.get("GITHUB_TOKEN"); repo=os.getenv("GITHUB_REPOSITORY","Rakesh3136/binance-square-ai-creator")
@@ -107,6 +140,7 @@ def publish_change(proposal):
         if load(POLICY_PATH,{}).get("auto_merge"): api_json("PUT",f"https://api.github.com/repos/{repo}/pulls/{pr['number']}/merge",token,{"merge_method":"squash"}); merged=True
     except Exception: pass
     return {"pr_number":pr["number"],"pr_url":pr.get("html_url"),"branch":branch,"merged":merged}
+
 
 def main():
     policy=load(POLICY_PATH,{})
