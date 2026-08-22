@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json, os, re, subprocess, sys
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 ROOT=Path(__file__).resolve().parents[1]
 POLICY_PATH=ROOT/"config/self_engineer_policy.json"
@@ -18,8 +19,12 @@ def load(path, default):
 def api_json(method,url,token,payload=None):
     headers={"Accept":"application/vnd.github+json","Authorization":f"Bearer {token}","X-GitHub-Api-Version":"2022-11-28","Content-Type":"application/json","User-Agent":"binance-square-self-engineer"}
     body=json.dumps(payload).encode() if payload is not None else None
-    with urlopen(Request(url,data=body,headers=headers,method=method),timeout=30) as r:
-        raw=r.read().decode(); return json.loads(raw) if raw else {}
+    try:
+        with urlopen(Request(url,data=body,headers=headers,method=method),timeout=30) as r:
+            raw=r.read().decode(); return json.loads(raw) if raw else {}
+    except HTTPError as e:
+        detail=e.read().decode(errors="replace")
+        raise RuntimeError(f"GitHub API {e.code} during {method} {url}: {detail[:1200]}") from e
 
 
 def gemini_generate(prompt):
@@ -71,10 +76,6 @@ Return JSON only: {{"decision":"CHANGE|NO_CHANGE","title":"...","reason":"...","
 
 
 def contains_credential_literal(content, blocked_tokens):
-    # Environment-variable names are safe and are expected in creator code.
-    # Reject only actual-looking credential assignments, private-key material,
-    # or suspicious bearer/JWT literals. This prevents false positives when the
-    # proposed source legitimately contains os.getenv("GEMINI_API_KEY").
     private_key=re.search(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",content,re.I)
     if private_key: return True
     jwt=re.search(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",content)
@@ -85,9 +86,7 @@ def contains_credential_literal(content, blocked_tokens):
             value=m.group(1)
             if value and not value.startswith(("$","${","os.getenv","env(")) and len(value)>=16:
                 return True
-    generic=(
-        r"(?:api[_-]?key|secret|access[_-]?token|private[_-]?key)\s*=\s*['\"][A-Za-z0-9_\-+/=]{24,}['\"]"
-    )
+    generic=r"(?:api[_-]?key|secret|access[_-]?token|private[_-]?key)\s*=\s*['\"][A-Za-z0-9_\-+/=]{24,}['\"]"
     return bool(re.search(generic,content,re.I))
 
 
@@ -128,18 +127,27 @@ def publish_change(proposal):
     slug=re.sub(r"[^a-z0-9-]+","-",proposal.get("title","improvement").lower()).strip("-")[:45]
     branch=f"self-engineer/{slug}-{os.getenv('GITHUB_RUN_ID','run')}"
     base=api_json("GET",f"https://api.github.com/repos/{repo}/git/ref/heads/main",token)["object"]["sha"]
-    api_json("POST",f"https://api.github.com/repos/{repo}/git/refs",token,{"ref":f"refs/heads/{branch}","sha":base})
+    try:
+        api_json("POST",f"https://api.github.com/repos/{repo}/git/refs",token,{"ref":f"refs/heads/{branch}","sha":base})
+    except RuntimeError as e:
+        raise RuntimeError(f"branch creation failed: {e}")
     git("checkout","-b",branch)
     for item in proposal["files"]:
         p=ROOT/item["path"]; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(item["content"],encoding="utf-8"); git("add",item["path"])
     git("-c","user.name=creator-engineer","-c","user.email=41898282+github-actions[bot]@users.noreply.github.com","commit","-m",f"Self-engineer: {proposal['title']}")
     git("push","-u","origin",branch)
-    pr=api_json("POST",f"https://api.github.com/repos/{repo}/pulls",token,{"title":f"Self-engineer: {proposal['title']}","head":branch,"base":"main","body":proposal.get("reason","")})
-    merged=False
     try:
-        if load(POLICY_PATH,{}).get("auto_merge"): api_json("PUT",f"https://api.github.com/repos/{repo}/pulls/{pr['number']}/merge",token,{"merge_method":"squash"}); merged=True
-    except Exception: pass
-    return {"pr_number":pr["number"],"pr_url":pr.get("html_url"),"branch":branch,"merged":merged}
+        pr=api_json("POST",f"https://api.github.com/repos/{repo}/pulls",token,{"title":f"Self-engineer: {proposal['title']}","head":branch,"base":"main","body":proposal.get("reason","")})
+    except RuntimeError as e:
+        return {"branch":branch,"merged":False,"pr_creation":"BLOCKED","error":str(e),"next_action":"Enable GitHub Actions permission to create pull requests, or review this branch manually."}
+    merged=False
+    merge_error=None
+    try:
+        if load(POLICY_PATH,{}).get("auto_merge"):
+            result=api_json("PUT",f"https://api.github.com/repos/{repo}/pulls/{pr['number']}/merge",token,{"merge_method":"squash"})
+            merged=bool(result.get("merged"))
+    except Exception as e: merge_error=str(e)
+    return {"pr_number":pr["number"],"pr_url":pr.get("html_url"),"branch":branch,"merged":merged,"merge_error":merge_error}
 
 
 def main():
