@@ -24,94 +24,202 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install dependencies
         run: pip install --disable-pip-version-check "google-genai>=1.0.0" matplotlib
+
+      - name: Initialize pipeline
+        run: python src/pipeline_stage.py scan running "Starting end-to-end production run"
+
       - name: Scan live Binance market
-        run: python src/live_market_scanner.py
+        run: |
+          if python src/live_market_scanner.py; then
+            python src/pipeline_stage.py scan success "Live market scan completed"
+          else
+            python src/pipeline_stage.py scan failed "Live market scanner failed"
+            exit 1
+          fi
+
       - name: Scan crypto, macro and regulatory news
-        run: python src/news_scanner.py
+        run: |
+          if python src/news_scanner.py; then
+            python src/pipeline_stage.py select success "News and market inputs available for opportunity selection"
+          else
+            python src/pipeline_stage.py select failed "News scanner failed"
+            exit 1
+          fi
+
       - name: Human-like editorial preflight
         env:
           TOPIC: ${{ inputs.topic }}
         run: |
-          python src/editorial_preflight.py
-          if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
+          if python src/editorial_preflight.py; then
+            if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
+          else
+            python src/pipeline_stage.py select failed "Editorial preflight failed"
+            exit 1
+          fi
+
       - name: Engagement-first opportunity rotation
-        run: python src/engagement_engine.py
+        run: |
+          if python src/engagement_engine.py; then
+            python src/pipeline_stage.py select success "Opportunity lane selected"
+          else
+            python src/pipeline_stage.py select failed "Opportunity rotation failed"
+            exit 1
+          fi
+
       - name: Run AI only for a real opportunity
         if: ${{ hashFiles('data/live/editorial_preflight.json') != '' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
-          # 20 matches the currently observed Gemini free-tier request ceiling.
-          # The preflight and engagement gates prevent weak/repetitive opportunities from consuming requests.
           GEMINI_DAILY_BUDGET: "20"
           TOPIC: ${{ inputs.topic }}
         run: |
           RUN_AI=$(python -c "import json; print(str(json.load(open('data/live/editorial_preflight.json')).get('run_ai',False)).lower())")
           if [ "$RUN_AI" != "true" ]; then
             echo '{"status":"NO_OPPORTUNITY"}' > data/live/creator_status.json
+            python src/pipeline_stage.py ai_draft blocked "No real opportunity passed preflight"
             exit 0
           fi
-          python src/safe_creator_runner.py
+          python src/pipeline_stage.py ai_draft running "Generating fresh human-style draft"
+          if python src/safe_creator_runner.py; then
+            STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
+            if [ "$STATUS" = "AI_SUCCESS" ]; then
+              python src/pipeline_stage.py ai_draft success "Fresh AI draft generated"
+            else
+              python src/pipeline_stage.py ai_draft blocked "$STATUS"
+            fi
+          else
+            python src/pipeline_stage.py ai_draft failed "AI creator failed"
+            exit 1
+          fi
+
       - name: Render visual
         if: ${{ hashFiles('data/live/creator_status.json') != '' }}
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
-          if [ "$STATUS" = "AI_SUCCESS" ]; then python src/visual_renderer.py; fi
+          if [ "$STATUS" != "AI_SUCCESS" ]; then
+            python src/pipeline_stage.py visual blocked "No fresh AI draft to render"
+            exit 0
+          fi
+          python src/pipeline_stage.py visual running "Rendering real market visual"
+          if python src/visual_renderer.py; then
+            python src/pipeline_stage.py visual success "Visual rendering completed or correctly determined that text format is appropriate"
+          else
+            python src/pipeline_stage.py visual failed "Visual renderer failed"
+            exit 1
+          fi
+
       - name: Evaluate publication gate
         id: gate
         shell: bash
-        run: python src/workflow_helpers.py gate
+        run: |
+          if python src/workflow_helpers.py gate; then
+            PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
+            if [ "$PUBLISH" = "true" ]; then
+              python src/pipeline_stage.py quality_gate success "All publication quality and interaction gates passed"
+            else
+              python src/pipeline_stage.py quality_gate blocked "Publication gate rejected this draft; see data/live/engagement_gate.json"
+            fi
+          else
+            python src/pipeline_stage.py quality_gate failed "Publication gate crashed"
+            exit 1
+          fi
+
       - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
         id: draft
         run: |
           DRAFT=$(find data/reports -type f -name '*multi-agent.json' -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$DRAFT" || (echo "No fresh draft" >&2; exit 1)
+          test -n "$DRAFT" || (python src/pipeline_stage.py quality_gate failed "No fresh draft found after gate"; exit 1)
           echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
+
       - name: Extract post
         if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
         run: python src/workflow_helpers.py extract
+
       - name: Setup Node
         if: ${{ steps.gate.outputs.publish == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
       - name: Download official Binance Square skill
         if: ${{ steps.gate.outputs.publish == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
+
       - name: Publish image post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
+          python src/pipeline_stage.py publish running "Sending image post to Binance Square"
           IMAGE=$(find data/visuals -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$IMAGE" || (echo "No fresh visual; refusing to publish" >&2; exit 1)
-          node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --text "$(cat /tmp/square-post.txt)" --images "$IMAGE" | tee /tmp/publish-result.txt
+          if [ -z "$IMAGE" ]; then
+            python src/pipeline_stage.py publish failed "No fresh visual available"
+            exit 1
+          fi
+          if node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --text "$(cat /tmp/square-post.txt)" --images "$IMAGE" | tee /tmp/publish-result.txt; then
+            python src/pipeline_stage.py publish success "Binance image publisher completed"
+          else
+            python src/pipeline_stage.py publish failed "Binance image publisher command failed"
+            exit 1
+          fi
+
       - name: Publish text post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
-        run: node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat /tmp/square-post.txt)" | tee /tmp/publish-result.txt
+        run: |
+          python src/pipeline_stage.py publish running "Sending text post to Binance Square"
+          if node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat /tmp/square-post.txt)" | tee /tmp/publish-result.txt; then
+            python src/pipeline_stage.py publish success "Binance text publisher completed"
+          else
+            python src/pipeline_stage.py publish failed "Binance text publisher command failed"
+            exit 1
+          fi
+
+      - name: Verify Binance publication
+        if: ${{ steps.gate.outputs.publish == 'true' && success() }}
+        run: python src/pipeline_stage.py verify-publish
+
       - name: Record publication metadata
         if: ${{ steps.gate.outputs.publish == 'true' && success() }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
           MODE: ${{ steps.gate.outputs.mode }}
-        run: python src/workflow_helpers.py record
+        run: |
+          python src/pipeline_stage.py record running "Recording verified publication metadata"
+          if python src/workflow_helpers.py record; then
+            python src/pipeline_stage.py record success "Publication metadata recorded"
+          else
+            python src/pipeline_stage.py record failed "Publication metadata recording failed"
+            exit 1
+          fi
+
+      - name: Mark learning checkpoint
+        if: ${{ steps.gate.outputs.publish == 'true' && success() }}
+        run: python src/pipeline_stage.py learn success "Verified publication and metrics are available for the next strategy cycle"
+
+      - name: Complete production run
+        if: ${{ steps.gate.outputs.publish == 'true' && success() }}
+        run: python src/pipeline_stage.py complete success "Research through publication and recording completed"
+
       - name: Save state
         if: ${{ always() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl src/workflow_helpers.py src/manual_topic_override.py src/engagement_engine.py
+          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl src/pipeline_stage.py src/workflow_helpers.py src/manual_topic_override.py src/engagement_engine.py
           git diff --cached --quiet && exit 0
-          git commit -m "Add engagement-first editorial rotation"
+          git commit -m "Track end-to-end creator production pipeline"
           git push
