@@ -40,13 +40,15 @@ jobs:
         run: |
           python src/editorial_preflight.py
           if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
+      - name: Engagement-first opportunity rotation
+        run: python src/engagement_engine.py
       - name: Run AI only for a real opportunity
         if: ${{ hashFiles('data/live/editorial_preflight.json') != '' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
           # 20 matches the currently observed Gemini free-tier request ceiling.
-          # The preflight gate still prevents weak/repetitive opportunities from consuming requests.
+          # The preflight and engagement gates prevent weak/repetitive opportunities from consuming requests.
           GEMINI_DAILY_BUDGET: "20"
           TOPIC: ${{ inputs.topic }}
         run: |
@@ -109,7 +111,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl src/workflow_helpers.py src/manual_topic_override.py
+          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl src/workflow_helpers.py src/manual_topic_override.py src/engagement_engine.py
           git diff --cached --quiet && exit 0
-          git commit -m "Expand daily AI budget and keep dynamic editorial gate"
+          git commit -m "Add engagement-first editorial rotation"
           git push
