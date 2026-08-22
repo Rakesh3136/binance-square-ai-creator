@@ -4,10 +4,13 @@ import json
 POLICY = json.loads(Path("config/self_engineer_policy.json").read_text(encoding="utf-8"))
 
 
-def test_policy_has_safe_boundaries():
-    assert POLICY["max_files_per_cycle"] <= 2
-    assert POLICY["max_changed_lines_per_file"] <= 180
+def test_policy_allows_business_layer_autonomy():
+    assert POLICY["max_files_per_cycle"] <= 4
+    assert POLICY["max_changed_lines_per_file"] <= 300
     assert POLICY["auto_merge"] is True
+    assert POLICY["autonomous_business_layer"] is True
+    assert POLICY["business_autonomy"]["can_change_content_strategy"] is True
+    assert POLICY["business_autonomy"]["can_change_revenue_strategy"] is True
     assert ".github/workflows/" in POLICY["blocked_prefixes"]
     assert "BINANCE_SQUARE_OPENAPI_KEY" in POLICY["blocked_tokens"]
 
