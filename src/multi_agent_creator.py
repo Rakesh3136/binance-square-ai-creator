@@ -14,6 +14,8 @@ Use public creator research only as pattern intelligence. Never copy another cre
 
 GOAL: maximize genuine attention, useful interaction, follower growth and eligible monetization opportunities without spam, fake engagement, fabricated facts or guaranteed returns.
 
+MONETIZATION & ATTRIBUTION: Include the natural cashtag for the primary tradeable asset discussed (e.g. $TRUMP, $BTC, $ETH) in the text. Binance requires explicit cashtags for Write to Earn attribution.
+
 VISUAL-FIRST: For a single-asset market story, prefer a REAL Binance 1h candlestick chart. Use only real OHLCV-derived levels/patterns. Never invent a pattern or level.
 
 WRITING: Normal target 180-500 characters; hard maximum 750. First line creates curiosity. Use 2-5 short mobile-friendly lines. Sound conversational, not like a financial report. Avoid analyst filler. Do not automatically provide TP/SL/entry calls.
@@ -65,6 +67,12 @@ def main():
     selected=preflight.get('selected_opportunity') or {}; engagement=preflight.get('engagement_strategy') or {}; instruction=TOPIC or selected.get('instruction') or 'Choose the strongest evidence-based opportunity across all supplied market and news lanes.'
     prompt=("EDITORIAL LANE:\n"+instruction+"\n\nOUR ENGAGEMENT STRATEGY:\n"+json.dumps(engagement,ensure_ascii=False,indent=2)+"\n\nPUBLIC CREATOR PATTERNS:\n"+json.dumps(creator_patterns,ensure_ascii=False,indent=2)+"\n\nPREFLIGHT:\n"+json.dumps(preflight,ensure_ascii=False,indent=2)+"\n\nLIVE MARKET:\n"+json.dumps(live,ensure_ascii=False,indent=2)+"\n\nNEWS:\n"+json.dumps(news,ensure_ascii=False,indent=2)+"\n\nOUR STRATEGY MEMORY:\n"+json.dumps(memory,ensure_ascii=False,indent=2)+"\n\nCreate ONE original short visual-first post.")
     result=parse_json(call_creator(client,prompt)); research=result.get('research') or {}; critique=result.get('critique') or {}; draft=normalize_draft(result.get('draft')); visual=normalize_visual(result.get('visual_plan'))
+    exp_id=engagement.get('experiment_id') or selected.get('recommended_experiment') or 'A'
+    sym_name=selected.get('symbol') or selected.get('topic') or ''
+    cat_name=selected.get('category') or selected.get('reason') or ''
+    draft['experiment_id']=exp_id
+    draft['symbol']=sym_name
+    draft['content_category']=cat_name
     draft['publication_status']='DRAFT_ONLY_NOT_PUBLISHED'
     allowed={'candlestick_chart','market_bar_chart','market_comparison','market_range_chart','news_timeline','text_card','none'}
     if visual.get('type') not in allowed: visual['type']='none'
