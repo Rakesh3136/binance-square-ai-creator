@@ -49,15 +49,33 @@ def parse_json(text):
     if not isinstance(value,dict): raise RuntimeError('Gemini returned non-object JSON')
     return value
 
-def normalize_draft(value):
+def normalize_object(value, fallback_key='text'):
     if isinstance(value,dict): return value
-    if isinstance(value,str): return {'text':value,'quality_score':0,'editorial_style':'normalized_string_draft'}
-    return {'text':'','quality_score':0,'editorial_style':'missing_draft'}
+    if isinstance(value,str): return {fallback_key:value}
+    if value is None: return {}
+    return {fallback_key:str(value)}
+
+def normalize_draft(value):
+    draft=normalize_object(value)
+    draft.setdefault('text','')
+    draft.setdefault('quality_score',0)
+    draft.setdefault('editorial_style','normalized')
+    return draft
 
 def normalize_visual(value):
     if isinstance(value,dict): return value
     if isinstance(value,str): return {'type':value,'use_visual':value!='none'}
     return {'type':'none','use_visual':False}
+
+def safe_slug_value(value):
+    if isinstance(value,(str,int,float)): return str(value)
+    if isinstance(value,dict):
+        for key in ('symbol','topic','name','title','value'):
+            candidate=value.get(key)
+            if isinstance(candidate,(str,int,float)) and str(candidate).strip(): return str(candidate)
+    if isinstance(value,list):
+        return str(value[0]) if value else ''
+    return ''
 
 def main():
     key=os.getenv('GEMINI_API_KEY')
@@ -66,7 +84,11 @@ def main():
     live=load(LIVE_SNAPSHOT); news=load(NEWS_SNAPSHOT); preflight=load(PREFLIGHT); memory=load(STRATEGY_MEMORY); creator_patterns=load(CREATOR_PATTERNS)
     selected=preflight.get('selected_opportunity') or {}; engagement=preflight.get('engagement_strategy') or {}; instruction=TOPIC or selected.get('instruction') or 'Choose the strongest evidence-based opportunity across all supplied market and news lanes.'
     prompt=("EDITORIAL LANE:\n"+instruction+"\n\nOUR ENGAGEMENT STRATEGY:\n"+json.dumps(engagement,ensure_ascii=False,indent=2)+"\n\nPUBLIC CREATOR PATTERNS:\n"+json.dumps(creator_patterns,ensure_ascii=False,indent=2)+"\n\nPREFLIGHT:\n"+json.dumps(preflight,ensure_ascii=False,indent=2)+"\n\nLIVE MARKET:\n"+json.dumps(live,ensure_ascii=False,indent=2)+"\n\nNEWS:\n"+json.dumps(news,ensure_ascii=False,indent=2)+"\n\nOUR STRATEGY MEMORY:\n"+json.dumps(memory,ensure_ascii=False,indent=2)+"\n\nCreate ONE original short visual-first post.")
-    result=parse_json(call_creator(client,prompt)); research=result.get('research') or {}; critique=result.get('critique') or {}; draft=normalize_draft(result.get('draft')); visual=normalize_visual(result.get('visual_plan'))
+    result=parse_json(call_creator(client,prompt))
+    research=normalize_object(result.get('research'),'summary')
+    critique=normalize_object(result.get('critique'),'summary')
+    draft=normalize_draft(result.get('draft'))
+    visual=normalize_visual(result.get('visual_plan'))
     exp_id=engagement.get('experiment_id') or selected.get('recommended_experiment') or 'A'
     sym_name=selected.get('symbol') or selected.get('topic') or ''
     cat_name=selected.get('category') or selected.get('reason') or ''
@@ -77,7 +99,8 @@ def main():
     allowed={'candlestick_chart','market_bar_chart','market_comparison','market_range_chart','news_timeline','text_card','none'}
     if visual.get('type') not in allowed: visual['type']='none'
     report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':MODEL,'topic_instruction':instruction,'selected_editorial_lane':selected,'engagement_strategy':engagement,'creator_intelligence':creator_patterns,'live_market_snapshot':live,'news_discovery_snapshot':news,'strategy_memory':memory,'research':research,'critique':critique,'draft':draft,'visual_plan':visual,'status':'DRAFT_ONLY_NOT_PUBLISHED','gemini_requests_used':1}
-    slug=''.join(c.lower() if c.isalnum() else '-' for c in str(TOPIC or research.get('strongest_signal') or selected.get('category') or 'market-opportunity')).strip('-')[:80] or 'market-opportunity'
+    slug_source=TOPIC or safe_slug_value(research.get('strongest_signal')) or safe_slug_value(selected.get('category')) or 'market-opportunity'
+    slug=''.join(c.lower() if c.isalnum() else '-' for c in slug_source).strip('-')[:80] or 'market-opportunity'
     output=OUTPUT_DIR/f'{slug}-multi-agent.json'; output.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps({'status':'DRAFT_ONLY_NOT_PUBLISHED','report':str(output),'quality_score':draft.get('quality_score',0),'editorial_style':draft.get('editorial_style',''),'visual_requested':visual.get('use_visual',False),'visual_type':visual.get('type','none'),'creator_intelligence_samples':creator_patterns.get('sample_count',0)},indent=2))
 
