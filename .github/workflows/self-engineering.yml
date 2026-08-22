@@ -45,11 +45,18 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: python src/self_engineer.py
 
-      - name: Save engineering report
+      - name: Save engineering report on main
         if: always()
         run: |
+          REPORT="data/live/self_engineering_report.json"
+          test -f "$REPORT" || exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          git pull --ff-only origin main
+          cp "$REPORT" /tmp/self_engineering_report.json
+          cp /tmp/self_engineering_report.json data/live/self_engineering_report.json
           git add data/live/self_engineering_report.json
-          git diff --cached --quiet || git commit -m "Record self-engineering cycle"
-          git push origin main || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Record self-engineering cycle"
+          git push origin main
