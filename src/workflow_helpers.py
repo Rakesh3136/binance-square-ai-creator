@@ -34,12 +34,19 @@ def main():
         quality = float(d.get("quality_score") or 0)
         opportunity = max(float(r.get("opportunity_score") or 0), float(c.get("revised_opportunity_score") or 0))
         post = str(d.get("post") or "").strip()
-        publish = quality >= 85 and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED" and bool(post)
-        Path("/tmp/publish_gate.json").write_text(json.dumps({"draft": str(draft), "quality_score": quality, "opportunity_score": opportunity, "publish": publish}, indent=2))
+        try:
+            from engagement_quality_gate import evaluate
+            interaction_gate = evaluate(post, v)
+        except Exception as exc:
+            interaction_gate = {"score": 0, "publish": False, "reasons": [f"quality_gate_error:{type(exc).__name__}"]}
+        publish = quality >= 85 and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED" and bool(post) and interaction_gate["publish"]
+        gate_record = {"draft": str(draft), "quality_score": quality, "opportunity_score": opportunity, "interaction_gate": interaction_gate, "publish": publish}
+        Path("/tmp/publish_gate.json").write_text(json.dumps(gate_record, indent=2))
+        Path("data/live/engagement_gate.json").write_text(json.dumps(interaction_gate, indent=2), encoding="utf-8")
         with open(os.environ["GITHUB_OUTPUT"], "a") as out:
             out.write(f"publish={'true' if publish else 'false'}\n")
             out.write(f"mode={'image' if v.get('use_visual') else 'text'}\n")
-        print(json.dumps({"publish": publish, "quality_score": quality, "opportunity_score": opportunity, "mode": "image" if v.get('use_visual') else "text", "editorial_style": d.get("editorial_style", "")}, indent=2))
+        print(json.dumps({"publish": publish, "quality_score": quality, "opportunity_score": opportunity, "interaction_gate": interaction_gate, "mode": "image" if v.get('use_visual') else "text", "editorial_style": d.get("editorial_style", "")}, indent=2))
     elif cmd == "extract":
         d = load(os.environ["DRAFT_PATH"])
         post = ((d.get("draft") or {}).get("post") or "").strip()
