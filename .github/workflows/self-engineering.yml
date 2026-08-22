@@ -1,0 +1,55 @@
+name: Creator Self Engineering
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: creator-self-engineering
+  cancel-in-progress: true
+
+jobs:
+  engineer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install AI SDK
+        run: pip install --disable-pip-version-check "google-genai>=1.0.0"
+
+      - name: Inspect current strategy
+        run: |
+          python src/analytics_optimizer.py || true
+          python src/creator_intelligence.py || true
+
+      - name: Run bounded self-engineering agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.6-flash
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: python src/self_engineer.py
+
+      - name: Save engineering report
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/live/self_engineering_report.json
+          git diff --cached --quiet || git commit -m "Record self-engineering cycle"
+          git push origin main || true
