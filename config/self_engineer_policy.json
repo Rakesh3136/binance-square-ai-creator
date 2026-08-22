@@ -1,8 +1,9 @@
 {
-  "version": 1,
+  "version": 2,
   "enabled": true,
-  "max_files_per_cycle": 2,
-  "max_changed_lines_per_file": 180,
+  "autonomous_business_layer": true,
+  "max_files_per_cycle": 4,
+  "max_changed_lines_per_file": 300,
   "allowed_prefixes": [
     "src/editorial_preflight.py",
     "src/engagement_engine.py",
@@ -16,6 +17,10 @@
     "src/distribution_timing_engine.py",
     "src/editorial_brain.py",
     "src/editorial_portfolio.py",
+    "src/content_researcher.py",
+    "src/hook_engine.py",
+    "src/experiment_engine.py",
+    "src/revenue_optimizer.py",
     "prompts/",
     "config/"
   ],
@@ -34,8 +39,26 @@
     "PRIVATE_KEY",
     "ACCESS_TOKEN"
   ],
+  "business_autonomy": {
+    "can_change_prompts": true,
+    "can_change_content_strategy": true,
+    "can_change_editorial_scoring": true,
+    "can_change_visual_strategy": true,
+    "can_change_experiments": true,
+    "can_change_posting_frequency": true,
+    "can_change_revenue_strategy": true,
+    "can_change_publishing_behavior": true,
+    "can_create_new_creator_modules": true
+  },
+  "security_boundary": {
+    "credentials_are_runtime_inputs": true,
+    "cannot_reveal_or_rewrite_credentials": true,
+    "cannot_disable_secret_scanning": true,
+    "cannot_remove_emergency_stop": true
+  },
   "auto_merge": true,
   "minimum_complete_metrics": 5,
   "cooldown_hours": 12,
-  "one_major_variable_per_cycle": true
+  "one_major_variable_per_cycle": true,
+  "require_validation": true
 }
