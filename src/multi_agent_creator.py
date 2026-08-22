@@ -6,135 +6,83 @@ from datetime import datetime, timezone
 from pathlib import Path
 from google import genai
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
-TOPIC = os.getenv("TOPIC", "").strip()
-OUTPUT_DIR = Path("data/reports")
-LIVE_SNAPSHOT = Path("data/live/market_snapshot.json")
-NEWS_SNAPSHOT = Path("data/live/news_snapshot.json")
-PREFLIGHT = Path("data/live/editorial_preflight.json")
-STRATEGY_MEMORY = Path("analytics/strategy_memory.json")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+MODEL=os.getenv("GEMINI_MODEL","gemini-3.6-flash"); TOPIC=os.getenv("TOPIC","").strip()
+OUTPUT_DIR=Path("data/reports"); LIVE_SNAPSHOT=Path("data/live/market_snapshot.json"); NEWS_SNAPSHOT=Path("data/live/news_snapshot.json"); PREFLIGHT=Path("data/live/editorial_preflight.json"); STRATEGY_MEMORY=Path("analytics/strategy_memory.json"); CREATOR_PATTERNS=Path("data/intelligence/creator_patterns.json")
+OUTPUT_DIR.mkdir(parents=True,exist_ok=True)
+SYSTEM=r'''You are the senior editorial intelligence of an original HUMAN crypto creator on Binance Square.
+Use public creator research only as pattern intelligence. Never copy another creator's sentences, distinctive phrasing, identity, branding or posts. Do not claim to know Binance's hidden recommendation algorithm. Treat observed patterns as hypotheses and validate them against our own performance.
 
-SYSTEM = r'''You are the senior editorial intelligence of a HUMAN crypto creator on Binance Square.
+GOAL: maximize genuine attention, useful interaction, follower growth and eligible monetization opportunities without spam, fake engagement, fabricated facts or guaranteed returns.
 
-PRIMARY OBJECTIVE: stop the scroll, make the reader understand the story in seconds, earn genuine interaction, grow followers, and maximize eligible monetization opportunities without spam, fake engagement, fabricated facts, or guaranteed-return language.
+CREATOR-INTELLIGENCE RULES
+- Study multiple archetypes: news flash, technical/chart, data/on-chain, educational, community/opinion, macro and movers.
+- Prefer patterns supported by multiple examples over one viral outlier.
+- Optimize for replies and follower conversion, not views alone.
+- Use creator research to choose hook, format, length, question style and visual approach; keep the actual post original.
+- If our own performance data contradicts a public pattern, prefer our evidence.
 
-VISUAL-FIRST RULE
-For a single-coin market story, prefer a REAL Binance 1h candlestick chart. The image is part of the hook, not decoration. If a chart is appropriate, visual_plan.use_visual MUST be true and type MUST be candlestick_chart. Request only annotations supported by supplied candles: actual support/resistance, breakout/breakdown, retest, volume expansion, EMA, or a verified W/M/cup-like structure. Never invent a pattern or level. The renderer must use real OHLCV values, not AI-drawn candles.
+VISUAL-FIRST
+For a single-asset market story, prefer a REAL Binance 1h candlestick chart. It is part of the hook, not decoration. Use only real OHLCV-derived support/resistance, breakout/breakdown, retest, volume, EMA or verified patterns. Never invent a pattern or level and never ask an image model to draw fake candles.
 
-WRITING STYLE
-- Write like a sharp human creator, not a research report.
-- Target 180-500 characters for normal posts; hard maximum 750 unless breaking news genuinely requires more.
-- First line: curiosity or a surprising fact. Do not begin with a dry data sentence such as "$ENS is up 34.4%...".
-- Then 2-5 short mobile-friendly lines.
-- Explain ONE interesting thing, not five.
-- Use natural contractions and conversational language.
-- Emojis are optional and should be sparse.
-- Avoid phrases such as "notable factor here", "clear shift", "overhead liquidity", "market participants", "key takeaway", "why such a dramatic split", "this suggests", and other analyst-report filler unless genuinely necessary.
-- Do not sound like a financial newsletter.
+WRITING
+- Normal target: 180-500 characters; hard maximum 750 unless genuinely necessary for breaking news.
+- First line must create curiosity before explaining numbers.
+- 2-5 short mobile-friendly lines. One main idea.
+- Sound conversational, not like a financial report.
+- Avoid filler such as "notable factor", "clear shift", "overhead liquidity", "market participants", "key takeaway", "this suggests".
+- Do not automatically provide TP/SL/entry calls.
+- For technical content use levels-to-watch, confirmation and invalidation only when supported by real candles.
 
 INTERACTION
-End with ONE low-friction question that a normal trader can answer in one sentence. Prefer:
-- "Breakout or fakeout?"
-- "Would you wait for the retest?"
-- "Which one are you watching: A or B?"
-- "Does this level hold?"
-- "Bullish continuation or pullback first?"
-Never beg for comments/follows and never use generic "What do you think?".
-
-CONTENT ROTATION
-Choose among gainers, losers, unusual volume, volatility, breakouts, breakdowns, retests, support/resistance, liquidations, macro/CPI/Fed, regulation, verified listings, news reactions, comparisons and educational posts. Never repeatedly choose XRP simply because its scanner score is high.
-
-TRADING CONTENT
-Do NOT automatically provide TP/SL/entry calls. For technical posts, use "levels to watch", "confirmation" and "invalidation". Concrete levels are allowed only when calculated from supplied real candles. Never invent a price target.
+End with exactly ONE low-friction question. It must be answerable in under five seconds. Good examples: "Breakout or fakeout?", "Would you wait for the retest?", "Which one wins: A or B?", "Bullish continuation or pullback first?" Avoid generic "What do you think?" and never beg for likes/follows.
 
 MONETIZATION
-When discussing a tradeable asset, naturally include the relevant $CASHTAG. If a real chart widget is available downstream, prefer it. Do not make promises about earnings or returns.
+When a tradeable asset is discussed, naturally include its relevant $CASHTAG. Prefer a real chart widget downstream when available. Never promise earnings or returns.
 
 FACTS
 Never invent prices, volume, OHLC, news, quotes, listing dates, CPI/Fed statements, sources or URLs. Separate observation from inference.
 
 QUALITY GATE
-Before returning JSON, reject and rewrite any draft that looks like an AI market report, exceeds the length target, contains more than one major idea, has a weak/generic question, lacks a useful visual for a single-coin technical story, or repeats a recently covered asset without a major verified reason.
+Rewrite anything repetitive, generic, overlong, unsupported, overly signal-like, or lacking a useful visual for a single-coin technical story.
 
-Return ONLY valid JSON:
-{
-  "research": {"thesis":"...","strongest_signal":"...","market_observations":[],"news_leads":[],"source_urls":[],"audience_questions":[],"possible_angles":[],"risks":[],"live_verification_needed":[],"opportunity_score":0},
-  "critique": {"strongest_angle":"...","weak_points":[],"missing_context":[],"source_verification_plan":[],"required_checks":[],"counterpoints":[],"safer_wording":[],"revised_opportunity_score":0},
-  "draft": {"title":"...","post":"...","hook":"...","key_takeaway":"...","discussion_question":"...","hashtags":[],"source_links":[],"editorial_style":"...","publication_status":"DRAFT_ONLY_NOT_PUBLISHED","quality_score":0},
-  "visual_plan": {"use_visual":false,"type":"none","title":"...","purpose":"...","data_points":[],"technical_annotations":[],"caption":"...","alt_text":"..."}
-}
-visual_plan.type: candlestick_chart, market_bar_chart, market_comparison, market_range_chart, news_timeline, text_card, none.'''
+Return ONLY valid JSON with research, critique, draft and visual_plan fields. visual_plan.type must be one of candlestick_chart, market_bar_chart, market_comparison, market_range_chart, news_timeline, text_card, none.'''
 
-def call_creator(client, prompt):
+def call_creator(client,prompt):
     for attempt in range(2):
         try:
-            interaction = client.interactions.create(model=MODEL, input=prompt, system_instruction=SYSTEM)
-            text = (interaction.output_text or "").strip()
-            if not text:
-                raise RuntimeError("Gemini returned an empty response")
+            r=client.interactions.create(model=MODEL,input=prompt,system_instruction=SYSTEM); text=(r.output_text or '').strip()
+            if not text: raise RuntimeError('Gemini returned an empty response')
             return text
         except Exception as exc:
-            if "429" not in str(exc) or attempt == 1:
-                raise
-            print("Gemini rate limit reached; waiting 25s...")
-            time.sleep(25)
-    raise RuntimeError("Gemini request failed")
+            if '429' not in str(exc) or attempt==1: raise
+            print('Gemini rate limit reached; waiting 25s...'); time.sleep(25)
+    raise RuntimeError('Gemini request failed')
+
+def load(path):
+    if not path.exists(): return {}
+    return json.loads(path.read_text(encoding='utf-8'))
 
 def parse_json(text):
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
-        cleaned = re.sub(r"\s*```$", "", cleaned)
-    value = json.loads(cleaned)
-    if not isinstance(value, dict):
-        raise RuntimeError("Gemini returned non-object JSON")
+    text=text.strip()
+    if text.startswith('```'):
+        text=re.sub(r'^```(?:json)?\s*','',text); text=re.sub(r'\s*```$','',text)
+    value=json.loads(text)
+    if not isinstance(value,dict): raise RuntimeError('Gemini returned non-object JSON')
     return value
 
-def load_json(path):
-    if not path.exists(): return {}
-    return json.loads(path.read_text(encoding="utf-8"))
-
 def main():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key: raise RuntimeError("GEMINI_API_KEY is missing")
-    client = genai.Client(api_key=api_key)
-    live_context = load_json(LIVE_SNAPSHOT)
-    news_context = load_json(NEWS_SNAPSHOT)
-    preflight = load_json(PREFLIGHT)
-    strategy_memory = load_json(STRATEGY_MEMORY)
-    selected = preflight.get("selected_opportunity") or {}
-    engagement = preflight.get("engagement_strategy") or {}
-    instruction = TOPIC or selected.get("instruction") or "Choose the strongest evidence-based opportunity across all supplied market and news lanes."
-    prompt = (
-        "EDITORIAL LANE:\n" + instruction
-        + "\n\nENGAGEMENT STRATEGY:\n" + json.dumps(engagement, ensure_ascii=False, indent=2)
-        + "\n\nPREFLIGHT:\n" + json.dumps(preflight, ensure_ascii=False, indent=2)
-        + "\n\nLIVE MARKET:\n" + json.dumps(live_context, ensure_ascii=False, indent=2)
-        + "\n\nNEWS:\n" + json.dumps(news_context, ensure_ascii=False, indent=2)
-        + "\n\nSTRATEGY MEMORY:\n" + json.dumps(strategy_memory, ensure_ascii=False, indent=2)
-        + "\n\nCreate ONE short visual-first, human-sounding post."
-    )
-    result = parse_json(call_creator(client, prompt))
-    research = result.get("research") or {}
-    critique = result.get("critique") or {}
-    draft = result.get("draft") or {}
-    visual = result.get("visual_plan") or {}
-    draft["publication_status"] = "DRAFT_ONLY_NOT_PUBLISHED"
-    allowed = {"candlestick_chart","market_bar_chart","market_comparison","market_range_chart","news_timeline","text_card","none"}
-    if visual.get("type") not in allowed: visual["type"] = "none"
-    report = {
-        "generated_at": datetime.now(timezone.utc).isoformat(), "model": MODEL,
-        "topic_instruction": instruction, "selected_editorial_lane": selected,
-        "engagement_strategy": engagement, "live_market_snapshot": live_context,
-        "news_discovery_snapshot": news_context, "strategy_memory": strategy_memory,
-        "research": research, "critique": critique, "draft": draft,
-        "visual_plan": visual, "status": "DRAFT_ONLY_NOT_PUBLISHED", "gemini_requests_used": 1,
-    }
-    slug_source = TOPIC or str(research.get("strongest_signal") or selected.get("category") or "market-opportunity")
-    safe_name = "".join(c.lower() if c.isalnum() else "-" for c in slug_source).strip("-")[:80] or "market-opportunity"
-    output = OUTPUT_DIR / f"{safe_name}-multi-agent.json"
-    output.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({"status":"DRAFT_ONLY_NOT_PUBLISHED","report":str(output),"quality_score":draft.get("quality_score",0),"editorial_style":draft.get("editorial_style",""),"visual_requested":visual.get("use_visual",False),"visual_type":visual.get("type","none")}, indent=2))
+    key=os.getenv('GEMINI_API_KEY')
+    if not key: raise RuntimeError('GEMINI_API_KEY is missing')
+    client=genai.Client(api_key=key)
+    live=load(LIVE_SNAPSHOT); news=load(NEWS_SNAPSHOT); preflight=load(PREFLIGHT); memory=load(STRATEGY_MEMORY); creator_patterns=load(CREATOR_PATTERNS)
+    selected=preflight.get('selected_opportunity') or {}; engagement=preflight.get('engagement_strategy') or {}; instruction=TOPIC or selected.get('instruction') or 'Choose the strongest evidence-based opportunity across all supplied market and news lanes.'
+    prompt=("EDITORIAL LANE:\n"+instruction+"\n\nOUR ENGAGEMENT STRATEGY:\n"+json.dumps(engagement,ensure_ascii=False,indent=2)+"\n\nPUBLIC CREATOR PATTERNS (use only as hypotheses):\n"+json.dumps(creator_patterns,ensure_ascii=False,indent=2)+"\n\nPREFLIGHT:\n"+json.dumps(preflight,ensure_ascii=False,indent=2)+"\n\nLIVE MARKET:\n"+json.dumps(live,ensure_ascii=False,indent=2)+"\n\nNEWS:\n"+json.dumps(news,ensure_ascii=False,indent=2)+"\n\nOUR STRATEGY MEMORY:\n"+json.dumps(memory,ensure_ascii=False,indent=2)+"\n\nCreate ONE original short visual-first post. Public creator patterns must influence structure only, never wording or identity.")
+    result=parse_json(call_creator(client,prompt)); research=result.get('research') or {}; critique=result.get('critique') or {}; draft=result.get('draft') or {}; visual=result.get('visual_plan') or {}
+    draft['publication_status']='DRAFT_ONLY_NOT_PUBLISHED'; allowed={'candlestick_chart','market_bar_chart','market_comparison','market_range_chart','news_timeline','text_card','none'}
+    if visual.get('type') not in allowed: visual['type']='none'
+    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':MODEL,'topic_instruction':instruction,'selected_editorial_lane':selected,'engagement_strategy':engagement,'creator_intelligence':creator_patterns,'live_market_snapshot':live,'news_discovery_snapshot':news,'strategy_memory':memory,'research':research,'critique':critique,'draft':draft,'visual_plan':visual,'status':'DRAFT_ONLY_NOT_PUBLISHED','gemini_requests_used':1}
+    slug=''.join(c.lower() if c.isalnum() else '-' for c in str(TOPIC or research.get('strongest_signal') or selected.get('category') or 'market-opportunity')).strip('-')[:80] or 'market-opportunity'
+    output=OUTPUT_DIR/f'{slug}-multi-agent.json'; output.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
+    print(json.dumps({'status':'DRAFT_ONLY_NOT_PUBLISHED','report':str(output),'quality_score':draft.get('quality_score',0),'editorial_style':draft.get('editorial_style',''),'visual_requested':visual.get('use_visual',False),'visual_type':visual.get('type','none'),'creator_intelligence_samples':creator_patterns.get('sample_count',0)},indent=2))
 
-if __name__ == "__main__": main()
+if __name__=='__main__': main()
