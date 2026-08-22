@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,8 +45,7 @@ def set_stage(stage: str, status: str, reason: str = "", **details) -> dict:
     if stage not in STAGES:
         raise SystemExit(f"Unknown pipeline stage: {stage}")
     data = load()
-    if "stages" not in data:
-        data["stages"] = {}
+    data.setdefault("stages", {})
     data["last_updated_at"] = now()
     data["current_stage"] = stage
     data["stages"][stage] = {
@@ -63,7 +63,24 @@ def set_stage(stage: str, status: str, reason: str = "", **details) -> dict:
     return data
 
 
+def verify_publish() -> int:
+    result_path = Path("/tmp/publish-result.txt")
+    if not result_path.exists():
+        set_stage("verify", "failed", "publish result file missing")
+        return 1
+    result = result_path.read_text(encoding="utf-8", errors="replace")
+    post_id = re.search(r"ID:\s*(\S+)", result)
+    link = next((line.split("Link:", 1)[1].strip() for line in result.splitlines() if line.startswith("Link:")), None)
+    if not post_id or not link:
+        set_stage("verify", "failed", "publisher did not return a Binance post ID and link", result_tail=result[-1200:])
+        return 1
+    set_stage("verify", "success", "Binance publisher returned post ID and link", post_id=post_id.group(1), link=link)
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) >= 2 and sys.argv[1] == "verify-publish":
+        return verify_publish()
     if len(sys.argv) < 3:
         raise SystemExit("usage: pipeline_stage.py <stage> <status> [reason]")
     stage, status = sys.argv[1], sys.argv[2]
