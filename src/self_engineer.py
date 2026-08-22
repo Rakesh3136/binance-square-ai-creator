@@ -1,6 +1,6 @@
 """Bounded autonomous engineering loop for the creator business layer."""
 from __future__ import annotations
-import json, os, re, subprocess, sys
+import json, os, re, subprocess, sys, time, random
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -30,8 +30,27 @@ def api_json(method,url,token,payload=None):
 def gemini_generate(prompt):
     from google import genai
     client=genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    response=client.models.generate_content(model=os.getenv("GEMINI_MODEL","gemini-3.6-flash"),contents=prompt)
-    return str(getattr(response,"text","") or "")
+    primary=os.getenv("GEMINI_MODEL","gemini-3.6-flash")
+    fallback=os.getenv("GEMINI_FALLBACK_MODEL","gemini-2.5-flash")
+    models=[]
+    for model in (primary,fallback):
+        if model and model not in models: models.append(model)
+    errors=[]
+    for model in models:
+        for attempt in range(4):
+            try:
+                response=client.models.generate_content(model=model,contents=prompt)
+                text=str(getattr(response,"text","") or "")
+                if not text.strip(): raise RuntimeError(f"Gemini returned empty response from {model}")
+                return text
+            except Exception as exc:
+                msg=str(exc)
+                transient=("503" in msg or "UNAVAILABLE" in msg or "500" in msg or "INTERNAL" in msg or "429" in msg or "RESOURCE_EXHAUSTED" in msg)
+                errors.append(f"{model} attempt {attempt+1}: {msg[:500]}")
+                if not transient: break
+                if attempt < 3:
+                    time.sleep(min(30,2**attempt)+random.uniform(0.2,1.2))
+    raise RuntimeError("Gemini generation failed after retries/fallback: " + " | ".join(errors))
 
 
 def parse_json(text):
@@ -127,10 +146,8 @@ def publish_change(proposal):
     slug=re.sub(r"[^a-z0-9-]+","-",proposal.get("title","improvement").lower()).strip("-")[:45]
     branch=f"self-engineer/{slug}-{os.getenv('GITHUB_RUN_ID','run')}"
     base=api_json("GET",f"https://api.github.com/repos/{repo}/git/ref/heads/main",token)["object"]["sha"]
-    try:
-        api_json("POST",f"https://api.github.com/repos/{repo}/git/refs",token,{"ref":f"refs/heads/{branch}","sha":base})
-    except RuntimeError as e:
-        raise RuntimeError(f"branch creation failed: {e}")
+    try: api_json("POST",f"https://api.github.com/repos/{repo}/git/refs",token,{"ref":f"refs/heads/{branch}","sha":base})
+    except RuntimeError as e: raise RuntimeError(f"branch creation failed: {e}")
     git("checkout","-b",branch)
     for item in proposal["files"]:
         p=ROOT/item["path"]; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(item["content"],encoding="utf-8"); git("add",item["path"])
@@ -140,12 +157,10 @@ def publish_change(proposal):
         pr=api_json("POST",f"https://api.github.com/repos/{repo}/pulls",token,{"title":f"Self-engineer: {proposal['title']}","head":branch,"base":"main","body":proposal.get("reason","")})
     except RuntimeError as e:
         return {"branch":branch,"merged":False,"pr_creation":"BLOCKED","error":str(e),"next_action":"Enable GitHub Actions permission to create pull requests, or review this branch manually."}
-    merged=False
-    merge_error=None
+    merged=False; merge_error=None
     try:
         if load(POLICY_PATH,{}).get("auto_merge"):
-            result=api_json("PUT",f"https://api.github.com/repos/{repo}/pulls/{pr['number']}/merge",token,{"merge_method":"squash"})
-            merged=bool(result.get("merged"))
+            result=api_json("PUT",f"https://api.github.com/repos/{repo}/pulls/{pr['number']}/merge",token,{"merge_method":"squash"}); merged=bool(result.get("merged"))
     except Exception as e: merge_error=str(e)
     return {"pr_number":pr["number"],"pr_url":pr.get("html_url"),"branch":branch,"merged":merged,"merge_error":merge_error}
 
