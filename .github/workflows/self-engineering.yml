@@ -2,6 +2,11 @@ name: Creator Self Engineering
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "src/self_engineer.py"
+      - "config/self_engineer_policy.json"
+      - ".github/workflows/self-engineering.yml"
   schedule:
     - cron: "17 3 * * *"
 
@@ -50,12 +55,12 @@ jobs:
         run: |
           REPORT="data/live/self_engineering_report.json"
           test -f "$REPORT" || exit 0
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp "$REPORT" /tmp/self_engineering_report.json
           git checkout main
           git pull --ff-only origin main
-          cp "$REPORT" /tmp/self_engineering_report.json
           cp /tmp/self_engineering_report.json data/live/self_engineering_report.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/live/self_engineering_report.json
           git diff --cached --quiet && exit 0
           git commit -m "Record self-engineering cycle"
