@@ -206,20 +206,26 @@ jobs:
             exit 1
           fi
 
+      - name: Update learning model
+        if: ${{ success() }}
+        run: |
+          python src/learning_engine.py
+          python src/pipeline_stage.py learn success "Strategy memory and experiment hypotheses updated"
+
       - name: Mark learning checkpoint
         if: ${{ steps.gate.outputs.publish == 'true' && success() }}
-        run: python src/pipeline_stage.py learn success "Verified publication and metrics are available for the next strategy cycle"
+        run: python src/pipeline_stage.py learn success "Verified publication recorded; learning state updated"
 
       - name: Complete production run
         if: ${{ steps.gate.outputs.publish == 'true' && success() }}
-        run: python src/pipeline_stage.py complete success "Research through publication and recording completed"
+        run: python src/pipeline_stage.py complete success "Research through publication, recording and learning completed"
 
       - name: Save state
         if: ${{ always() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl src/pipeline_stage.py src/workflow_helpers.py src/manual_topic_override.py src/engagement_engine.py
+          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl analytics/strategy_memory.json analytics/post_metrics.jsonl src/pipeline_stage.py src/workflow_helpers.py src/manual_topic_override.py src/engagement_engine.py src/learning_engine.py data/intelligence/creator_patterns.json
           git diff --cached --quiet && exit 0
-          git commit -m "Track end-to-end creator production pipeline"
+          git commit -m "Track creator learning loop"
           git push
