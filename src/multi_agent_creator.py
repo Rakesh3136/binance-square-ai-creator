@@ -24,6 +24,7 @@ MONETIZATION & ATTRIBUTION: Include the natural cashtag for the primary tradeabl
 VISUAL-FIRST: For a single-asset market story, prefer a REAL Binance 1h candlestick chart. Use only real OHLCV-derived levels/patterns. Never invent a pattern or level.
 WRITING: Normal target 180-500 characters; hard maximum 750. First line creates curiosity. Use 2-5 short mobile-friendly lines. Sound conversational, not like a financial report. Do not automatically provide TP/SL/entry calls.
 INTERACTION: End with exactly ONE low-friction question answerable in under five seconds. Avoid generic "What do you think?" and never beg for likes/follows.
+STYLE ROTATION: Do not reuse the same opening cadence, editorial_style, or paragraph structure as the immediately previous post. Prefer visibly different structures such as CHOICE, CHART CHALLENGE, COIN VS COIN, DATA SURPRISE, BREAKOUT/FAKEOUT, NEWS REACTION, LIQUIDATION STORY, TOP MOVERS, quick observation, or mini-story.
 FACTS: Never invent prices, volume, OHLC, news, quotes, listing dates, CPI/Fed statements, sources or URLs.
 Return ONLY valid JSON with research, critique, draft and visual_plan fields.'''
 
@@ -113,6 +114,14 @@ def fmt_money(value):
     return f"${value:.0f}"
 
 
+def _previous_style(preflight):
+    strategy = preflight.get("engagement_strategy") or {}
+    counts = strategy.get("recent_style_counts") or {}
+    if not counts:
+        return ""
+    return max(counts.items(), key=lambda kv: kv[1])[0]
+
+
 def local_market_fallback(live, preflight, memory):
     selected = preflight.get("selected_opportunity") or {}
     item = find_item(live, selected.get("symbol"))
@@ -139,43 +148,74 @@ def local_market_fallback(live, preflight, memory):
     resistance = max(highs[-8:]) if highs else last
     support = min(lows[-8:]) if lows else last
     category = str(selected.get("category") or "market_opportunity").lower()
-    styles = ["shock", "debate", "watchlist", "story", "technical"]
-    style = styles[len(memory.get("recent_performance_observations") or []) % len(styles)]
-    if category == "top_gainers":
-        hook = f"${symbol} just woke up: {move:+.1f}% today."
-        question = f"Would you chase ${symbol}, or wait for a pullback?"
-    elif category == "top_losers":
-        hook = f"${symbol} just got hit hard: {move:+.1f}% today."
-        question = f"Capitulation or another leg down for ${symbol}?"
-    elif category == "volume_leaders":
-        hook = f"Something changed in ${symbol}: volume is suddenly {fmt_money(volume)}."
-        question = f"Real rotation into ${symbol}, or just noise?"
-    elif category == "new_listings":
-        hook = f"New listing ${symbol} is already showing serious volatility."
-        question = f"Would you watch ${symbol}, or wait for price to settle?"
-    elif category == "high_volatility":
-        hook = f"${symbol} is moving violently today — {move:+.1f}% with a {intraday:.1f}% range."
-        question = "Breakout opportunity or volatility trap?"
+    engagement = preflight.get("engagement_strategy") or {}
+    experiment = engagement.get("experiment") or {}
+    exp_id = str(engagement.get("experiment_id") or selected.get("experiment_id") or "A").upper()
+    exp_format = str(experiment.get("format") or "CHOICE").upper()
+    previous_style = _previous_style(preflight)
+
+    # Each experiment has a genuinely different fallback structure. This is
+    # intentionally not driven by a simple counter, because a counter can keep
+    # producing the same prose pattern when AI is unavailable for a long period.
+    if exp_id == "A" or exp_format == "CHOICE":
+        hook = f"${symbol} moved {move:+.1f}% today. The interesting part is what price does after the first impulse."
+        detail = f"Last ${last:.8g} • {fmt_money(volume)} spot volume" if volume else f"Last ${last:.8g}"
+        question = f"Would you chase ${symbol} now, or wait for a pullback?"
+        style = "fallback_choice"
+    elif exp_id == "B" or exp_format == "CHART CHALLENGE":
+        hook = f"Quick chart challenge on ${symbol}: price is sitting after a {move:+.1f}% move."
+        detail = f"Observed 1h range: ${support:.8g} → ${resistance:.8g}"
+        question = "Which level would you mark first: the recent high or the recent low?"
+        style = "fallback_chart_challenge"
+    elif exp_id == "C" or exp_format == "COIN VS COIN":
+        # Use one real comparison partner from the current market snapshot.
+        partner = next((x for x in all_market_items(live) if str(x.get("symbol", "")).upper() != str(item.get("symbol", "")).upper() and x.get("price_change_percent") is not None), None)
+        psym = str(partner.get("symbol", "BTC")).upper().replace("USDT", "") if partner else "BTC"
+        try: pmove = float(partner.get("price_change_percent")) if partner else 0.0
+        except Exception: pmove = 0.0
+        hook = f"${symbol} vs ${psym}: one market move is clearly stronger right now."
+        detail = f"${symbol} {move:+.1f}% | ${psym} {pmove:+.1f}%"
+        question = f"Which chart would you watch next: ${symbol} or ${psym}?"
+        style = "fallback_coin_vs_coin"
+    elif exp_id == "D" or exp_format == "DATA SURPRISE":
+        hook = f"The number that stands out on ${symbol}: {intraday:.1f}% intraday range."
+        detail = f"Spot volume {fmt_money(volume)} • last ${last:.8g}"
+        question = "Did you notice the volatility before looking at the headline move?"
+        style = "fallback_data_surprise"
+    elif exp_id == "E" or exp_format == "BREAKOUT OR FAKEOUT":
+        hook = f"${symbol} is testing the edge of its recent range after a {move:+.1f}% move."
+        detail = f"Resistance ${resistance:.8g} • support ${support:.8g}"
+        question = "Breakout or fakeout?"
+        style = "fallback_breakout_fakeout"
+    elif exp_id == "F" or exp_format == "NEWS REACTION":
+        hook = f"${symbol} has the market's attention today. Here's the price action I would watch."
+        detail = f"{move:+.1f}% today • {fmt_money(volume)} spot volume" if volume else f"{move:+.1f}% today"
+        question = "Bullish follow-through or headline fade?"
+        style = "fallback_news_reaction"
+    elif exp_id == "G" or exp_format == "LIQUIDATION STORY":
+        hook = f"${symbol}: this move looks more like a flush than a quiet trend."
+        detail = f"{intraday:.1f}% intraday range • ${support:.8g} low" if intraday else f"Observed low ${support:.8g}"
+        question = "Reversal or continuation from here?"
+        style = "fallback_liquidation_story"
     else:
-        hook = f"${symbol} is making a move that deserves a closer look."
-        question = f"Bullish setup or fakeout for ${symbol}?"
-    if style == "debate":
-        hook = f"The interesting part isn't the {move:+.1f}% move in ${symbol}. It's what happens next."
-    elif style == "watchlist":
-        hook = f"${symbol} just moved onto my watchlist. Here's why."
-    elif style == "story":
-        hook = f"One chart is telling a very different story today: ${symbol}."
-    elif style == "technical":
-        hook = f"${symbol}: the next few candles matter more than the headline move."
-    price = f"Last: ${last:.8g}" if last else ""
-    levels = f"Observed range: ${support:.8g}–${resistance:.8g}" if support and resistance else ""
-    stats = f"{price} • {fmt_money(volume)} spot volume" if volume else price
-    range_line = f"{intraday:.1f}% intraday range" if intraday else ""
-    text = "\n".join(x for x in (hook, stats, range_line, levels, question) if x)
+        hook = f"Top-mover check: ${symbol} is up {move:+.1f}% with {fmt_money(volume)} in spot volume."
+        detail = f"Last ${last:.8g} • range {intraday:.1f}%" if intraday else f"Last ${last:.8g}"
+        question = f"Chase ${symbol}, fade it, or wait?"
+        style = "fallback_top_movers"
+
+    # Absolute anti-repetition guard: if the strategy reports the same style as
+    # recent content, switch the structure without changing the market facts.
+    if previous_style == style.upper():
+        hook = f"One detail on ${symbol} is easy to miss: {intraday:.1f}% intraday range."
+        detail = f"Last ${last:.8g} • {fmt_money(volume)} spot volume" if volume else f"Last ${last:.8g}"
+        question = f"Is ${symbol} setting up, or simply getting noisy?"
+        style = "fallback_quick_observation"
+
+    text = "\n".join(x for x in (hook, detail, question) if x)
     return {
         "research": {"summary": "Quota-safe draft built only from the verified live market snapshot.", "strongest_signal": symbol, "source_mode": "local_fallback", "opportunity_score": float(selected.get("adjusted_score") or 80)},
         "critique": {"summary": "Gemini was unavailable; deterministic editorial fallback preserved verified market facts.", "reason": "gemini_quota_or_rate_limit", "revised_opportunity_score": float(selected.get("adjusted_score") or 80)},
-        "draft": {"post": text[:740], "text": text[:740], "hook": hook, "discussion_question": question, "quality_score": 82, "editorial_style": f"fallback_{style}", "generation_mode": "LOCAL_FALLBACK"},
+        "draft": {"post": text[:740], "text": text[:740], "hook": hook, "discussion_question": question, "quality_score": 82, "editorial_style": style, "generation_mode": "LOCAL_FALLBACK", "experiment_id": exp_id, "experiment_format": exp_format},
         "visual_plan": {"type": "candlestick_chart", "use_visual": bool(candles), "title": f"{symbol}: real 1H market structure", "data_points": [{"symbol": symbol}], "purpose": "Show real OHLCV structure, observed levels and detected patterns."}
     }
 
@@ -233,7 +273,7 @@ def main():
             "\n\nLIVE MARKET:\n" + json.dumps(live, ensure_ascii=False, indent=2) +
             "\n\nNEWS:\n" + json.dumps(news, ensure_ascii=False, indent=2) +
             "\n\nOUR STRATEGY MEMORY:\n" + json.dumps(memory, ensure_ascii=False, indent=2) +
-            "\n\nCreate ONE original short visual-first post."
+            "\n\nCreate ONE original short visual-first post. It must use a visibly different editorial structure from the previous post and follow the selected experiment."
         )
         result = parse_json(call_creator(client, prompt))
         generation_mode = "GEMINI"
@@ -243,6 +283,7 @@ def main():
     draft = normalize_draft(result.get("draft"))
     visual = normalize_visual(result.get("visual_plan"))
     draft["experiment_id"] = (preflight.get("engagement_strategy") or {}).get("experiment_id") or preflight.get("recommended_experiment") or "A"
+    draft["experiment_format"] = ((preflight.get("engagement_strategy") or {}).get("experiment") or {}).get("format")
     draft["symbol"] = selected.get("symbol") or research.get("strongest_signal") or ""
     draft["content_category"] = selected.get("category") or selected.get("reason") or "market_opportunity"
     draft["publication_status"] = "DRAFT_ONLY_NOT_PUBLISHED"
