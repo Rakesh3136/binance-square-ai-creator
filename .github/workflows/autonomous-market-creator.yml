@@ -1,71 +1,66 @@
 name: Autonomous Market Creator
 
 on:
+  schedule:
+    - cron: '7,37 * * * *'
   workflow_dispatch:
     inputs:
       topic:
         description: "Optional topic; leave blank for autonomous selection"
         required: false
         default: ""
-  schedule:
-    - cron: "7,37 * * * *"
 
-permissions:
-  contents: write
-
-concurrency:
-  group: autonomous-market-creator
-  cancel-in-progress: true
+env:
+  PYTHONUNBUFFERED: "1"
 
 jobs:
-  creator:
+  create-and-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install --disable-pip-version-check "google-genai>=1.0.0" matplotlib
+        run: pip install -r requirements.txt
 
-      - name: Initialize pipeline
-        run: python src/pipeline_stage.py scan running "Starting end-to-end production run"
-
-      - name: Scan live Binance market
+      - name: Benchmark successful public Square creators
         run: |
-          if python src/live_market_scanner.py; then
-            python src/pipeline_stage.py scan success "Live market scan completed"
+          if python src/creator_benchmark.py; then
+            python src/pipeline_stage.py creator_benchmark success "Updated public creator pattern intelligence"
           else
-            python src/pipeline_stage.py scan failed "Live market scanner failed"
-            exit 1
+            python src/pipeline_stage.py creator_benchmark blocked "Creator benchmark unavailable; continue with existing intelligence"
           fi
 
-      - name: Scan crypto, macro and regulatory news
-        run: |
-          if python src/news_scanner.py; then
-            python src/pipeline_stage.py select success "News and market inputs available for opportunity selection"
-          else
-            python src/pipeline_stage.py select failed "News scanner failed"
-            exit 1
-          fi
-
-      - name: Human-like editorial preflight
+      - name: Run market and editorial preflight
         env:
           TOPIC: ${{ inputs.topic }}
         run: |
-          if python src/editorial_preflight.py; then
-            if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
-          else
-            python src/pipeline_stage.py select failed "Editorial preflight failed"
-            exit 1
+          python src/editorial_preflight.py
+          if [ -n "$TOPIC" ]; then
+            python - <<'PY'
+            import json
+            from pathlib import Path
+            p=Path('data/live/editorial_preflight.json')
+            d=json.loads(p.read_text())
+            if not isinstance(d, dict):
+                d={}
+            d['run_ai']=True
+            d['reason']='manual_topic'
+            p.write_text(json.dumps(d, indent=2))
+            PY
           fi
 
-      - name: Engagement-first opportunity rotation
+      - name: Select engagement experiment
+        env:
+          TOPIC: ${{ inputs.topic }}
         run: |
           if python src/engagement_engine.py; then
             python src/pipeline_stage.py select success "Opportunity lane selected"
@@ -188,44 +183,25 @@ jobs:
             exit 1
           fi
 
-      - name: Verify Binance publication
-        if: ${{ steps.gate.outputs.publish == 'true' && success() }}
-        run: python src/pipeline_stage.py verify-publish
+      - name: Record publication
+        if: ${{ steps.gate.outputs.publish == 'true' }}
+        run: python src/workflow_helpers.py record
 
-      - name: Record publication metadata
-        if: ${{ steps.gate.outputs.publish == 'true' && success() }}
-        env:
-          DRAFT_PATH: ${{ steps.draft.outputs.path }}
-          MODE: ${{ steps.gate.outputs.mode }}
+      - name: Learn from performance and creator benchmarks
+        if: ${{ always() }}
         run: |
-          python src/pipeline_stage.py record running "Recording verified publication metadata"
-          if python src/workflow_helpers.py record; then
-            python src/pipeline_stage.py record success "Publication metadata recorded"
+          if python src/learning_engine.py; then
+            python src/pipeline_stage.py learning success "Updated strategy memory from our performance and public creator patterns"
           else
-            python src/pipeline_stage.py record failed "Publication metadata recording failed"
-            exit 1
+            python src/pipeline_stage.py learning blocked "Learning update unavailable"
           fi
 
-      - name: Update learning model
-        if: ${{ success() }}
-        run: |
-          python src/learning_engine.py
-          python src/pipeline_stage.py learn success "Strategy memory and experiment hypotheses updated"
-
-      - name: Mark learning checkpoint
-        if: ${{ steps.gate.outputs.publish == 'true' && success() }}
-        run: python src/pipeline_stage.py learn success "Verified publication recorded; learning state updated"
-
-      - name: Complete production run
-        if: ${{ steps.gate.outputs.publish == 'true' && success() }}
-        run: python src/pipeline_stage.py complete success "Research through publication, recording and learning completed"
-
-      - name: Save state
+      - name: Commit intelligence state
         if: ${{ always() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live/ data/reports/ data/visuals/ analytics/ai_usage.json analytics/publication_log.jsonl analytics/strategy_memory.json analytics/post_metrics.jsonl src/pipeline_stage.py src/workflow_helpers.py src/manual_topic_override.py src/engagement_engine.py src/learning_engine.py data/intelligence/creator_patterns.json
+          git add data/intelligence analytics data/live
           git diff --cached --quiet && exit 0
-          git commit -m "Track creator learning loop"
-          git push
+          git commit -m "Update creator intelligence and learning state"
+          git push origin main
