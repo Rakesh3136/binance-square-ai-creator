@@ -173,9 +173,9 @@ def local_market_fallback(live, preflight, memory):
     range_line = f"{intraday:.1f}% intraday range" if intraday else ""
     text = "\n".join(x for x in (hook, stats, range_line, levels, question) if x)
     return {
-        "research": {"summary": "Quota-safe draft built only from the verified live market snapshot.", "strongest_signal": symbol, "source_mode": "local_fallback"},
-        "critique": {"summary": "Gemini was unavailable; deterministic editorial fallback preserved verified market facts.", "reason": "gemini_quota_or_rate_limit"},
-        "draft": {"text": text[:740], "quality_score": 82, "editorial_style": f"fallback_{style}", "generation_mode": "LOCAL_FALLBACK"},
+        "research": {"summary": "Quota-safe draft built only from the verified live market snapshot.", "strongest_signal": symbol, "source_mode": "local_fallback", "opportunity_score": float(selected.get("adjusted_score") or 80)},
+        "critique": {"summary": "Gemini was unavailable; deterministic editorial fallback preserved verified market facts.", "reason": "gemini_quota_or_rate_limit", "revised_opportunity_score": float(selected.get("adjusted_score") or 80)},
+        "draft": {"post": text[:740], "text": text[:740], "hook": hook, "discussion_question": question, "quality_score": 82, "editorial_style": f"fallback_{style}", "generation_mode": "LOCAL_FALLBACK"},
         "visual_plan": {"type": "candlestick_chart", "use_visual": bool(candles), "title": f"{symbol}: real 1H market structure", "data_points": [{"symbol": symbol}], "purpose": "Show real OHLCV structure, observed levels and detected patterns."}
     }
 
@@ -190,15 +190,14 @@ def local_news_fallback(news):
         return None
     text = f"This is the crypto story I’m watching right now:\n{title}\n\nBullish catalyst or headline noise?"
     return {
-        "research": {"summary": "Quota-safe news draft built from the latest supplied news snapshot.", "source_mode": "local_news_fallback"},
-        "critique": {"summary": "Gemini unavailable; kept the supplied headline unchanged rather than inventing context."},
-        "draft": {"text": text[:740], "quality_score": 78, "editorial_style": "fallback_news", "generation_mode": "LOCAL_FALLBACK"},
+        "research": {"summary": "Quota-safe news draft built from the latest supplied news snapshot.", "source_mode": "local_news_fallback", "opportunity_score": 80},
+        "critique": {"summary": "Gemini unavailable; kept the supplied headline unchanged rather than inventing context.", "revised_opportunity_score": 80},
+        "draft": {"post": text[:740], "text": text[:740], "hook": "This is the crypto story I’m watching right now:", "discussion_question": "Bullish catalyst or headline noise?", "quality_score": 78, "editorial_style": "fallback_news", "generation_mode": "LOCAL_FALLBACK"},
         "visual_plan": {"type": "none", "use_visual": False}
     }
 
 
 def call_creator(client, prompt):
-    # Exactly one Gemini request. A 429 is handled by safe_creator_runner.
     response = client.interactions.create(model=MODEL, input=prompt, system_instruction=SYSTEM)
     text = (response.output_text or "").strip()
     if not text:
@@ -248,6 +247,8 @@ def main():
     draft["content_category"] = selected.get("category") or selected.get("reason") or "market_opportunity"
     draft["publication_status"] = "DRAFT_ONLY_NOT_PUBLISHED"
     draft["generation_mode"] = generation_mode
+    if not draft.get("post") and draft.get("text"):
+        draft["post"] = str(draft["text"]).strip()
     allowed = {"candlestick_chart", "market_bar_chart", "market_comparison", "market_range_chart", "news_timeline", "text_card", "none"}
     if visual.get("type") not in allowed:
         visual["type"] = "none"
