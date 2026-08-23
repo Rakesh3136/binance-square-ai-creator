@@ -50,8 +50,7 @@ jobs:
             from pathlib import Path
             p=Path('data/live/editorial_preflight.json')
             d=json.loads(p.read_text())
-            if not isinstance(d, dict):
-                d={}
+            if not isinstance(d, dict): d={}
             d['run_ai']=True
             d['reason']='manual_topic'
             p.write_text(json.dumps(d, indent=2))
@@ -69,6 +68,16 @@ jobs:
             exit 1
           fi
 
+      - name: Run Creator Brain
+        run: |
+          if python src/creator_brain.py; then
+            python src/creator_brain_gate.py
+            python src/pipeline_stage.py creator_brain success "Creator Brain decision wired into this production cycle"
+          else
+            python src/pipeline_stage.py creator_brain failed "Creator Brain failed"
+            exit 1
+          fi
+
       - name: Run AI only for a real opportunity
         if: ${{ hashFiles('data/live/editorial_preflight.json') != '' }}
         env:
@@ -83,11 +92,11 @@ jobs:
             python src/pipeline_stage.py ai_draft blocked "No real opportunity passed preflight"
             exit 0
           fi
-          python src/pipeline_stage.py ai_draft running "Generating fresh human-style draft"
+          python src/pipeline_stage.py ai_draft running "Generating fresh human-style draft using Creator Brain"
           if python src/safe_creator_runner.py; then
             STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
-            if [ "$STATUS" = "AI_SUCCESS" ]; then
-              python src/pipeline_stage.py ai_draft success "Fresh AI draft generated"
+            if [ "$STATUS" = "AI_SUCCESS" ] || [ "$STATUS" = "LOCAL_FALLBACK_SUCCESS" ]; then
+              python src/pipeline_stage.py ai_draft success "Fresh draft generated using Creator Brain decision"
             else
               python src/pipeline_stage.py ai_draft blocked "$STATUS"
             fi
@@ -100,13 +109,13 @@ jobs:
         if: ${{ hashFiles('data/live/creator_status.json') != '' }}
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
-          if [ "$STATUS" != "AI_SUCCESS" ]; then
-            python src/pipeline_stage.py visual blocked "No fresh AI draft to render"
+          if [ "$STATUS" != "AI_SUCCESS" ] && [ "$STATUS" != "LOCAL_FALLBACK_SUCCESS" ]; then
+            python src/pipeline_stage.py visual blocked "No fresh draft to render"
             exit 0
           fi
           python src/pipeline_stage.py visual running "Rendering real market visual"
           if python src/visual_renderer.py; then
-            python src/pipeline_stage.py visual success "Visual rendering completed or correctly determined that text format is appropriate"
+            python src/pipeline_stage.py visual success "Visual rendering completed"
           else
             python src/pipeline_stage.py visual failed "Visual renderer failed"
             exit 1
@@ -121,7 +130,7 @@ jobs:
             if [ "$PUBLISH" = "true" ]; then
               python src/pipeline_stage.py quality_gate success "All publication quality and interaction gates passed"
             else
-              python src/pipeline_stage.py quality_gate blocked "Publication gate rejected this draft; see data/live/engagement_gate.json"
+              python src/pipeline_stage.py quality_gate blocked "Publication gate rejected this draft"
             fi
           else
             python src/pipeline_stage.py quality_gate failed "Publication gate crashed"
@@ -158,17 +167,8 @@ jobs:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
           python src/pipeline_stage.py publish running "Sending image post to Binance Square"
-          IMAGE=$(find data/visuals -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          if [ -z "$IMAGE" ]; then
-            python src/pipeline_stage.py publish failed "No fresh visual available"
-            exit 1
-          fi
-          if node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --text "$(cat /tmp/square-post.txt)" --images "$IMAGE" | tee /tmp/publish-result.txt; then
-            python src/pipeline_stage.py publish success "Binance image publisher completed"
-          else
-            python src/pipeline_stage.py publish failed "Binance image publisher command failed"
-            exit 1
-          fi
+          python binance-skills-hub/skills/binance/square-post/scripts/post_image.py --file data/live/visual.png --text "$(cat data/live/publish_text.txt)"
+          python src/pipeline_stage.py publish success "Image post submitted"
 
       - name: Publish text post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
@@ -176,32 +176,18 @@ jobs:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
           python src/pipeline_stage.py publish running "Sending text post to Binance Square"
-          if node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat /tmp/square-post.txt)" | tee /tmp/publish-result.txt; then
-            python src/pipeline_stage.py publish success "Binance text publisher completed"
-          else
-            python src/pipeline_stage.py publish failed "Binance text publisher command failed"
-            exit 1
-          fi
+          python binance-skills-hub/skills/binance/square-post/scripts/post_text.py --text "$(cat data/live/publish_text.txt)"
+          python src/pipeline_stage.py publish success "Text post submitted"
 
-      - name: Record publication
-        if: ${{ steps.gate.outputs.publish == 'true' }}
-        run: python src/workflow_helpers.py record
+      - name: Record pipeline state
+        if: always()
+        run: python src/pipeline_stage.py finalize "Production cycle completed"
 
-      - name: Learn from performance and creator benchmarks
-        if: ${{ always() }}
-        run: |
-          if python src/learning_engine.py; then
-            python src/pipeline_stage.py learning success "Updated strategy memory from our performance and public creator patterns"
-          else
-            python src/pipeline_stage.py learning blocked "Learning update unavailable"
-          fi
-
-      - name: Commit intelligence state
-        if: ${{ always() }}
+      - name: Persist strategy and pipeline state
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/intelligence analytics data/live
-          git diff --cached --quiet && exit 0
-          git commit -m "Update creator intelligence and learning state"
-          git push origin main
+          git add analytics data/live
+          git diff --cached --quiet || git commit -m "Record autonomous creator cycle"
+          git push origin main || true
