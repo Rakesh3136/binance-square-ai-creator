@@ -9,9 +9,15 @@ from pathlib import Path
 
 OUT = Path("data/live/pipeline_status.json")
 
+# Keep this list aligned with every stage name used by the production workflow.
+# ``finalize`` is intentionally supported because the workflow uses it as the
+# always-run terminal bookkeeping step.
 STAGES = [
+    "creator_benchmark",
+    "intelligence",
     "scan",
     "select",
+    "creator_brain",
     "ai_draft",
     "visual",
     "quality_gate",
@@ -20,6 +26,7 @@ STAGES = [
     "record",
     "learn",
     "complete",
+    "finalize",
 ]
 
 
@@ -31,7 +38,8 @@ def load() -> dict:
     if not OUT.exists():
         return {"run_started_at": now(), "stages": {}}
     try:
-        return json.loads(OUT.read_text(encoding="utf-8"))
+        data = json.loads(OUT.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {"run_started_at": now(), "stages": {}}
     except Exception:
         return {"run_started_at": now(), "stages": {}}
 
@@ -58,6 +66,8 @@ def set_stage(stage: str, status: str, reason: str = "", **details) -> dict:
         data["last_successful_stage"] = stage
     if status in {"failed", "blocked"}:
         data["blocked_at"] = stage
+    if stage == "finalize":
+        data["run_finished_at"] = now()
     save(data)
     print(json.dumps(data, indent=2, ensure_ascii=False))
     return data
