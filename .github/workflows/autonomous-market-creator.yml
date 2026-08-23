@@ -39,6 +39,15 @@ jobs:
             python src/pipeline_stage.py creator_benchmark blocked "Creator benchmark unavailable; continue with existing intelligence"
           fi
 
+      - name: Run full creator intelligence phases
+        run: |
+          if python src/run_creator_intelligence.py; then
+            python src/pipeline_stage.py intelligence success "Audience, experiments, timing, visuals, thesis and evolution intelligence updated"
+          else
+            python src/pipeline_stage.py intelligence failed "Creator intelligence phase failed"
+            exit 1
+          fi
+
       - name: Run market and editorial preflight
         env:
           TOPIC: ${{ inputs.topic }}
