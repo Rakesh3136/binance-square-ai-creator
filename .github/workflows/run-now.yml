@@ -15,11 +15,16 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Dispatch autonomous creator
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           gh workflow run autonomous-market-creator.yml \
             --repo Rakesh3136/binance-square-ai-creator \
             --ref main \
             --field topic="${{ inputs.topic }}"
+          echo "Autonomous Market Creator dispatched successfully."
