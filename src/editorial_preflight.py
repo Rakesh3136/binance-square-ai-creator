@@ -23,8 +23,15 @@ LANES = ["top_gainers", "top_losers", "volume_leaders", "new_listings", "high_vo
 
 def load(path):
     if not path.exists(): return {}
-    try: return json.loads(path.read_text(encoding="utf-8"))
-    except Exception: return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+
+def rows(value):
+    return value if isinstance(value, list) else []
 
 
 def extract_symbols(text):
@@ -36,20 +43,22 @@ def extract_symbols(text):
 
 
 def recent_publications():
-    rows=[]; cutoff=datetime.now(timezone.utc)-timedelta(hours=24)
-    if not PUBLICATIONS.exists(): return rows
+    rows_out=[]; cutoff=datetime.now(timezone.utc)-timedelta(hours=24)
+    if not PUBLICATIONS.exists(): return rows_out
     for line in PUBLICATIONS.read_text(encoding="utf-8").splitlines():
         try:
-            row=json.loads(line); dt=datetime.fromisoformat(str(row.get("published_at","")).replace("Z","+00:00"))
+            row=json.loads(line)
+            if not isinstance(row,dict): continue
+            dt=datetime.fromisoformat(str(row.get("published_at","")).replace("Z","+00:00"))
             if dt >= cutoff:
                 raw=" ".join(str(row.get(k) or "") for k in ("symbol","selected_lane_symbol","topic"))
-                rows.append({**row,"_symbols":extract_symbols(raw),"_dt":dt})
+                rows_out.append({**row,"_symbols":extract_symbols(raw),"_dt":dt})
         except Exception: pass
-    return rows
+    return rows_out
 
 
 def add_market_candidate(pool, category, item, boost=0.0):
-    if not item: return
+    if not isinstance(item,dict): return
     symbol=str(item.get("symbol") or "").upper()
     if not symbol: return
     raw=float(item.get("content_signal_score") or 0)
@@ -63,18 +72,19 @@ def add_market_candidate(pool, category, item, boost=0.0):
 def main():
     market=load(MARKET); news=load(NEWS); memory=load(MEMORY); feedback=load(FEEDBACK); publications=recent_publications()
     publication_counts=Counter(); category_counts=Counter(); last_asset_time={}
+    observations=rows(memory.get("recent_performance_observations"))
     for row in publications:
         for symbol in row.get("_symbols",set()):
             publication_counts[symbol]+=1; last_asset_time[symbol]=max(last_asset_time.get(symbol,datetime.min.replace(tzinfo=timezone.utc)),row["_dt"])
         if row.get("content_category"): category_counts[str(row["content_category"]).lower()]+=1
-    memory_counts=Counter(str(x.get("topic") or "").upper().replace("USDT","") for x in memory.get("recent_performance_observations") or [] if x.get("topic"))
+    memory_counts=Counter(str(x.get("topic") or "").upper().replace("USDT","") for x in observations if isinstance(x,dict) and x.get("topic"))
 
     pool=[]
-    for item in (market.get("top_gainers") or [])[:10]: add_market_candidate(pool,"top_gainers",item)
-    for item in (market.get("top_losers") or [])[:10]: add_market_candidate(pool,"top_losers",item)
-    for item in (market.get("highest_volume") or [])[:10]: add_market_candidate(pool,"volume_leaders",item)
-    for item in (market.get("new_listing_market") or [])[:10]: add_market_candidate(pool,"new_listings",item,5)
-    signals=market.get("top_content_signals") or []
+    for item in rows(market.get("top_gainers"))[:10]: add_market_candidate(pool,"top_gainers",item)
+    for item in rows(market.get("top_losers"))[:10]: add_market_candidate(pool,"top_losers",item)
+    for item in rows(market.get("highest_volume"))[:10]: add_market_candidate(pool,"volume_leaders",item)
+    for item in rows(market.get("new_listing_market"))[:10]: add_market_candidate(pool,"new_listings",item,5)
+    signals=[x for x in rows(market.get("top_content_signals")) if isinstance(x,dict)]
     for item in sorted(signals,key=lambda x:float(x.get("intraday_range_percent") or 0),reverse=True)[:8]: add_market_candidate(pool,"high_volatility",item,3)
     for item in [x for x in signals if str(x.get("symbol") or "") in {"BTCUSDT","ETHUSDT"}]: add_market_candidate(pool,"technical_setup",item,4)
     pool=list({(x["category"],x["topic"]):x for x in pool}.values())
@@ -87,21 +97,19 @@ def main():
         c.update({"recent_count":recent,"memory_count":mem,"category_recent_count":cat,"cooldown_active":active,"adjusted_score":round(c["raw_score"]-min(55,recent*22)-min(54,mem*MEMORY_REPEAT_PENALTY)-min(35,cat*CATEGORY_REPEAT_PENALTY)-(45 if active else 0),2),"repeated":recent>=2 or mem>=MEMORY_HARD_BLOCK_COUNT or active})
 
     fresh_news=0
-    for article in news.get("articles") or []:
+    for article in rows(news.get("articles")):
+        if not isinstance(article,dict): continue
         try:
             dt=datetime.fromisoformat(str(article.get("published_at","")).replace("Z","+00:00"))
             if now-dt<=timedelta(minutes=NEWS_FRESH_MINUTES): fresh_news+=1
         except Exception: pass
 
-    # Portfolio planner can suggest a lane, while feedback determines whether we should
-    # favor an experiment. It never overrides a verified breaking-news opportunity.
-    portfolio_lane=str((load(PORTFOLIO).get("selected_lane") or "")).lower()
-    feedback_rows=feedback.get("ranked_experiments") or []
-    best_experiment=(feedback_rows[0].get("experiment") if feedback_rows else None)
+    portfolio=load(PORTFOLIO); portfolio_lane=str(portfolio.get("selected_lane") or "").lower()
+    feedback_rows=rows(feedback.get("ranked_experiments")); best_experiment=(feedback_rows[0].get("experiment") if feedback_rows and isinstance(feedback_rows[0],dict) else None)
     eligible=[c for c in pool if not c["repeated"]] or [c for c in pool if c["adjusted_score"]>0]
     if portfolio_lane:
         lane_candidates=[c for c in eligible if c["category"]==portfolio_lane]
-        if lane_candidates: eligible=lane_candidates+ [c for c in eligible if c not in lane_candidates]
+        if lane_candidates: eligible=lane_candidates+[c for c in eligible if c not in lane_candidates]
     best=max(eligible,key=lambda x:x["adjusted_score"],default=None)
     market_ok=bool(best and best["adjusted_score"]>=MIN_MARKET_SCORE)
     run_ai=market_ok or fresh_news>0
