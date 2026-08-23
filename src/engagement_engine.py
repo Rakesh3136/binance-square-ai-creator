@@ -1,7 +1,7 @@
 """Distribution + engagement experimentation layer.
 
 Views alone are not treated as success. The creator rotates hooks, formats,
-assets and categories, while using observed interaction rates to choose future
+visuals and categories, while using observed interaction rates to choose future
 experiments. Missing metrics are never treated as zero-performance evidence.
 """
 from __future__ import annotations
@@ -58,12 +58,13 @@ def main():
     pre=load(PREFLIGHT,{})
     candidates=pre.get("candidate_pool") or []
     history=pubs()
-    asset_count=Counter();cat_count=Counter();exp_count=Counter();rows_by_exp=defaultdict(list);rows_by_cat=defaultdict(list)
+    asset_count=Counter();cat_count=Counter();exp_count=Counter();style_count=Counter();rows_by_exp=defaultdict(list);rows_by_cat=defaultdict(list)
     for r in history:
-        s=sym(r); c=str(r.get("content_category") or r.get("category") or "").lower(); e=str(r.get("experiment_id") or r.get("editorial_experiment") or "").upper()
+        s=sym(r); c=str(r.get("content_category") or r.get("category") or "").lower(); e=str(r.get("experiment_id") or r.get("editorial_experiment") or "").upper(); st=str(r.get("editorial_style") or "").strip().upper()
         if s:asset_count[s]+=1
         if c:cat_count[c]+=1;rows_by_cat[c].append(r)
         if e:exp_count[e]+=1;rows_by_exp[e].append(r)
+        if st:style_count[st]+=1
 
     ranked=[]
     for c in candidates:
@@ -81,18 +82,12 @@ def main():
     if untested:exp=untested
     else:
         def exp_score(x):
-            rs=rate(rows_by_exp[x["id"]],"replies")
-            fs=rate(rows_by_exp[x["id"]],"followers_gained")
-            ls=rate(rows_by_exp[x["id"]],"likes")
-            ss=rate(rows_by_exp[x["id"]],"shares")
-            # No evidence => neutral; small samples are capped by confidence.
+            rs=rate(rows_by_exp[x["id"]],"replies"); fs=rate(rows_by_exp[x["id"]],"followers_gained"); ls=rate(rows_by_exp[x["id"]],"likes"); ss=rate(rows_by_exp[x["id"]],"shares")
             n=len(rows_by_exp[x["id"]]); conf=min(1.0,n/10)
             observed=(0.50*(rs or 0)+0.30*(fs or 0)+0.12*(ls or 0)+0.08*(ss or 0))
             return observed*conf
         exp=max(EXPERIMENTS,key=exp_score)
 
-    # If feedback explicitly reports a weak format, keep it in the rotation but
-    # don't let it dominate. If a format has strong evidence, give it more tests.
     category=str(selected.get("category") or "news_and_macro").lower()
     strategy={
       "primary_goal":"maximize genuine interaction and follower conversion, not posting volume",
@@ -103,21 +98,23 @@ def main():
       "visual_rule":"single-asset technical story => real OHLCV candlestick chart with only data-supported annotations",
       "question_rule":"one question only; answerable in under 5 seconds; prefer A/B, breakout/fakeout, or precise chart observation",
       "length_rule":"180-500 characters normally; hard maximum 750 unless genuinely necessary",
-      "avoid":["generic What do you think?","follow/like begging","fake urgency","guaranteed returns","long analyst report","automatic TP/SL"],
+      "style_rule":"Never repeat the same editorial_style in consecutive posts. Rotate across shock, debate, chart challenge, data surprise, comparison, news reaction, liquidation story and quick take. A repeated style requires a fresh verified event and a documented reason.",
+      "avoid":["generic What do you think?","follow/like begging","fake urgency","guaranteed returns","long analyst report","automatic TP/SL","reusing the same opening sentence pattern"],
       "monetization":"use relevant cashtag or real chart widget naturally when supported; never promise earnings",
+      "recent_style_counts":dict(style_count),
     }
     selected=dict(selected)
     selected["instruction"]=(f"Use {category.replace('_',' ')} and experiment {exp['id']} ({exp['format']}). "
       f"Hook around {exp['hook']}; end with exactly one easy question: {exp['question']}. "
       "Keep it short, visual-first and conversational. Do not repeat recently covered assets without a major verified event. "
-      "Use historical feedback only as evidence, not as a guarantee of future performance.")
+      "Do not reuse the previous editorial style or opening cadence. Choose a visibly different structure from the previous post.")
     selected["engagement_strategy"]=strategy
 
     perf_summary={}
     for e in EXPERIMENTS:
         rs=rate(rows_by_exp[e["id"]],"replies");fs=rate(rows_by_exp[e["id"]],"followers_gained");ls=rate(rows_by_exp[e["id"]],"likes");ss=rate(rows_by_exp[e["id"]],"shares")
         perf_summary[e["id"]]={"posts":len(rows_by_exp[e["id"]]),"reply_rate":rs,"follower_rate":fs,"like_rate":ls,"share_rate":ss,"confidence":min(1.0,len(rows_by_exp[e["id"]])/10)}
-    result={"generated_at":datetime.now(timezone.utc).isoformat(),"selected":selected,"ranked_candidates":ranked[:15],"recent_assets":dict(asset_count),"recent_categories":dict(cat_count),"experiment_counts":dict(exp_count),"experiments":EXPERIMENTS,"performance":perf_summary,"interaction_blueprint":strategy,"learning_note":"Observed reply/follower rates now influence the next experiment after enough evidence exists. Missing metrics remain unknown rather than zero. Historical performance never guarantees future results."}
+    result={"generated_at":datetime.now(timezone.utc).isoformat(),"selected":selected,"ranked_candidates":ranked[:15],"recent_assets":dict(asset_count),"recent_categories":dict(cat_count),"recent_styles":dict(style_count),"experiment_counts":dict(exp_count),"experiments":EXPERIMENTS,"performance":perf_summary,"interaction_blueprint":strategy,"learning_note":"Observed reply/follower rates influence the next experiment after enough evidence exists. Missing metrics remain unknown rather than zero. Historical performance never guarantees future results."}
     OUTPUT.parent.mkdir(parents=True,exist_ok=True);OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
     pre["selected_opportunity"]=selected;pre["engagement_strategy"]=strategy;pre["engagement_ranked_candidates"]=ranked[:15];PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding="utf-8")
     print(json.dumps(result,indent=2,ensure_ascii=False))
