@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   create-and-publish:
-    if: ${{ github.event_name != 'push' || startsWith(github.event.head_commit.message, 'Fix autonomous creator workflow blockers') }}
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Record autonomous creator cycle') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -79,6 +79,19 @@ jobs:
           fi
           python src/safe_creator_runner.py
           python src/pipeline_stage.py ai_draft success "Fresh draft generated"
+      - name: Run Creator Intelligence 2.0 self-editor
+        run: |
+          set +e
+          python src/creator_intelligence_2.py
+          RC=$?
+          set -e
+          if [ "$RC" = "3" ]; then
+            echo "Creator Intelligence 2.0 rejected the first draft; publication gate will invoke rescue/rework."
+          elif [ "$RC" != "0" ]; then
+            echo "Creator Intelligence 2.0 failed safely with exit code $RC; publication gate remains authoritative."
+          else
+            echo "Creator Intelligence 2.0 accepted the draft for publication review."
+          fi
       - name: Render visual
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
@@ -124,6 +137,7 @@ PY
             python src/pipeline_stage.py quality_gate blocked "Publication gate and deterministic rescue both rejected the cycle"
             cat /tmp/publish_gate.json || true
             cat data/live/engagement_gate.json || true
+            cat data/live/creator_intelligence_2.json || true
             exit 1
           fi
       - name: Locate fresh draft
