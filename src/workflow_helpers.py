@@ -19,7 +19,8 @@ def main():
         p.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
     elif cmd == "gate":
         status = load("data/live/creator_status.json") if Path("data/live/creator_status.json").exists() else {}
-        if status.get("status") != "AI_SUCCESS":
+        accepted_statuses = {"AI_SUCCESS", "LOCAL_FALLBACK_SUCCESS"}
+        if status.get("status") not in accepted_statuses:
             print(json.dumps({"publish": False, "reason": status.get("reason", "no fresh AI draft")}))
             print("publish=false", file=open(os.environ["GITHUB_OUTPUT"], "a"))
             return
@@ -39,33 +40,20 @@ def main():
             interaction_gate = evaluate(post, v)
         except Exception as exc:
             interaction_gate = {"score": 0, "publish": False, "reasons": [f"quality_gate_error:{type(exc).__name__}"]}
-
-        # Some Gemini responses omit quality_score even when the structured
-        # editorial checks prove the draft is publishable. Do not turn a
-        # missing numeric field into an automatic zero. Derive a transparent
-        # score from the checks already returned by the model.
         if quality <= 0 and post:
             derived = 0
             char_count = int(c.get("character_count") or len(post))
-            if 180 <= char_count <= 500:
-                derived += 25
-            elif char_count <= 750:
-                derived += 15
-            if c.get("has_cashtag") or re.search(r"\$[A-Z][A-Z0-9]{1,11}", post):
-                derived += 20
-            if c.get("has_choice_question"):
-                derived += 20
-            if c.get("avoids_prohibited_terms"):
-                derived += 15
-            if c.get("tone_check"):
-                derived += 10
-            quality = float(min(100, derived))
-            d["quality_score"] = quality
-
+            if 180 <= char_count <= 500: derived += 25
+            elif char_count <= 750: derived += 15
+            if c.get("has_cashtag") or re.search(r"\$[A-Z][A-Z0-9]{1,11}", post): derived += 20
+            if c.get("has_choice_question"): derived += 20
+            if c.get("avoids_prohibited_terms"): derived += 15
+            if c.get("tone_check"): derived += 10
+            quality = float(min(100, derived)); d["quality_score"] = quality
         generation_mode = str(d.get("generation_mode") or data.get("generation_mode") or "GEMINI").upper()
         quality_threshold = 80 if generation_mode == "LOCAL_FALLBACK" else 85
-        publish = quality >= quality_threshold and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED" and bool(post) and interaction_gate["publish"]
-        gate_record = {"draft": str(draft), "quality_score": quality, "quality_threshold": quality_threshold, "generation_mode": generation_mode, "opportunity_score": opportunity, "interaction_gate": interaction_gate, "publish": publish}
+        publish = quality >= quality_threshold and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED" and bool(post) and interaction_gate.get("publish") is True
+        gate_record = {"draft": str(draft), "quality_score": quality, "quality_threshold": quality_threshold, "generation_mode": generation_mode, "opportunity_score": opportunity, "interaction_gate": interaction_gate, "publish": publish, "creator_status": status.get("status")}
         Path("/tmp/publish_gate.json").write_text(json.dumps(gate_record, indent=2))
         Path("data/live/engagement_gate.json").write_text(json.dumps(interaction_gate, indent=2), encoding="utf-8")
         with open(os.environ["GITHUB_OUTPUT"], "a") as out:
@@ -78,58 +66,28 @@ def main():
         if not post:
             raise SystemExit("No publishable post")
         Path("/tmp/square-post.txt").write_text(post, encoding="utf-8")
+        # The Binance publishing steps consume data/live/publish_text.txt.
+        # Keep the canonical text in that location as well as the temporary copy.
+        out = Path("data/live/publish_text.txt")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(post, encoding="utf-8")
+        print(json.dumps({"status":"POST_TEXT_EXTRACTED","path":str(out),"characters":len(post)}))
     elif cmd == "record":
         d = load(os.environ["DRAFT_PATH"])
         result = Path("/tmp/publish-result.txt").read_text(encoding="utf-8")
         m = re.search(r"ID:\s*(\S+)", result)
         link = next((x.split("Link:", 1)[1].strip() for x in result.splitlines() if x.startswith("Link:")), None)
-        r = d.get("research") or {}
-        draft = d.get("draft") or {}
-        visual = d.get("visual_plan") or {}
-        selected = d.get("selected_editorial_lane") or {}
-        engagement = d.get("engagement_strategy") or {}
-        strongest = str(r.get("strongest_signal") or "")[:300]
-        symbol = None
-        lane_symbol = str(selected.get("symbol") or "").upper()
-        lane_match = re.search(r"\b([A-Z0-9]{2,12})USDT\b", lane_symbol)
-        if lane_match:
-            symbol = lane_match.group(1)
-        elif lane_symbol and re.fullmatch(r"[A-Z0-9]{2,10}", lane_symbol):
-            symbol = lane_symbol
+        r = d.get("research") or {}; draft = d.get("draft") or {}; visual = d.get("visual_plan") or {}; selected = d.get("selected_editorial_lane") or {}; engagement = d.get("engagement_strategy") or {}
+        strongest = str(r.get("strongest_signal") or "")[:300]; symbol = None
+        lane_symbol = str(selected.get("symbol") or "").upper(); lane_match = re.search(r"\b([A-Z0-9]{2,12})USDT\b", lane_symbol)
+        if lane_match: symbol = lane_match.group(1)
+        elif lane_symbol and re.fullmatch(r"[A-Z0-9]{2,10}", lane_symbol): symbol = lane_symbol
         if not symbol:
-            symbol_match = re.search(r"\b([A-Z]{2,10})USDT\b", strongest.upper())
-            symbol = symbol_match.group(1) if symbol_match else None
-        if not symbol:
-            for candidate in ("BTC", "ETH", "BNB", "XRP", "SOL", "DOGE", "ADA", "AVAX", "LINK", "TRX", "SUI", "TON", "DOT", "LTC", "BCH", "UNI", "XLM", "HBAR", "SHIB"):
-                if re.search(rf"(?<![A-Z0-9])\$?{candidate}(?![A-Z0-9])", strongest.upper()):
-                    symbol = candidate
-                    break
-        record = {
-            "published_at": datetime.now(timezone.utc).isoformat(),
-            "post_id": m.group(1) if m else None,
-            "link": link,
-            "symbol": symbol,
-            "topic": strongest,
-            "content_category": selected.get("category") or "unknown",
-            "selected_lane_symbol": selected.get("symbol"),
-            "format": os.environ["MODE"],
-            "editorial_style": draft.get("editorial_style", ""),
-            "hook": draft.get("hook", ""),
-            "discussion_question": draft.get("discussion_question", ""),
-            "experiment_id": engagement.get("experiment_id") or selected.get("experiment_id"),
-            "experiment_format": (engagement.get("experiment") or {}).get("format"),
-            "timing_hypothesis": (d.get("distribution_strategy") or {}).get("timing_hypothesis"),
-            "quality_score": draft.get("quality_score", 0),
-            "opportunity_score": max(float(r.get("opportunity_score") or 0), float((d.get("critique") or {}).get("revised_opportunity_score") or 0)),
-            "visual_type": visual.get("type", "none"),
-            "status": "PUBLISHED_AUTONOMOUSLY",
-        }
-        p = Path("analytics/publication_log.jsonl")
-        p.parent.mkdir(exist_ok=True)
-        with p.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        print(json.dumps(record, indent=2, ensure_ascii=False))
-
+            symbol_match = re.search(r"\b([A-Z]{2,10})USDT\b", strongest.upper()); symbol = symbol_match.group(1) if symbol_match else None
+        record = {"published_at":datetime.now(timezone.utc).isoformat(),"post_id":m.group(1) if m else None,"link":link,"symbol":symbol,"topic":strongest,"content_category":selected.get("category") or "unknown","selected_lane_symbol":selected.get("symbol"),"format":os.environ.get("MODE","unknown"),"editorial_style":draft.get("editorial_style",""),"hook":draft.get("hook",""),"discussion_question":draft.get("discussion_question",""),"experiment_id":engagement.get("experiment_id") or selected.get("experiment_id"),"experiment_format":(engagement.get("experiment") or {}).get("format"),"timing_hypothesis":(d.get("distribution_strategy") or {}).get("timing_hypothesis"),"quality_score":draft.get("quality_score",0),"opportunity_score":max(float(r.get("opportunity_score") or 0),float((d.get("critique") or {}).get("revised_opportunity_score") or 0)),"visual_type":visual.get("type","none"),"status":"PUBLISHED_AUTONOMOUSLY"}
+        p=Path("analytics/publication_log.jsonl"); p.parent.mkdir(exist_ok=True)
+        with p.open("a",encoding="utf-8") as f: f.write(json.dumps(record,ensure_ascii=False)+"\n")
+        print(json.dumps(record,indent=2,ensure_ascii=False))
 
 if __name__ == "__main__":
     main()
