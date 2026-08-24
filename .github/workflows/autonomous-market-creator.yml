@@ -100,21 +100,30 @@ jobs:
               python src/pipeline_stage.py visual success "Degraded safely to text"
             fi
           fi
-      - name: Evaluate publication gate
+      - name: Evaluate publication gate and rescue once if needed
         id: gate
         run: |
           python src/workflow_helpers.py gate
           PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
+          if [ "$PUBLISH" != "true" ]; then
+            echo "Publication gate rejected the first draft. Building a deterministic publish rescue from verified market data."
+            python src/publish_rescue.py
+            python src/workflow_helpers.py gate
+            PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
+          fi
           if [ "$PUBLISH" = "true" ]; then
-            python src/pipeline_stage.py quality_gate success "Publication gate passed"
+            python src/pipeline_stage.py quality_gate success "Publication gate passed or rescue succeeded"
           else
-            python src/pipeline_stage.py quality_gate blocked "Publication gate rejected draft"
+            python src/pipeline_stage.py quality_gate blocked "Publication gate and deterministic rescue both rejected the cycle"
+            cat /tmp/publish_gate.json || true
+            cat data/live/engagement_gate.json || true
+            exit 1
           fi
       - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
         id: draft
         run: |
-          DRAFT=$(find data/reports -type f -name '*multi-agent.json' -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          DRAFT=$(find data/reports -type f -name '*-multi-agent.json' -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
           test -n "$DRAFT"
           echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
       - name: Extract post text
