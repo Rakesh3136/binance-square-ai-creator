@@ -33,7 +33,20 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Verify production dependencies
+        run: |
+          python - <<'PY'
+          import importlib.util
+          required = ["matplotlib", "pandas", "numpy"]
+          missing = [name for name in required if importlib.util.find_spec(name) is None]
+          if missing:
+              raise SystemExit("Missing production dependencies: " + ", ".join(missing))
+          print("Production visualization dependencies OK")
+          PY
 
       - name: Benchmark successful public Square creators
         run: |
@@ -46,7 +59,7 @@ jobs:
       - name: Run full creator intelligence phases
         run: |
           if python src/run_creator_intelligence.py; then
-            python src/pipeline_stage.py intelligence success "Audience, experiments, timing, visuals, thesis and evolution intelligence updated"
+            python src/pipeline_stage.py intelligence success "Creator intelligence updated"
           else
             python src/pipeline_stage.py intelligence failed "Creator intelligence phase failed"
             exit 1
@@ -121,8 +134,14 @@ jobs:
           if python src/visual_renderer.py; then
             python src/pipeline_stage.py visual success "Visual rendering completed"
           else
-            python src/pipeline_stage.py visual failed "Visual renderer failed"
-            exit 1
+            echo "Visual renderer failed; checking/installing matplotlib and retrying once"
+            python -m pip install --disable-pip-version-check "matplotlib>=3.8.0" "pandas>=2.0.0" "numpy>=1.26.0"
+            if python src/visual_renderer.py; then
+              python src/pipeline_stage.py visual success "Visual rendering completed after dependency recovery"
+            else
+              python src/pipeline_stage.py visual failed "Visual renderer failed after dependency recovery"
+              exit 1
+            fi
           fi
 
       - name: Evaluate publication gate
@@ -182,17 +201,3 @@ jobs:
           python src/pipeline_stage.py publish running "Sending text post to Binance Square"
           python binance-skills-hub/skills/binance/square-post/scripts/post_text.py --text "$(cat data/live/publish_text.txt)"
           python src/pipeline_stage.py publish success "Text post submitted"
-
-      - name: Record pipeline state
-        if: always()
-        run: python src/pipeline_stage.py finalize "Production cycle completed"
-
-      - name: Persist strategy and pipeline state
-        if: always()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add analytics data/live data/intelligence
-          git diff --cached --quiet || git commit -m "Record autonomous creator cycle"
-          git pull --rebase --autostash origin main
-          git push origin main || true
