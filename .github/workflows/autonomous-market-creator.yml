@@ -79,18 +79,41 @@ jobs:
           fi
           python src/safe_creator_runner.py
           python src/pipeline_stage.py ai_draft success "Fresh draft generated"
-      - name: Run Creator Intelligence 2.0 self-editor
+      - name: Run Creator Intelligence 2.0 self-editor and one AI rework
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.6-flash
+          GEMINI_DAILY_BUDGET: "20"
+          TOPIC: ${{ inputs.topic }}
         run: |
           set +e
           python src/creator_intelligence_2.py
           RC=$?
           set -e
           if [ "$RC" = "3" ]; then
-            echo "Creator Intelligence 2.0 rejected the first draft; publication gate will invoke rescue/rework."
+            echo "Creator Intelligence 2.0 rejected the first draft. Performing one fresh AI rewrite using the rejection reasons."
+            python - <<'PY'
+import json
+from pathlib import Path
+p=Path('data/live/editorial_preflight.json')
+f=Path('data/live/creator_intelligence_2.json')
+d=json.loads(p.read_text())
+r=json.loads(f.read_text()) if f.exists() else {}
+reasons=', '.join(r.get('reasons', []))
+selected=d.get('selected_opportunity') or {}
+base=str(selected.get('instruction') or 'Create the strongest evidence-based opportunity.')
+selected['instruction']=base + f"\n\nCREATOR INTELLIGENCE 2.0 REWORK: The previous draft was rejected for: {reasons}. Rewrite from scratch. Do not reuse its hook, opening cadence, paragraph structure or question. Keep only verified facts. Make the thesis clearer, the voice more human and the question more specific."
+d['selected_opportunity']=selected
+d['run_ai']=True
+d['reason']='creator_intelligence_rework'
+p.write_text(json.dumps(d,indent=2,ensure_ascii=False))
+PY
+            python src/safe_creator_runner.py
+            python src/creator_intelligence_2.py
           elif [ "$RC" != "0" ]; then
             echo "Creator Intelligence 2.0 failed safely with exit code $RC; publication gate remains authoritative."
           else
-            echo "Creator Intelligence 2.0 accepted the draft for publication review."
+            echo "Creator Intelligence 2.0 accepted the first draft for publication review."
           fi
       - name: Render visual
         run: |
