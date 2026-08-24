@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +31,10 @@ def main():
             print(json.dumps({"publish": False, "reason": "no fresh draft"}))
             print("publish=false", file=open(os.environ["GITHUB_OUTPUT"], "a"))
             return
+
+        # Creator Intelligence 2.0 is deliberately allowed to reject the draft.
+        # It may also make safe editorial repairs before this gate evaluates it.
+        subprocess.run([sys.executable, "src/creator_intelligence_2.py"], check=False)
         data = load(draft)
         r = data.get("research") or {}
         c = data.get("critique") or {}
@@ -49,20 +54,20 @@ def main():
         except Exception as exc:
             interaction_gate = {"score": 0, "publish": False, "reasons": [f"quality_gate_error:{type(exc).__name__}"]}
 
-        # quality_score is an output of the downstream gate, so an AI draft may
-        # legitimately leave it at zero. Fall back to the independent gate.
+        intelligence = {}
+        intel_path = Path("data/live/creator_intelligence_2.json")
+        if intel_path.exists():
+            try:
+                intelligence = load(intel_path)
+            except Exception:
+                intelligence = {}
         explicit_quality = float(d.get("quality_score") or 0)
         if explicit_quality <= 0:
             explicit_quality = float(interaction_gate.get("score") or 0)
         quality = explicit_quality
-
         generation_mode = str(d.get("generation_mode") or data.get("generation_mode") or status.get("generation_mode") or "GEMINI").upper()
         quality_threshold = 72
 
-        # Opportunity is produced by preflight/Creator Brain, not necessarily
-        # copied into the Gemini report. The old gate only inspected research
-        # and critique, so valid fresh opportunities were scored as 0 and
-        # rejected. Read all authoritative opportunity fields.
         opportunity_values = []
         for obj, keys in (
             (r, ("opportunity_score", "adjusted_score", "engagement_score")),
@@ -80,11 +85,13 @@ def main():
                         opportunity_values.append(value)
         opportunity = max(opportunity_values, default=0.0)
 
+        intelligence_ok = intelligence.get("publish_recommendation") is True
         publish = (
             quality >= quality_threshold
             and opportunity >= 72
             and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
             and interaction_gate.get("publish") is True
+            and intelligence_ok
         )
         gate_record = {
             "draft": str(draft),
@@ -98,6 +105,7 @@ def main():
                 "selected_editorial_lane": selected.get("adjusted_score"),
                 "preflight_selected_opportunity": preflight_selected.get("adjusted_score"),
             },
+            "creator_intelligence_2": intelligence,
             "interaction_gate": interaction_gate,
             "publish": publish,
             "creator_status": status.get("status"),
@@ -115,6 +123,7 @@ def main():
             "generation_mode": generation_mode,
             "opportunity_score": opportunity,
             "opportunity_sources": gate_record["opportunity_sources"],
+            "creator_intelligence_2": intelligence,
             "interaction_gate": interaction_gate,
             "mode": "image" if v.get("use_visual") else "text",
             "editorial_style": d.get("editorial_style", ""),
@@ -141,7 +150,8 @@ def main():
         elif lane_symbol and re.fullmatch(r"[A-Z0-9]{2,10}", lane_symbol): symbol = lane_symbol
         if not symbol:
             symbol_match = re.search(r"\b([A-Z]{2,10})USDT\b", strongest.upper()); symbol = symbol_match.group(1) if symbol_match else None
-        record = {"published_at":datetime.now(timezone.utc).isoformat(),"post_id":m.group(1) if m else None,"link":link,"symbol":symbol,"topic":strongest,"content_category":selected.get("category") or "unknown","selected_lane_symbol":selected.get("symbol"),"format":os.environ.get("MODE","unknown"),"editorial_style":draft.get("editorial_style",""),"hook":draft.get("hook",""),"discussion_question":draft.get("discussion_question",""),"experiment_id":engagement.get("experiment_id") or selected.get("experiment_id"),"experiment_format":(engagement.get("experiment") or {}).get("format"),"timing_hypothesis":(d.get("distribution_strategy") or {}).get("timing_hypothesis"),"quality_score":draft.get("quality_score",0),"opportunity_score":max(float(r.get("opportunity_score") or 0),float((d.get("critique") or {}).get("revised_opportunity_score") or 0),float(selected.get("adjusted_score") or 0)),"visual_type":visual.get("type","none"),"status":"PUBLISHED_AUTONOMOUSLY"}
+        intelligence = d.get("creator_intelligence_2") or {}
+        record = {"published_at":datetime.now(timezone.utc).isoformat(),"post_id":m.group(1) if m else None,"link":link,"symbol":symbol,"topic":strongest,"content_category":selected.get("category") or "unknown","selected_lane_symbol":selected.get("symbol"),"format":os.environ.get("MODE","unknown"),"editorial_style":draft.get("editorial_style",""),"hook":draft.get("hook",""),"discussion_question":draft.get("discussion_question",""),"experiment_id":engagement.get("experiment_id") or selected.get("experiment_id"),"experiment_format":(engagement.get("experiment") or {}).get("format"),"timing_hypothesis":(d.get("distribution_strategy") or {}).get("timing_hypothesis"),"quality_score":draft.get("quality_score",0),"opportunity_score":max(float(r.get("opportunity_score") or 0),float((d.get("critique") or {}).get("revised_opportunity_score") or 0),float(selected.get("adjusted_score") or 0)),"visual_type":visual.get("type","none"),"intelligence_score":intelligence.get("score"),"status":"PUBLISHED_AUTONOMOUSLY"}
         p=Path("analytics/publication_log.jsonl"); p.parent.mkdir(exist_ok=True)
         with p.open("a",encoding="utf-8") as f: f.write(json.dumps(record,ensure_ascii=False)+"\n")
         print(json.dumps(record,indent=2,ensure_ascii=False))
