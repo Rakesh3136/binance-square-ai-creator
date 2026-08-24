@@ -24,25 +24,26 @@ def save_status(status, reason, **extra):
     STATUS.write_text(json.dumps({"updated_at": datetime.now(timezone.utc).isoformat(), "status": status, "reason": reason, **extra}, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def run_creator(local_fallback=False):
-    if local_fallback:
-        os.environ["LOCAL_FALLBACK"] = "true"
-    else:
-        os.environ.pop("LOCAL_FALLBACK", None)
+def run_creator():
+    """Load the AI creator only for the real Gemini attempt."""
     import multi_agent_creator
     multi_agent_creator.main()
 
 
 def emergency_verified_draft(reason):
-    """Last-resort draft using only verified local snapshots; no AI/provider calls."""
+    """Last-resort draft using only verified local snapshots; never imports an AI SDK."""
     preflight = load(Path("data/live/editorial_preflight.json"), {})
     market = load(Path("data/live/market_snapshot.json"), {})
     selected = preflight.get("selected_opportunity") or {}
+    if not isinstance(selected, dict):
+        selected = {}
 
     items = []
     for group in ("top_content_signals", "top_gainers", "top_losers", "highest_volume", "new_listing_market"):
-        items.extend(x for x in (market.get(group) or []) if isinstance(x, dict))
-    selected_symbol = str(selected.get("symbol") or "").upper()
+        values = market.get(group) or []
+        if isinstance(values, list):
+            items.extend(x for x in values if isinstance(x, dict))
+    selected_symbol = str(selected.get("symbol") or selected.get("topic") or "").upper()
     item = next((x for x in items if str(x.get("symbol", "")).upper() == selected_symbol), None)
     if item is None:
         item = next((x for x in items if x.get("symbol")), {})
@@ -59,7 +60,7 @@ def emergency_verified_draft(reason):
     price = number("last_price")
     volume = number("quote_volume_usdt") or number("quote_volume")
     category = str(selected.get("category") or selected.get("reason") or "market_opportunity")
-    opportunity = float(selected.get("adjusted_score") or 80)
+    opportunity = float(selected.get("adjusted_score") or selected.get("raw_score") or 80)
     price_text = f"${price:.8g}" if price else "the current level"
     volume_text = f"${volume/1_000_000:.1f}M spot volume" if volume >= 1_000_000 else (f"${volume/1_000:.0f}K spot volume" if volume >= 1_000 else "live market data")
 
@@ -78,7 +79,7 @@ def emergency_verified_draft(reason):
         "news_discovery_snapshot": load(Path("data/live/news_snapshot.json"), {}),
         "strategy_memory": load(Path("analytics/strategy_memory.json"), {}),
         "research": {"summary": "Emergency draft built only from verified live market data.", "strongest_signal": symbol, "source_mode": "deterministic_emergency_fallback", "opportunity_score": opportunity},
-        "critique": {"summary": "AI/local creator failed; no unverified facts were added.", "reason": str(reason)[-500:], "revised_opportunity_score": opportunity},
+        "critique": {"summary": "AI creator unavailable; no unverified facts were added.", "reason": str(reason)[-500:], "revised_opportunity_score": opportunity},
         "draft": {
             "post": post, "text": post, "hook": f"Quick market check: ${symbol} is {move:+.1f}% today.",
             "discussion_question": f"Would you wait for confirmation on ${symbol}?", "quality_score": 82,
@@ -98,13 +99,18 @@ def emergency_verified_draft(reason):
 
 
 def local_or_emergency(original_error):
+    """Never re-import the same broken AI module as a supposed fallback."""
     try:
-        run_creator(local_fallback=True)
-        return "LOCAL_FALLBACK_SUCCESS"
+        import importlib.util
+        google_genai_available = importlib.util.find_spec("google.genai") is not None
+        if google_genai_available:
+            run_creator()
+            return "LOCAL_FALLBACK_SUCCESS"
+        print("google.genai is unavailable; skipping AI import and using dependency-free emergency creator")
     except Exception as fallback_exc:
-        print(f"Local fallback failed: {fallback_exc}")
-        emergency_verified_draft(f"local fallback failed: {fallback_exc}; original: {original_error}")
-        return "EMERGENCY_SUCCESS"
+        print(f"Local AI fallback failed: {fallback_exc}")
+    emergency_verified_draft(original_error)
+    return "EMERGENCY_SUCCESS"
 
 
 def main():
@@ -125,7 +131,7 @@ def main():
     USAGE.write_text(json.dumps(usage, indent=2), encoding="utf-8")
 
     try:
-        run_creator(local_fallback=False)
+        run_creator()
     except Exception as exc:
         message = str(exc)
         print(f"Gemini creator failed; switching immediately to local/emergency creator. Original error: {message}")
