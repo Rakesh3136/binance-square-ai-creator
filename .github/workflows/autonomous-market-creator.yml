@@ -91,12 +91,16 @@ jobs:
               python src/pipeline_stage.py visual success "Visual rendering recovered"
             else
               python - <<'PY'
-          import json
-          from pathlib import Path
-          reports=sorted(Path('data/reports').glob('*-multi-agent.json'),key=lambda p:p.stat().st_mtime,reverse=True)
-          if not reports: raise SystemExit('No draft available')
-          p=reports[0]; d=json.loads(p.read_text()); d.setdefault('visual_plan',{}).update(use_visual=False,type='none',degraded_from_visual=True); p.write_text(json.dumps(d,indent=2))
-          PY
+import json
+from pathlib import Path
+reports = sorted(Path('data/reports').glob('*-multi-agent.json'), key=lambda p: p.stat().st_mtime, reverse=True)
+if not reports:
+    raise SystemExit('No draft available')
+p = reports[0]
+d = json.loads(p.read_text())
+d.setdefault('visual_plan', {}).update(use_visual=False, type='none', degraded_from_visual=True)
+p.write_text(json.dumps(d, indent=2))
+PY
               python src/pipeline_stage.py visual success "Degraded safely to text"
             fi
           fi
@@ -106,7 +110,7 @@ jobs:
           python src/workflow_helpers.py gate
           PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
           if [ "$PUBLISH" != "true" ]; then
-            echo "Publication gate rejected the first draft. Building a deterministic publish rescue from verified market data."
+            echo "Publication gate rejected the first draft. Building deterministic publish rescue from verified market data."
             python src/publish_rescue.py
             python src/workflow_helpers.py gate
             PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
@@ -167,7 +171,7 @@ jobs:
         run: python src/workflow_helpers.py record
       - name: Finalize
         if: always()
-        run: python src/pipeline_stage.py finalize "Production cycle completed"
+        run: python src/pipeline_stage.py finalize success "Production cycle completed"
       - name: Persist state
         if: always()
         run: |
