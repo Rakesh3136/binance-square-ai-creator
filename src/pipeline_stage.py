@@ -9,24 +9,10 @@ from pathlib import Path
 
 OUT = Path("data/live/pipeline_status.json")
 
-# Keep this list aligned with every stage name used by the production workflow.
-# ``finalize`` is intentionally supported because the workflow uses it as the
-# always-run terminal bookkeeping step.
 STAGES = [
-    "creator_benchmark",
-    "intelligence",
-    "scan",
-    "select",
-    "creator_brain",
-    "ai_draft",
-    "visual",
-    "quality_gate",
-    "publish",
-    "verify",
-    "record",
-    "learn",
-    "complete",
-    "finalize",
+    "creator_benchmark", "intelligence", "scan", "select", "creator_brain",
+    "ai_draft", "visual", "quality_gate", "publish", "verify", "record",
+    "learn", "complete", "finalize",
 ]
 
 
@@ -49,6 +35,21 @@ def save(data: dict) -> None:
     OUT.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def reset_run(reason="New autonomous production cycle") -> dict:
+    data = {
+        "run_started_at": now(),
+        "last_updated_at": now(),
+        "current_stage": "start",
+        "last_successful_stage": None,
+        "blocked_at": None,
+        "stages": {},
+        "reason": reason,
+    }
+    save(data)
+    print(json.dumps(data, indent=2, ensure_ascii=False))
+    return data
+
+
 def set_stage(stage: str, status: str, reason: str = "", **details) -> dict:
     if stage not in STAGES:
         raise SystemExit(f"Unknown pipeline stage: {stage}")
@@ -56,12 +57,7 @@ def set_stage(stage: str, status: str, reason: str = "", **details) -> dict:
     data.setdefault("stages", {})
     data["last_updated_at"] = now()
     data["current_stage"] = stage
-    data["stages"][stage] = {
-        "status": status,
-        "updated_at": now(),
-        "reason": reason,
-        **details,
-    }
+    data["stages"][stage] = {"status": status, "updated_at": now(), "reason": reason, **details}
     if status == "success":
         data["last_successful_stage"] = stage
     if status in {"failed", "blocked"}:
@@ -89,10 +85,13 @@ def verify_publish() -> int:
 
 
 def main() -> int:
+    if len(sys.argv) >= 2 and sys.argv[1] == "reset":
+        reset_run(" ".join(sys.argv[2:]) or "New autonomous production cycle")
+        return 0
     if len(sys.argv) >= 2 and sys.argv[1] == "verify-publish":
         return verify_publish()
     if len(sys.argv) < 3:
-        raise SystemExit("usage: pipeline_stage.py <stage> <status> [reason]")
+        raise SystemExit("usage: pipeline_stage.py <stage> <status> [reason] | reset [reason]")
     stage, status = sys.argv[1], sys.argv[2]
     reason = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else ""
     set_stage(stage, status, reason)
