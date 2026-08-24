@@ -32,20 +32,23 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Reset production cycle state
+        run: python src/pipeline_stage.py reset "Fresh autonomous production cycle"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install --no-cache-dir -r requirements.txt
 
       - name: Verify production dependencies
         run: |
           python - <<'PY'
           import importlib.util
-          required = ["matplotlib", "pandas", "numpy"]
+          required = ["google.genai", "matplotlib", "pandas", "numpy"]
           missing = [name for name in required if importlib.util.find_spec(name) is None]
           if missing:
               raise SystemExit("Missing production dependencies: " + ", ".join(missing))
-          print("Production visualization dependencies OK")
+          print("All production dependencies OK")
           PY
 
       - name: Benchmark successful public Square creators
@@ -134,13 +137,29 @@ jobs:
           if python src/visual_renderer.py; then
             python src/pipeline_stage.py visual success "Visual rendering completed"
           else
-            echo "Visual renderer failed; checking/installing matplotlib and retrying once"
-            python -m pip install --disable-pip-version-check "matplotlib>=3.8.0" "pandas>=2.0.0" "numpy>=1.26.0"
+            echo "Visual renderer failed; recovering visualization dependencies"
+            python -m pip install --no-cache-dir "matplotlib>=3.8.0" "pandas>=2.0.0" "numpy>=1.26.0"
             if python src/visual_renderer.py; then
               python src/pipeline_stage.py visual success "Visual rendering completed after dependency recovery"
             else
-              python src/pipeline_stage.py visual failed "Visual renderer failed after dependency recovery"
-              exit 1
+              echo "Visual still unavailable; degrading this cycle to a text post instead of losing the opportunity"
+              python - <<'PY'
+          import json
+          from pathlib import Path
+          reports = sorted(Path("data/reports").glob("*-multi-agent.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+          if not reports:
+              raise SystemExit("No draft available for text degradation")
+          p = reports[0]
+          d = json.loads(p.read_text(encoding="utf-8"))
+          v = d.setdefault("visual_plan", {})
+          v["use_visual"] = False
+          v["type"] = "none"
+          v["degraded_from_visual"] = True
+          d["status"] = "DRAFT_ONLY_NOT_PUBLISHED"
+          p.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
+          print("Degraded visual plan to text-only publication:", p)
+          PY
+              python src/pipeline_stage.py visual success "Visual unavailable; safely degraded to text publication"
             fi
           fi
 
