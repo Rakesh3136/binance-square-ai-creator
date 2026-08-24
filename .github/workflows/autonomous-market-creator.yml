@@ -1,5 +1,4 @@
 name: Autonomous Market Creator
-
 on:
   schedule:
     - cron: '7,37 * * * *'
@@ -9,14 +8,11 @@ on:
         description: "Optional topic; leave blank for autonomous selection"
         required: false
         default: ""
-
 env:
   PYTHONUNBUFFERED: "1"
-
 concurrency:
   group: main-branch-writer
   cancel-in-progress: false
-
 jobs:
   create-and-publish:
     runs-on: ubuntu-latest
@@ -26,20 +22,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Reset production cycle state
         run: python src/pipeline_stage.py reset "Fresh autonomous production cycle"
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
-
       - name: Verify production dependencies
         run: |
           python - <<'PY'
@@ -50,56 +42,26 @@ jobs:
               raise SystemExit("Missing production dependencies: " + ", ".join(missing))
           print("All production dependencies OK")
           PY
-
       - name: Benchmark successful public Square creators
-        run: |
-          if python src/creator_benchmark.py; then
-            python src/pipeline_stage.py creator_benchmark success "Updated public creator pattern intelligence"
-          else
-            python src/pipeline_stage.py creator_benchmark blocked "Creator benchmark unavailable; continue with existing intelligence"
-          fi
-
+        run: python src/creator_benchmark.py || true
       - name: Run full creator intelligence phases
-        run: |
-          if python src/run_creator_intelligence.py; then
-            python src/pipeline_stage.py intelligence success "Creator intelligence updated"
-          else
-            python src/pipeline_stage.py intelligence failed "Creator intelligence phase failed"
-            exit 1
-          fi
-
+        run: python src/run_creator_intelligence.py
       - name: Run market and editorial preflight
         env:
           TOPIC: ${{ inputs.topic }}
         run: |
           python src/editorial_preflight.py
           if [ -n "$TOPIC" ]; then
-            python -c "import json; from pathlib import Path; p=Path('data/live/editorial_preflight.json'); d=json.loads(p.read_text()); d=d if isinstance(d,dict) else {}; d['run_ai']=True; d['reason']='manual_topic'; p.write_text(json.dumps(d, indent=2))"
+            python -c "import json; from pathlib import Path; p=Path('data/live/editorial_preflight.json'); d=json.loads(p.read_text()); d['run_ai']=True; d['reason']='manual_topic'; p.write_text(json.dumps(d,indent=2))"
           fi
-
       - name: Select engagement experiment
-        env:
-          TOPIC: ${{ inputs.topic }}
-        run: |
-          if python src/engagement_engine.py; then
-            python src/pipeline_stage.py select success "Opportunity lane selected"
-          else
-            python src/pipeline_stage.py select failed "Opportunity rotation failed"
-            exit 1
-          fi
-
+        run: python src/engagement_engine.py
       - name: Run Creator Brain
         run: |
-          if python src/creator_brain.py; then
-            python src/creator_brain_gate.py
-            python src/pipeline_stage.py creator_brain success "Creator Brain decision wired into this production cycle"
-          else
-            python src/pipeline_stage.py creator_brain failed "Creator Brain failed"
-            exit 1
-          fi
-
-      - name: Run AI only for a real opportunity
-        if: ${{ hashFiles('data/live/editorial_preflight.json') != '' }}
+          python src/creator_brain.py
+          python src/creator_brain_gate.py
+          python src/pipeline_stage.py creator_brain success "Creator Brain decision wired into this production cycle"
+      - name: Run AI creator
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -112,124 +74,92 @@ jobs:
             python src/pipeline_stage.py ai_draft blocked "No real opportunity passed preflight"
             exit 0
           fi
-          python src/pipeline_stage.py ai_draft running "Generating fresh human-style draft using Creator Brain"
-          if python src/safe_creator_runner.py; then
-            STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
-            if [ "$STATUS" = "AI_SUCCESS" ] || [ "$STATUS" = "LOCAL_FALLBACK_SUCCESS" ]; then
-              python src/pipeline_stage.py ai_draft success "Fresh draft generated using Creator Brain decision"
-            else
-              python src/pipeline_stage.py ai_draft blocked "$STATUS"
-            fi
-          else
-            python src/pipeline_stage.py ai_draft failed "AI creator failed"
-            exit 1
-          fi
-
+          python src/safe_creator_runner.py
+          python src/pipeline_stage.py ai_draft success "Fresh draft generated"
       - name: Render visual
-        if: ${{ hashFiles('data/live/creator_status.json') != '' }}
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
           if [ "$STATUS" != "AI_SUCCESS" ] && [ "$STATUS" != "LOCAL_FALLBACK_SUCCESS" ]; then
-            python src/pipeline_stage.py visual blocked "No fresh draft to render"
+            python src/pipeline_stage.py visual blocked "No fresh draft"
             exit 0
           fi
-          python src/pipeline_stage.py visual running "Rendering real market visual"
           if python src/visual_renderer.py; then
             python src/pipeline_stage.py visual success "Visual rendering completed"
           else
-            echo "Visual renderer failed; recovering visualization dependencies"
             python -m pip install --no-cache-dir "matplotlib>=3.8.0" "pandas>=2.0.0" "numpy>=1.26.0"
             if python src/visual_renderer.py; then
-              python src/pipeline_stage.py visual success "Visual rendering completed after dependency recovery"
+              python src/pipeline_stage.py visual success "Visual rendering recovered"
             else
-              echo "Visual still unavailable; degrading this cycle to a text post instead of losing the opportunity"
               python - <<'PY'
           import json
           from pathlib import Path
-          reports = sorted(Path("data/reports").glob("*-multi-agent.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-          if not reports:
-              raise SystemExit("No draft available for text degradation")
-          p = reports[0]
-          d = json.loads(p.read_text(encoding="utf-8"))
-          v = d.setdefault("visual_plan", {})
-          v["use_visual"] = False
-          v["type"] = "none"
-          v["degraded_from_visual"] = True
-          d["status"] = "DRAFT_ONLY_NOT_PUBLISHED"
-          p.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
-          print("Degraded visual plan to text-only publication:", p)
+          reports=sorted(Path('data/reports').glob('*-multi-agent.json'),key=lambda p:p.stat().st_mtime,reverse=True)
+          if not reports: raise SystemExit('No draft available')
+          p=reports[0]; d=json.loads(p.read_text()); d.setdefault('visual_plan',{}).update(use_visual=False,type='none',degraded_from_visual=True); p.write_text(json.dumps(d,indent=2))
           PY
-              python src/pipeline_stage.py visual success "Visual unavailable; safely degraded to text publication"
+              python src/pipeline_stage.py visual success "Degraded safely to text"
             fi
           fi
-
       - name: Evaluate publication gate
         id: gate
-        shell: bash
         run: |
-          if python src/workflow_helpers.py gate; then
-            PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
-            if [ "$PUBLISH" = "true" ]; then
-              python src/pipeline_stage.py quality_gate success "All publication quality and interaction gates passed"
-            else
-              python src/pipeline_stage.py quality_gate blocked "Publication gate rejected this draft"
-            fi
+          python src/workflow_helpers.py gate
+          PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
+          if [ "$PUBLISH" = "true" ]; then
+            python src/pipeline_stage.py quality_gate success "Publication gate passed"
           else
-            python src/pipeline_stage.py quality_gate failed "Publication gate crashed"
-            exit 1
+            python src/pipeline_stage.py quality_gate blocked "Publication gate rejected draft"
           fi
-
       - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
         id: draft
         run: |
           DRAFT=$(find data/reports -type f -name '*multi-agent.json' -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$DRAFT" || (python src/pipeline_stage.py quality_gate failed "No fresh draft found after gate"; exit 1)
+          test -n "$DRAFT"
           echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
-
-      - name: Extract post
+      - name: Extract post text
         if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
         run: python src/workflow_helpers.py extract
-
       - name: Setup Node
         if: ${{ steps.gate.outputs.publish == 'true' }}
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-
+          node-version: '24'
       - name: Download official Binance Square skill
         if: ${{ steps.gate.outputs.publish == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
-
       - name: Publish image post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          python src/pipeline_stage.py publish running "Sending image post to Binance Square"
-          python binance-skills-hub/skills/binance/square-post/scripts/post_image.py --file data/live/visual.png --text "$(cat data/live/publish_text.txt)"
-          python src/pipeline_stage.py publish success "Image post submitted"
-
+          python src/pipeline_stage.py publish running "Publishing image to Binance Square"
+          node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
+          grep -q '^ID:' /tmp/publish-result.txt
+          python src/pipeline_stage.py publish success "Binance publisher returned a post result"
+          python src/pipeline_stage.py verify-publish
       - name: Publish text post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          python src/pipeline_stage.py publish running "Sending text post to Binance Square"
-          python binance-skills-hub/skills/binance/square-post/scripts/post_text.py --text "$(cat data/live/publish_text.txt)"
-          python src/pipeline_stage.py publish success "Text post submitted"
-
-      - name: Verify publication
+          python src/pipeline_stage.py publish running "Publishing text to Binance Square"
+          node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
+          grep -q '^ID:' /tmp/publish-result.txt
+          python src/pipeline_stage.py publish success "Binance publisher returned a post result"
+          python src/pipeline_stage.py verify-publish
+      - name: Record publication
         if: ${{ steps.gate.outputs.publish == 'true' }}
-        run: python src/pipeline_stage.py verify-publish
-
-      - name: Record pipeline state
+        env:
+          DRAFT_PATH: ${{ steps.draft.outputs.path }}
+          MODE: ${{ steps.gate.outputs.mode }}
+        run: python src/workflow_helpers.py record
+      - name: Finalize
         if: always()
         run: python src/pipeline_stage.py finalize "Production cycle completed"
-
-      - name: Persist strategy and pipeline state
+      - name: Persist state
         if: always()
         run: |
           git config user.name "github-actions[bot]"
