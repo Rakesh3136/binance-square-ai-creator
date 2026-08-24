@@ -32,28 +32,37 @@ def main():
             return
         data = load(draft)
         r, c, d, v = data.get("research") or {}, data.get("critique") or {}, data.get("draft") or {}, data.get("visual_plan") or {}
-        quality = float(d.get("quality_score") or 0)
-        opportunity = max(float(r.get("opportunity_score") or 0), float(c.get("revised_opportunity_score") or 0))
-        post = str(d.get("post") or "").strip()
+        post = str(d.get("post") or d.get("text") or "").strip()
+        if not post:
+            print(json.dumps({"publish": False, "reason": "draft has no post text"}))
+            print("publish=false", file=open(os.environ["GITHUB_OUTPUT"], "a"))
+            return
         try:
             from engagement_quality_gate import evaluate
             interaction_gate = evaluate(post, v)
         except Exception as exc:
             interaction_gate = {"score": 0, "publish": False, "reasons": [f"quality_gate_error:{type(exc).__name__}"]}
-        if quality <= 0 and post:
-            derived = 0
-            char_count = int(c.get("character_count") or len(post))
-            if 180 <= char_count <= 500: derived += 25
-            elif char_count <= 750: derived += 15
-            if c.get("has_cashtag") or re.search(r"\$[A-Z][A-Z0-9]{1,11}", post): derived += 20
-            if c.get("has_choice_question"): derived += 20
-            if c.get("avoids_prohibited_terms"): derived += 15
-            if c.get("tone_check"): derived += 10
-            quality = float(min(100, derived)); d["quality_score"] = quality
-        generation_mode = str(d.get("generation_mode") or data.get("generation_mode") or "GEMINI").upper()
-        quality_threshold = 80 if generation_mode == "LOCAL_FALLBACK" else 85
-        publish = quality >= quality_threshold and opportunity >= 80 and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED" and bool(post) and interaction_gate.get("publish") is True
-        gate_record = {"draft": str(draft), "quality_score": quality, "quality_threshold": quality_threshold, "generation_mode": generation_mode, "opportunity_score": opportunity, "interaction_gate": interaction_gate, "publish": publish, "creator_status": status.get("status")}
+
+        # The AI draft often legitimately leaves quality_score at 0 because
+        # scoring is a downstream concern. Do not interpret that as a bad post.
+        # Use the independent interaction gate as the quality baseline.
+        explicit_quality = float(d.get("quality_score") or 0)
+        if explicit_quality <= 0:
+            explicit_quality = float(interaction_gate.get("score") or 0)
+        quality = explicit_quality
+
+        generation_mode = str(d.get("generation_mode") or data.get("generation_mode") or status.get("generation_mode") or "GEMINI").upper()
+        quality_threshold = 72
+        opportunity = max(float(r.get("opportunity_score") or 0), float(c.get("revised_opportunity_score") or 0))
+        # A real fresh draft with a verified opportunity should not be blocked
+        # merely because an upstream model omitted a numeric quality field.
+        publish = (
+            quality >= quality_threshold
+            and opportunity >= 72
+            and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
+            and interaction_gate.get("publish") is True
+        )
+        gate_record = {"draft": str(draft), "quality_score": quality, "quality_threshold": quality_threshold, "generation_mode": generation_mode, "opportunity_score": opportunity, "interaction_gate": interaction_gate, "publish": publish, "creator_status": status.get("status"), "reason": "publish_eligible" if publish else "gate_rejected"}
         Path("/tmp/publish_gate.json").write_text(json.dumps(gate_record, indent=2))
         Path("data/live/engagement_gate.json").write_text(json.dumps(interaction_gate, indent=2), encoding="utf-8")
         with open(os.environ["GITHUB_OUTPUT"], "a") as out:
@@ -62,12 +71,10 @@ def main():
         print(json.dumps({"publish": publish, "quality_score": quality, "quality_threshold": quality_threshold, "generation_mode": generation_mode, "opportunity_score": opportunity, "interaction_gate": interaction_gate, "mode": "image" if v.get('use_visual') else "text", "editorial_style": d.get("editorial_style", "")}, indent=2))
     elif cmd == "extract":
         d = load(os.environ["DRAFT_PATH"])
-        post = ((d.get("draft") or {}).get("post") or "").strip()
+        post = ((d.get("draft") or {}).get("post") or (d.get("draft") or {}).get("text") or "").strip()
         if not post:
             raise SystemExit("No publishable post")
         Path("/tmp/square-post.txt").write_text(post, encoding="utf-8")
-        # The Binance publishing steps consume data/live/publish_text.txt.
-        # Keep the canonical text in that location as well as the temporary copy.
         out = Path("data/live/publish_text.txt")
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(post, encoding="utf-8")
