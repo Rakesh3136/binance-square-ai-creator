@@ -55,7 +55,7 @@ jobs:
         run: |
           python src/editorial_preflight.py
           if [ -n "$TOPIC" ]; then
-            python -c "import json; from pathlib import Path; p=Path('data/live/editorial_preflight.json'); d=json.loads(p.read_text()); d['run_ai']=True; d['reason']='manual_topic'; p.write_text(json.dumps(d,indent=2))"
+            python src/workflow_helpers.py manual-topic
           fi
       - name: Select engagement experiment
         run: python src/engagement_engine.py
@@ -92,22 +92,7 @@ jobs:
           set -e
           if [ "$RC" = "3" ]; then
             echo "Creator Intelligence 2.0 rejected the first draft. Performing one fresh AI rewrite using the rejection reasons."
-            python - <<'PY'
-import json
-from pathlib import Path
-p=Path('data/live/editorial_preflight.json')
-f=Path('data/live/creator_intelligence_2.json')
-d=json.loads(p.read_text())
-r=json.loads(f.read_text()) if f.exists() else {}
-reasons=', '.join(r.get('reasons', []))
-selected=d.get('selected_opportunity') or {}
-base=str(selected.get('instruction') or 'Create the strongest evidence-based opportunity.')
-selected['instruction']=base + f"\n\nCREATOR INTELLIGENCE 2.0 REWORK: The previous draft was rejected for: {reasons}. Rewrite from scratch. Do not reuse its hook, opening cadence, paragraph structure or question. Keep only verified facts. Make the thesis clearer, the voice more human and the question more specific."
-d['selected_opportunity']=selected
-d['run_ai']=True
-d['reason']='creator_intelligence_rework'
-p.write_text(json.dumps(d,indent=2,ensure_ascii=False))
-PY
+            python src/creator_rework.py
             python src/safe_creator_runner.py
             python src/creator_intelligence_2.py
           elif [ "$RC" != "0" ]; then
@@ -130,16 +115,16 @@ PY
               python src/pipeline_stage.py visual success "Visual rendering recovered"
             else
               python - <<'PY'
-import json
-from pathlib import Path
-reports = sorted(Path('data/reports').glob('*-multi-agent.json'), key=lambda p: p.stat().st_mtime, reverse=True)
-if not reports:
-    raise SystemExit('No draft available')
-p = reports[0]
-d = json.loads(p.read_text())
-d.setdefault('visual_plan', {}).update(use_visual=False, type='none', degraded_from_visual=True)
-p.write_text(json.dumps(d, indent=2))
-PY
+              import json
+              from pathlib import Path
+              reports = sorted(Path('data/reports').glob('*-multi-agent.json'), key=lambda p: p.stat().st_mtime, reverse=True)
+              if not reports:
+                  raise SystemExit('No draft available')
+              p = reports[0]
+              d = json.loads(p.read_text())
+              d.setdefault('visual_plan', {}).update(use_visual=False, type='none', degraded_from_visual=True)
+              p.write_text(json.dumps(d, indent=2))
+              PY
               python src/pipeline_stage.py visual success "Degraded safely to text"
             fi
           fi
