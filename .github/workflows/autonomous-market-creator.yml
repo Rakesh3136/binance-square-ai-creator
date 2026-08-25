@@ -40,7 +40,7 @@ jobs:
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Verify production dependencies
         run: |
-          python -c 'import importlib.util; required=["google.genai","matplotlib","pandas","numpy"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; raise SystemExit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
+          python -c 'import importlib.util,sys; required=["google.genai","matplotlib","pandas","numpy"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; sys.exit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
       - name: Benchmark successful public Square creators
         run: python src/creator_benchmark.py || true
       - name: Run full creator intelligence phases
