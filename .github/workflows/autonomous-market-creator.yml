@@ -8,6 +8,8 @@ on:
       - '.github/workflows/autonomous-market-creator.yml'
       - 'requirements.txt'
       - 'src/visual_renderer.py'
+      - 'src/tradingview_renderer.mjs'
+      - 'src/validate_visual.py'
       - 'src/normalize_draft.py'
       - 'src/degrade_visual.py'
       - 'src/publication_context.py'
@@ -27,7 +29,7 @@ concurrency:
 jobs:
   create-and-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: write
     steps:
@@ -107,24 +109,29 @@ jobs:
           else
             echo "Creator Intelligence 2.0 accepted the first draft for publication review."
           fi
-      - name: Render visual
+      - name: Setup Node for TradingView renderer
+        if: ${{ always() }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright Chromium for TradingView snapshot
+        if: ${{ always() }}
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Render TradingView visual
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
           if [ "$STATUS" != "AI_SUCCESS" ] && [ "$STATUS" != "LOCAL_FALLBACK_SUCCESS" ]; then
             python src/pipeline_stage.py visual blocked "No fresh draft"
             exit 0
           fi
-          if python src/visual_renderer.py; then
-            python src/pipeline_stage.py visual success "Visual rendering completed"
-          else
-            python -m pip install --no-cache-dir "matplotlib>=3.8.0" "pandas>=2.0.0" "numpy>=1.26.0"
-            if python src/visual_renderer.py; then
-              python src/pipeline_stage.py visual success "Visual rendering recovered"
-            else
-              python src/degrade_visual.py
-              python src/pipeline_stage.py visual success "Degraded safely to text"
-            fi
-          fi
+          python src/visual_renderer.py
+          python src/pipeline_stage.py visual success "Official TradingView chart snapshot rendered"
+      - name: Validate TradingView visual matches post
+        run: |
+          python src/validate_visual.py
+          python src/pipeline_stage.py visual success "TradingView chart symbol matches the post"
       - name: Evaluate publication gate and rescue once if needed
         id: gate
         run: |
@@ -157,11 +164,6 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
         run: python src/workflow_helpers.py extract
-      - name: Setup Node
-        if: ${{ steps.gate.outputs.publish == 'true' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
       - name: Download official Binance Square skill
         if: ${{ steps.gate.outputs.publish == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
@@ -170,7 +172,7 @@ jobs:
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          python src/pipeline_stage.py publish running "Publishing image to Binance Square"
+          python src/pipeline_stage.py publish running "Publishing TradingView image to Binance Square"
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
           grep -q '^ID:' /tmp/publish-result.txt
           python src/pipeline_stage.py publish success "Binance publisher returned a post result"
