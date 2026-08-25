@@ -9,6 +9,8 @@ on:
       - 'src/normalize_draft.py'
       - 'src/degrade_visual.py'
       - 'src/publication_context.py'
+      - 'src/performance_feedback.py'
+      - 'src/creator_brain.py'
   workflow_dispatch:
     inputs:
       topic:
@@ -56,6 +58,8 @@ jobs:
           fi
       - name: Select engagement experiment
         run: python src/engagement_engine.py
+      - name: Update performance feedback
+        run: python src/performance_feedback.py
       - name: Run Creator Brain
         run: |
           python src/creator_brain.py
