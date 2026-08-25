@@ -34,14 +34,7 @@ jobs:
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Verify production dependencies
         run: |
-          python - <<'PY'
-          import importlib.util
-          required = ["google.genai", "matplotlib", "pandas", "numpy"]
-          missing = [name for name in required if importlib.util.find_spec(name) is None]
-          if missing:
-              raise SystemExit("Missing production dependencies: " + ", ".join(missing))
-          print("All production dependencies OK")
-          PY
+          python -c 'import importlib.util; required=["google.genai","matplotlib","pandas","numpy"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; raise SystemExit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
       - name: Benchmark successful public Square creators
         run: python src/creator_benchmark.py || true
       - name: Run full creator intelligence phases
@@ -75,7 +68,8 @@ jobs:
             exit 0
           fi
           python src/safe_creator_runner.py
-          python src/pipeline_stage.py ai_draft success "Fresh draft generated"
+          python src/normalize_draft.py
+          python src/pipeline_stage.py ai_draft success "Fresh draft generated and normalized"
       - name: Run Creator Intelligence 2.0 self-editor and one AI rework
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -91,6 +85,7 @@ jobs:
             echo "Creator Intelligence 2.0 rejected the first draft. Performing one fresh AI rewrite using the rejection reasons."
             python src/creator_rework.py
             python src/safe_creator_runner.py
+            python src/normalize_draft.py
             python src/creator_intelligence_2.py
           elif [ "$RC" != "0" ]; then
             echo "Creator Intelligence 2.0 failed safely with exit code $RC; publication gate remains authoritative."
@@ -111,17 +106,7 @@ jobs:
             if python src/visual_renderer.py; then
               python src/pipeline_stage.py visual success "Visual rendering recovered"
             else
-              python - <<'PY'
-              import json
-              from pathlib import Path
-              reports = sorted(Path('data/reports').glob('*-multi-agent.json'), key=lambda p: p.stat().st_mtime, reverse=True)
-              if not reports:
-                  raise SystemExit('No draft available')
-              p = reports[0]
-              d = json.loads(p.read_text())
-              d.setdefault('visual_plan', {}).update(use_visual=False, type='none', degraded_from_visual=True)
-              p.write_text(json.dumps(d, indent=2))
-              PY
+              python src/degrade_visual.py
               python src/pipeline_stage.py visual success "Degraded safely to text"
             fi
           fi
@@ -193,7 +178,13 @@ jobs:
         run: python src/workflow_helpers.py record
       - name: Finalize
         if: always()
-        run: python src/pipeline_stage.py finalize success "Production cycle completed"
+        run: |
+          if [ "${{ steps.gate.outputs.publish }}" = "true" ]; then
+            python src/pipeline_stage.py finalize success "Production cycle completed and publication verified"
+          else
+            python src/pipeline_stage.py finalize blocked "Production cycle ended without a verified Binance Square publication"
+            exit 1
+          fi
       - name: Persist state
         if: always()
         run: |
