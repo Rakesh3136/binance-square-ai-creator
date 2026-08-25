@@ -8,6 +8,7 @@ on:
       - '.github/workflows/autonomous-market-creator.yml'
       - 'src/normalize_draft.py'
       - 'src/degrade_visual.py'
+      - 'src/publication_context.py'
   workflow_dispatch:
     inputs:
       topic:
@@ -60,6 +61,8 @@ jobs:
           python src/creator_brain.py
           python src/creator_brain_gate.py
           python src/pipeline_stage.py creator_brain success "Creator Brain decision wired into this production cycle"
+      - name: Lock publication context
+        run: python src/publication_context.py
       - name: Run AI creator
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
