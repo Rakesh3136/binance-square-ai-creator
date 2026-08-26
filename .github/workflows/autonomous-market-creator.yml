@@ -100,18 +100,30 @@ jobs:
           set +e
           python src/creator_intelligence_2.py
           RC=$?
-          set -e
           if [ "$RC" = "3" ]; then
             echo "Creator Intelligence 2.0 rejected the first draft. Performing one fresh AI rewrite using the rejection reasons."
             python src/creator_rework.py
-            python src/safe_creator_runner.py
-            python src/normalize_draft.py
-            python src/creator_intelligence_2.py
+            REWORK_RC=$?
+            if [ "$REWORK_RC" = "0" ]; then
+              python src/safe_creator_runner.py
+              NORMALIZE_RC=$?
+              if [ "$NORMALIZE_RC" = "0" ]; then
+                python src/normalize_draft.py
+                python src/creator_intelligence_2.py
+                FINAL_RC=$?
+                echo "Creator Intelligence 2.0 rework finished with exit code $FINAL_RC."
+              else
+                echo "Normalization after rework failed with exit code $NORMALIZE_RC; production manager will rescue."
+              fi
+            else
+              echo "Creator rework failed with exit code $REWORK_RC; production manager will rescue."
+            fi
           elif [ "$RC" != "0" ]; then
-            echo "Creator Intelligence 2.0 failed safely with exit code $RC; bounded production rescue remains available."
+            echo "Creator Intelligence 2.0 failed safely with exit code $RC; production manager remains authoritative."
           else
             echo "Creator Intelligence 2.0 accepted the first draft for publication review."
           fi
+          set -e
       - name: Setup Node for TradingView renderer
         if: ${{ always() }}
         uses: actions/setup-node@v4
@@ -138,13 +150,22 @@ jobs:
           fi
       - name: Validate TradingView visual matches post
         run: |
-          USE_VISUAL=$(python -c "import json; p=sorted(__import__('pathlib').Path('data/reports').glob('*-multi-agent.json'), key=lambda p:p.stat().st_mtime, reverse=True)[0]; print(str((json.load(open(p)).get('visual_plan') or {}).get('use_visual',False)).lower())")
+          USE_VISUAL=$(python -c "import json; from pathlib import Path; reports=sorted(Path('data/reports').glob('*-multi-agent.json'), key=lambda p:p.stat().st_mtime, reverse=True); print(str((json.load(open(reports[0])).get('visual_plan') or {}).get('use_visual',False)).lower()) if reports else print('false')")
           if [ "$USE_VISUAL" != "true" ]; then
             echo "Visual validation skipped because this cycle is text-only or visually degraded."
             exit 0
           fi
+          set +e
           python src/validate_visual.py
-          python src/pipeline_stage.py visual success "TradingView chart symbol matches the post"
+          RC=$?
+          set -e
+          if [ "$RC" != "0" ]; then
+            echo "TradingView visual validation failed with exit code $RC; degrading safely to text and continuing."
+            python src/degrade_visual.py
+            python src/pipeline_stage.py visual success "TradingView validation failed; safely degraded to text"
+          else
+            python src/pipeline_stage.py visual success "TradingView chart symbol matches the post"
+          fi
       - name: Production Manager — evaluate, repair once, and authorize publication
         id: gate
         run: |
