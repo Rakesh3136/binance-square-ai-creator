@@ -21,10 +21,6 @@ def main():
     elif cmd == "gate":
         status = load("data/live/creator_status.json") if Path("data/live/creator_status.json").exists() else {}
         accepted_statuses = {"AI_SUCCESS", "LOCAL_FALLBACK_SUCCESS"}
-        if status.get("status") not in accepted_statuses:
-            print(json.dumps({"publish": False, "reason": status.get("reason", "no fresh AI draft")}))
-            print("publish=false", file=open(os.environ["GITHUB_OUTPUT"], "a"))
-            return
         drafts = sorted(Path("data/reports").glob("*multi-agent.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         draft = drafts[0] if drafts else None
         if not draft or (datetime.now().timestamp() - draft.stat().st_mtime) > 1200:
@@ -32,8 +28,19 @@ def main():
             print("publish=false", file=open(os.environ["GITHUB_OUTPUT"], "a"))
             return
 
-        # Creator Intelligence 2.0 is deliberately allowed to reject the draft.
-        # It may also make safe editorial repairs before this gate evaluates it.
+        # A rescue writes a fresh deterministic draft and LOCAL_FALLBACK_SUCCESS.
+        # Keep the old gate usable, but do not let a stale creator_status value
+        # prevent a valid rescue from being evaluated.
+        data = load(draft)
+        rescue = data.get("publish_rescue") is True
+        if status.get("status") not in accepted_statuses and not rescue:
+            print(json.dumps({"publish": False, "reason": status.get("reason", "no accepted creator draft")}))
+            print("publish=false", file=open(os.environ["GITHUB_OUTPUT"], "a"))
+            return
+
+        # Creator Intelligence 2.0 may make safe editorial repairs before the
+        # final gate. Rescue publication does not require the AI to approve its
+        # own deterministic fallback; it must pass the stronger rescue threshold.
         subprocess.run([sys.executable, "src/creator_intelligence_2.py"], check=False)
         data = load(draft)
         r = data.get("research") or {}
@@ -66,7 +73,7 @@ def main():
             explicit_quality = float(interaction_gate.get("score") or 0)
         quality = explicit_quality
         generation_mode = str(d.get("generation_mode") or data.get("generation_mode") or status.get("generation_mode") or "GEMINI").upper()
-        quality_threshold = 72
+        quality_threshold = 85 if rescue else 72
 
         opportunity_values = []
         for obj, keys in (
@@ -91,7 +98,7 @@ def main():
             and opportunity >= 72
             and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
             and interaction_gate.get("publish") is True
-            and intelligence_ok
+            and (intelligence_ok or rescue)
         )
         gate_record = {
             "draft": str(draft),
@@ -109,6 +116,7 @@ def main():
             "interaction_gate": interaction_gate,
             "publish": publish,
             "creator_status": status.get("status"),
+            "rescue": rescue,
             "reason": "publish_eligible" if publish else "gate_rejected",
         }
         Path("/tmp/publish_gate.json").write_text(json.dumps(gate_record, indent=2))
@@ -127,6 +135,7 @@ def main():
             "interaction_gate": interaction_gate,
             "mode": "image" if v.get("use_visual") else "text",
             "editorial_style": d.get("editorial_style", ""),
+            "rescue": rescue,
         }, indent=2))
     elif cmd == "extract":
         d = load(os.environ["DRAFT_PATH"])
