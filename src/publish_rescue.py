@@ -8,6 +8,7 @@ from pathlib import Path
 REPORT_DIR = Path("data/reports")
 PREFLIGHT = Path("data/live/editorial_preflight.json")
 MARKET = Path("data/live/market_snapshot.json")
+STATUS = Path("data/live/creator_status.json")
 
 
 def load(path: Path, default):
@@ -91,7 +92,7 @@ def main():
     if not isinstance(visual, dict):
         visual = {}
     # Rescue is intentionally text-first so a gate failure cannot be caused by
-    # a stale/broken image dependency.
+    # a stale/broken image dependency. Normal cycles still use TradingView.
     visual.update({"use_visual": False, "type": "none", "rescue_text_fallback": True})
 
     report["draft"] = draft
@@ -99,7 +100,22 @@ def main():
     report["status"] = "DRAFT_ONLY_NOT_PUBLISHED"
     report["generation_mode"] = "LOCAL_FALLBACK"
     report["publish_rescue"] = True
+    report["publish_rescue_at"] = datetime.now(timezone.utc).isoformat()
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    STATUS.parent.mkdir(parents=True, exist_ok=True)
+    STATUS.write_text(
+        json.dumps(
+            {
+                "status": "LOCAL_FALLBACK_SUCCESS",
+                "generation_mode": "LOCAL_FALLBACK",
+                "reason": "Production manager rescue produced a fresh deterministic draft",
+                "rescue": True,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(json.dumps({"status": "PUBLISH_RESCUE_READY", "report": str(report_path), "symbol": symbol}, indent=2))
 
 
