@@ -1,11 +1,8 @@
 """Bounded production manager for the Binance Square creator.
 
-The manager is the final orchestration layer between a fresh draft and publication.
-It gives the normal draft one quality review and exactly one deterministic rescue
-attempt. Rescue is allowed only when the opportunity is still strong and the
-repaired post passes the interaction-quality checks. This prevents a flaky AI,
-visual renderer, or over-strict editorial score from silently killing a good
-production cycle while keeping publication bounded and evidence-based.
+Final publication authority. AI/editorial components may fail or reject a draft,
+but they must not prevent the manager from making one bounded deterministic rescue
+when a fresh market opportunity exists.
 """
 from __future__ import annotations
 
@@ -13,7 +10,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +20,7 @@ PREFLIGHT_PATH = ROOT / "data/live/editorial_preflight.json"
 INTEL_PATH = ROOT / "data/live/creator_intelligence_2.json"
 GATE_PATH = ROOT / "data/live/engagement_gate.json"
 AUDIT_PATH = Path("/tmp/publish_gate.json")
+
 QUALITY_THRESHOLD = 72.0
 OPPORTUNITY_THRESHOLD = 72.0
 RESCUE_QUALITY_THRESHOLD = 85.0
@@ -40,7 +38,11 @@ def load(path: Path, default=None):
 
 
 def fresh_report():
-    reports = sorted(REPORT_DIR.glob("*-multi-agent.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    reports = sorted(
+        REPORT_DIR.glob("*-multi-agent.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     if not reports:
         return None
     report = reports[0]
@@ -69,12 +71,31 @@ def set_fallback_status():
     )
 
 
-def run_intelligence():
-    return subprocess.run(
-        [sys.executable, str(ROOT / "src/creator_intelligence_2.py")],
-        cwd=ROOT,
-        check=False,
-    ).returncode
+def opportunity_score(data):
+    research = data.get("research") or {}
+    critique = data.get("critique") or {}
+    selected = data.get("selected_editorial_lane") or {}
+    preflight = load(PREFLIGHT_PATH, {})
+    preflight_selected = preflight.get("selected_opportunity") or {}
+
+    values = []
+    sources = (
+        (research, ("opportunity_score", "adjusted_score", "engagement_score")),
+        (critique, ("revised_opportunity_score", "opportunity_score", "adjusted_score", "engagement_score")),
+        (selected, ("adjusted_score", "raw_score", "engagement_score")),
+        (preflight_selected, ("adjusted_score", "raw_score", "content_signal_score", "engagement_score")),
+    )
+    for obj, keys in sources:
+        if not isinstance(obj, dict):
+            continue
+        for key in keys:
+            try:
+                value = float(obj.get(key) or 0)
+            except (TypeError, ValueError):
+                value = 0.0
+            if value > 0:
+                values.append(value)
+    return max(values, default=0.0)
 
 
 def evaluate(report: Path):
@@ -82,6 +103,7 @@ def evaluate(report: Path):
     draft = data.get("draft") or {}
     visual = data.get("visual_plan") or {}
     post = str(draft.get("post") or draft.get("text") or "").strip()
+    rescue = data.get("publish_rescue") is True
 
     try:
         from engagement_quality_gate import evaluate as interaction_evaluate
@@ -93,52 +115,37 @@ def evaluate(report: Path):
             "reasons": [f"quality_gate_error:{type(exc).__name__}"],
         }
 
-    research = data.get("research") or {}
-    critique = data.get("critique") or {}
-    selected = data.get("selected_editorial_lane") or {}
-    preflight = load(PREFLIGHT_PATH, {})
-    preflight_selected = preflight.get("selected_opportunity") or {}
+    try:
+        quality = float(draft.get("quality_score") or interaction.get("score") or 0)
+    except (TypeError, ValueError):
+        quality = float(interaction.get("score") or 0)
 
-    opportunity_values = []
-    for obj, keys in (
-        (research, ("opportunity_score", "adjusted_score", "engagement_score")),
-        (critique, ("revised_opportunity_score", "opportunity_score", "adjusted_score", "engagement_score")),
-        (selected, ("adjusted_score", "raw_score", "engagement_score")),
-        (preflight_selected, ("adjusted_score", "raw_score", "content_signal_score", "engagement_score")),
-    ):
-        if isinstance(obj, dict):
-            for key in keys:
-                try:
-                    value = float(obj.get(key) or 0)
-                except (TypeError, ValueError):
-                    value = 0
-                if value > 0:
-                    opportunity_values.append(value)
-    opportunity = max(opportunity_values, default=0.0)
-
-    quality = float(draft.get("quality_score") or interaction.get("score") or 0)
+    opportunity = opportunity_score(data)
     intelligence = load(INTEL_PATH, {})
     intelligence_ok = intelligence.get("publish_recommendation") is True
-    rescue = data.get("publish_rescue") is True
 
-    # Normal publication requires the intelligence recommendation. A rescue is
-    # a deterministic, market-data-only fallback, so it uses the stronger rescue
-    # quality threshold and interaction gate instead of asking the AI to approve
-    # its own fallback.
-    intelligence_required = not rescue
-    publish = bool(
-        post
-        and quality >= (RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD)
-        and opportunity >= OPPORTUNITY_THRESHOLD
-        and interaction.get("publish") is True
-        and (intelligence_ok or not intelligence_required)
-        and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
-    )
+    if rescue:
+        eligible = (
+            bool(post)
+            and quality >= RESCUE_QUALITY_THRESHOLD
+            and opportunity >= OPPORTUNITY_THRESHOLD
+            and interaction.get("publish") is True
+            and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
+        )
+    else:
+        eligible = (
+            bool(post)
+            and quality >= QUALITY_THRESHOLD
+            and opportunity >= OPPORTUNITY_THRESHOLD
+            and interaction.get("publish") is True
+            and intelligence_ok
+            and data.get("status") == "DRAFT_ONLY_NOT_PUBLISHED"
+        )
 
-    mode = "image" if isinstance(visual, dict) and visual.get("use_visual") else "text"
+    mode = "image" if visual.get("use_visual") is True else "text"
     audit = {
         "draft": str(report),
-        "publish": publish,
+        "publish": eligible,
         "attempt": "rescue" if rescue else "normal",
         "quality_score": quality,
         "quality_threshold": RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD,
@@ -149,13 +156,13 @@ def evaluate(report: Path):
         "interaction_gate": interaction,
         "mode": mode,
         "rescue": rescue,
-        "reason": "publish_eligible" if publish else "gate_rejected",
+        "reason": "publish_eligible" if eligible else "gate_rejected",
     }
     AUDIT_PATH.write_text(json.dumps(audit, indent=2, ensure_ascii=False), encoding="utf-8")
     GATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     GATE_PATH.write_text(json.dumps(interaction, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(audit, indent=2, ensure_ascii=False))
-    return publish, mode
+    return eligible, mode
 
 
 def main():
@@ -165,46 +172,40 @@ def main():
         print(json.dumps({"publish": False, "reason": "no fresh draft within 20 minutes"}))
         return 0
 
-    # First pass: let Creator Intelligence 2.0 self-edit/recommend normally.
-    run_intelligence()
+    # The AI self-editor already ran earlier in the workflow. Never rerun it
+    # here: its failure must not block the production manager or the rescue lane.
     publish, mode = evaluate(report)
     if publish:
         output(True, mode)
+        print("Production manager: normal draft passed; publication authorized.")
         return 0
 
-    # Exactly one rescue. It creates a deterministic post from the verified
-    # opportunity and deliberately switches to text so a broken visual cannot
-    # prevent a timely publication.
-    print("Production manager: first gate rejected the draft; running one bounded rescue.")
+    print("Production manager: normal gate rejected the draft; running one bounded rescue.")
     rescue = subprocess.run(
         [sys.executable, str(ROOT / "src/publish_rescue.py")],
         cwd=ROOT,
         check=False,
     )
     if rescue.returncode != 0:
-        output(False)
+        output(False, mode)
         print("Production manager: rescue failed; no publication.")
         return 0
 
     set_fallback_status()
     report = fresh_report()
     if not report:
-        output(False)
+        output(False, mode)
         print("Production manager: rescue produced no fresh report; no publication.")
         return 0
 
-    # Re-score the repaired draft. Intelligence may still reject it for
-    # stylistic reasons, but the rescue is deterministic and must satisfy the
-    # stronger quality + opportunity + interaction checks in evaluate().
-    run_intelligence()
     publish, mode = evaluate(report)
     if publish:
         output(True, mode)
-        print("Production manager: rescue passed; publication is authorized.")
+        print("Production manager: deterministic rescue passed; publication authorized.")
         return 0
 
     output(False, mode)
-    print("Production manager: bounded rescue also failed; stopping safely.")
+    print("Production manager: bounded rescue failed the final evidence checks; no publication.")
     return 0
 
 
