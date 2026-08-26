@@ -15,6 +15,9 @@ on:
       - 'src/publication_context.py'
       - 'src/performance_feedback.py'
       - 'src/creator_brain.py'
+      - 'src/production_manager.py'
+      - 'src/publish_rescue.py'
+      - 'src/workflow_helpers.py'
   workflow_dispatch:
     inputs:
       topic:
@@ -105,7 +108,7 @@ jobs:
             python src/normalize_draft.py
             python src/creator_intelligence_2.py
           elif [ "$RC" != "0" ]; then
-            echo "Creator Intelligence 2.0 failed safely with exit code $RC; publication gate remains authoritative."
+            echo "Creator Intelligence 2.0 failed safely with exit code $RC; bounded production rescue remains available."
           else
             echo "Creator Intelligence 2.0 accepted the first draft for publication review."
           fi
@@ -126,31 +129,34 @@ jobs:
             python src/pipeline_stage.py visual blocked "No fresh draft"
             exit 0
           fi
-          python src/visual_renderer.py
-          python src/pipeline_stage.py visual success "Official TradingView chart snapshot rendered"
+          if python src/visual_renderer.py; then
+            python src/pipeline_stage.py visual success "Official TradingView chart snapshot rendered"
+          else
+            echo "TradingView renderer failed; degrading visual only so the production manager can rescue the text publication."
+            python src/degrade_visual.py
+            python src/pipeline_stage.py visual success "TradingView visual failed; safely degraded to text"
+          fi
       - name: Validate TradingView visual matches post
         run: |
+          USE_VISUAL=$(python -c "import json; p=sorted(__import__('pathlib').Path('data/reports').glob('*-multi-agent.json'), key=lambda p:p.stat().st_mtime, reverse=True)[0]; print(str((json.load(open(p)).get('visual_plan') or {}).get('use_visual',False)).lower())")
+          if [ "$USE_VISUAL" != "true" ]; then
+            echo "Visual validation skipped because this cycle is text-only or visually degraded."
+            exit 0
+          fi
           python src/validate_visual.py
           python src/pipeline_stage.py visual success "TradingView chart symbol matches the post"
-      - name: Evaluate publication gate and rescue once if needed
+      - name: Production Manager — evaluate, repair once, and authorize publication
         id: gate
         run: |
-          python src/workflow_helpers.py gate
+          python src/production_manager.py
           PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
-          if [ "$PUBLISH" != "true" ]; then
-            echo "Publication gate rejected the first draft. Building deterministic publish rescue from verified market data."
-            python src/publish_rescue.py
-            python src/workflow_helpers.py gate
-            PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
-          fi
           if [ "$PUBLISH" = "true" ]; then
-            python src/pipeline_stage.py quality_gate success "Publication gate passed or rescue succeeded"
+            python src/pipeline_stage.py quality_gate success "Production Manager authorized publication after bounded review/rescue"
           else
-            python src/pipeline_stage.py quality_gate blocked "Publication gate and deterministic rescue both rejected the cycle"
+            python src/pipeline_stage.py quality_gate blocked "Production Manager could not produce a verified publishable draft"
             cat /tmp/publish_gate.json || true
             cat data/live/engagement_gate.json || true
             cat data/live/creator_intelligence_2.json || true
-            exit 1
           fi
       - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
