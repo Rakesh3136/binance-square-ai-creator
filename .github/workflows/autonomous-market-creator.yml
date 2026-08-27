@@ -20,6 +20,7 @@ on:
       - 'src/workflow_helpers.py'
       - 'src/signal_outcome_tracker.py'
       - 'src/technical_enricher.py'
+      - 'src/editorial_prompt_patch.py'
   workflow_dispatch:
     inputs:
       topic:
@@ -78,6 +79,8 @@ jobs:
           python src/pipeline_stage.py creator_brain success "Creator Brain decision wired into this production cycle"
       - name: Lock publication context
         run: python src/publication_context.py
+      - name: Patch AI editorial director
+        run: python src/editorial_prompt_patch.py
       - name: Run AI creator
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
