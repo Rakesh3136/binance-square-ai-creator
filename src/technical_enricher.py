@@ -5,7 +5,6 @@ ROOT=Path(__file__).resolve().parents[1]
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'
 MARKET=ROOT/'data/live/market_snapshot.json'
 REPORTS=ROOT/'data/reports'
-
 TECH_WORDS=re.compile(r'\b(breakout|fakeout|support|resistance|rsi|ema|fib|target|stop[- ]?loss|sl\b|tp\b|entry|setup|chart)\b',re.I)
 
 def load(p, default=None):
@@ -22,8 +21,7 @@ def find_item(market,symbol):
             if isinstance(x,dict) and str(x.get('symbol','')).upper()==target:return x
     return None
 
-def fmt(x):
-    return f"{x:.8g}"
+def fmt(x): return f"{x:.8g}"
 
 def main():
     pre=load(PREFLIGHT,{})
@@ -45,22 +43,21 @@ def main():
     symbol=str(item.get('symbol')).upper().replace('USDT','')
     report_files=sorted(REPORTS.glob('*-multi-agent.json'),key=lambda p:p.stat().st_mtime,reverse=True)
     if not report_files: print(json.dumps({'status':'SKIP','reason':'no draft'})); return
-    path=report_files[0]
-    data=load(path,{})
-    draft=data.get('draft') or {}
-    text=str(draft.get('post') or draft.get('text') or '').strip()
+    path=report_files[0]; data=load(path,{})
+    draft=data.get('draft') or {}; text=str(draft.get('post') or draft.get('text') or '').strip()
     if not text or (not TECH_WORDS.search(text) and category!='technical_setup'):
         print(json.dumps({'status':'SKIP','reason':'draft is not technical'})); return
-    level_line=(f"Chart-derived levels: support ${fmt(support)} • resistance ${fmt(resistance)} • "
-                f"measured target ${fmt(target)} • invalidation below ${fmt(invalidation)}.")
-    disclaimer='These are chart-derived levels, not guarantees; confirmation matters.'
-    if 'Chart-derived levels:' not in text:
-        text=(text.rstrip()+"\n"+level_line+"\n"+disclaimer)[:740]
-        draft['post']=text; draft['text']=text
-        data['draft']=draft
+    level_line=f"Levels: support ${fmt(support)} • resistance ${fmt(resistance)} • measured target ${fmt(target)} • invalidation < ${fmt(invalidation)}."
+    if 'Levels: support' not in text:
+        # Keep the creator's question as the final line so engagement checks remain valid.
+        lines=[x.strip() for x in text.splitlines() if x.strip()]
+        question=lines.pop() if lines and '?' in lines[-1] else ''
+        body='\n'.join(lines)
+        enriched=(body+'\n'+level_line+'\n'+('Chart-derived, not guaranteed.' if question else '')+'\n'+question).strip()
+        enriched=enriched[:740]
+        draft['post']=enriched; draft['text']=enriched; data['draft']=draft
         data.setdefault('research',{})['chart_levels']={'support':support,'resistance':resistance,'target':target,'invalidation':invalidation,'method':'recent_12_candles'}
-        data.setdefault('visual_plan',{})['use_visual']=True
-        data['visual_plan']['type']='candlestick_chart'
+        data.setdefault('visual_plan',{})['use_visual']=True; data['visual_plan']['type']='candlestick_chart'
         path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8')
         print(json.dumps({'status':'ENRICHED','symbol':symbol,'support':support,'resistance':resistance,'target':target,'invalidation':invalidation}))
     else: print(json.dumps({'status':'SKIP','reason':'already enriched'}))
