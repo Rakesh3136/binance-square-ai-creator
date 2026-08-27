@@ -18,6 +18,8 @@ on:
       - 'src/production_manager.py'
       - 'src/publish_rescue.py'
       - 'src/workflow_helpers.py'
+      - 'src/signal_outcome_tracker.py'
+      - 'src/technical_enricher.py'
   workflow_dispatch:
     inputs:
       topic:
@@ -63,6 +65,8 @@ jobs:
           if [ -n "$TOPIC" ]; then
             python src/workflow_helpers.py manual-topic
           fi
+      - name: Track creator calls and verified outcomes
+        run: python src/signal_outcome_tracker.py
       - name: Select engagement experiment
         run: python src/engagement_engine.py
       - name: Update performance feedback
@@ -89,7 +93,8 @@ jobs:
           fi
           python src/safe_creator_runner.py
           python src/normalize_draft.py
-          python src/pipeline_stage.py ai_draft success "Fresh draft generated and normalized"
+          python src/technical_enricher.py
+          python src/pipeline_stage.py ai_draft success "Fresh draft generated, normalized, and technically enriched when supported by verified chart data"
       - name: Run Creator Intelligence 2.0 self-editor and one AI rework
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -109,6 +114,7 @@ jobs:
               NORMALIZE_RC=$?
               if [ "$NORMALIZE_RC" = "0" ]; then
                 python src/normalize_draft.py
+                python src/technical_enricher.py
                 python src/creator_intelligence_2.py
                 FINAL_RC=$?
                 echo "Creator Intelligence 2.0 rework finished with exit code $FINAL_RC."
@@ -124,8 +130,6 @@ jobs:
             echo "Creator Intelligence 2.0 accepted the first draft for publication review."
           fi
           set -e
-          # This editor is advisory. A rejection or bounded rework failure must not
-          # prevent Production Manager from evaluating/rescuing the draft.
           exit 0
       - name: Setup Node for TradingView renderer
         if: ${{ always() }}
