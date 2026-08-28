@@ -2,26 +2,67 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from datetime import datetime, timezone
-ROOT=Path(__file__).resolve().parents[1]
-PRE=ROOT/'data/live/editorial_preflight.json'
-OUT=ROOT/'data/live/authoritative_opportunity.json'
+
+ROOT = Path(__file__).resolve().parents[1]
+PRE = ROOT / "data/live/editorial_preflight.json"
+ENGAGEMENT = ROOT / "data/live/engagement_strategy.json"
+OUT = ROOT / "data/live/authoritative_opportunity.json"
+
+
+def load(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
 
 def main():
-    data=json.loads(PRE.read_text(encoding='utf-8'))
-    selected=data.get('selected_opportunity') or {}
-    if not selected.get('symbol'):
-        raise SystemExit('No selected opportunity to freeze')
-    frozen={
-        'version':1,
-        'frozen_at':datetime.now(timezone.utc).isoformat(),
-        'symbol':str(selected.get('symbol')).upper().replace('USDT',''),
-        'symbol_usdt':str(selected.get('symbol')).upper().replace('USDT','')+'USDT',
-        'category':selected.get('category',''),
-        'reason':selected.get('reason',''),
-        'instruction':selected.get('instruction',''),
-        'score':selected.get('adjusted_score',selected.get('raw_score',0)),
-        'run_ai':bool(data.get('run_ai',False)),
+    pre = load(PRE)
+    engagement = load(ENGAGEMENT)
+
+    # The engagement selector is authoritative after engagement selection.
+    # Keep the preflight copy when present, but recover from the selector output
+    # if another stage replaced/cleared selected_opportunity between steps.
+    selected = pre.get("selected_opportunity")
+    if not isinstance(selected, dict) or not selected.get("symbol"):
+        candidate = engagement.get("selected")
+        if isinstance(candidate, dict) and candidate.get("symbol"):
+            selected = candidate
+            pre["selected_opportunity"] = candidate
+            pre["recovered_selected_opportunity"] = True
+        else:
+            ranked = engagement.get("ranked_candidates")
+            if isinstance(ranked, list):
+                selected = next((x for x in ranked if isinstance(x, dict) and x.get("symbol")), None)
+            if not isinstance(selected, dict) or not selected.get("symbol"):
+                raise SystemExit("No selected opportunity to freeze after engagement selection")
+            pre["selected_opportunity"] = selected
+            pre["recovered_selected_opportunity"] = True
+
+    symbol_usdt = str(selected.get("symbol")).upper().strip()
+    if not symbol_usdt.endswith("USDT"):
+        symbol_usdt += "USDT"
+    symbol = symbol_usdt[:-4]
+
+    frozen = {
+        "version": 2,
+        "frozen_at": datetime.now(timezone.utc).isoformat(),
+        "symbol": symbol,
+        "symbol_usdt": symbol_usdt,
+        "category": selected.get("category", ""),
+        "reason": selected.get("reason", ""),
+        "instruction": selected.get("instruction", ""),
+        "score": selected.get("adjusted_score", selected.get("raw_score", 0)),
+        "run_ai": bool(pre.get("run_ai", False)),
+        "selection_source": "engagement_strategy" if pre.get("recovered_selected_opportunity") else "editorial_preflight",
     }
-    OUT.write_text(json.dumps(frozen,indent=2,ensure_ascii=False),encoding='utf-8')
-    print(json.dumps(frozen,indent=2,ensure_ascii=False))
-if __name__=='__main__': main()
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(frozen, indent=2, ensure_ascii=False), encoding="utf-8")
+    PRE.write_text(json.dumps(pre, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(json.dumps(frozen, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
