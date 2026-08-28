@@ -1,6 +1,7 @@
 """Normalize AI draft aliases and enforce publication-context visual requirements."""
 from __future__ import annotations
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,13 +42,13 @@ def main() -> None:
     except Exception:
         context = {}
     visual_decision = context.get("visual_decision") or {}
+    base = str(context.get("symbol") or "").upper().replace("USDT", "").strip()
 
     if bool(visual_decision.get("required")):
-        # The production contract requires the selected asset to be explicitly
-        # tagged in the post so the TradingView image and post are unambiguous.
-        base = str(context.get("symbol") or "").upper().replace("USDT", "").strip()
+        # Every autonomous market post is explicitly tied to the selected asset
+        # and to a TradingView visual. Never substitute an AI-generated chart.
         if base and f"${base}" not in text.upper():
-            text = f"${base} " + text
+            text = f"${base} — " + text
         draft["visual_requested"] = True
         draft["visual_type"] = "tradingview_chart"
         report["visual_plan"] = {
@@ -59,11 +60,33 @@ def main() -> None:
             "source": "publication_context",
         }
 
-    text = text[:740]
+    # Binance Square mobile copy must have one useful conversation question.
+    # Preserve an AI-written question when there is exactly one; otherwise make
+    # the final line a chart-specific, non-promotional question.
+    question_count = text.count("?")
+    if question_count == 0:
+        if base:
+            text = f"{text.rstrip()}\n\nBreakout or retest — which level are you watching for confirmation on ${base}?"
+        else:
+            text = f"{text.rstrip()}\n\nBreakout or fakeout — which level are you watching for confirmation?"
+    elif question_count > 1:
+        # Keep the final question and turn earlier question marks into periods.
+        last_q = text.rfind("?")
+        prefix = text[:last_q].replace("?", ".")
+        text = prefix + text[last_q:]
+
+    # Avoid accidental truncation in the middle of a question.
+    text = text[:740].rstrip()
+    if "?" not in text:
+        suffix = f" Which level confirms your setup on ${base}?" if base else " Which level confirms your setup?"
+        text = (text[: 740 - len(suffix)].rstrip() + suffix)
+
     draft["text"] = text
     draft["post"] = text
+    draft["hook"] = draft.get("hook") or (f"${base} setup:" if base else "Market setup:")
+    draft["discussion_question"] = draft.get("discussion_question") or text[text.rfind("\n") + 1:].strip()
     draft.setdefault("quality_score", 0)
-    draft.setdefault("editorial_style", "ai_normalized")
+    draft.setdefault("editorial_style", "ai_normalized_chart_first")
     draft.setdefault("publication_status", "DRAFT_ONLY_NOT_PUBLISHED")
 
     report["draft"] = draft
@@ -82,7 +105,7 @@ def main() -> None:
         "status": "AI_SUCCESS",
         "report": str(path),
         "draft_text_ready": True,
-        "normalization": "canonical_text_and_post_fields",
+        "normalization": "canonical_text_post_hook_question_fields",
         "visual_required_by_context": bool(visual_decision.get("required")),
     })
     STATUS.parent.mkdir(parents=True, exist_ok=True)
@@ -93,7 +116,9 @@ def main() -> None:
         "characters": len(text),
         "visual_requested": bool(draft.get("visual_requested")),
         "visual_type": draft.get("visual_type", "none"),
-        "cashtag": f"${str(context.get('symbol') or '').upper().replace('USDT', '')}" if context.get('symbol') else None,
+        "cashtag": f"${base}" if base else None,
+        "question_count": text.count("?"),
+        "hook": draft.get("hook"),
     }))
 
 
