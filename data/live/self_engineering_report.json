@@ -3,12 +3,12 @@
   "policy_version": 2,
   "proposal": {
     "decision": "CHANGE",
-    "title": "Balance experimental format exploration in engagement engine tie-breaker",
-    "reason": "Diagnostics show Experiment A ('CHOICE') was selected 8 times while Experiments B through H had only 1 sample each. When engagement metrics are unpopulated or tied at 0.0, calling max() on the experiment list systematically selected index 0 (Experiment A). Adding a sample-count tie-breaker ensures each format receives at least 3 samples before greedy selection, building sufficient statistical evidence across all interactive format hypotheses.",
+    "title": "Improve immediate style rotation tracking and zero-view metric rate evaluation",
+    "reason": "Tracking last_editorial_style ensures strict anti-repetition of consecutive editorial styles, while adding raw metric fallbacks in rate evaluation prevents experiment scoring from collapsing to zero when view counts are missing.",
     "expected_metric": "diversity"
   },
   "result": {
-    "branch": "self-engineer/balance-experimental-format-exploration-in-en-33080778318",
+    "branch": "self-engineer/improve-immediate-style-rotation-tracking-and-33184663762",
     "merged": false,
     "pr_creation": "BLOCKED",
     "error": "GitHub API 403 during POST https://api.github.com/repos/Rakesh3136/binance-square-ai-creator/pulls: {\"message\":\"GitHub Actions is not permitted to create or approve pull requests.\",\"documentation_url\":\"https://docs.github.com/rest/pulls/pulls#create-a-pull-request\",\"status\":\"403\"}",
