@@ -2,28 +2,6 @@ name: Autonomous Market Creator
 on:
   schedule:
     - cron: '7 */3 * * *'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/autonomous-market-creator.yml'
-      - 'requirements.txt'
-      - 'src/visual_renderer.py'
-      - 'src/tradingview_renderer.mjs'
-      - 'src/validate_visual.py'
-      - 'src/normalize_draft.py'
-      - 'src/degrade_visual.py'
-      - 'src/publication_context.py'
-      - 'src/performance_feedback.py'
-      - 'src/creator_brain.py'
-      - 'src/production_manager.py'
-      - 'src/publish_rescue.py'
-      - 'src/workflow_helpers.py'
-      - 'src/signal_outcome_tracker.py'
-      - 'src/technical_enricher.py'
-      - 'src/editorial_prompt_patch.py'
-      - 'src/freeze_opportunity.py'
-      - 'src/market_chart_renderer.py'
-      - 'src/live_market_scanner.py'
   workflow_dispatch:
     inputs:
       topic:
@@ -231,10 +209,16 @@ jobs:
           fi
       - name: Persist state
         if: always()
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add analytics data/live data/intelligence
           git diff --cached --quiet || git commit -m "Record autonomous creator cycle"
-          git pull --rebase --autostash origin main
-          git push origin main || true
+          git fetch origin main
+          if ! git rebase origin/main; then
+            git rebase --abort || true
+            echo "State rebase conflict; leaving remote main unchanged rather than failing publication."
+            exit 0
+          fi
+          git push origin HEAD:main || true
