@@ -1,18 +1,28 @@
 from pathlib import Path
-P=Path('src/multi_agent_creator.py')
-text=P.read_text(encoding='utf-8')
-replacements={
-'VISUAL-FIRST: For a single-asset market story, prefer a REAL Binance 1h candlestick chart. Use only real OHLCV-derived levels/patterns. Never invent a pattern or level.':'TRADINGVIEW-ONLY VISUAL: For every single-asset market story, the publication MUST include an official TradingView 1H candlestick chart for the exact primary Binance symbol. Use only real chart data and data-supported annotations. Never substitute a homemade, Binance-only, generated, placeholder, or text-only chart. If TradingView cannot be rendered or verified, do not publish.',
-'WRITING: Normal target 220-650 characters; hard maximum 750. First line must create curiosity or urgency without fake hype. Use 3-6 short mobile-friendly lines. Sound like a sharp human crypto creator. Rotate market movers, breaking news, macro, new listings, volume anomalies, TradingView technical setups, breakout/fakeout, comparison, education, creator-call outcomes and follow-ups. For chart-driven stories, include live-data-derived support/resistance and, when justified, a measured target and invalidation/SL. Label levels as scenarios, never guarantees.':'WRITING: Normal target 300-700 characters; hard maximum 900 when the evidence genuinely needs more context. Write like a sharp human crypto creator, not a template or market report. Start with a strong specific hook tied to the actual move/event. Explain WHY the move matters, what the chart is showing, and what traders should watch next. Rotate breaking news + market impact, top gainer/loser, volume surge, new listing, TradingView chart breakdown, breakout/fakeout, target map, news + chart, liquidation story, comparison, education, creator-call outcome and follow-up. For technical setups, include current price plus support/resistance and a measured target and invalidation/SL only when directly supported by the TradingView chart/data; label them as scenarios, never guarantees. Use natural cashtags and avoid repetitive sentence patterns.',
-'STYLE ROTATION: Do not reuse the same opening cadence or structure. Rotate BREAKING NEWS + MARKET IMPACT, TOP GAINER/LOSER, VOLUME SURGE, NEW LISTING WATCH, CHART BREAKOUT, TARGET MAP, BREAKOUT/FAKEOUT, NEWS + CHART, COIN VS COIN, DATA SURPRISE, LIQUIDATION STORY, CREATOR CALL OUTCOME, FOLLOW-UP/UPDATE and education.':'STYLE ROTATION: Never reuse the same opening, cadence, structure, emoji pattern, or question framing in consecutive posts. Rotate BREAKING NEWS + MARKET IMPACT, TOP GAINER/LOSER, VOLUME SURGE, NEW LISTING WATCH, TRADINGVIEW CHART BREAKDOWN, BREAKOUT/FAKEOUT, TARGET MAP, NEWS + CHART, COIN VS COIN, DATA SURPRISE, LIQUIDATION STORY, CREATOR CALL OUTCOME, FOLLOW-UP/UPDATE, and education. Choose the format that best matches the evidence instead of mechanically following a fixed experiment.',
+
+P = Path("src/multi_agent_creator.py")
+text = P.read_text(encoding="utf-8")
+
+replacements = {
+    "VISUAL-FIRST: For a single-asset market story, prefer a REAL Binance 1h candlestick chart. Use only real OHLCV-derived levels/patterns. Never invent a pattern or level.": "TRADINGVIEW-ONLY VISUAL: For every single-asset market story, the publication MUST include an official TradingView 1H candlestick chart for the exact primary Binance symbol. Use only real chart data and data-supported annotations. Never substitute a homemade, Binance-only, generated, placeholder, or text-only chart. If TradingView cannot be rendered or verified, do not publish.",
+    "WRITING: Normal target 180-500 characters; hard maximum 750. First line creates curiosity. Use 2-5 short mobile-friendly lines. Sound conversational, not like a financial report. Do not automatically provide TP/SL/entry calls.": "WRITING: Normal target 300-700 characters; hard maximum 900 when the evidence genuinely needs more context. Start with a strong, specific hook tied to the actual market move or event. Explain WHY it matters, what the chart/news is showing, and what traders should watch next. For technical setups, include current price, support, resistance, and when directly supported by live OHLCV, TP1/target and invalidation/SL. Label levels as chart-derived scenarios, never guarantees. Use natural cashtags and avoid repetitive sentence patterns.",
+    "STYLE ROTATION: Do not reuse the same opening cadence, editorial_style, or paragraph structure as the immediately previous post. Prefer visibly different structures such as CHOICE, CHART CHALLENGE, COIN VS COIN, DATA SURPRISE, BREAKOUT/FAKEOUT, NEWS REACTION, LIQUIDATION STORY, TOP MOVERS, quick observation, or mini-story.": "STYLE ROTATION: Never reuse the same opening, cadence, structure, emoji pattern, or question framing in consecutive posts. Rotate BREAKING NEWS + MARKET IMPACT, TOP GAINER/LOSER, VOLUME SURGE, NEW LISTING WATCH, TRADINGVIEW CHART BREAKDOWN, BREAKOUT/FAKEOUT, TARGET MAP, NEWS + CHART, COIN VS COIN, DATA SURPRISE, LIQUIDATION STORY, CREATOR CALL OUTCOME, FOLLOW-UP/UPDATE and education. Choose the format that best matches the evidence instead of mechanically repeating one experiment.",
 }
-for old,new in replacements.items():
-    if old in text: text=text.replace(old,new)
-asset_rule='''SELECTED ASSET LOCK: The selected editorial opportunity is authoritative. Use its exact primary symbol unless the research proves that the opportunity is invalid. Never silently switch to another coin. The final draft symbol, chart symbol, cashtag and discussed market must all refer to the same primary asset. If the selected opportunity is a chart-first lane, do not produce a text-only generic market recap.'''
-if 'SELECTED ASSET LOCK:' not in text:
-    marker='TRADINGVIEW-ONLY VISUAL: For every single-asset market story, the publication MUST include an official TradingView 1H candlestick chart for the exact primary Binance symbol. Use only real chart data and data-supported annotations. Never substitute a homemade, Binance-only, generated, placeholder, or text-only chart. If TradingView cannot be rendered or verified, do not publish.'
-    if marker in text: text=text.replace(marker,marker+'\n\n'+asset_rule)
-else:
-    text=text.replace('If the selected opportunity is a chart-first lane, do not produce a text-only generic market recap.','If the selected opportunity is a chart-first lane, do not produce a text-only generic market recap. TradingView is mandatory for publication.')
-P.write_text(text,encoding='utf-8')
-print({'status':'EDITORIAL_DIRECTOR_PATCH_READY'})
+for old, new in replacements.items():
+    if old in text:
+        text = text.replace(old, new)
+
+rules = """
+
+RESEARCH COVERAGE: The supplied NEWS snapshot is a first-class research input, not a fallback. Before choosing the post, compare current crypto headlines, official macro/regulatory announcements, market movers, volume anomalies, new listings and technical setups. Prefer a news post when a material, recent, verified story has stronger attention potential; use NEWS + CHART when the story materially affects a tradeable asset. Never invent or exaggerate news.
+
+TECHNICAL LEVELS: For a technical/chart post, the final draft MUST use the live technical enrichment values when supplied: current price, support, resistance, TP1/target and invalidation/SL. The chart visual must display those same values. Never manufacture levels. If the data does not justify a target or stop, say so rather than inventing one.
+
+CALL-OUT FOLLOW-UP: When a prior creator signal/call is available in the research inputs, the AI may create an original outcome post only when the subsequent price move is verified from fresh market data. State the measured result; never falsely claim "I told you to buy" and never guarantee future returns. Avoid 10x/20x certainty claims; such scenarios must be explicitly speculative.
+"""
+if "RESEARCH COVERAGE:" not in text:
+    marker = "Return ONLY valid JSON with research, critique, draft and visual_plan fields.'''
+    text = text.replace(marker, rules + "\n" + marker)
+
+P.write_text(text, encoding="utf-8")
+print({"status": "EDITORIAL_DIRECTOR_PATCH_APPLIED"})
