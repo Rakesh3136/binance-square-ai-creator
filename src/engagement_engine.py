@@ -34,18 +34,23 @@ def metric(r,key):
     except:return None
 
 def rate(rows_,key,den='views'):
-    vals=[(metric(r,key),metric(r,den)) for r in rows_]; vals=[x for x in vals if x[0] is not None and x[1] is not None and x[1]>0]
-    return sum(v for v,_ in vals)/sum(d for _,d in vals) if vals else None
+    vals=[(metric(r,key),metric(r,den)) for r in rows_]
+    valid=[x for x in vals if x[0] is not None and x[1] is not None and x[1]>0]
+    if valid: return sum(v for v,_ in valid)/sum(d for _,d in valid)
+    raw_vals=[x[0] for x in vals if x[0] is not None]
+    return (sum(raw_vals)/len(raw_vals)) if raw_vals else None
 
 def main():
     pre=load(PREFLIGHT,{}); candidates=[x for x in rows(pre.get("candidate_pool")) if isinstance(x,dict)]; history=pubs()
-    asset_count=Counter();cat_count=Counter();exp_count=Counter();style_count=Counter();rows_by_exp=defaultdict(list)
+    asset_count=Counter();cat_count=Counter();exp_count=Counter();style_count=Counter();rows_by_exp=defaultdict(list);last_style=""
     for r in history:
         s=sym(r); c=str(r.get("content_category") or r.get("category") or "").lower(); e=str(r.get("experiment_id") or r.get("editorial_experiment") or "").upper(); st=str(r.get("editorial_style") or "").strip().upper()
         if s:asset_count[s]+=1
         if c:cat_count[c]+=1
         if e:exp_count[e]+=1;rows_by_exp[e].append(r)
-        if st:style_count[st]+=1
+        if st:
+            style_count[st]+=1
+            last_style=st
     ranked=[]
     for c in candidates:
         s=sym(c);cat=str(c.get("category") or "").lower();raw=metric(c,"adjusted_score") or metric(c,"raw_score") or 0
@@ -60,8 +65,10 @@ def main():
             return (0.50*(rs or 0)+0.30*(fs or 0)+0.12*(ls or 0)+0.08*(ss or 0))*conf
         exp=max(EXPERIMENTS,key=exp_score)
     category=str(selected.get("category") or "news_and_macro").lower()
-    strategy={"primary_goal":"maximize genuine interaction and follower conversion, not posting volume","experiment_id":exp["id"],"experiment":exp,"feedback_source":str(FEEDBACK),"distribution_rule":"react to fresh, high-signal opportunities; reject stale moves when their strongest expansion has already passed","hook_rule":"first line creates curiosity without sounding like a market report","visual_rule":"single-asset technical story => real OHLCV candlestick chart with only data-supported annotations","question_rule":"one question only; answerable in under 5 seconds; prefer A/B, breakout/fakeout, or precise chart observation","length_rule":"180-500 characters normally; hard maximum 750 unless genuinely necessary","style_rule":"Never repeat the same editorial_style in consecutive posts. Rotate across shock, debate, chart challenge, data surprise, comparison, news reaction, liquidation story and quick take.","avoid":["generic What do you think?","follow/like begging","fake urgency","guaranteed returns","long analyst report","automatic TP/SL","reusing the same opening sentence pattern"],"monetization":"use relevant cashtag or real chart widget naturally when supported; never promise earnings","recent_style_counts":dict(style_count)}
+    strategy={"primary_goal":"maximize genuine interaction and follower conversion, not posting volume","experiment_id":exp["id"],"experiment":exp,"feedback_source":str(FEEDBACK),"distribution_rule":"react to fresh, high-signal opportunities; reject stale moves when their strongest expansion has already passed","hook_rule":"first line creates curiosity without sounding like a market report","visual_rule":"single-asset technical story => real OHLCV candlestick chart with only data-supported annotations","question_rule":"one question only; answerable in under 5 seconds; prefer A/B, breakout/fakeout, or precise chart observation","length_rule":"180-500 characters normally; hard maximum 750 unless genuinely necessary","style_rule":"Never repeat the same editorial_style in consecutive posts. Rotate across shock, debate, chart challenge, data surprise, comparison, news reaction, liquidation story and quick take.","avoid":["generic What do you think?","follow/like begging","fake urgency","guaranteed returns","long analyst report","automatic TP/SL","reusing the same opening sentence pattern"],"monetization":"use relevant cashtag or real chart widget naturally when supported; never promise earnings","recent_style_counts":dict(style_count),"last_editorial_style":last_style}
     selected=dict(selected); selected["instruction"]=(f"Use {category.replace('_',' ')} and experiment {exp['id']} ({exp['format']}). Hook around {exp['hook']}; end with exactly one easy question: {exp['question']}. Keep it short, visual-first and conversational. Do not repeat recently covered assets without a major verified event. Do not reuse the previous editorial style or opening cadence."); selected["engagement_strategy"]=strategy
-    result={"generated_at":datetime.now(timezone.utc).isoformat(),"selected":selected,"ranked_candidates":ranked[:15],"recent_assets":dict(asset_count),"recent_categories":dict(cat_count),"recent_styles":dict(style_count),"experiment_counts":dict(exp_count),"experiments":EXPERIMENTS,"interaction_blueprint":strategy,"learning_note":"Observed reply/follower rates influence the next experiment after enough evidence exists. Missing metrics remain unknown rather than zero."}
-    OUTPUT.parent.mkdir(parents=True,exist_ok=True);OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8"); pre["selected_opportunity"]=selected;pre["engagement_strategy"]=strategy;pre["engagement_ranked_candidates"]=ranked[:15];PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding="utf-8");print(json.dumps(result,indent=2,ensure_ascii=False))
-if __name__=="__main__":main()
+    result={"generated_at":datetime.now(timezone.utc).isoformat(),"selected":selected,"ranked_candidates":ranked[:15],"recent_assets":dict(asset_count),"recent_categories":dict(cat_count),"recent_styles":dict(style_count),"last_style":last_style,"experiment_counts":dict(exp_count),"experiments":EXPERIMENTS,"interaction_blueprint":strategy,"learning_note":"Observed reply/follower rates influence the next experiment after enough evidence exists. Missing metrics remain unknown rather than zero."}
+    OUTPUT.parent.mkdir(parents=True,exist_ok=True);OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8"); pre["selected_opportunity"]=selected;pre["engagement_strategy"]=strategy;pre["engagement_ranked_candidates"]=ranked[:15];PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding="utf-8")
+
+if __name__=="__main__":
+    main()
