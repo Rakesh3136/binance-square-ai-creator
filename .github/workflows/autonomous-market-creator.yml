@@ -71,12 +71,12 @@ jobs:
           if [ -n "$TOPIC" ]; then
             python src/workflow_helpers.py manual-topic
           fi
-      - name: Freeze authoritative editorial opportunity
-        run: python src/freeze_opportunity.py
       - name: Track creator calls and verified outcomes
         run: python src/signal_outcome_tracker.py
       - name: Select engagement experiment
         run: python src/engagement_engine.py
+      - name: Freeze authoritative editorial opportunity
+        run: python src/freeze_opportunity.py
       - name: Update performance feedback
         run: python src/performance_feedback.py
       - name: Run Creator Brain
@@ -153,22 +153,15 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Render TradingView visual
         id: tradingview
-        continue-on-error: true
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
           if [ "$STATUS" != "AI_SUCCESS" ] && [ "$STATUS" != "LOCAL_FALLBACK_SUCCESS" ]; then
             python src/pipeline_stage.py visual blocked "No fresh draft"
-            exit 0
+            exit 1
           fi
           python src/visual_renderer.py
-          python src/pipeline_stage.py visual success "Official TradingView advanced-chart visual rendered"
-      - name: Fallback to verified Binance OHLCV chart
-        if: ${{ always() && steps.tradingview.outcome == 'failure' }}
-        run: |
-          echo "TradingView capture unavailable in this GitHub runner; generating a data-accurate fallback chart from fresh Binance OHLCV."
-          python src/market_chart_renderer.py
-          python src/pipeline_stage.py visual success "Verified Binance OHLCV chart rendered because TradingView capture was unavailable"
-      - name: Validate visual matches post
+          python src/pipeline_stage.py visual success "Official TradingView chart snapshot rendered"
+      - name: Validate TradingView visual matches post
         run: |
           REQUIRED=$(python -c "import json; c=json.load(open('data/live/publication_context.json')); print(str((c.get('visual_decision') or {}).get('required',False)).lower())")
           if [ "$REQUIRED" != "true" ]; then
@@ -177,7 +170,7 @@ jobs:
           fi
           test -s data/live/visual.png
           python src/validate_visual.py
-          python src/pipeline_stage.py visual success "Chart visual symbol matches the frozen publication asset"
+          python src/pipeline_stage.py visual success "TradingView chart visual symbol matches the frozen publication asset"
       - name: Production Manager — evaluate, repair once, and authorize publication
         id: gate
         run: |
@@ -211,21 +204,16 @@ jobs:
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          python src/pipeline_stage.py publish running "Publishing chart image to Binance Square"
+          python src/pipeline_stage.py publish running "Publishing TradingView chart image to Binance Square"
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
           grep -q '^ID:' /tmp/publish-result.txt
           python src/pipeline_stage.py publish success "Binance publisher returned a post result"
           python src/pipeline_stage.py verify-publish
       - name: Publish text post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
-        env:
-          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          python src/pipeline_stage.py publish running "Publishing text to Binance Square"
-          node binance-skills-hub/skills/binance/square-post/scripts/post-text.mjs --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
-          grep -q '^ID:' /tmp/publish-result.txt
-          python src/pipeline_stage.py publish success "Binance publisher returned a post result"
-          python src/pipeline_stage.py verify-publish
+          echo "TEXT-ONLY PUBLICATION DISABLED: TradingView chart is mandatory for autonomous market posts."
+          exit 1
       - name: Record publication
         if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
