@@ -17,7 +17,11 @@ def latest_report() -> Path:
 
 
 def tickers(text: str) -> list[str]:
-    return list(dict.fromkeys(re.findall(r"\$?([A-Z0-9]{2,12})USDT\b", text.upper())))
+    # Prefer explicit Binance Square-style cashtags ($HEMI), while also
+    # accepting a full HEMIUSDT market symbol when the model emits one.
+    found = re.findall(r"\$([A-Z0-9]{2,12})(?:USDT)?\b", text.upper())
+    found += re.findall(r"\b([A-Z0-9]{2,12})USDT\b", text.upper())
+    return list(dict.fromkeys(found))
 
 
 def main() -> None:
