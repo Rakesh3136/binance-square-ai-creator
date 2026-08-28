@@ -22,6 +22,8 @@ on:
       - 'src/technical_enricher.py'
       - 'src/editorial_prompt_patch.py'
       - 'src/freeze_opportunity.py'
+      - 'src/market_chart_renderer.py'
+      - 'src/live_market_scanner.py'
   workflow_dispatch:
     inputs:
       topic:
@@ -55,6 +57,8 @@ jobs:
       - name: Verify production dependencies
         run: |
           python -c 'import importlib.util,sys; required=["google.genai","matplotlib","pandas","numpy"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; sys.exit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
+      - name: Refresh live Binance market snapshot
+        run: python src/live_market_scanner.py
       - name: Benchmark successful public Square creators
         run: python src/creator_benchmark.py || true
       - name: Run full creator intelligence phases
@@ -148,6 +152,8 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Render TradingView visual
+        id: tradingview
+        continue-on-error: true
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
           if [ "$STATUS" != "AI_SUCCESS" ] && [ "$STATUS" != "LOCAL_FALLBACK_SUCCESS" ]; then
@@ -156,15 +162,22 @@ jobs:
           fi
           python src/visual_renderer.py
           python src/pipeline_stage.py visual success "Official TradingView advanced-chart visual rendered"
-      - name: Validate TradingView visual matches post
+      - name: Fallback to verified Binance OHLCV chart
+        if: ${{ always() && steps.tradingview.outcome == 'failure' }}
+        run: |
+          echo "TradingView capture unavailable in this GitHub runner; generating a data-accurate fallback chart from fresh Binance OHLCV."
+          python src/market_chart_renderer.py
+          python src/pipeline_stage.py visual success "Verified Binance OHLCV chart rendered because TradingView capture was unavailable"
+      - name: Validate visual matches post
         run: |
           REQUIRED=$(python -c "import json; c=json.load(open('data/live/publication_context.json')); print(str((c.get('visual_decision') or {}).get('required',False)).lower())")
           if [ "$REQUIRED" != "true" ]; then
             echo "Visual validation skipped because this is not a chart-required lane."
             exit 0
           fi
+          test -s data/live/visual.png
           python src/validate_visual.py
-          python src/pipeline_stage.py visual success "TradingView chart symbol matches the frozen publication asset"
+          python src/pipeline_stage.py visual success "Chart visual symbol matches the frozen publication asset"
       - name: Production Manager — evaluate, repair once, and authorize publication
         id: gate
         run: |
@@ -198,7 +211,7 @@ jobs:
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          python src/pipeline_stage.py publish running "Publishing TradingView image to Binance Square"
+          python src/pipeline_stage.py publish running "Publishing chart image to Binance Square"
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
           grep -q '^ID:' /tmp/publish-result.txt
           python src/pipeline_stage.py publish success "Binance publisher returned a post result"
