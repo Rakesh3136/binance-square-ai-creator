@@ -35,20 +35,19 @@ def main() -> None:
     if not text:
         raise SystemExit("AI draft contains no publishable text")
 
-    draft["text"] = text[:740]
-    draft["post"] = text[:740]
-    draft.setdefault("quality_score", 0)
-    draft.setdefault("editorial_style", "ai_normalized")
-    draft.setdefault("publication_status", "DRAFT_ONLY_NOT_PUBLISHED")
-
     context = {}
     try:
         context = json.loads(CONTEXT.read_text(encoding="utf-8"))
     except Exception:
         context = {}
     visual_decision = context.get("visual_decision") or {}
+
     if bool(visual_decision.get("required")):
-        # The model is not allowed to override the production contract.
+        # The production contract requires the selected asset to be explicitly
+        # tagged in the post so the TradingView image and post are unambiguous.
+        base = str(context.get("symbol") or "").upper().replace("USDT", "").strip()
+        if base and f"${base}" not in text.upper():
+            text = f"${base} " + text
         draft["visual_requested"] = True
         draft["visual_type"] = "tradingview_chart"
         report["visual_plan"] = {
@@ -59,6 +58,13 @@ def main() -> None:
             "symbol": context.get("symbol"),
             "source": "publication_context",
         }
+
+    text = text[:740]
+    draft["text"] = text
+    draft["post"] = text
+    draft.setdefault("quality_score", 0)
+    draft.setdefault("editorial_style", "ai_normalized")
+    draft.setdefault("publication_status", "DRAFT_ONLY_NOT_PUBLISHED")
 
     report["draft"] = draft
     report["status"] = "DRAFT_ONLY_NOT_PUBLISHED"
@@ -80,13 +86,14 @@ def main() -> None:
         "visual_required_by_context": bool(visual_decision.get("required")),
     })
     STATUS.parent.mkdir(parents=True, exist_ok=True)
-    STATUS.write_text(json.dumps(status, indent=2, ensure_ascii=False), encoding="utf-8")
+    STATUS.write_text(json.dumps(status, indent=2), encoding="utf-8")
     print(json.dumps({
         "status": "DRAFT_NORMALIZED",
         "report": str(path),
         "characters": len(text),
         "visual_requested": bool(draft.get("visual_requested")),
         "visual_type": draft.get("visual_type", "none"),
+        "cashtag": f"${str(context.get('symbol') or '').upper().replace('USDT', '')}" if context.get('symbol') else None,
     }))
 
 
