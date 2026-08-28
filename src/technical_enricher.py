@@ -25,7 +25,7 @@ def find_item(market,symbol):
     return None
 
 
-def fetch_fresh_candles(symbol, limit=24):
+def fetch_fresh_candles(symbol, limit=48):
     query=urllib.parse.urlencode({'symbol':symbol,'interval':'1h','limit':limit})
     last_error=None
     for base in BINANCE_BASES:
@@ -53,45 +53,91 @@ def main():
     category=str(selected.get('category') or '').lower()
     if category not in TECH_LANES or not symbol:
         print(json.dumps({'status':'SKIP','reason':'non-chart editorial lane'})); return
+
     market=load(MARKET,{})
     item=find_item(market,symbol)
     candles=(item or {}).get('candles_1h') or []
-    # Never rely on stale/missing scanner candles for the authoritative asset.
-    if len(candles)<6:
+    if len(candles)<12:
         candles=fetch_fresh_candles(symbol+'USDT')
         if item is None:item={'symbol':symbol+'USDT'}
         item['candles_1h']=candles
-        # Keep the fresh candles available to the chart renderer in this run.
         for group in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
             for x in market.get(group) or []:
                 if isinstance(x,dict) and str(x.get('symbol','')).upper()==symbol+'USDT':
                     x['candles_1h']=candles
-    if len(candles)<6:
+    if len(candles)<12:
         raise SystemExit('insufficient fresh 1H candles for authoritative asset')
-    highs=[float(c['high']) for c in candles[-12:]]
-    lows=[float(c['low']) for c in candles[-12:]]
-    last=float((item or {}).get('last_price') or candles[-1].get('close') or 0)
-    support=min(lows); resistance=max(highs); span=max(resistance-support,0)
-    target=resistance+span*0.5 if last<resistance else resistance+span
-    invalidation=support
+
+    window=candles[-24:]
+    highs=[float(c['high']) for c in window]
+    lows=[float(c['low']) for c in window]
+    closes=[float(c['close']) for c in window]
+    last=float((item or {}).get('last_price') or closes[-1] or 0)
+    support=min(lows)
+    resistance=max(highs)
+    span=max(resistance-support,0.0)
+
+    # Direction is evidence-based: compare the latest close with the first close
+    # in the 24-hour window, with the live market move as a secondary signal.
+    try:
+        market_move=float((item or {}).get('price_change_percent') or 0)
+    except Exception:
+        market_move=0.0
+    window_move=((closes[-1]/closes[0])-1)*100 if closes[0] else market_move
+    direction='LONG_BIAS' if (window_move if abs(window_move)>0.01 else market_move) >= 0 else 'SHORT_BIAS'
+
+    if direction=='LONG_BIAS':
+        tp1=resistance + span*0.25
+        target=resistance + span*0.50
+        invalidation=support
+        sl_label='SL / invalidation'
+    else:
+        tp1=max(0.0, support - span*0.25)
+        target=max(0.0, support - span*0.50)
+        invalidation=resistance
+        sl_label='SL / invalidation'
+
     reports=sorted(REPORTS.glob('*-multi-agent.json'),key=lambda p:p.stat().st_mtime,reverse=True)
     if not reports:raise SystemExit('no draft')
-    path=reports[0]; data=load(path,{})
-    draft=data.get('draft') or {}; text=str(draft.get('post') or draft.get('text') or '').strip()
+    path=reports[0]
+    data=load(path,{})
+    draft=data.get('draft') or {}
+    text=str(draft.get('post') or draft.get('text') or '').strip()
     if not text:raise SystemExit('empty draft')
-    level_line=f"📊 Chart levels: support ${fmt(support)} • resistance ${fmt(resistance)} • target ${fmt(target)} • invalidation below ${fmt(invalidation)}."
-    if 'Chart levels:' not in text:
+
+    level_line=(
+        f"📊 {symbol} 1H: price ${fmt(last)} • support ${fmt(support)} • resistance ${fmt(resistance)} • "
+        f"TP1 ${fmt(tp1)} • target ${fmt(target)} • {sl_label} ${fmt(invalidation)} ({direction.replace('_',' ').lower()})."
+    )
+    if '📊 ' + symbol + ' 1H:' not in text:
         lines=[x.strip() for x in text.splitlines() if x.strip()]
         question=lines.pop() if lines and '?' in lines[-1] else ''
         body='\n'.join(lines)
         enriched=(body+'\n'+level_line+'\nLevels are chart-derived scenarios, not guarantees.\n'+question).strip()
-        draft['post']=enriched[:740]; draft['text']=draft['post']
-    draft['visual_requested']=True; draft['visual_type']='tradingview_chart'
+        draft['post']=enriched[:890]
+        draft['text']=draft['post']
+
+    draft['visual_requested']=True
+    draft['visual_type']='tradingview_chart'
+    draft['technical_levels']={
+        'current_price':last,'support':support,'resistance':resistance,
+        'tp1':tp1,'target':target,'invalidation':invalidation,'direction':direction,
+        'timeframe':'1H','method':'fresh_24_1h_candles'
+    }
     data['draft']=draft
-    data.setdefault('research',{})['chart_levels']={'support':support,'resistance':resistance,'target':target,'invalidation':invalidation,'method':'recent_12_1h_candles'}
-    data.setdefault('visual_plan',{}).update({'use_visual':True,'type':'tradingview_chart','title':f'{symbol} 1H chart — support, resistance and measured target','symbol':symbol})
+    data.setdefault('research',{})['chart_levels']={
+        'current_price':last,'support':support,'resistance':resistance,
+        'tp1':tp1,'target':target,'invalidation':invalidation,'direction':direction,
+        'method':'fresh_24_1h_candles'
+    }
+    data.setdefault('visual_plan',{}).update({
+        'use_visual':True,'type':'tradingview_chart',
+        'title':f'{symbol} 1H TradingView chart — support, resistance, TP1, target and SL',
+        'symbol':symbol,
+        'annotations':['current_price','support','resistance','tp1','target','invalidation']
+    })
     path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8')
     MARKET.write_text(json.dumps(market,indent=2,ensure_ascii=False),encoding='utf-8')
-    print(json.dumps({'status':'ENRICHED','symbol':symbol,'support':support,'resistance':resistance,'target':target,'invalidation':invalidation,'visual_required':True,'candles':len(candles)}))
+    print(json.dumps({'status':'ENRICHED','symbol':symbol,'direction':direction,'current_price':last,'support':support,'resistance':resistance,'tp1':tp1,'target':target,'invalidation':invalidation,'visual_required':True,'candles':len(candles)}))
 
 if __name__=='__main__': main()
