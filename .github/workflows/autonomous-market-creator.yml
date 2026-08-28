@@ -21,6 +21,7 @@ on:
       - 'src/signal_outcome_tracker.py'
       - 'src/technical_enricher.py'
       - 'src/editorial_prompt_patch.py'
+      - 'src/freeze_opportunity.py'
   workflow_dispatch:
     inputs:
       topic:
@@ -66,6 +67,8 @@ jobs:
           if [ -n "$TOPIC" ]; then
             python src/workflow_helpers.py manual-topic
           fi
+      - name: Freeze authoritative editorial opportunity
+        run: python src/freeze_opportunity.py
       - name: Track creator calls and verified outcomes
         run: python src/signal_outcome_tracker.py
       - name: Select engagement experiment
@@ -88,7 +91,7 @@ jobs:
           GEMINI_DAILY_BUDGET: "20"
           TOPIC: ${{ inputs.topic }}
         run: |
-          RUN_AI=$(python -c "import json; print(str(json.load(open('data/live/editorial_preflight.json')).get('run_ai',False)).lower())")
+          RUN_AI=$(python -c "import json; print(str(json.load(open('data/live/authoritative_opportunity.json')).get('run_ai',False)).lower())")
           if [ "$RUN_AI" != "true" ]; then
             echo '{"status":"NO_OPPORTUNITY"}' > data/live/creator_status.json
             python src/pipeline_stage.py ai_draft blocked "No real opportunity passed preflight"
@@ -151,31 +154,17 @@ jobs:
             python src/pipeline_stage.py visual blocked "No fresh draft"
             exit 0
           fi
-          if python src/visual_renderer.py; then
-            python src/pipeline_stage.py visual success "Official TradingView chart snapshot rendered"
-          else
-            echo "TradingView renderer failed; degrading visual only so the production manager can rescue the text publication."
-            python src/degrade_visual.py
-            python src/pipeline_stage.py visual success "TradingView visual failed; safely degraded to text"
-          fi
+          python src/visual_renderer.py
+          python src/pipeline_stage.py visual success "Official TradingView advanced-chart visual rendered"
       - name: Validate TradingView visual matches post
         run: |
-          USE_VISUAL=$(python -c "import json; from pathlib import Path; reports=sorted(Path('data/reports').glob('*-multi-agent.json'), key=lambda p:p.stat().st_mtime, reverse=True); print(str((json.load(open(reports[0])).get('visual_plan') or {}).get('use_visual',False)).lower()) if reports else print('false')")
-          if [ "$USE_VISUAL" != "true" ]; then
-            echo "Visual validation skipped because this cycle is text-only or visually degraded."
+          REQUIRED=$(python -c "import json; c=json.load(open('data/live/publication_context.json')); print(str((c.get('visual_decision') or {}).get('required',False)).lower())")
+          if [ "$REQUIRED" != "true" ]; then
+            echo "Visual validation skipped because this is not a chart-required lane."
             exit 0
           fi
-          set +e
           python src/validate_visual.py
-          RC=$?
-          set -e
-          if [ "$RC" != "0" ]; then
-            echo "TradingView visual validation failed with exit code $RC; degrading safely to text and continuing."
-            python src/degrade_visual.py
-            python src/pipeline_stage.py visual success "TradingView validation failed; safely degraded to text"
-          else
-            python src/pipeline_stage.py visual success "TradingView chart symbol matches the post"
-          fi
+          python src/pipeline_stage.py visual success "TradingView chart symbol matches the frozen publication asset"
       - name: Production Manager — evaluate, repair once, and authorize publication
         id: gate
         run: |
