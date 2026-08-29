@@ -59,6 +59,8 @@ jobs:
         run: python src/creator_growth_system.py
       - name: Run Living Brain audit and improvement planner
         run: python src/living_brain.py
+      - name: Analyze documentation changes
+        run: python src/doc_change_impact.py || true
       - name: Run Creator Brain
         run: |
           python src/creator_brain.py
@@ -157,7 +159,8 @@ jobs:
           python src/pipeline_stage.py publish running "Publishing TradingView chart image to Binance Square"
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
           grep -q '^ID:' /tmp/publish-result.txt
-          python src/pipeline_stage.py publish success "Binance publisher returned a post result"
+          python src/square_publish_verifier.py
+          python src/pipeline_stage.py publish success "Binance Square returned a verified post ID"
           python src/pipeline_stage.py verify-publish
       - name: Publish text post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
