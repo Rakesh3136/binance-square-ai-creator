@@ -1,18 +1,11 @@
 {
-  "status": "CHANGE_APPLIED",
+  "status": "REJECTED_VALIDATION",
   "policy_version": 2,
   "proposal": {
     "decision": "CHANGE",
-    "title": "Improve immediate style rotation tracking and zero-view metric rate evaluation",
-    "reason": "Tracking last_editorial_style ensures strict anti-repetition of consecutive editorial styles, while adding raw metric fallbacks in rate evaluation prevents experiment scoring from collapsing to zero when view counts are missing.",
-    "expected_metric": "diversity"
+    "title": "Gate historical call outcome experiments based on asset publication history",
+    "reason": "When choosing an engagement strategy for newly selected market opportunities without prior publication history, candidate experiments like 'CREATOR CALL OUTCOME' (Experiment I) or 'FOLLOW-UP / UPDATE' (Experiment J) forced contextually incorrect framing claiming a previous call was being measured. Filtering eligible experiments based on whether the asset has historical coverage prevents hallucinated call outcome framing and improves editorial authenticity and reply rates.",
+    "expected_metric": "reply_rate"
   },
-  "result": {
-    "branch": "self-engineer/improve-immediate-style-rotation-tracking-and-33184663762",
-    "merged": false,
-    "pr_creation": "BLOCKED",
-    "error": "GitHub API 403 during POST https://api.github.com/repos/Rakesh3136/binance-square-ai-creator/pulls: {\"message\":\"GitHub Actions is not permitted to create or approve pull requests.\",\"documentation_url\":\"https://docs.github.com/rest/pulls/pulls#create-a-pull-request\",\"status\":\"403\"}",
-    "next_action": "Enable GitHub Actions permission to create pull requests, or review this branch manually."
-  },
-  "validation": "validation passed"
+  "reason": ""
 }
