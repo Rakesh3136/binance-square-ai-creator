@@ -10,8 +10,9 @@ replacements = {
 }
 
 for old, new in replacements.items():
-    if old in text:
-        text = text.replace(old, new)
+    if old not in text:
+        raise RuntimeError(f"Expected editorial prompt fragment not found: {old[:60]}")
+    text = text.replace(old, new)
 
 rules = (
     "\n\nRESEARCH COVERAGE: The supplied NEWS snapshot is a first-class research input, not a fallback. "
@@ -28,12 +29,12 @@ rules = (
     "must be explicitly speculative.\n"
 )
 
-marker = "Return ONLY valid JSON with research, critique, draft and visual_plan fields.'''
-"
 if "RESEARCH COVERAGE:" not in text:
+    needle = "Return ONLY valid JSON with research, critique, draft and visual_plan fields."
+    marker = needle + (chr(39) * 3)
     if marker not in text:
-        raise RuntimeError("Editorial system prompt marker not found; refusing unsafe patch")
-    text = text.replace(marker, rules + marker)
+        raise RuntimeError("Editorial system prompt closing marker not found; refusing unsafe patch")
+    text = text.replace(marker, needle + rules + (chr(39) * 3), 1)
 
 P.write_text(text, encoding="utf-8")
 print({"status": "EDITORIAL_DIRECTOR_PATCH_APPLIED"})
