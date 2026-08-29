@@ -40,12 +40,29 @@ def opportunity_score(data):
                 if v>0: vals.append(v)
     return max(vals,default=0.0)
 
-def visual_is_verified():
+def visual_is_verified(expected_symbol=''):
+    """Verify both chart provenance and chart/asset synchronization."""
     meta=load(VISUAL_META,{})
-    return meta.get('provider')=='TradingView' and meta.get('status')=='TRADINGVIEW_CREATED' and VISUAL.exists() and VISUAL.stat().st_size>=1000
+    if not (meta.get('provider')=='TradingView' and meta.get('status')=='TRADINGVIEW_CREATED' and VISUAL.exists() and VISUAL.stat().st_size>=1000):
+        return False
+    if expected_symbol:
+        expected=f"BINANCE:{expected_symbol.upper().replace('USDT','')}USDT"
+        actual=str(meta.get('tradingview_symbol') or meta.get('symbol') or '').upper()
+        if actual != expected:
+            print(f"Production manager: refusing publication because chart asset is {actual!r}, expected {expected!r}.")
+            return False
+    return True
 
 def evaluate(report:Path):
     data=load(report,{ }); draft=data.get('draft') or {}; visual=dict(data.get('visual_plan') or {}); post=str(draft.get('post') or draft.get('text') or '').strip(); rescue=data.get('publish_rescue') is True
+    # The authoritative asset is the frozen/preflight symbol. Never allow a
+    # downstream rescue to switch the asset after TradingView rendering.
+    pre=load(PREFLIGHT_PATH,{})
+    selected=pre.get('selected_opportunity') or data.get('selected_editorial_lane') or {}
+    expected_symbol=str(selected.get('symbol') or selected.get('topic') or draft.get('symbol') or '').upper().replace('USDT','') if isinstance(selected,dict) else str(draft.get('symbol') or '').upper().replace('USDT','')
+    if not expected_symbol:
+        expected_symbol=str(draft.get('symbol') or '').upper().replace('USDT','')
+
     # Market publication policy is stronger than the AI's optional visual plan.
     # The workflow already renders TradingView for every autonomous market run,
     # so force the verified chart into the publication decision and image mode.
@@ -58,13 +75,13 @@ def evaluate(report:Path):
     try:quality=float(draft.get('quality_score') or interaction.get('score') or 0)
     except:quality=float(interaction.get('score') or 0)
     opportunity=opportunity_score(data); intelligence=load(INTEL_PATH,{ }); intelligence_ok=intelligence.get('publish_recommendation') is True
-    chart_ok=visual_is_verified()
+    chart_ok=visual_is_verified(expected_symbol)
     if rescue:
         eligible=bool(post) and quality>=RESCUE_QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' and chart_ok
     else:
         eligible=bool(post) and quality>=QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and intelligence_ok and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' and chart_ok
     mode='image'
-    audit={'draft':str(report),'publish':eligible,'attempt':'rescue' if rescue else 'normal','quality_score':quality,'quality_threshold':RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD,'opportunity_score':opportunity,'opportunity_threshold':OPPORTUNITY_THRESHOLD,'creator_status':load(STATUS_PATH,{}).get('status'),'creator_intelligence_2':intelligence,'interaction_gate':interaction,'mode':mode,'tradingview_required':True,'tradingview_verified':chart_ok,'rescue':rescue,'reason':'publish_eligible' if eligible else 'gate_rejected'}
+    audit={'draft':str(report),'publish':eligible,'attempt':'rescue' if rescue else 'normal','quality_score':quality,'quality_threshold':RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD,'opportunity_score':opportunity,'opportunity_threshold':OPPORTUNITY_THRESHOLD,'creator_status':load(STATUS_PATH,{}).get('status'),'creator_intelligence_2':intelligence,'interaction_gate':interaction,'mode':mode,'tradingview_required':True,'tradingview_verified':chart_ok,'chart_expected_symbol':expected_symbol,'rescue':rescue,'reason':'publish_eligible' if eligible else 'gate_rejected'}
     AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False),encoding='utf-8'); GATE_PATH.parent.mkdir(parents=True,exist_ok=True); GATE_PATH.write_text(json.dumps(interaction,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(audit,indent=2,ensure_ascii=False)); return eligible,mode
 
 def main():
