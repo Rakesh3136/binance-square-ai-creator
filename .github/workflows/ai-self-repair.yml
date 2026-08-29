@@ -1,0 +1,41 @@
+name: AI Self Repair
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 * * * *'
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: ai-self-repair
+  cancel-in-progress: false
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+      - name: Diagnose repository health
+        run: python src/self_repair_agent.py
+      - name: Generate and sandbox candidate repair
+        if: ${{ hashFiles('data/intelligence/self_repair_report.json') != '' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.6-flash
+          REPAIR_MAX_ROUNDS: '2'
+        run: python src/ai_code_agent.py && python src/repair_loop.py
+      - name: Prepare review plan
+        run: python src/repair_pr_manager.py
+      - name: Create isolated repair branch and commit candidate
+        if: ${{ hashFiles('data/intelligence/repair_sandbox_report.json') != '' }}
+        run: |
+          STATUS=$(python -c "import json; print(json.load(open('data/intelligence/repair_sandbox_report.json')).get('status',''))")
+          if [ "$STATUS" != "PASSED_ISOLATED_TESTS" ]; then echo "No verified repair"; exit 0; fi
+          echo "Verified repair remains review-gated; no automatic production merge is performed."

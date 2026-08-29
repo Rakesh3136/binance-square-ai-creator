@@ -1,0 +1,26 @@
+name: Engineering Knowledge Refresh
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * 0'
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Refresh approved knowledge source registry
+        run: python src/knowledge_ingest.py
+      - name: Rebuild local engineering knowledge digest
+        run: python src/knowledge_brain.py
+      - name: Commit knowledge metadata only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/intelligence/knowledge_sources.json data/intelligence/knowledge_ingestion_log.jsonl data/intelligence/engineering_knowledge.jsonl data/intelligence/knowledge_digest.json
+          git diff --cached --quiet || git commit -m 'Refresh engineering knowledge registry'
+          git push
