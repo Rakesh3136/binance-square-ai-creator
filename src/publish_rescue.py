@@ -1,4 +1,9 @@
-"""Deterministic publish-rescue draft for a fresh but gate-rejected cycle."""
+"""Deterministic publish-rescue draft for a fresh but gate-rejected cycle.
+
+Rescue must never change the authoritative asset or remove the required
+TradingView visual. It may only simplify the writing so the already-rendered
+chart and publication context remain synchronized.
+"""
 from __future__ import annotations
 
 import json
@@ -9,6 +14,7 @@ REPORT_DIR = Path("data/reports")
 PREFLIGHT = Path("data/live/editorial_preflight.json")
 MARKET = Path("data/live/market_snapshot.json")
 STATUS = Path("data/live/creator_status.json")
+VISUAL_META = Path("data/live/visual_metadata.json")
 
 
 def load(path: Path, default):
@@ -32,24 +38,52 @@ def latest_report():
     return report
 
 
+def market_match(market: dict, symbol: str):
+    """Find the selected asset without ever silently switching assets."""
+    wanted = symbol.upper().replace("USDT", "")
+    groups = []
+    for key in ("top_content_signals", "top_gainers", "top_losers", "highest_volume"):
+        value = market.get(key)
+        if isinstance(value, list):
+            groups.extend(value)
+        elif isinstance(value, dict):
+            groups.append(value)
+    for key in ("top_signal", "top_gainer", "top_loser"):
+        value = market.get(key)
+        if isinstance(value, dict):
+            groups.append(value)
+    for item in groups:
+        item_symbol = str(item.get("symbol", "")).upper().replace("USDT", "")
+        if item_symbol == wanted:
+            return item
+    return {}
+
+
 def main():
     report_path = latest_report()
     report = load(report_path, {})
     preflight = load(PREFLIGHT, {})
     market = load(MARKET, {})
+
     selected = preflight.get("selected_opportunity") or report.get("selected_editorial_lane") or {}
     if not isinstance(selected, dict):
         selected = {}
 
-    symbol = str(selected.get("symbol") or selected.get("topic") or "").upper()
-    values = []
-    for key in ("top_content_signals", "top_gainers", "top_losers", "highest_volume"):
-        group = market.get(key) or []
-        if isinstance(group, list):
-            values.extend(x for x in group if isinstance(x, dict))
-    match = next((x for x in values if str(x.get("symbol", "")).upper() == symbol), None)
-    match = match or next((x for x in values if x.get("symbol")), {})
-    symbol = str(match.get("symbol") or symbol or "MARKET").upper().replace("USDT", "")
+    # The frozen/preflight asset is authoritative. Rescue is not allowed to
+    # replace it with the first convenient market row.
+    symbol = str(
+        selected.get("symbol")
+        or selected.get("topic")
+        or report.get("symbol")
+        or (report.get("draft") or {}).get("symbol")
+        or ""
+    ).upper().replace("USDT", "")
+    if not symbol:
+        raise SystemExit("No authoritative symbol available for rescue")
+
+    match = market_match(market, symbol)
+    if not match:
+        raise SystemExit(f"No fresh market evidence found for authoritative asset {symbol}")
 
     try:
         move = float(match.get("price_change_percent") or 0)
@@ -88,12 +122,28 @@ def main():
             "content_category": selected.get("category") or selected.get("reason") or "market_opportunity",
         }
     )
+
+    # CRITICAL: the rescue keeps TradingView mandatory. The chart was rendered
+    # before rescue from the frozen opportunity, so do not alter the asset or
+    # downgrade the visual plan to text-only.
     visual = report.get("visual_plan") or {}
     if not isinstance(visual, dict):
         visual = {}
-    # Rescue is intentionally text-first so a gate failure cannot be caused by
-    # a stale/broken image dependency. Normal cycles still use TradingView.
-    visual.update({"use_visual": False, "type": "none", "rescue_text_fallback": True})
+    visual.update({
+        "use_visual": True,
+        "type": "candlestick_chart",
+        "provider": "TradingView",
+        "timeframe": "1H",
+        "rescue_text_fallback": False,
+    })
+
+    meta = load(VISUAL_META, {})
+    chart_symbol = str(meta.get("tradingview_symbol") or meta.get("symbol") or "").upper()
+    expected = f"BINANCE:{symbol}USDT"
+    if chart_symbol and chart_symbol != expected:
+        raise SystemExit(
+            f"TradingView visual asset mismatch: chart={chart_symbol}, expected={expected}; refusing rescue"
+        )
 
     report["draft"] = draft
     report["visual_plan"] = visual
@@ -109,7 +159,7 @@ def main():
             {
                 "status": "LOCAL_FALLBACK_SUCCESS",
                 "generation_mode": "LOCAL_FALLBACK",
-                "reason": "Production manager rescue produced a fresh deterministic draft",
+                "reason": "Production manager rescue simplified writing without changing the authoritative asset or TradingView visual",
                 "rescue": True,
             },
             indent=2,
