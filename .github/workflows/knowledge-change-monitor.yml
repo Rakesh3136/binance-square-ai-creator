@@ -1,0 +1,24 @@
+name: Knowledge Change Monitor
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '11 */6 * * *'
+permissions:
+  contents: write
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Detect approved-source changes
+        run: python src/knowledge_change_monitor.py
+      - name: Commit change events
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/intelligence/knowledge_source_state.json data/intelligence/knowledge_change_events.jsonl
+          git diff --cached --quiet || git commit -m 'Record knowledge source monitoring cycle'
+          git push
