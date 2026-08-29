@@ -8,8 +8,6 @@ on:
 permissions:
   contents: write
 
-# Share the main-branch writer lock with other repository workflows.
-# This prevents a learning run from racing an autonomous creator push.
 concurrency:
   group: main-branch-writer
   cancel-in-progress: false
@@ -32,10 +30,11 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add analytics/square_performance.jsonl analytics/square_performance_state.json analytics/strategy_memory.json analytics/follower_history.jsonl data/intelligence data/live
+          # Stage only files that are guaranteed to exist; optional follower history is omitted.
+          git add analytics/square_performance.jsonl analytics/square_performance_state.json analytics/strategy_memory.json data/intelligence data/live
           git diff --cached --quiet && exit 0
           git pull --rebase --autostash origin main
-          git add analytics/square_performance.jsonl analytics/square_performance_state.json analytics/strategy_memory.json analytics/follower_history.jsonl data/intelligence data/live
+          git add analytics/square_performance.jsonl analytics/square_performance_state.json analytics/strategy_memory.json data/intelligence data/live
           git diff --cached --quiet && exit 0
           git commit -m 'Update Square performance and growth learning data'
           git push origin main
