@@ -46,9 +46,7 @@ jobs:
           TOPIC: ${{ inputs.topic }}
         run: |
           python src/editorial_preflight.py
-          if [ -n "$TOPIC" ]; then
-            python src/workflow_helpers.py manual-topic
-          fi
+          if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
       - name: Track creator calls and verified outcomes
         run: python src/signal_outcome_tracker.py
       - name: Select engagement experiment
@@ -85,6 +83,8 @@ jobs:
           python src/normalize_draft.py
           python src/technical_enricher.py
           python src/pipeline_stage.py ai_draft success "Fresh draft generated, normalized, and technically enriched when supported by verified chart data"
+      - name: Track explicit prediction call
+        run: python src/call_tracker.py
       - name: Run Creator Intelligence 2.0 self-editor and one AI rework
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -96,28 +96,11 @@ jobs:
           python src/creator_intelligence_2.py
           RC=$?
           if [ "$RC" = "3" ]; then
-            echo "Creator Intelligence 2.0 rejected the first draft. Performing one fresh AI rewrite using the rejection reasons."
             python src/creator_rework.py
             REWORK_RC=$?
             if [ "$REWORK_RC" = "0" ]; then
-              python src/safe_creator_runner.py
-              NORMALIZE_RC=$?
-              if [ "$NORMALIZE_RC" = "0" ]; then
-                python src/normalize_draft.py
-                python src/technical_enricher.py
-                python src/creator_intelligence_2.py
-                FINAL_RC=$?
-                echo "Creator Intelligence 2.0 rework finished with exit code $FINAL_RC."
-              else
-                echo "Normalization after rework failed with exit code $NORMALIZE_RC; production manager will rescue."
-              fi
-            else
-              echo "Creator rework failed with exit code $REWORK_RC; production manager will rescue."
+              python src/safe_creator_runner.py && python src/normalize_draft.py && python src/technical_enricher.py && python src/creator_intelligence_2.py || true
             fi
-          elif [ "$RC" != "0" ]; then
-            echo "Creator Intelligence 2.0 failed safely with exit code $RC; production manager remains authoritative."
-          else
-            echo "Creator Intelligence 2.0 accepted the first draft for publication review."
           fi
           set -e
           exit 0
@@ -132,22 +115,13 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Render TradingView visual
-        id: tradingview
         run: |
           STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
-          if [ "$STATUS" != "AI_SUCCESS" ] && [ "$STATUS" != "LOCAL_FALLBACK_SUCCESS" ]; then
-            python src/pipeline_stage.py visual blocked "No fresh draft"
-            exit 1
-          fi
+          if [ "$STATUS" != "AI_SUCCESS" ] && [ "$STATUS" != "LOCAL_FALLBACK_SUCCESS" ]; then exit 1; fi
           python src/visual_renderer.py
           python src/pipeline_stage.py visual success "Official TradingView chart snapshot rendered"
       - name: Validate TradingView visual matches post
         run: |
-          REQUIRED=$(python -c "import json; c=json.load(open('data/live/publication_context.json')); print(str((c.get('visual_decision') or {}).get('required',False)).lower())")
-          if [ "$REQUIRED" != "true" ]; then
-            echo "Visual validation skipped because this is not a chart-required lane."
-            exit 0
-          fi
           test -s data/live/visual.png
           python src/validate_visual.py
           python src/pipeline_stage.py visual success "TradingView chart visual symbol matches the frozen publication asset"
@@ -157,32 +131,26 @@ jobs:
           python src/production_manager.py
           PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
           if [ "$PUBLISH" = "true" ]; then
-            python src/pipeline_stage.py quality_gate success "Production Manager authorized publication after bounded review/rescue"
+            python src/pipeline_stage.py quality_gate success "Production Manager authorized publication"
           else
             python src/pipeline_stage.py quality_gate blocked "Production Manager could not produce a verified publishable draft"
-            cat /tmp/publish_gate.json || true
-            cat data/live/engagement_gate.json || true
-            cat data/live/creator_intelligence_2.json || true
           fi
       - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
         id: draft
         run: |
           DRAFT=$(find data/reports -type f -name '*-multi-agent.json' -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$DRAFT"
-          echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
+          test -n "$DRAFT"; echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
       - name: Extract post text
         if: ${{ steps.gate.outputs.publish == 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.draft.outputs.path }}
+        env: { DRAFT_PATH: '${{ steps.draft.outputs.path }}' }
         run: python src/workflow_helpers.py extract
       - name: Download official Binance Square skill
         if: ${{ steps.gate.outputs.publish == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
       - name: Publish image post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
-        env:
-          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
+        env: { BINANCE_SQUARE_OPENAPI_KEY: '${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}' }
         run: |
           python src/pipeline_stage.py publish running "Publishing TradingView chart image to Binance Square"
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
@@ -191,9 +159,7 @@ jobs:
           python src/pipeline_stage.py verify-publish
       - name: Publish text post
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
-        run: |
-          echo "TEXT-ONLY PUBLICATION DISABLED: TradingView chart is mandatory for autonomous market posts."
-          exit 1
+        run: exit 1
       - name: Record publication
         if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
@@ -203,37 +169,18 @@ jobs:
       - name: Finalize
         if: always()
         run: |
-          if [ "${{ steps.gate.outputs.publish }}" = "true" ]; then
-            python src/pipeline_stage.py finalize success "Production cycle completed and publication verified"
-          else
-            python src/pipeline_stage.py finalize blocked "Production cycle ended without a verified Binance Square publication"
-            exit 1
-          fi
+          if [ "${{ steps.gate.outputs.publish }}" = "true" ]; then python src/pipeline_stage.py finalize success "Production cycle completed and publication verified"; else python src/pipeline_stage.py finalize blocked "Production cycle ended without a verified Binance Square publication"; exit 1; fi
       - name: Persist state
         if: always()
         continue-on-error: true
         run: |
           set +e
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add analytics data/live data/intelligence
-          git diff --cached --quiet
-          if [ "$?" != "0" ]; then
-            git commit -m "Record autonomous creator cycle"
-          fi
+          git diff --cached --quiet || git commit -m "Record autonomous creator cycle"
           git fetch origin main
-          git reset --soft origin/main
-          git reset
+          git rebase origin/main
           git add analytics data/live data/intelligence
-          if git diff --cached --quiet; then
-            echo "No new state to persist."
-            exit 0
-          fi
-          git commit -m "Record autonomous creator cycle"
-          git pull --rebase origin main
-          git push origin HEAD:main
-          RC=$?
-          if [ "$RC" != "0" ]; then
-            echo "State persistence could not update remote main; publication result remains authoritative."
-          fi
+          git diff --cached --quiet || git commit -m "Persist creator learning state"
+          git push origin HEAD:main || echo "State persistence failed; publication result remains authoritative."
           exit 0
