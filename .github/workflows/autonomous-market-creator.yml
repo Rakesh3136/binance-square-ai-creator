@@ -34,7 +34,7 @@ jobs:
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Verify production dependencies
         run: |
-          python -c 'import importlib.util,sys; required=["google.genai","matplotlib","pandas","numpy"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; sys.exit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
+          python -c 'import importlib.util,sys; required=["google.genai","matplotlib","pandas","numpy","PIL"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; sys.exit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
       - name: Refresh live Binance market snapshot
         run: python src/live_market_scanner.py
       - name: Benchmark successful public Square creators
@@ -130,7 +130,11 @@ jobs:
         run: |
           test -s data/live/visual.png
           python src/validate_visual.py
-          python src/pipeline_stage.py visual success "TradingView chart visual symbol matches the frozen publication asset"
+          python src/pipeline_stage.py visual_symbol success "TradingView chart visual symbol matches the frozen publication asset"
+      - name: Validate TradingView image has real visible chart content
+        run: |
+          python src/validate_tradingview_visual.py data/live/visual.png
+          python src/pipeline_stage.py visual_content success "Final TradingView image passed pixel-content validation"
       - name: Production Manager — evaluate, repair once, and authorize publication
         id: gate
         run: |
@@ -148,6 +152,11 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
         run: python src/workflow_helpers.py extract
+      - name: Revalidate final publication image immediately before upload
+        if: ${{ steps.gate.outputs.publish == 'true' }}
+        run: |
+          python src/validate_tradingview_visual.py data/live/visual.png
+          python src/validate_visual.py
       - name: Download official Binance Square skill
         if: ${{ steps.gate.outputs.publish == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
@@ -156,7 +165,7 @@ jobs:
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          python src/pipeline_stage.py publish running "Publishing TradingView chart image to Binance Square"
+          python src/pipeline_stage.py publish running "Publishing validated TradingView chart image to Binance Square"
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
           grep -q '^ID:' /tmp/publish-result.txt
           python src/pipeline_stage.py publish success "Binance publisher returned a post result"
