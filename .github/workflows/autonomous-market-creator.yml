@@ -66,10 +66,12 @@ jobs:
           python src/pipeline_stage.py creator_brain success "Creator Brain decision wired into this production cycle"
       - name: Lock publication context
         run: python src/publication_context.py
+      - name: Run bounded self-repair diagnostics before mutation
+        run: python src/self_repair_agent.py
       - name: Patch AI editorial director
         run: python src/editorial_prompt_patch.py
-      - name: Run bounded self-repair diagnostics
-        run: python src/self_repair_agent.py
+      - name: Verify all Python sources after patch
+        run: python -m compileall -q src
       - name: Run AI creator
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
