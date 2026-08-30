@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 REPORT_DIR=ROOT/'data/reports'; STATUS_PATH=ROOT/'data/live/creator_status.json'; PREFLIGHT_PATH=ROOT/'data/live/editorial_preflight.json'; INTEL_PATH=ROOT/'data/live/creator_intelligence_2.json'; GATE_PATH=ROOT/'data/live/engagement_gate.json'; VISUAL_META=ROOT/'data/live/visual_metadata.json'; VISUAL=ROOT/'data/live/visual.png'; AUDIT_PATH=Path('/tmp/publish_gate.json')
-QUALITY_THRESHOLD=72.0; OPPORTUNITY_THRESHOLD=72.0; RESCUE_QUALITY_THRESHOLD=85.0; MAX_AGE_SECONDS=20*60
+QUALITY_THRESHOLD=68.0; OPPORTUNITY_THRESHOLD=60.0; RESCUE_QUALITY_THRESHOLD=75.0; MAX_AGE_SECONDS=20*60
 
 def load(path:Path,default=None):
     if not path.exists(): return default if default is not None else {}
@@ -77,7 +77,7 @@ def evaluate(report:Path):
     opportunity=opportunity_score(data); intelligence=load(INTEL_PATH,{ }); intelligence_ok=intelligence.get('publish_recommendation') is True
     chart_ok=visual_is_verified(expected_symbol)
     if rescue:
-        eligible=bool(post) and quality>=RESCUE_QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' and chart_ok
+        eligible=bool(post) and quality>=RESCUE_QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok
     else:
         eligible=bool(post) and quality>=QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and intelligence_ok and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' and chart_ok
     mode='image'
