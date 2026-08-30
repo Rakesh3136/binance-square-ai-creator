@@ -1,12 +1,12 @@
 name: Binance Square AI Creator
 
-"on":
+on:
   schedule:
     - cron: '7 */3 * * *'
   workflow_dispatch:
     inputs:
       topic:
-        description: 'Optional topic; leave blank for autonomous selection'
+        description: Optional topic; leave blank for autonomous selection
         required: false
         default: ''
         type: string
@@ -49,10 +49,12 @@ jobs:
 
       - name: Run editorial preflight
         env:
-          TOPIC: '${{ inputs.topic }}'
+          TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           python src/editorial_preflight.py
-          if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
+          if [ -n "$TOPIC" ]; then
+            python src/workflow_helpers.py manual-topic
+          fi
 
       - name: Run growth and engagement intelligence
         run: |
@@ -78,10 +80,10 @@ jobs:
 
       - name: Create AI draft
         env:
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: '20'
-          TOPIC: '${{ inputs.topic }}'
+          TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           python src/safe_creator_runner.py
           python src/normalize_draft.py
@@ -90,15 +92,17 @@ jobs:
 
       - name: Improve draft with Creator Intelligence
         env:
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: '20'
-          TOPIC: '${{ inputs.topic }}'
+          TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           set +e
           python src/creator_intelligence_2.py
           rc=$?
-          if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
+          if [ "$rc" = '3' ]; then
+            python src/creator_rework.py
+          fi
           exit 0
 
       - name: Setup Node and Playwright
@@ -123,6 +127,23 @@ jobs:
           python src/validate_tradingview_visual.py data/live/visual.png
           python src/pipeline_stage.py visual_symbol success 'TradingView symbol matches the post'
           python src/pipeline_stage.py visual_content success 'TradingView image passed visual validation'
+
+      - name: Locate fresh draft
+        id: draft
+        run: |
+          draft=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          if [ -z "$draft" ]; then
+            echo '::error::No fresh AI draft found'
+            exit 1
+          fi
+          echo "path=$draft" >> "$GITHUB_OUTPUT"
+
+      - name: Apply human editorial layer
+        env:
+          DRAFT_PATH: ${{ steps.draft.outputs.path }}
+        run: |
+          python src/human_editor.py
+          python -m json.tool "$DRAFT_PATH" >/dev/null
 
       - name: Run publication gate
         id: gate
@@ -149,34 +170,26 @@ jobs:
           fi
           exit 0
 
-      - name: Locate fresh draft
-        if: '${{ steps.gate.outputs.publish == ''true'' }}'
-        id: draft
-        run: |
-          draft=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$draft"
-          echo "path=$draft" >> "$GITHUB_OUTPUT"
-
       - name: Extract publication text
-        if: '${{ steps.gate.outputs.publish == ''true'' }}'
+        if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
-          DRAFT_PATH: '${{ steps.draft.outputs.path }}'
+          DRAFT_PATH: ${{ steps.draft.outputs.path }}
         run: python src/workflow_helpers.py extract
 
       - name: Final image validation
-        if: '${{ steps.gate.outputs.publish == ''true'' }}'
+        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         run: |
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
 
       - name: Download Binance Square publisher
-        if: '${{ steps.gate.outputs.publish == ''true'' && steps.gate.outputs.mode == ''image'' }}'
+        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
 
       - name: Publish to Binance Square
-        if: '${{ steps.gate.outputs.publish == ''true'' && steps.gate.outputs.mode == ''image'' }}'
+        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         env:
-          BINANCE_SQUARE_OPENAPI_KEY: '${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}'
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
           python src/pipeline_stage.py publish running 'Publishing validated TradingView image'
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
@@ -185,10 +198,10 @@ jobs:
           python src/pipeline_stage.py verify-publish
 
       - name: Record publication
-        if: '${{ steps.gate.outputs.publish == ''true'' }}'
+        if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
-          DRAFT_PATH: '${{ steps.draft.outputs.path }}'
-          MODE: '${{ steps.gate.outputs.mode }}'
+          DRAFT_PATH: ${{ steps.draft.outputs.path }}
+          MODE: ${{ steps.gate.outputs.mode }}
         run: python src/workflow_helpers.py record
 
       - name: Diagnostics
@@ -202,13 +215,15 @@ jobs:
           test -f data/live/creator_status.json && cat data/live/creator_status.json || true
           echo '=== VISUAL METADATA ==='
           test -f data/live/visual_metadata.json && cat data/live/visual_metadata.json || true
+          echo '=== EDITORIAL POLISH ==='
+          test -f data/live/editorial_polish.json && cat data/live/editorial_polish.json || true
 
       - name: Persist learning state
         if: always()
         continue-on-error: true
         run: |
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.email '41898282+users.noreply.github.com'
           git add analytics data/live data/intelligence
           git diff --cached --quiet || git commit -m 'Record autonomous creator cycle'
           git push origin HEAD:main || true
