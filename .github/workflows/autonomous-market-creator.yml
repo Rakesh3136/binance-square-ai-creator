@@ -1,18 +1,18 @@
 name: Binance Square AI Creator
 
-on:
+"on":
   schedule:
-    - cron: "7 */3 * * *"
+    - cron: '7 */3 * * *'
   workflow_dispatch:
     inputs:
       topic:
-        description: "Optional topic; leave blank for autonomous selection"
+        description: 'Optional topic; leave blank for autonomous selection'
         required: false
-        default: ""
+        default: ''
         type: string
 
 env:
-  PYTHONUNBUFFERED: "1"
+  PYTHONUNBUFFERED: '1'
 
 concurrency:
   group: autonomous-market-creator
@@ -31,7 +31,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
@@ -39,7 +39,7 @@ jobs:
           python -m pip install --no-cache-dir -r requirements.txt
 
       - name: Reset production cycle
-        run: python src/pipeline_stage.py reset "Fresh autonomous production cycle"
+        run: python src/pipeline_stage.py reset 'Fresh autonomous production cycle'
 
       - name: Refresh live market
         run: python src/live_market_scanner.py
@@ -49,7 +49,7 @@ jobs:
 
       - name: Run editorial preflight
         env:
-          TOPIC: ${{ inputs.topic }}
+          TOPIC: '${{ inputs.topic }}'
         run: |
           python src/editorial_preflight.py
           if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
@@ -67,7 +67,7 @@ jobs:
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
-          python src/pipeline_stage.py creator_brain success "Creator Brain decision completed"
+          python src/pipeline_stage.py creator_brain success 'Creator Brain decision completed'
 
       - name: Prepare publication context
         run: |
@@ -78,10 +78,10 @@ jobs:
 
       - name: Create AI draft
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GEMINI_MODEL: gemini-3.6-flash
-          GEMINI_DAILY_BUDGET: "20"
-          TOPIC: ${{ inputs.topic }}
+          GEMINI_DAILY_BUDGET: '20'
+          TOPIC: '${{ inputs.topic }}'
         run: |
           python src/safe_creator_runner.py
           python src/normalize_draft.py
@@ -90,23 +90,21 @@ jobs:
 
       - name: Improve draft with Creator Intelligence
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GEMINI_MODEL: gemini-3.6-flash
-          GEMINI_DAILY_BUDGET: "20"
-          TOPIC: ${{ inputs.topic }}
+          GEMINI_DAILY_BUDGET: '20'
+          TOPIC: '${{ inputs.topic }}'
         run: |
           set +e
           python src/creator_intelligence_2.py
           rc=$?
-          if [ "$rc" = "3" ]; then
-            python src/creator_rework.py
-          fi
+          if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
           exit 0
 
       - name: Setup Node and Playwright
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: '24'
 
       - name: Install Chromium
         run: |
@@ -117,14 +115,14 @@ jobs:
         run: |
           python src/visual_renderer.py
           test -s data/live/visual.png
-          python src/pipeline_stage.py visual success "TradingView chart rendered"
+          python src/pipeline_stage.py visual success 'TradingView chart rendered'
 
       - name: Validate TradingView chart
         run: |
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
-          python src/pipeline_stage.py visual_symbol success "TradingView symbol matches the post"
-          python src/pipeline_stage.py visual_content success "TradingView image passed visual validation"
+          python src/pipeline_stage.py visual_symbol success 'TradingView symbol matches the post'
+          python src/pipeline_stage.py visual_content success 'TradingView image passed visual validation'
 
       - name: Run publication gate
         id: gate
@@ -134,25 +132,25 @@ jobs:
           rc=$?
           set -e
           if [ ! -f /tmp/publish_gate.json ]; then
-            echo "::error::Production Manager did not create /tmp/publish_gate.json"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "mode=image" >> "$GITHUB_OUTPUT"
+            echo '::error::Production Manager did not create /tmp/publish_gate.json'
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            echo 'mode=image' >> "$GITHUB_OUTPUT"
             exit "$rc"
           fi
-          python -c 'import json; d=json.load(open("/tmp/publish_gate.json")); print(json.dumps(d, indent=2))'
+          python -c 'import json; print(json.dumps(json.load(open("/tmp/publish_gate.json")), indent=2))'
           publish=$(python -c 'import json; print(str(json.load(open("/tmp/publish_gate.json")).get("publish", False)).lower())')
           mode=$(python -c 'import json; print(json.load(open("/tmp/publish_gate.json")).get("mode", "image"))')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          if [ "$publish" = "true" ]; then
-            python src/pipeline_stage.py quality_gate success "Publication authorized"
+          if [ "$publish" = 'true' ]; then
+            python src/pipeline_stage.py quality_gate success 'Publication authorized'
           else
-            python src/pipeline_stage.py quality_gate blocked "Publication blocked by quality gate"
+            python src/pipeline_stage.py quality_gate blocked 'Publication blocked by quality gate'
           fi
           exit 0
 
       - name: Locate fresh draft
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: '${{ steps.gate.outputs.publish == ''true'' }}'
         id: draft
         run: |
           draft=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
@@ -160,67 +158,67 @@ jobs:
           echo "path=$draft" >> "$GITHUB_OUTPUT"
 
       - name: Extract publication text
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: '${{ steps.gate.outputs.publish == ''true'' }}'
         env:
-          DRAFT_PATH: ${{ steps.draft.outputs.path }}
+          DRAFT_PATH: '${{ steps.draft.outputs.path }}'
         run: python src/workflow_helpers.py extract
 
       - name: Final image validation
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: '${{ steps.gate.outputs.publish == ''true'' }}'
         run: |
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
 
       - name: Download Binance Square publisher
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
+        if: '${{ steps.gate.outputs.publish == ''true'' && steps.gate.outputs.mode == ''image'' }}'
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
 
       - name: Publish to Binance Square
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
+        if: '${{ steps.gate.outputs.publish == ''true'' && steps.gate.outputs.mode == ''image'' }}'
         env:
-          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
+          BINANCE_SQUARE_OPENAPI_KEY: '${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}'
         run: |
-          python src/pipeline_stage.py publish running "Publishing validated TradingView image"
+          python src/pipeline_stage.py publish running 'Publishing validated TradingView image'
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
           grep -q '^ID:' /tmp/publish-result.txt
-          python src/pipeline_stage.py publish success "Binance Square returned a post ID"
+          python src/pipeline_stage.py publish success 'Binance Square returned a post ID'
           python src/pipeline_stage.py verify-publish
 
       - name: Record publication
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: '${{ steps.gate.outputs.publish == ''true'' }}'
         env:
-          DRAFT_PATH: ${{ steps.draft.outputs.path }}
-          MODE: ${{ steps.gate.outputs.mode }}
+          DRAFT_PATH: '${{ steps.draft.outputs.path }}'
+          MODE: '${{ steps.gate.outputs.mode }}'
         run: python src/workflow_helpers.py record
 
       - name: Diagnostics
         if: always()
         run: |
-          echo "=== PIPELINE STATUS ==="
+          echo '=== PIPELINE STATUS ==='
           test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
-          echo "=== PUBLICATION GATE ==="
+          echo '=== PUBLICATION GATE ==='
           test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
-          echo "=== CREATOR STATUS ==="
+          echo '=== CREATOR STATUS ==='
           test -f data/live/creator_status.json && cat data/live/creator_status.json || true
-          echo "=== VISUAL METADATA ==="
+          echo '=== VISUAL METADATA ==='
           test -f data/live/visual_metadata.json && cat data/live/visual_metadata.json || true
 
       - name: Persist learning state
         if: always()
         continue-on-error: true
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add analytics data/live data/intelligence
-          git diff --cached --quiet || git commit -m "Record autonomous creator cycle"
+          git diff --cached --quiet || git commit -m 'Record autonomous creator cycle'
           git push origin HEAD:main || true
 
       - name: Finalize
         if: always()
         run: |
-          if [ "${{ steps.gate.outputs.publish }}" = "true" ]; then
-            python src/pipeline_stage.py finalize success "Production cycle completed and publication verified"
+          if [ '${{ steps.gate.outputs.publish }}' = 'true' ]; then
+            python src/pipeline_stage.py finalize success 'Production cycle completed and publication verified'
           else
-            python src/pipeline_stage.py finalize blocked "Production cycle ended without a verified Binance Square publication"
+            python src/pipeline_stage.py finalize blocked 'Production cycle ended without a verified Binance Square publication'
             exit 1
           fi
