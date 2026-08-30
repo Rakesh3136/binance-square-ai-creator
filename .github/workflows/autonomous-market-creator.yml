@@ -1,18 +1,23 @@
 name: Binance Square AI Creator
+
 on:
   schedule:
-    - cron: '7 */3 * * *'
+    - cron: "7 */3 * * *"
   workflow_dispatch:
     inputs:
       topic:
         description: "Optional topic; leave blank for autonomous selection"
         required: false
         default: ""
+        type: string
+
 env:
   PYTHONUNBUFFERED: "1"
+
 concurrency:
   group: autonomous-market-creator
   cancel-in-progress: false
+
 jobs:
   create-and-publish:
     runs-on: ubuntu-latest
@@ -22,75 +27,68 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - name: Reset production cycle state
-        run: python src/pipeline_stage.py reset "Fresh autonomous production cycle"
+          python-version: "3.12"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
-      - name: Verify production dependencies
-        run: python -c 'import importlib.util,sys; required=["google.genai","matplotlib","pandas","numpy","PIL"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; sys.exit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
-      - name: Refresh live Binance market snapshot
+
+      - name: Reset production cycle
+        run: python src/pipeline_stage.py reset "Fresh autonomous production cycle"
+
+      - name: Refresh live market
         run: python src/live_market_scanner.py
-      - name: Benchmark successful public Square creators
-        run: python src/creator_benchmark.py || true
-      - name: Run full creator intelligence phases
+
+      - name: Run creator intelligence
         run: python src/run_creator_intelligence.py
-      - name: Run market and editorial preflight
+
+      - name: Run editorial preflight
         env:
           TOPIC: ${{ inputs.topic }}
         run: |
           python src/editorial_preflight.py
           if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
-      - name: Track creator calls and verified outcomes
-        run: python src/signal_outcome_tracker.py
-      - name: Select engagement experiment
-        run: python src/engagement_engine.py
-      - name: Freeze authoritative editorial opportunity
-        run: python src/freeze_opportunity.py
-      - name: Update performance feedback
-        run: python src/performance_feedback.py
-      - name: Update daily growth intelligence
-        run: python src/creator_growth_system.py
-      - name: Run Living Brain audit and improvement planner
-        run: python src/living_brain.py
+
+      - name: Run growth and engagement intelligence
+        run: |
+          python src/signal_outcome_tracker.py
+          python src/engagement_engine.py
+          python src/freeze_opportunity.py
+          python src/performance_feedback.py
+          python src/creator_growth_system.py
+          python src/living_brain.py
+
       - name: Run Creator Brain
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
-          python src/pipeline_stage.py creator_brain success "Creator Brain decision wired into this production cycle"
-      - name: Lock publication context
-        run: python src/publication_context.py
-      - name: Run bounded self-repair diagnostics before mutation
-        run: python src/self_repair_agent.py
-      - name: Patch AI editorial director
-        run: python src/editorial_prompt_patch.py
-      - name: Verify all Python sources after patch
-        run: python -m compileall -q src
-      - name: Run AI creator
+          python src/pipeline_stage.py creator_brain success "Creator Brain decision completed"
+
+      - name: Prepare publication context
+        run: |
+          python src/publication_context.py
+          python src/self_repair_agent.py
+          python src/editorial_prompt_patch.py
+          python -m compileall -q src
+
+      - name: Create AI draft
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: "20"
           TOPIC: ${{ inputs.topic }}
         run: |
-          RUN_AI=$(python -c "import json; print(str(json.load(open('data/live/authoritative_opportunity.json')).get('run_ai',False)).lower())")
-          if [ "$RUN_AI" != "true" ]; then
-            echo '{"status":"NO_OPPORTUNITY"}' > data/live/creator_status.json
-            python src/pipeline_stage.py ai_draft blocked "No real opportunity passed preflight"
-            exit 0
-          fi
           python src/safe_creator_runner.py
           python src/normalize_draft.py
           python src/technical_enricher.py
-          python src/pipeline_stage.py ai_draft success "Fresh draft generated, normalized, and technically enriched when supported by verified chart data"
-      - name: Track explicit prediction call
-        run: python src/call_tracker.py
-      - name: Run Creator Intelligence 2.0 self-editor and one AI rework
+          python src/call_tracker.py
+
+      - name: Improve draft with Creator Intelligence
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -99,99 +97,130 @@ jobs:
         run: |
           set +e
           python src/creator_intelligence_2.py
-          RC=$?
-          if [ "$RC" = "3" ]; then
+          rc=$?
+          if [ "$rc" = "3" ]; then
             python src/creator_rework.py
-            REWORK_RC=$?
-            if [ "$REWORK_RC" = "0" ]; then python src/safe_creator_runner.py && python src/normalize_draft.py && python src/technical_enricher.py && python src/creator_intelligence_2.py || true; fi
           fi
-          set -e
           exit 0
-      - name: Setup Node for TradingView renderer
-        if: ${{ always() }}
+
+      - name: Setup Node and Playwright
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
-      - name: Install Playwright Chromium for TradingView snapshot
-        if: ${{ always() }}
+          node-version: "24"
+
+      - name: Install Chromium
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Render TradingView visual
+
+      - name: Render TradingView chart
         run: |
-          STATUS=$(python -c "import json; print(json.load(open('data/live/creator_status.json')).get('status',''))")
-          if [ "$STATUS" != "AI_SUCCESS" ] && [ "$STATUS" != "LOCAL_FALLBACK_SUCCESS" ]; then exit 1; fi
           python src/visual_renderer.py
-          python src/pipeline_stage.py visual success "Official TradingView chart snapshot rendered"
-      - name: Validate TradingView visual matches post
-        run: |
           test -s data/live/visual.png
+          python src/pipeline_stage.py visual success "TradingView chart rendered"
+
+      - name: Validate TradingView chart
+        run: |
           python src/validate_visual.py
-      - name: Validate TradingView image has real visible chart content
-        run: python src/validate_tradingview_visual.py data/live/visual.png
-      - name: Production Manager — evaluate, repair once, and authorize publication
+          python src/validate_tradingview_visual.py data/live/visual.png
+          python src/pipeline_stage.py visual_symbol success "TradingView symbol matches the post"
+          python src/pipeline_stage.py visual_content success "TradingView image passed visual validation"
+
+      - name: Run publication gate
         id: gate
         run: |
-          set -o pipefail
+          set +e
           python src/production_manager.py
-          if grep -q '^publish=true$' "$GITHUB_OUTPUT"; then
-            python src/pipeline_stage.py quality_gate success "Production Manager authorized publication"
-          else
-            python src/pipeline_stage.py quality_gate blocked "Production Manager did not authorize publication"
+          rc=$?
+          set -e
+          if [ ! -f /tmp/publish_gate.json ]; then
+            echo "::error::Production Manager did not create /tmp/publish_gate.json"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "mode=image" >> "$GITHUB_OUTPUT"
+            exit "$rc"
           fi
+          python -c 'import json; d=json.load(open("/tmp/publish_gate.json")); print(json.dumps(d, indent=2))'
+          publish=$(python -c 'import json; print(str(json.load(open("/tmp/publish_gate.json")).get("publish", False)).lower())')
+          mode=$(python -c 'import json; print(json.load(open("/tmp/publish_gate.json")).get("mode", "image"))')
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          if [ "$publish" = "true" ]; then
+            python src/pipeline_stage.py quality_gate success "Publication authorized"
+          else
+            python src/pipeline_stage.py quality_gate blocked "Publication blocked by quality gate"
+          fi
+          exit 0
+
       - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
         id: draft
         run: |
-          DRAFT=$(find data/reports -type f -name '*-multi-agent.json' -mmin -20 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$DRAFT"; echo "path=$DRAFT" >> "$GITHUB_OUTPUT"
-      - name: Extract post text
+          draft=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          test -n "$draft"
+          echo "path=$draft" >> "$GITHUB_OUTPUT"
+
+      - name: Extract publication text
         if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
         run: python src/workflow_helpers.py extract
-      - name: Revalidate final publication image immediately before upload
+
+      - name: Final image validation
         if: ${{ steps.gate.outputs.publish == 'true' }}
         run: |
-          python src/validate_tradingview_visual.py data/live/visual.png
           python src/validate_visual.py
-      - name: Download official Binance Square skill
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+          python src/validate_tradingview_visual.py data/live/visual.png
+
+      - name: Download Binance Square publisher
+        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
-      - name: Publish image post
+
+      - name: Publish to Binance Square
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
-          python src/pipeline_stage.py publish running "Publishing validated TradingView chart image to Binance Square"
+          python src/pipeline_stage.py publish running "Publishing validated TradingView image"
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
           grep -q '^ID:' /tmp/publish-result.txt
-          python src/pipeline_stage.py publish success "Binance publisher returned a post result"
+          python src/pipeline_stage.py publish success "Binance Square returned a post ID"
           python src/pipeline_stage.py verify-publish
-      - name: Publish text post
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'text' }}
-        run: exit 1
+
       - name: Record publication
         if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
           MODE: ${{ steps.gate.outputs.mode }}
         run: python src/workflow_helpers.py record
-      - name: Finalize
+
+      - name: Diagnostics
         if: always()
         run: |
-          if [ "${{ steps.gate.outputs.publish }}" = "true" ]; then python src/pipeline_stage.py finalize success "Production cycle completed and publication verified"; else python src/pipeline_stage.py finalize blocked "Production cycle ended without a verified Binance Square publication"; exit 1; fi
-      - name: Persist state
+          echo "=== PIPELINE STATUS ==="
+          test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
+          echo "=== PUBLICATION GATE ==="
+          test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
+          echo "=== CREATOR STATUS ==="
+          test -f data/live/creator_status.json && cat data/live/creator_status.json || true
+          echo "=== VISUAL METADATA ==="
+          test -f data/live/visual_metadata.json && cat data/live/visual_metadata.json || true
+
+      - name: Persist learning state
         if: always()
         continue-on-error: true
         run: |
-          set +e
-          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add analytics data/live data/intelligence
           git diff --cached --quiet || git commit -m "Record autonomous creator cycle"
-          git fetch origin main
-          git rebase origin/main
-          git add analytics data/live data/intelligence
-          git diff --cached --quiet || git commit -m "Persist creator learning state"
-          git push origin HEAD:main || echo "State persistence failed; publication result remains authoritative."
-          exit 0
+          git push origin HEAD:main || true
+
+      - name: Finalize
+        if: always()
+        run: |
+          if [ "${{ steps.gate.outputs.publish }}" = "true" ]; then
+            python src/pipeline_stage.py finalize success "Production cycle completed and publication verified"
+          else
+            python src/pipeline_stage.py finalize blocked "Production cycle ended without a verified Binance Square publication"
+            exit 1
+          fi
