@@ -33,8 +33,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Verify production dependencies
-        run: |
-          python -c 'import importlib.util,sys; required=["google.genai","matplotlib","pandas","numpy","PIL"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; sys.exit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
+        run: python -c 'import importlib.util,sys; required=["google.genai","matplotlib","pandas","numpy","PIL"]; missing=[name for name in required if importlib.util.find_spec(name) is None]; sys.exit("Missing production dependencies: "+", ".join(missing)) if missing else print("All production dependencies OK")'
       - name: Refresh live Binance market snapshot
         run: python src/live_market_scanner.py
       - name: Benchmark successful public Square creators
@@ -104,9 +103,7 @@ jobs:
           if [ "$RC" = "3" ]; then
             python src/creator_rework.py
             REWORK_RC=$?
-            if [ "$REWORK_RC" = "0" ]; then
-              python src/safe_creator_runner.py && python src/normalize_draft.py && python src/technical_enricher.py && python src/creator_intelligence_2.py || true
-            fi
+            if [ "$REWORK_RC" = "0" ]; then python src/safe_creator_runner.py && python src/normalize_draft.py && python src/technical_enricher.py && python src/creator_intelligence_2.py || true; fi
           fi
           set -e
           exit 0
@@ -130,17 +127,18 @@ jobs:
         run: |
           test -s data/live/visual.png
           python src/validate_visual.py
-          python src/pipeline_stage.py visual_symbol success "TradingView chart visual symbol matches the frozen publication asset"
       - name: Validate TradingView image has real visible chart content
-        run: |
-          python src/validate_tradingview_visual.py data/live/visual.png
-          python src/pipeline_stage.py visual_content success "Final TradingView image passed pixel-content validation"
+        run: python src/validate_tradingview_visual.py data/live/visual.png
       - name: Production Manager — evaluate, repair once, and authorize publication
         id: gate
         run: |
+          set -o pipefail
           python src/production_manager.py
-          PUBLISH=$(grep -E '^publish=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)
-          if [ "$PUBLISH" = "true" ]; then python src/pipeline_stage.py quality_gate success "Production Manager authorized publication"; else python src/pipeline_stage.py quality_gate blocked "Production Manager could not produce a verified publishable draft"; fi
+          if grep -q '^publish=true$' "$GITHUB_OUTPUT"; then
+            python src/pipeline_stage.py quality_gate success "Production Manager authorized publication"
+          else
+            python src/pipeline_stage.py quality_gate blocked "Production Manager did not authorize publication"
+          fi
       - name: Locate fresh draft
         if: ${{ steps.gate.outputs.publish == 'true' }}
         id: draft
