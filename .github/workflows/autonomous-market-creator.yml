@@ -102,6 +102,8 @@ jobs:
           rc=$?
           if [ "$rc" = '3' ]; then
             python src/creator_rework.py
+          elif [ "$rc" != '0' ]; then
+            echo "Creator Intelligence exited with $rc; continuing with validated draft"
           fi
           exit 0
 
@@ -125,8 +127,7 @@ jobs:
         run: |
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
-          python src/pipeline_stage.py visual_symbol success 'TradingView symbol matches the post'
-          python src/pipeline_stage.py visual_content success 'TradingView image passed visual validation'
+          echo 'TradingView symbol/content validation passed; keeping validation as non-mutating checks'
 
       - name: Locate fresh draft
         id: draft
@@ -179,6 +180,7 @@ jobs:
       - name: Final image validation
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         run: |
+          test -s data/live/visual.png
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
 
@@ -187,18 +189,21 @@ jobs:
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
 
       - name: Publish to Binance Square
+        id: publish
         if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
+          set -o pipefail
           python src/pipeline_stage.py publish running 'Publishing validated TradingView image'
           node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
           grep -q '^ID:' /tmp/publish-result.txt
           python src/pipeline_stage.py publish success 'Binance Square returned a post ID'
           python src/pipeline_stage.py verify-publish
+          echo 'verified=true' >> "$GITHUB_OUTPUT"
 
       - name: Record publication
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: ${{ steps.gate.outputs.publish == 'true' && steps.publish.outputs.verified == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
           MODE: ${{ steps.gate.outputs.mode }}
@@ -231,9 +236,12 @@ jobs:
       - name: Finalize
         if: always()
         run: |
-          if [ '${{ steps.gate.outputs.publish }}' = 'true' ]; then
+          if [ '${{ steps.publish.outputs.verified }}' = 'true' ]; then
             python src/pipeline_stage.py finalize success 'Production cycle completed and publication verified'
+          elif [ '${{ steps.gate.outputs.publish }}' = 'true' ]; then
+            python src/pipeline_stage.py finalize blocked 'Publication was authorized but Binance Square verification did not complete'
+            exit 1
           else
-            python src/pipeline_stage.py finalize blocked 'Production cycle ended without a verified Binance Square publication'
+            python src/pipeline_stage.py finalize blocked 'Production cycle ended without an authorized Binance Square publication'
             exit 1
           fi
