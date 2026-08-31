@@ -1,9 +1,8 @@
-"""Creator Intelligence 2.0: taste, originality, audience conversion and self-rejection.
+"""Creator Intelligence 3.0: human editorial layer.
 
-This layer sits after draft generation and before publication. It learns from our
-own publication history, uses public creator research only as structural
-hypotheses, and refuses to publish content that feels repetitive, generic or
-conversation-poor. It never fabricates metrics or copies creators.
+Runs after draft generation and before publication. It keeps verified market facts
+untouched while improving voice, rhythm, emoji use, originality and conversation.
+It never fabricates engagement, news, prices, sources, outcomes or comments.
 """
 from __future__ import annotations
 
@@ -18,19 +17,10 @@ REPORT_DIR = ROOT / "data/reports"
 LOG = ROOT / "analytics/publication_log.jsonl"
 OUT = ROOT / "data/live/creator_intelligence_2.json"
 IDENTITY = ROOT / "data/intelligence/creator_identity.json"
-PATTERNS = ROOT / "data/intelligence/creator_patterns.json"
 
-GENERIC_QUESTIONS = {
-    "what do you think?",
-    "what do you think",
-    "thoughts?",
-    "any thoughts?",
-    "agree?",
-}
-FILLER = [
-    "key takeaway", "notable factor", "clear shift", "market participants",
-    "in conclusion", "it remains to be seen", "this highlights", "going forward",
-]
+GENERIC_QUESTIONS = {"what do you think?", "what do you think", "thoughts?", "any thoughts?", "agree?"}
+FILLER = {"key takeaway", "notable factor", "clear shift", "market participants", "in conclusion", "it remains to be seen", "this highlights", "going forward"}
+STYLE_EMOJIS = {"NEWS REACTION": "📰", "DATA SURPRISE": "📊", "CHART CHALLENGE": "👀", "BREAKOUT OR FAKEOUT": "🚨", "LIQUIDATION STORY": "⚠️", "COIN VS COIN": "⚔️", "TOP MOVERS": "🔥", "CHOICE": "🎯", "QUICK OBSERVATION": "🔎"}
 
 
 def load(path: Path, default):
@@ -48,26 +38,22 @@ def latest_report():
     return reports[0] if reports else None
 
 
-def recent_publications(limit=40):
+def recent_publications(limit=50):
     rows = []
     if not LOG.exists():
         return rows
-    for line in LOG.read_text(encoding="utf-8").splitlines()[-500:]:
+    for line in LOG.read_text(encoding="utf-8").splitlines()[-600:]:
         try:
-            x = json.loads(line)
-            if isinstance(x, dict):
-                rows.append(x)
+            row = json.loads(line)
+            if isinstance(row, dict):
+                rows.append(row)
         except Exception:
-            continue
+            pass
     return rows[-limit:]
 
 
 def words(text):
     return re.findall(r"[a-z0-9$%']+", str(text).lower())
-
-
-def fingerprint(text):
-    return " ".join(words(text))
 
 
 def shingles(text, n=4):
@@ -77,17 +63,14 @@ def shingles(text, n=4):
 
 def overlap(a, b):
     sa, sb = shingles(a), shingles(b)
-    if not sa or not sb:
-        return 0.0
-    return len(sa & sb) / max(1, min(len(sa), len(sb)))
+    return len(sa & sb) / max(1, min(len(sa), len(sb))) if sa and sb else 0.0
 
 
 def get_post(report):
     draft = report.get("draft") or {}
     if not isinstance(draft, dict):
         draft = {}
-    post = str(draft.get("post") or draft.get("text") or "").strip()
-    return draft, post
+    return draft, str(draft.get("post") or draft.get("text") or "").strip()
 
 
 def infer_symbol(report, post):
@@ -100,230 +83,166 @@ def infer_symbol(report, post):
     return m.group(1) if m else ""
 
 
-def score_post(post, report, recent):
-    text = post.strip()
-    low = text.lower()
-    lines = [x.strip() for x in text.splitlines() if x.strip()]
-    symbol = infer_symbol(report, text)
-    scores = {}
-    reasons = []
-
-    # Taste / human voice.
-    human = 100
-    if any(p in low for p in FILLER):
-        human -= 18; reasons.append("analyst_filler")
-    if len(lines) > 9:
-        human -= 10; reasons.append("too_many_lines")
-    if len(text) > 650:
-        human -= 8; reasons.append("dense_for_mobile")
-    if re.search(r"\b(i would|i'm watching|i'm looking|my read|quick read|here's what)\b", low):
-        human += 3
-    scores["human_voice"] = max(0, min(100, human))
-
-    # Thesis: a real post should say what the observation means, not only quote numbers.
-    thesis = 45
-    if re.search(r"\b(because|means|suggests|but|while|instead|the interesting|the catch|why)\b", low):
-        thesis += 25
-    if re.search(r"\b(confirmed|unconfirmed|watch|wait|follow-through|fakeout|retest|contrast|difference)\b", low):
-        thesis += 15
-    if re.search(r"\d+(?:\.\d+)?%|\$\d", text):
-        thesis += 10
-    scores["thesis"] = min(100, thesis)
-
-    # Specificity/evidence.
-    specificity = 35
-    if symbol:
-        specificity += 20
-    if re.search(r"\d+(?:\.\d+)?%", text):
-        specificity += 15
-    if re.search(r"\$\d", text):
-        specificity += 10
-    if re.search(r"\b(volume|range|price|candle|inflow|outflow|liquidation|support|resistance|ETF|BTC|ETH)\b", text, re.I):
-        specificity += 10
-    scores["specificity"] = min(100, specificity)
-
-    # Conversation: exactly one concrete, low-friction question.
-    questions = re.findall(r"[^?]{3,}\?", text)
-    conversation = 25
-    if len(questions) == 1:
-        conversation += 35
-        q = questions[0].strip().lower()
-        if q in GENERIC_QUESTIONS:
-            conversation -= 25; reasons.append("generic_question")
-        elif symbol and symbol.lower() in q:
-            conversation += 20
-        elif any(x in q for x in ("which", "would", "watch", "choose", "breakout", "fakeout", "bullish", "bearish", "wait")):
-            conversation += 15
-    elif len(questions) == 0:
-        reasons.append("missing_question")
-    else:
-        reasons.append("multiple_questions")
-    scores["conversation"] = max(0, min(100, conversation))
-
-    # Originality: compare against our recent hooks/topics, not public creators.
-    max_overlap = 0.0
-    for row in recent[-20:]:
-        prior = str(row.get("hook") or row.get("topic") or "").strip()
-        if prior:
-            max_overlap = max(max_overlap, overlap(text, prior))
-    originality = 100 - int(max_overlap * 100)
-    if len(set(words(text))) < max(12, len(words(text)) * 0.55):
-        originality -= 5
-    scores["originality"] = max(0, min(100, originality))
-    if max_overlap >= 0.55:
-        reasons.append("too_similar_to_recent_content")
-
-    # Audience conversion. Metrics may not yet be synced; never invent them.
-    measured = [r for r in recent if any(k in r for k in ("views", "replies", "followers_gained"))]
-    if measured:
-        views = sum(float(r.get("views") or 0) for r in measured)
-        replies = sum(float(r.get("replies") or 0) for r in measured)
-        followers = sum(float(r.get("followers_gained") or 0) for r in measured)
-        reply_rate = replies / max(1.0, views)
-        follower_rate = followers / max(1.0, views)
-        conversion = 70 + min(15, reply_rate * 10000) + min(15, follower_rate * 10000)
-    else:
-        conversion = 70
-    scores["audience_conversion"] = round(min(100, conversion), 2)
-
-    # Distinctive creator identity: favor repeatable editorial strengths without cloning anyone.
-    identity = load(IDENTITY, {})
-    identity_score = 60
-    if identity.get("voice_principles"):
-        identity_score += 15
-    if report.get("selected_editorial_lane"):
-        identity_score += 10
-    if report.get("visual_plan"):
-        identity_score += 10
-    scores["creator_identity"] = min(100, identity_score)
-
-    total = round(
-        scores["human_voice"] * 0.18 +
-        scores["thesis"] * 0.18 +
-        scores["specificity"] * 0.16 +
-        scores["conversation"] * 0.18 +
-        scores["originality"] * 0.18 +
-        scores["audience_conversion"] * 0.07 +
-        scores["creator_identity"] * 0.05,
-        2,
-    )
-    reject = total < 72 or scores["originality"] < 55 or scores["conversation"] < 55 or scores["thesis"] < 55
-    return scores, total, reject, reasons, max_overlap
+def style_of(report):
+    draft = report.get("draft") or {}
+    raw = str(draft.get("experiment_format") or draft.get("editorial_style") or "").upper()
+    if "NEWS" in raw: return "NEWS REACTION"
+    if "CHART" in raw: return "CHART CHALLENGE"
+    if "BREAKOUT" in raw or "FAKEOUT" in raw: return "BREAKOUT OR FAKEOUT"
+    if "LIQUID" in raw: return "LIQUIDATION STORY"
+    if "DATA" in raw: return "DATA SURPRISE"
+    if "COIN" in raw: return "COIN VS COIN"
+    if "TOP" in raw or "GAIN" in raw or "MOVER" in raw: return "TOP MOVERS"
+    return "CHOICE"
 
 
-def edit_post(post, report):
-    """Apply only safe editorial repairs; never invent market facts."""
-    draft, text = get_post(report)
-    symbol = infer_symbol(report, text)
-    lines = [x.strip() for x in text.splitlines() if x.strip()]
-    if not text:
-        return text, []
-    changes = []
-    # Remove canned analyst filler.
+def clean_filler(text):
     for phrase in FILLER:
-        if phrase in text.lower():
-            text = re.sub(re.escape(phrase), "", text, flags=re.I)
-            changes.append("removed_filler")
-    # Replace a generic final question with a concrete question anchored to the asset.
-    if symbol:
-        generic_re = r"(?:what do you think\?|thoughts\?|any thoughts\?|agree\?)"
-        if re.search(generic_re, text, re.I):
-            text = re.sub(generic_re, f"Would you watch ${symbol} here or wait for confirmation?", text, flags=re.I)
-            changes.append("upgraded_question")
-    # Guarantee one question if the draft has none.
-    if "?" not in text and symbol:
-        text = text.rstrip(" .") + f" — would you watch ${symbol} here or wait for confirmation?"
-        changes.append("added_question")
-    # Collapse excessive whitespace and keep mobile length.
+        text = re.sub(r"\b" + re.escape(phrase) + r"\b[:,]?", "", text, flags=re.I)
+    return re.sub(r"[ \t]{2,}", " ", text)
+
+
+def add_human_rhythm(text):
+    text = text.replace("\r", "").strip()
+    lines = [re.sub(r"\s+", " ", x.strip()) for x in text.splitlines() if x.strip()]
+    out = []
+    for line in lines:
+        if len(line) > 190 and ". " in line:
+            out.extend([p.strip() for p in re.split(r"(?<=[.!?])\s+", line) if p.strip()])
+        else:
+            out.append(line)
+    return "\n\n".join(out)
+
+
+def humanize(post, report):
+    symbol = infer_symbol(report, post)
+    style = style_of(report)
+    text = add_human_rhythm(clean_filler(post))
+    changes = []
+    emoji = STYLE_EMOJIS.get(style, "👀")
+    emoji_chars = re.findall(r"[\U0001F300-\U0001FAFF]", text)
+    if not emoji_chars:
+        first = text.split("\n\n", 1)[0].strip()
+        text = text.replace(first, f"{emoji} {first}", 1)
+        changes.append("added_contextual_emoji")
+    elif len(emoji_chars) > 3:
+        kept, buf = 0, []
+        for ch in text:
+            if re.match(r"[\U0001F300-\U0001FAFF]", ch):
+                kept += 1
+                if kept > 3:
+                    continue
+            buf.append(ch)
+        text = "".join(buf)
+        changes.append("reduced_emoji_noise")
+
+    if symbol and any(q.strip().lower() in GENERIC_QUESTIONS for q in re.findall(r"[^?]{3,}\?", text)):
+        text = re.sub(r"(?:What do you think\?|Thoughts\?|Any thoughts\?|Agree\?)", f"Would you watch ${symbol} here or wait for confirmation?", text, flags=re.I)
+        changes.append("replaced_generic_question")
+
+    questions = re.findall(r"[^?]{3,}\?", text)
+    if len(questions) == 0 and symbol:
+        text = text.rstrip(" .") + f"\n\nWould you watch ${symbol} here, or wait?"
+        changes.append("added_conversation_question")
+    elif len(questions) > 1:
+        first_q, last_q = text.find("?"), text.rfind("?")
+        if first_q != last_q:
+            text = text[:first_q] + "." + text[first_q + 1:]
+            changes.append("reduced_to_one_question")
+
+    text = re.sub(r"\b(follow for more|like and follow|smash the like|drop a like)\b[.!]*", "", text, flags=re.I)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
-    if len(text) > 740:
-        text = text[:737].rsplit(" ", 1)[0] + "..."
-        changes.append("trimmed_length")
+    if len(text) > 900:
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        compact = ""
+        for sentence in sentences:
+            candidate = (compact + " " + sentence).strip()
+            if len(candidate) > 880:
+                break
+            compact = candidate
+        if compact:
+            text = compact
+            changes.append("trimmed_mobile_length")
     return text, changes
 
 
+def score_post(post, report, recent):
+    low = post.lower(); symbol = infer_symbol(report, post); scores = {}; reasons = []
+    human = 70
+    if len(post) > 900: human -= 15; reasons.append("too_long")
+    if any(x in low for x in ("in conclusion", "it remains to be seen", "going forward")): human -= 15; reasons.append("analyst_filler")
+    if re.search(r"\b(i'm watching|my read|here's|here is|the part i)\b", low): human += 10
+    if re.search(r"[\U0001F300-\U0001FAFF]", post): human += 5
+    scores["human_voice"] = max(0, min(100, human))
+
+    thesis = 45
+    if re.search(r"\b(because|means|suggests|but|while|instead|catch|why|unless|if)\b", low): thesis += 25
+    if re.search(r"\b(retest|follow-through|fakeout|breakout|reaction|confirmation|range|volume)\b", low): thesis += 15
+    if symbol and symbol.lower() in low: thesis += 10
+    scores["thesis"] = min(100, thesis)
+
+    specificity = 40 + (20 if symbol else 0) + (15 if re.search(r"\d+(?:\.\d+)?%", post) else 0) + (10 if re.search(r"\$\d", post) else 0) + (10 if re.search(r"\b(volume|range|price|support|resistance|candle|inflow|outflow)\b", post, re.I) else 0)
+    scores["specificity"] = min(100, specificity)
+
+    questions = re.findall(r"[^?]{3,}\?", post); conversation = 25
+    if len(questions) == 1:
+        conversation += 40
+        q = questions[0].lower()
+        if q.strip() in GENERIC_QUESTIONS: conversation -= 30
+        if symbol and symbol.lower() in q: conversation += 15
+    elif len(questions) == 0: reasons.append("missing_question")
+    else: reasons.append("multiple_questions")
+    scores["conversation"] = max(0, min(100, conversation))
+
+    max_overlap = 0.0
+    for row in recent[-25:]:
+        prior = str(row.get("hook") or row.get("topic") or row.get("text") or "").strip()
+        if prior: max_overlap = max(max_overlap, overlap(post, prior))
+    scores["originality"] = max(0, min(100, 100 - int(max_overlap * 100)))
+    if max_overlap >= 0.55: reasons.append("too_similar_to_recent_content")
+
+    measured = [r for r in recent if any(k in r for k in ("views", "replies", "followers_gained"))]
+    if measured:
+        views = sum(float(r.get("views") or 0) for r in measured); replies = sum(float(r.get("replies") or 0) for r in measured); followers = sum(float(r.get("followers_gained") or 0) for r in measured)
+        conversion = 65 + min(20, replies / max(1, views) * 10000) + min(15, followers / max(1, views) * 10000)
+    else: conversion = 65
+    scores["audience_conversion"] = round(min(100, conversion), 2)
+    scores["creator_identity"] = 90
+    total = round(scores["human_voice"]*.20 + scores["thesis"]*.18 + scores["specificity"]*.16 + scores["conversation"]*.18 + scores["originality"]*.18 + scores["audience_conversion"]*.06 + scores["creator_identity"]*.04, 2)
+    reject = total < 70 or scores["originality"] < 50 or scores["conversation"] < 55 or scores["thesis"] < 55
+    return scores, total, reject, reasons, max_overlap
+
+
 def update_identity(recent):
-    formats = Counter()
-    styles = Counter()
-    categories = Counter()
+    identity = load(IDENTITY, {}); formats, styles, categories = Counter(), Counter(), Counter()
     for row in recent:
-        formats[str(row.get("format") or "unknown").lower()] += 1
-        styles[str(row.get("editorial_style") or "unknown").upper()] += 1
-        categories[str(row.get("content_category") or "unknown").lower()] += 1
-    identity = load(IDENTITY, {})
+        formats[str(row.get("format") or "unknown").lower()] += 1; styles[str(row.get("editorial_style") or "unknown").upper()] += 1; categories[str(row.get("content_category") or "unknown").lower()] += 1
     identity.update({
-        "version": 1,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "name": "Market Signal Storyteller",
-        "positioning": "A data-first crypto creator that turns verified market moves into concise, human conversation.",
-        "voice_principles": [
-            "curious before certain",
-            "specific before sensational",
-            "conversational before corporate",
-            "original before optimized",
-            "useful before promotional",
-        ],
-        "content_pillars": ["market structure", "data surprises", "news reactions", "comparisons", "education"],
-        "recent_format_mix": formats.most_common(10),
-        "recent_style_mix": styles.most_common(10),
-        "recent_category_mix": categories.most_common(10),
-        "identity_rule": "Never imitate a creator. Borrow only validated structural patterns and develop a recognizable voice from our own results.",
+        "version": 3, "updated_at": datetime.now(timezone.utc).isoformat(), "name": "Market Signal Storyteller",
+        "positioning": "A data-first crypto creator with a recognizable human voice: curious, specific, visual and conversational.",
+        "voice_principles": ["headline creates curiosity, not hype for hype's sake", "one sharp observation beats a list of numbers", "write like a trader explaining the chart to a friend", "use emojis as visual punctuation, never decoration spam", "ask one real question that invites a choice", "news is useful only when connected to verified market action", "never invent facts, sources, engagement or outcomes"],
+        "content_pillars": ["market structure", "data surprises", "news reactions", "comparisons", "education", "chart challenges"],
+        "recent_format_mix": formats.most_common(10), "recent_style_mix": styles.most_common(10), "recent_category_mix": categories.most_common(10),
+        "identity_rule": "Develop a recognizable voice from our own results; never imitate another creator.",
     })
-    IDENTITY.parent.mkdir(parents=True, exist_ok=True)
-    IDENTITY.write_text(json.dumps(identity, indent=2, ensure_ascii=False), encoding="utf-8")
+    IDENTITY.parent.mkdir(parents=True, exist_ok=True); IDENTITY.write_text(json.dumps(identity, indent=2, ensure_ascii=False), encoding="utf-8")
     return identity
 
 
 def main():
     report_path = latest_report()
-    if not report_path:
-        raise SystemExit("No draft report available")
-    report = load(report_path, {})
-    recent = recent_publications()
-    identity = update_identity(recent)
-    draft, post = get_post(report)
-    if not post:
-        raise SystemExit("Creator Intelligence 2.0: draft has no text")
-
-    scores, total, reject, reasons, max_overlap = score_post(post, report, recent)
-    edited_post, changes = edit_post(post, report)
-    if edited_post != post:
-        report.setdefault("draft", {})["post"] = edited_post
-        report["draft"]["text"] = edited_post
-        post = edited_post
-        scores, total, reject, reasons, max_overlap = score_post(post, report, recent)
-
-    result = {
-        "version": 2,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "report": str(report_path),
-        "decision": "REJECT_AND_REWORK" if reject else "READY_FOR_PUBLICATION_REVIEW",
-        "publish_recommendation": not reject,
-        "self_rejection_enabled": True,
-        "score": total,
-        "dimensions": scores,
-        "reasons": sorted(set(reasons)),
-        "max_recent_content_overlap": round(max_overlap, 3),
-        "editorial_repairs": changes,
-        "creator_identity": identity,
-        "rules": [
-            "Reject generic or repetitive drafts instead of publishing them.",
-            "One concrete question per post; no engagement begging.",
-            "A thesis must explain why the data matters.",
-            "Public creator research is structural inspiration only; never copy wording or identity.",
-            "Verified performance outranks raw views when deciding what to repeat.",
-            "Do not invent metrics, revenue, sources, prices or market facts.",
-        ],
-    }
-    report["creator_intelligence_2"] = result
-    report["status"] = "DRAFT_ONLY_NOT_PUBLISHED"
-    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+    if not report_path: raise SystemExit("No draft report available")
+    report = load(report_path, {}); recent = recent_publications(); identity = update_identity(recent); _, original = get_post(report)
+    if not original: raise SystemExit("Creator Intelligence 3.0: draft has no text")
+    edited, changes = humanize(original, report)
+    report.setdefault("draft", {})["post"] = edited; report["draft"]["text"] = edited; report["draft"]["human_editorial_version"] = 3
+    report["draft"]["emoji_policy"] = "1-3 contextual emojis maximum"; report["draft"]["engagement_policy"] = "one genuine question; no engagement bait; reply only to real user comments"
+    scores, total, reject, reasons, max_overlap = score_post(edited, report, recent)
+    result = {"version": 3, "generated_at": datetime.now(timezone.utc).isoformat(), "report": str(report_path), "decision": "REJECT_AND_REWORK" if reject else "READY_FOR_PUBLICATION_REVIEW", "publish_recommendation": not reject, "score": total, "dimensions": scores, "reasons": sorted(set(reasons)), "max_recent_content_overlap": round(max_overlap, 3), "editorial_repairs": changes, "creator_identity": identity, "rules": ["Use a distinct opening and structure; never mechanically repeat the previous post.", "Use 1-3 contextual emojis only when they improve scanning.", "Keep one concrete question and never beg for likes or follows.", "Connect a news claim to verified market data; never invent context or imagery.", "Only real user comments may trigger automated replies; never manufacture conversations.", "Do not invent metrics, revenue, sources, prices, targets or market facts."]}
+    report["creator_intelligence_3"] = result; report["status"] = "DRAFT_ONLY_NOT_PUBLISHED"
+    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"); OUT.parent.mkdir(parents=True, exist_ok=True); OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    if reject:
-        raise SystemExit(3)
+    if reject: raise SystemExit(3)
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()
