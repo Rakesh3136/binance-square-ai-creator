@@ -15,99 +15,49 @@ from pathlib import Path
 NEWS = Path("data/live/news_snapshot.json")
 OUT = Path("data/live/editorial_polish.json")
 
-# Style is rotated so the account does not sound like a template factory.
 STYLE_LIBRARY = {
     "NEWS_REACTION": {
         "emoji": "📰",
-        "hooks": [
-            "📰 The headline is interesting. The price reaction is the part I care about.",
-            "📰 News first, price action second — here’s what I’m watching.",
-        ],
-        "questions": [
-            "Does the chart confirm the headline for you?",
-            "Bullish reaction or headline fade?",
-        ],
+        "hooks": ["📰 The headline is interesting. The price reaction is the part I care about.", "📰 News first, price action second — here’s what I’m watching."],
+        "questions": ["Does the chart confirm the headline for you?", "Bullish reaction or headline fade?"],
     },
     "CHART_STORY": {
         "emoji": "📊",
-        "hooks": [
-            "📊 The candle is loud. The structure underneath it is more interesting.",
-            "📊 Before chasing the move, I’d look at this part of the chart.",
-        ],
-        "questions": [
-            "Which level would you watch first?",
-            "Would you wait for another candle here?",
-        ],
+        "hooks": ["📊 The candle is loud. The structure underneath it is more interesting.", "📊 Before chasing the move, I’d look at this part of the chart."],
+        "questions": ["Which level would you watch first?", "Would you wait for another candle here?"],
     },
     "VOLUME_STORY": {
         "emoji": "🔥",
-        "hooks": [
-            "🔥 Price got the attention. Volume is what made me stop scrolling.",
-            "🔥 This move has participation behind it — now comes the interesting part.",
-        ],
-        "questions": [
-            "Is volume confirming the move for you?",
-            "Would you wait for follow-through or act on this signal?",
-        ],
+        "hooks": ["🔥 Price got the attention. Volume is what made me stop scrolling.", "🔥 This move has participation behind it — now comes the interesting part."],
+        "questions": ["Is volume confirming the move for you?", "Would you wait for follow-through or act on this signal?"],
     },
     "CHOICE": {
         "emoji": "👀",
-        "hooks": [
-            "👀 I’m not chasing this candle. I’m watching what happens next.",
-            "👀 This is one of those moves where confirmation matters more than excitement.",
-        ],
-        "questions": [
-            "Chase the move, wait for a pullback, or stay out?",
-            "What would make you change your view here?",
-        ],
+        "hooks": ["👀 I’m not chasing this candle. I’m watching what happens next.", "👀 This is one of those moves where confirmation matters more than excitement."],
+        "questions": ["Chase the move, wait for a pullback, or stay out?", "What would make you change your view here?"],
     },
     "BREAKOUT": {
         "emoji": "⚡",
-        "hooks": [
-            "⚡ Breakouts look obvious afterwards. The reaction here is what matters now.",
-            "⚡ This is the point where a breakout can become a real move — or a trap.",
-        ],
-        "questions": [
-            "Breakout or fakeout?",
-            "Would you want another candle for confirmation?",
-        ],
+        "hooks": ["⚡ Breakouts look obvious afterwards. The reaction here is what matters now.", "⚡ This is the point where a breakout can become a real move — or a trap."],
+        "questions": ["Breakout or fakeout?", "Would you want another candle for confirmation?"],
     },
     "DATA_SURPRISE": {
         "emoji": "🔎",
-        "hooks": [
-            "🔎 One number here is more interesting than the headline move.",
-            "🔎 The first thing I noticed wasn’t price — it was the data behind it.",
-        ],
-        "questions": [
-            "Does this data change your read?",
-            "Did you notice this before looking at the percentage move?",
-        ],
+        "hooks": ["🔎 One number here is more interesting than the headline move.", "🔎 The first thing I noticed wasn’t price — it was the data behind it."],
+        "questions": ["Does this data change your read?", "Did you notice this before looking at the percentage move?"],
     },
     "COIN_VS_COIN": {
         "emoji": "⚔️",
-        "hooks": [
-            "⚔️ Side-by-side check: which chart is actually doing the work?",
-            "⚔️ Two coins can pump at the same time. Their structures can still tell very different stories.",
-        ],
-        "questions": [
-            "Which chart would you watch next?",
-            "Which setup looks cleaner to you?",
-        ],
+        "hooks": ["⚔️ Side-by-side check: which chart is actually doing the work?", "⚔️ Two coins can pump at the same time. Their structures can still tell very different stories."],
+        "questions": ["Which chart would you watch next?", "Which setup looks cleaner to you?"],
     },
     "UPDATE": {
         "emoji": "🔄",
-        "hooks": [
-            "🔄 Quick update — we have a little more information now.",
-            "🔄 The market gave us another clue. Here’s what changed.",
-        ],
-        "questions": [
-            "Did this change your read?",
-            "What signal would you watch next?",
-        ],
+        "hooks": ["🔄 Quick update — we have a little more information now.", "🔄 The market gave us another clue. Here’s what changed."],
+        "questions": ["Did this change your read?", "What signal would you watch next?"],
     },
 }
 
-# Deliberately avoid phrases that make the account sound generated or corporate.
 BANNED_CLICHES = [
     "in conclusion", "going forward", "it remains to be seen", "this highlights",
     "key takeaway", "notable factor", "clear shift", "market participants",
@@ -115,11 +65,7 @@ BANNED_CLICHES = [
     "this is the crypto story i'm watching right now:",
     "this is the crypto story i’m watching right now:",
 ]
-
-GENERIC_QUESTIONS = {
-    "what do you think?", "what do you think", "thoughts?", "thoughts",
-    "any thoughts?", "agree?", "agree",
-}
+GENERIC_QUESTIONS = {"what do you think?", "what do you think", "thoughts?", "thoughts", "any thoughts?", "agree?", "agree"}
 
 
 def load(path: Path, default=None):
@@ -140,14 +86,11 @@ def seed_for(text: str, style: str) -> int:
 
 
 def pick(values: list[str], seed: int, offset: int = 0) -> str:
-    if not values:
-        return ""
-    return values[(seed + offset) % len(values)]
+    return values[(seed + offset) % len(values)] if values else ""
 
 
 def clean(s: str) -> str:
-    s = re.sub(r"[ \t]+", " ", str(s or "")).strip()
-    return s
+    return re.sub(r"[ \t]+", " ", str(s or "")).strip()
 
 
 def symbol_from(draft: dict, text: str) -> str:
@@ -159,8 +102,12 @@ def symbol_from(draft: dict, text: str) -> str:
     return m.group(1) if m else ""
 
 
+def normalized_style(value: str) -> str:
+    return str(value or "").upper().replace("_", " ").replace("-", " ").strip()
+
+
 def style_for(draft: dict, text: str, news: dict, seed: int) -> str:
-    raw = str(draft.get("experiment_format") or draft.get("editorial_style") or "").upper().replace("_", " ")
+    raw = normalized_style(draft.get("experiment_format") or draft.get("editorial_style") or "")
     if "NEWS" in raw or "HEADLINE" in raw:
         return "NEWS_REACTION"
     if "COIN VS" in raw or "COMPARISON" in raw:
@@ -173,11 +120,12 @@ def style_for(draft: dict, text: str, news: dict, seed: int) -> str:
         return "DATA_SURPRISE"
     if "UPDATE" in raw or "FOLLOW" in raw:
         return "UPDATE"
-    if news.get("title") and any(x in raw for x in ("NEWS + CHART", "NEWS REACTION")):
-        return "NEWS_REACTION"
-    if "CHART" in raw or "TARGET" in raw or draft.get("visual_plan"):
+    if "CHART" in raw or "TARGET" in raw:
         return "CHART_STORY"
-    choices = ["CHOICE", "CHART_STORY", "VOLUME_STORY", "BREAKOUT", "DATA_SURPRISE"]
+    visual = draft.get("visual_plan") or {}
+    if isinstance(visual, dict) and str(visual.get("type") or "").lower() not in {"", "none", "text"}:
+        return "CHART_STORY"
+    choices = ["CHOICE", "VOLUME_STORY", "BREAKOUT", "DATA_SURPRISE"]
     return choices[seed % len(choices)]
 
 
@@ -186,17 +134,17 @@ def recent_styles(data: dict) -> set[str]:
     counts = strategy.get("recent_style_counts") or {}
     if not isinstance(counts, dict):
         return set()
-    return {str(k).upper().replace("_", " ") for k in counts}
+    return {normalized_style(k) for k in counts}
 
 
 def choose_non_repeating_style(draft: dict, text: str, news: dict, data: dict, seed: int) -> str:
     preferred = style_for(draft, text, news, seed)
     recent = recent_styles(data)
-    if preferred not in recent:
+    if normalized_style(preferred) not in recent:
         return preferred
     alternatives = ["CHOICE", "CHART_STORY", "VOLUME_STORY", "DATA_SURPRISE", "BREAKOUT", "UPDATE"]
     for i, candidate in enumerate(alternatives):
-        if candidate not in recent and candidate != preferred and (seed + i) % 2 == 0:
+        if normalized_style(candidate) not in recent and candidate != preferred and (seed + i) % 2 == 0:
             return candidate
     return preferred
 
@@ -214,25 +162,17 @@ def fresh_news(news: dict) -> dict:
             continue
         title = clean(article.get("title") or article.get("headline"))
         if title:
-            return {
-                "source": clean(article.get("source") or ""),
-                "title": title[:220],
-                "url": clean(article.get("url") or ""),
-                "published_at": clean(article.get("published_at") or ""),
-            }
+            return {"source": clean(article.get("source") or ""), "title": title[:220], "url": clean(article.get("url") or ""), "published_at": clean(article.get("published_at") or "")}
     return {}
 
 
 def strip_cliches(text: str) -> str:
     for phrase in BANNED_CLICHES:
         text = re.sub(re.escape(phrase), "", text, flags=re.I)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def remove_questions(text: str) -> str:
-    # Remove only trailing question lines. Preserve question marks in the body
-    # because they can be part of quoted/news text.
     lines = text.splitlines()
     while lines and lines[-1].strip().endswith("?"):
         lines.pop()
@@ -240,71 +180,42 @@ def remove_questions(text: str) -> str:
 
 
 def extract_fact_lines(text: str) -> list[str]:
-    """Keep useful researched facts while dropping report-like scaffolding."""
     lines = [clean(x) for x in text.splitlines() if clean(x)]
-    out = []
-    for line in lines:
-        low = line.lower()
-        if low in {"key scenario levels:", "key levels:", "bullish, bearish, or wait?"}:
-            continue
-        if re.fullmatch(r"[-•*]+", line):
-            continue
-        out.append(line)
-    return out
+    skip = {"key scenario levels:", "key levels:", "bullish, bearish, or wait?"}
+    return [x for x in lines if x.lower() not in skip and not re.fullmatch(r"[-•*]+", x)]
 
 
 def compact_levels(text: str) -> str:
-    # Collapse long bullet lists of levels into one readable sentence.
     lines = text.splitlines()
     level_lines = [x for x in lines if re.search(r"\b(support|resistance|target|invalidation|sl)\b", x, re.I)]
     if len(level_lines) < 3:
         return text
-    keep = []
-    inserted = False
+    keep, inserted = [], False
     for line in lines:
         if re.search(r"\b(support|resistance|target|invalidation|sl)\b", line, re.I):
             if not inserted:
-                parts = []
-                for x in level_lines:
-                    clean_x = re.sub(r"^[•*\-]\s*", "", x)
-                    parts.append(clean_x.rstrip("."))
+                parts = [re.sub(r"^[•*\-]\s*", "", x).rstrip(".") for x in level_lines]
                 keep.append("📍 " + " • ".join(parts[:5]))
                 inserted = True
-            continue
-        keep.append(line)
+        else:
+            keep.append(line)
     return "\n".join(keep)
 
 
 def make_body(original: str, style: str, symbol: str, news: dict, seed: int) -> tuple[str, bool]:
-    text = strip_cliches(original)
-    text = compact_levels(text)
+    text = compact_levels(strip_cliches(original))
     text = remove_questions(text)
     lines = extract_fact_lines(text)
     if not lines:
         return "", False
-
-    # Remove an old hook if it is clearly canned, then keep the strongest factual
-    # lines. We intentionally do not rewrite numeric facts here.
     first = lines[0]
     if first.lower().startswith(("$" + symbol.lower(), "current price", "fresh check", "quick market check")):
         lines = lines[1:] or lines
 
     profile = STYLE_LIBRARY[style]
     hook = pick(profile["hooks"], seed)
-
-    # Select only the most useful 2-4 factual chunks. Preserve original wording
-    # where possible because this layer is editorial, not a fact generator.
-    facts = []
-    for line in lines:
-        if len(line) < 260:
-            facts.append(line)
-        if len(facts) >= 4:
-            break
-
-    # Prefer a compact market sentence over a list-heavy report.
-    body = hook
-    if facts:
-        body += "\n\n" + "\n".join(facts[:3])
+    facts = [line for line in lines if len(line) < 260][:3]
+    body = hook + (("\n\n" + "\n".join(facts)) if facts else "")
 
     news_used = False
     if news and style == "NEWS_REACTION":
@@ -313,7 +224,6 @@ def make_body(original: str, style: str, symbol: str, news: dict, seed: int) -> 
             body += "\n\n" + marker
             news_used = True
 
-    # A light creator POV makes the writing less robotic without claiming certainty.
     if symbol and len(body) < 620:
         pov = pick([
             f"My focus here is the reaction, not the first spike on ${symbol}.",
@@ -322,33 +232,29 @@ def make_body(original: str, style: str, symbol: str, news: dict, seed: int) -> 
         ], seed, 7)
         if pov.lower() not in body.lower():
             body += "\n\n" + pov
-
     return body, news_used
 
 
 def final_question(style: str, symbol: str, seed: int) -> str:
     question = pick(STYLE_LIBRARY[style]["questions"], seed, 13)
-    # Make the question asset-specific when the selected question is too generic.
     if symbol and question.lower() in {"which level would you watch first?", "which chart would you watch next?"}:
         return question[:-1] + f" on ${symbol}?"
     return question
 
 
 def enforce_one_question(text: str, question: str) -> str:
-    text = remove_questions(text)
-    return text.rstrip(" .") + "\n\n" + question
+    return remove_questions(text).rstrip(" .") + "\n\n" + question
 
 
 def mobile_trim(text: str, question: str, limit: int = 820) -> str:
     if len(text) <= limit:
         return text
-    # Keep complete paragraphs rather than cutting through a number or word.
     base = remove_questions(text)
     room = max(350, limit - len(question) - 2)
     base = base[:room]
     cut = max(base.rfind("\n\n"), base.rfind(". "))
     if cut >= 300:
-        base = base[:cut + (2 if base[cut:cut+2] == ". " else 0)]
+        base = base[:cut + (2 if base[cut:cut + 2] == ". " else 0)]
     else:
         base = base.rsplit(" ", 1)[0]
     return enforce_one_question(base.strip(), question)
@@ -374,17 +280,12 @@ def main() -> int:
         raise SystemExit("Editorial engine produced empty body")
 
     question = final_question(style, symbol, seed)
-    text = enforce_one_question(body, question)
-    text = mobile_trim(text, question)
+    text = mobile_trim(enforce_one_question(body, question), question)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
 
-    # Guardrails for a natural-looking creator voice.
-    question_count = text.count("?")
-    if question_count != 1:
+    if text.count("?") != 1 or any(q in text.lower() for q in GENERIC_QUESTIONS):
         text = enforce_one_question(text, question)
-    if any(phrase in text.lower() for phrase in GENERIC_QUESTIONS):
-        text = enforce_one_question(remove_questions(text), question)
 
     emoji = STYLE_LIBRARY[style]["emoji"]
     draft["post"] = text
@@ -398,7 +299,7 @@ def main() -> int:
         "emoji_policy": "light_contextual_use",
         "fresh_news_used": news_used,
         "conversation_question": question,
-        "mobile_format": "hook_story_pov_question",
+        "mobile_format": "hook_story_evidence_pov_question",
         "question_count": 1,
         "anti_template": True,
         "fact_policy": "preserve_researched_facts; no new market claims",
@@ -407,26 +308,9 @@ def main() -> int:
     data["news_context"] = news
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({
-        "status": "HUMAN_EDITOR_APPLIED",
-        "version": "human-editor-v5-next-level",
-        "style": style,
-        "emoji": emoji,
-        "fresh_news": news_used,
-        "question": question,
-        "characters": len(text),
-        "question_count": text.count("?"),
-    }, indent=2, ensure_ascii=False), encoding="utf-8")
+    OUT.write_text(json.dumps({"status": "HUMAN_EDITOR_APPLIED", "version": "human-editor-v5-next-level", "style": style, "emoji": emoji, "fresh_news": news_used, "question": question, "characters": len(text), "question_count": text.count("?")}, indent=2, ensure_ascii=False), encoding="utf-8")
     draft_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({
-        "status": "HUMAN_EDITOR_APPLIED",
-        "characters": len(text),
-        "style": style,
-        "emoji": emoji,
-        "fresh_news": news_used,
-        "question": question,
-        "question_count": text.count("?"),
-    }, ensure_ascii=False))
+    print(json.dumps({"status": "HUMAN_EDITOR_APPLIED", "characters": len(text), "style": style, "emoji": emoji, "fresh_news": news_used, "question": question, "question_count": text.count("?")}, ensure_ascii=False))
     return 0
 
 
