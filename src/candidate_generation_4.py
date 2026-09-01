@@ -1,26 +1,26 @@
-"""Creator 4.0 candidate generation and rewrite stage.
-Uses the existing Gemini multi-agent writer as the generation backend while
-forcing story-specific diversity and a final scorecard pass.
+"""Creator 4.2 candidate-generation brief.
+The actual model call remains in the existing creator backend; this module supplies
+its richer editorial contract and candidate diversity requirements.
 """
 from __future__ import annotations
-import json, os
+import json
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
-PREFLIGHT=ROOT/'data/live/editorial_preflight.json'
+ROOT=Path(__file__).resolve().parents[1]; PREFLIGHT=ROOT/'data/live/editorial_preflight.json'
 
 def load(p):
- try:return json.loads(p.read_text(encoding='utf-8'))
- except:return {}
+    try:return json.loads(p.read_text(encoding='utf-8'))
+    except Exception:return {}
 
 def main():
- p=load(PREFLIGHT); d=p.get('content_director_4') or {}; s=p.get('script_director_4') or {}
- fmt=d.get('recommended_format','TOP MOVERS'); sym=s.get('primary_symbol') or (d.get('primary_story') or {}).get('symbol','')
- hooks=s.get('hook_candidates') or []
- prompt={
-  'version':'4.0','symbol':sym,'format':fmt,
-  'instruction':f'''You are the Creator 4.0 senior crypto editor. Story format: {fmt}. Primary asset: {sym}.\nGenerate 5 genuinely different COMPLETE Binance Square post candidates, not 5 hooks. Candidate styles must vary: breaking/newsroom, analytical, conversational/community, contrarian/counterpoint, and concise high-energy. Every candidate must be grounded in the supplied verified evidence. Use the TradingView chart for technical claims. Do not invent news, targets, volume, support/resistance, or creator calls. If a target or stop/invalidation is not supported by current data, omit it. Never promise profit or say a coin will definitely 10x/20x. Each candidate should have one natural question. Then select the strongest candidate and rewrite it once for mobile readability, factual precision and originality. Hook candidates to consider: {json.dumps(hooks,ensure_ascii=False)}''',
-  'selection_criteria':['stop-scroll strength','specificity','evidence density','usefulness','natural interaction','originality','mobile readability','risk-aware language']
- }
- p['candidate_generation_4']=prompt; PREFLIGHT.write_text(json.dumps(p,indent=2,ensure_ascii=False),encoding='utf-8')
- print(json.dumps({'status':'OK','format':fmt,'symbol':sym,'candidate_count':5},indent=2))
+    p=load(PREFLIGHT); d=p.get('content_director_4') or {}; s=p.get('script_director_4') or {}
+    fmt=d.get('recommended_format','TOP MOVERS'); sym=s.get('primary_symbol') or (d.get('primary_story') or {}).get('symbol','')
+    hooks=s.get('hook_candidates') or []
+    prompt={'version':'4.2','symbol':sym,'format':fmt,'instruction':f'''You are the senior editor of a serious but high-energy Binance Square crypto creator. Primary asset: ${sym}. Format: {fmt}.
+Generate 5 genuinely different COMPLETE posts, not five rewrites of one template. Use these voices: (1) newsroom/breaking, (2) sharp technical analyst, (3) conversational trader, (4) contrarian/counterpoint, (5) concise high-energy.
+Each candidate must have: a stop-scroll opening; the verified event/observation; why it matters now; concrete evidence; TradingView-based technical context when applicable; conditional bull and bear scenarios; what to watch next; exactly one natural question. Keep paragraphs mobile-first.
+Use ONLY supplied verified evidence. Never invent a headline, source, price, volume, target, stop, creator call or outcome. If evidence for a target/SL is missing, omit it. Never promise profit or claim a coin WILL pump/moon/10x/20x. For 10x/20x discussions, make the scenario conditional and explain the required price/market-cap conditions when data is available.
+If a public creator signal is supplied, clearly separate their original call from our measured outcome and attribute it; never claim we predicted their move. Do not imitate creators. Optimize for usefulness, curiosity and conversation rather than empty hype.
+After generating the five candidates, score each on hook strength, evidence density, usefulness, originality, conversation quality, mobile readability and risk discipline. Select the strongest and rewrite it once without adding new facts.
+Hook ideas (do not copy mechanically): {json.dumps(hooks,ensure_ascii=False)}''','selection_criteria':['stop-scroll strength','specificity','evidence density','usefulness','conversation quality','originality','mobile readability','scenario clarity','risk discipline','format diversity']}
+    p['candidate_generation_4']=prompt; PREFLIGHT.write_text(json.dumps(p,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps({'status':'OK','version':'4.2','format':fmt,'symbol':sym,'candidate_count':5},indent=2))
 if __name__=='__main__':main()
