@@ -49,6 +49,8 @@ jobs:
           if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
       - name: Creator 4.0 Content Director
         run: python src/content_director_4.py
+      - name: Creator 4.0 Script Director
+        run: python src/script_director_4.py
       - name: Run growth and engagement intelligence
         run: |
           python src/signal_outcome_tracker.py
@@ -177,6 +179,7 @@ jobs:
         run: |
           echo '=== PIPELINE STATUS ==='; test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
           echo '=== CONTENT DIRECTOR ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
+          echo '=== SCRIPT DIRECTOR ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
           echo '=== PUBLICATION GATE ==='; test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
       - name: Persist state
         if: always()
