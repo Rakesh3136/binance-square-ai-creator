@@ -51,6 +51,8 @@ jobs:
         run: python src/content_director_4.py
       - name: Creator 4.0 Script Director
         run: python src/script_director_4.py
+      - name: Creator 4.0 Candidate Generation Brief
+        run: python src/candidate_generation_4.py
       - name: Run growth and engagement intelligence
         run: |
           python src/signal_outcome_tracker.py
@@ -94,6 +96,14 @@ jobs:
           if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
           if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
           exit 0
+      - name: Generate and score 4.0 candidate scripts
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.6-flash
+          GEMINI_DAILY_BUDGET: '20'
+        run: |
+          python src/candidate_generation_4.py
+          python src/candidate_script_scorer_4.py
       - name: Setup Node and Playwright
         uses: actions/setup-node@v4
         with:
@@ -180,6 +190,7 @@ jobs:
           echo '=== PIPELINE STATUS ==='; test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
           echo '=== CONTENT DIRECTOR ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
           echo '=== SCRIPT DIRECTOR ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
+          echo '=== CANDIDATE SCORECARD ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
           echo '=== PUBLICATION GATE ==='; test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
       - name: Persist state
         if: always()
