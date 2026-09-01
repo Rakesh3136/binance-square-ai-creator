@@ -1,10 +1,10 @@
-"""Bounded production manager for Binance Square.
+"""Bounded production manager for Binance Square Creator 4.1.
 
-The manager is final publication authority. Autonomous market posts always
-require a verified TradingView visual and are never allowed to degrade to text.
+Final publication authority: only a fresh, coherent draft with a verified
+TradingView chart and a valid primary cashtag can be published.
 """
 from __future__ import annotations
-import json, os, subprocess, sys
+import json, os, subprocess, sys, re
 from datetime import datetime
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
@@ -13,8 +13,8 @@ QUALITY_THRESHOLD=68.0; OPPORTUNITY_THRESHOLD=60.0; RESCUE_QUALITY_THRESHOLD=75.
 
 def load(path:Path,default=None):
     if not path.exists(): return default if default is not None else {}
-    try: return json.loads(path.read_text(encoding='utf-8'))
-    except Exception: return default if default is not None else {}
+    try:return json.loads(path.read_text(encoding='utf-8'))
+    except Exception:return default if default is not None else {}
 
 def fresh_report():
     reports=sorted(REPORT_DIR.glob('*-multi-agent.json'),key=lambda p:p.stat().st_mtime,reverse=True)
@@ -23,8 +23,7 @@ def fresh_report():
     return report if datetime.now().timestamp()-report.stat().st_mtime<=MAX_AGE_SECONDS else None
 
 def output(publish:bool,mode='image'):
-    with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as out:
-        out.write(f"publish={'true' if publish else 'false'}\nmode={mode}\n")
+    with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as out:out.write(f"publish={'true' if publish else 'false'}\nmode={mode}\n")
 
 def set_fallback_status():
     STATUS_PATH.parent.mkdir(parents=True,exist_ok=True)
@@ -37,35 +36,39 @@ def opportunity_score(data):
             for k in keys:
                 try:v=float(obj.get(k) or 0)
                 except:v=0
-                if v>0: vals.append(v)
+                if v>0:vals.append(v)
     return max(vals,default=0.0)
 
+def authoritative_symbol(data):
+    pre=load(PREFLIGHT_PATH,{ }); selected=pre.get('selected_opportunity') or {}
+    values=[selected.get('symbol'),selected.get('topic'),(pre.get('content_director_4') or {}).get('primary_story',{}).get('symbol'),(data.get('draft') or {}).get('symbol')]
+    for value in values:
+        s=re.sub(r'USDT$','',str(value or '').upper().replace('$','').strip())
+        if re.fullmatch(r'[A-Z0-9]{2,15}',s):return s
+    return ''
+
 def visual_is_verified(expected_symbol=''):
-    """Verify both chart provenance and chart/asset synchronization."""
     meta=load(VISUAL_META,{})
-    if not (meta.get('provider')=='TradingView' and meta.get('status')=='TRADINGVIEW_CREATED' and VISUAL.exists() and VISUAL.stat().st_size>=1000):
-        return False
+    ok=(meta.get('provider')=='TradingView' and meta.get('status')=='TRADINGVIEW_CREATED' and meta.get('visual_mode')=='TRADINGVIEW_CHART_ONLY' and meta.get('overlays') is False and VISUAL.exists() and VISUAL.stat().st_size>=1000)
+    if not ok:return False
     if expected_symbol:
         expected=f"BINANCE:{expected_symbol.upper().replace('USDT','')}USDT"
         actual=str(meta.get('tradingview_symbol') or meta.get('symbol') or '').upper()
-        if actual != expected:
-            print(f"Production manager: refusing publication because chart asset is {actual!r}, expected {expected!r}.")
-            return False
+        if actual!=expected:
+            print(f"Production manager: chart is {actual!r}, expected {expected!r}.");return False
+    return True
+
+def content_is_coherent(post, expected_symbol):
+    if not post or not expected_symbol:return False
+    if '$.' in post or re.search(r'\$\s*(?:is|has|setup|moved)',post,re.I):return False
+    if f'${expected_symbol}' not in post.upper():return False
+    if post.count('?')!=1:return False
     return True
 
 def evaluate(report:Path):
     data=load(report,{ }); draft=data.get('draft') or {}; visual=dict(data.get('visual_plan') or {}); post=str(draft.get('post') or draft.get('text') or '').strip(); rescue=data.get('publish_rescue') is True
-    # The authoritative asset is the frozen/preflight symbol. Never allow a
-    # downstream rescue to switch the asset after TradingView rendering.
-    pre=load(PREFLIGHT_PATH,{})
-    selected=pre.get('selected_opportunity') or data.get('selected_editorial_lane') or {}
-    expected_symbol=str(selected.get('symbol') or selected.get('topic') or draft.get('symbol') or '').upper().replace('USDT','') if isinstance(selected,dict) else str(draft.get('symbol') or '').upper().replace('USDT','')
-    if not expected_symbol:
-        expected_symbol=str(draft.get('symbol') or '').upper().replace('USDT','')
-
-    # Market publication policy is stronger than the AI's optional visual plan.
-    # The workflow already renders TradingView for every autonomous market run,
-    # so force the verified chart into the publication decision and image mode.
+    expected_symbol=authoritative_symbol(data)
+    pre=load(PREFLIGHT_PATH,{ }); selected=pre.get('selected_opportunity') or data.get('selected_editorial_lane') or {}
     visual.update({'type':'candlestick_chart','use_visual':True,'provider':'TradingView'})
     try:
         from engagement_quality_gate import evaluate as interaction_evaluate
@@ -75,26 +78,26 @@ def evaluate(report:Path):
     try:quality=float(draft.get('quality_score') or interaction.get('score') or 0)
     except:quality=float(interaction.get('score') or 0)
     opportunity=opportunity_score(data); intelligence=load(INTEL_PATH,{ }); intelligence_ok=intelligence.get('publish_recommendation') is True
-    chart_ok=visual_is_verified(expected_symbol)
+    chart_ok=visual_is_verified(expected_symbol); coherent=content_is_coherent(post,expected_symbol)
     if rescue:
-        eligible=bool(post) and quality>=RESCUE_QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok
+        eligible=bool(post) and coherent and quality>=RESCUE_QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok
     else:
-        eligible=bool(post) and quality>=QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and intelligence_ok and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' and chart_ok
+        eligible=bool(post) and coherent and quality>=QUALITY_THRESHOLD and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and intelligence_ok and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' and chart_ok
     mode='image'
-    audit={'draft':str(report),'publish':eligible,'attempt':'rescue' if rescue else 'normal','quality_score':quality,'quality_threshold':RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD,'opportunity_score':opportunity,'opportunity_threshold':OPPORTUNITY_THRESHOLD,'creator_status':load(STATUS_PATH,{}).get('status'),'creator_intelligence_2':intelligence,'interaction_gate':interaction,'mode':mode,'tradingview_required':True,'tradingview_verified':chart_ok,'chart_expected_symbol':expected_symbol,'rescue':rescue,'reason':'publish_eligible' if eligible else 'gate_rejected'}
-    AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False),encoding='utf-8'); GATE_PATH.parent.mkdir(parents=True,exist_ok=True); GATE_PATH.write_text(json.dumps(interaction,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(audit,indent=2,ensure_ascii=False)); return eligible,mode
+    audit={'draft':str(report),'publish':eligible,'attempt':'rescue' if rescue else 'normal','quality_score':quality,'quality_threshold':RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD,'opportunity_score':opportunity,'opportunity_threshold':OPPORTUNITY_THRESHOLD,'creator_status':load(STATUS_PATH,{}).get('status'),'creator_intelligence_2':intelligence,'interaction_gate':interaction,'mode':mode,'tradingview_required':True,'tradingview_verified':chart_ok,'chart_expected_symbol':expected_symbol,'content_coherent':coherent,'rescue':rescue,'reason':'publish_eligible' if eligible else 'gate_rejected'}
+    AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False),encoding='utf-8'); GATE_PATH.parent.mkdir(parents=True,exist_ok=True); GATE_PATH.write_text(json.dumps(interaction,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
 
 def main():
     report=fresh_report()
-    if not report: output(False); print(json.dumps({'publish':False,'reason':'no fresh draft within 20 minutes'})); return 0
+    if not report:output(False);print(json.dumps({'publish':False,'reason':'no fresh draft within 20 minutes'}));return 0
     publish,mode=evaluate(report)
-    if publish: output(True,mode); print('Production manager: draft passed and verified TradingView evidence is mandatory.'); return 0
+    if publish:output(True,mode);print('Production manager: coherent draft and chart-only TradingView evidence verified.');return 0
     print('Production manager: normal gate rejected; running one bounded rescue.')
     rescue=subprocess.run([sys.executable,str(ROOT/'src/publish_rescue.py')],cwd=ROOT,check=False)
-    if rescue.returncode!=0: output(False); print('Production manager: rescue failed; no publication.'); return 0
-    set_fallback_status(); report=fresh_report()
-    if not report: output(False); print('Production manager: rescue produced no fresh report; no publication.'); return 0
+    if rescue.returncode!=0:output(False);print('Production manager: rescue failed; no publication.');return 0
+    set_fallback_status();report=fresh_report()
+    if not report:output(False);print('Production manager: rescue produced no fresh report; no publication.');return 0
     publish,mode=evaluate(report)
-    if publish: output(True,mode); print('Production manager: rescue passed with verified TradingView evidence.'); return 0
-    output(False); print('Production manager: final evidence checks failed; no publication.'); return 0
-if __name__=='__main__': raise SystemExit(main())
+    if publish:output(True,mode);print('Production manager: rescue passed with coherent content and verified chart-only TradingView evidence.');return 0
+    output(False);print('Production manager: final evidence checks failed; no publication.');return 0
+if __name__=='__main__':raise SystemExit(main())
