@@ -10,6 +10,11 @@ on:
         required: false
         default: ''
         type: string
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/autonomous-market-creator.yml'
 
 env:
   PYTHONUNBUFFERED: '1'
@@ -36,7 +41,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Reset production cycle
-        run: python src/pipeline_stage.py reset 'Fresh Creator 4.0 production cycle'
+        run: python src/pipeline_stage.py reset 'Fresh Creator 4.2 production cycle'
       - name: Refresh live market
         run: python src/live_market_scanner.py
       - name: Run creator intelligence
@@ -47,11 +52,11 @@ jobs:
         run: |
           python src/editorial_preflight.py
           if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
-      - name: Creator 4.0 Content Director
+      - name: Creator 4.2 Content Director
         run: python src/content_director_4.py
-      - name: Creator 4.0 Script Director
+      - name: Creator 4.2 Script Director
         run: python src/script_director_4.py
-      - name: Creator 4.0 Candidate Generation Brief
+      - name: Creator 4.2 Candidate Generation Brief
         run: python src/candidate_generation_4.py
       - name: Run growth and engagement intelligence
         run: |
@@ -65,7 +70,7 @@ jobs:
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
-          python src/pipeline_stage.py creator_brain success 'Creator 4.0 Brain decision completed'
+          python src/pipeline_stage.py creator_brain success 'Creator 4.2 Brain decision completed'
       - name: Prepare publication context
         run: |
           python src/publication_context.py
@@ -96,7 +101,7 @@ jobs:
           if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
           if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
           exit 0
-      - name: Generate and score 4.0 candidate scripts
+      - name: Generate and score 4.2 candidate scripts
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -198,6 +203,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add analytics data/live data/intelligence
-          git diff --cached --quiet || git commit -m 'Record Creator 4.0 cycle'
+          git diff --cached --quiet || git commit -m 'Record Creator 4.2 cycle'
           git pull --rebase --autostash origin main
           git push origin main || true
