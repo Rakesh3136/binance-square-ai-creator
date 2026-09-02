@@ -2,101 +2,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
 import { chromium } from 'playwright';
-
-const LIVE_VISUAL='data/live/visual.png', META='data/live/visual_metadata.json', ROOT=process.cwd();
-
-function base(s){
-  return String(s||'').toUpperCase().trim()
-    .replace(/^BINANCE:/,'').replace(/USDT$/,'').replace(/[^A-Z0-9]/g,'');
-}
-function tvSymbol(s){
-  const b=base(s);
-  if(b==='XAUUSD'||b==='GOLD') return 'OANDA:XAUUSD';
-  if(b==='XAGUSD'||b==='SILVER') return 'OANDA:XAGUSD';
-  return `BINANCE:${b}USDT`;
-}
+const LIVE_VISUAL='data/live/visual.png',META='data/live/visual_metadata.json',ROOT=process.cwd();
+function base(s){return String(s||'').toUpperCase().trim().replace(/^BINANCE:/,'').replace(/USDT$/,'').replace(/[^A-Z0-9]/g,'');}
+function tvSymbol(s){const b=base(s);if(b==='XAUUSD'||b==='GOLD')return 'OANDA:XAUUSD';if(b==='XAGUSD'||b==='SILVER')return 'OANDA:XAGUSD';return `BINANCE:${b}USDT`;}
 async function load(rel){try{return JSON.parse(await fs.readFile(path.resolve(ROOT,rel),'utf8'));}catch{return {};}}
-async function latestReport(){
-  try{
-    const d=path.resolve(ROOT,'data/reports');
-    const n=(await fs.readdir(d)).filter(x=>x.endsWith('-multi-agent.json'));
-    const a=await Promise.all(n.map(async x=>({x,m:(await fs.stat(path.join(d,x))).mtimeMs})));
-    a.sort((p,q)=>q.m-p.m);
-    return a.length?load(path.join('data/reports',a[0].x)):{};
-  }catch{return {};}
-}
-function uniq(a){return [...new Set(a.map(base).filter(x=>/^[A-Z0-9]{2,15}$/.test(x)))];}
-
-function chooseSymbols(frozen,pre,ctx,report,brief){
-  const selected=pre.selected_opportunity||{};
-  const authoritative=base(
-    frozen.symbol || frozen.symbol_usdt ||
-    selected.symbol || selected.symbol_usdt || selected.selected_lane_symbol || selected.topic ||
-    ctx.symbol || ctx.symbol_usdt || report.draft?.symbol || report.draft?.symbol_usdt ||
-    brief.symbol || brief.symbol_usdt || brief.primary_story?.symbol
-  );
-
-  // Publication context is expected to carry the chart package. Prefer it,
-  // but always keep the frozen primary asset as the first chart.
-  const planned=ctx.chart_symbols||ctx.visual_decision?.chart_symbols||
-    brief.chart_symbols||brief.primary_story?.chart_symbols||[];
-  let pair=uniq([authoritative,...planned]);
-
-  const isNews=Boolean(selected.news_title||ctx.news_title||brief.primary_story?.news_title);
-  if(isNews && pair.length<2){
-    // Only add BTC when the news story has no second verified asset. This is
-    // a chart package fallback, not a claim that BTC is part of the story.
-    pair=uniq([authoritative,'BTC']);
-  }
-
-  if(!authoritative && !pair.length){
-    throw new Error(`No authoritative symbol available for TradingView capture; frozen=${JSON.stringify({symbol:frozen.symbol||'',symbol_usdt:frozen.symbol_usdt||''})}; preflight=${JSON.stringify({symbol:selected.symbol||'',symbol_usdt:selected.symbol_usdt||'',topic:selected.topic||''})}; context=${JSON.stringify({symbol:ctx.symbol||'',symbol_usdt:ctx.symbol_usdt||'',chart_symbols:ctx.chart_symbols||[]})}`);
-  }
-  if(!pair.length) throw new Error('No usable TradingView symbols available');
-  return pair.slice(0,2);
-}
-
-function widget(sym,w,h){
-  const tv=tvSymbol(sym);
-  return `<div style="width:${w}px;height:${h}px"><div class="tradingview-widget-container" style="width:100%;height:100%"><div class="tradingview-widget-container__widget" style="width:100%;height:100%"></div><script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>{"autosize":false,"symbol":${JSON.stringify(tv)},"interval":"60","timezone":"Etc/UTC","theme":"dark","style":"1","locale":"en","allow_symbol_change":false,"calendar":false,"support_host":"https://www.tradingview.com","width":${w},"height":${h},"hide_top_toolbar":true,"hide_side_toolbar":true,"hide_legend":false,"withdateranges":false,"save_image":false,"studies":["Volume@tv-basicstudies","RSI@tv-basicstudies"]}</script></div></div>`;
-}
-
-async function main(){
-  const frozen=await load('data/live/authoritative_opportunity.json');
-  const pre=await load('data/live/editorial_preflight.json');
-  const ctx=await load('data/live/publication_context.json');
-  const report=await latestReport();
-  const brief=await load('data/live/content_director_brief.json');
-  const syms=chooseSymbols(frozen,pre,ctx,report,brief);
-  const W=1800,H=900,pair=syms.length>1,cells=syms.map(s=>widget(s,pair?900:1800,H)).join('');
-  const html=`<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;width:${W}px;height:${H}px;background:#131722;overflow:hidden}body{display:flex}</style></head><body>${cells}</body></html>`;
-  await fs.mkdir('data/live',{recursive:true});
-  await fs.writeFile(path.resolve('data/live/tradingview_capture.html'),html,'utf8');
-  const server=http.createServer(async(req,res)=>{
-    try{if(req.url!=='/'){res.writeHead(404);return res.end();}res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store'});res.end(await fs.readFile(path.resolve('data/live/tradingview_capture.html')));}
-    catch(e){res.writeHead(500);res.end(String(e));}
-  });
-  await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  const port=server.address().port;
-  const browser=await chromium.launch({headless:true,args:['--disable-blink-features=AutomationControlled','--disable-dev-shm-usage']});
-  const page=await browser.newPage({viewport:{width:W,height:H},deviceScaleFactor:1});
-  page.on('console',m=>console.log(`[TradingView] ${m.type()}: ${m.text()}`));
-  page.on('pageerror',e=>console.log(`[TradingView] pageerror: ${e.message}`));
-  try{
-    await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'domcontentloaded',timeout:30000});
-    await page.waitForSelector('iframe',{timeout:30000});
-    await page.waitForTimeout(45000);
-    const boxes=await page.locator('iframe').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height,src:e.src||''};}));
-    const usable=boxes.filter(b=>b.width>=700&&b.height>=600);
-    if(usable.length<syms.length) throw new Error(`TradingView iframes not usable: ${JSON.stringify(boxes)}`);
-    const bad=await page.evaluate(()=>document.querySelectorAll('[id="level-panel"],[id="story-panel"],[id="news-panel"],[id="question-panel"]').length);
-    if(bad) throw new Error('Custom overlay detected in chart-only renderer');
-    await page.screenshot({path:path.resolve(LIVE_VISUAL),type:'png',fullPage:false});
-    const stat=await fs.stat(LIVE_VISUAL);
-    if(stat.size<40000) throw new Error(`TradingView screenshot too small: ${stat.size} bytes`);
-    const meta={status:'TRADINGVIEW_CREATED',provider:'TradingView',tradingview_symbols:syms.map(tvSymbol),timeframe:'1H',visual_mode:pair?'TRADINGVIEW_CHART_PAIR':'TRADINGVIEW_CHART_ONLY',overlays:false,iframe_boxes:boxes,bytes:stat.size,output:LIVE_VISUAL};
-    await fs.writeFile(path.resolve(META),JSON.stringify(meta,null,2));
-    console.log(JSON.stringify({status:'OK',symbols:syms,mode:pair?'PAIR':'SINGLE',bytes:stat.size},null,2));
-  }finally{await browser.close();server.close();}
-}
-main().catch(e=>{console.error(e.stack||e);process.exit(1);});
+async function latestReport(){try{const d=path.resolve(ROOT,'data/reports');const n=(await fs.readdir(d)).filter(x=>x.endsWith('-multi-agent.json'));const a=await Promise.all(n.map(async x=>({x,m:(await fs.stat(path.join(d,x))).mtimeMs})));a.sort((p,q)=>q.m-p.m);return a.length?load(path.join('data/reports',a[0].x)):{};}catch{return {};}}
+function uniq(a){return [...new Set(a.map(base).filter(x=>/^[A-Z0-9]{1,15}$/.test(x)))];}
+function chooseSymbols(frozen,pre,ctx,report,brief){const selected=pre.selected_opportunity||{};const authoritative=base(frozen.symbol||frozen.symbol_usdt||selected.symbol||selected.symbol_usdt||selected.selected_lane_symbol||selected.topic||ctx.symbol||ctx.symbol_usdt||report.draft?.symbol||report.draft?.symbol_usdt||brief.symbol||brief.symbol_usdt||brief.primary_story?.symbol);const planned=ctx.chart_symbols||ctx.visual_decision?.chart_symbols||brief.chart_symbols||brief.primary_story?.chart_symbols||[];let pair=uniq([authoritative,...planned]);const isNews=Boolean(selected.news_title||ctx.news_title||brief.primary_story?.news_title);if(isNews&&pair.length<2)pair=uniq([authoritative,'BTC']);if(!authoritative&&!pair.length)throw new Error(`No authoritative symbol available for TradingView capture; frozen=${JSON.stringify({symbol:frozen.symbol||'',symbol_usdt:frozen.symbol_usdt||''})}; preflight=${JSON.stringify({symbol:selected.symbol||'',symbol_usdt:selected.symbol_usdt||'',topic:selected.topic||''})}; context=${JSON.stringify({symbol:ctx.symbol||'',symbol_usdt:ctx.symbol_usdt||'',chart_symbols:ctx.chart_symbols||[]})}`);if(!pair.length)throw new Error('No usable TradingView symbols available');return pair.slice(0,2);}
+function widget(sym,w,h){const tv=tvSymbol(sym);return `<div style="width:${w}px;height:${h}px"><div class="tradingview-widget-container" style="width:100%;height:100%"><div class="tradingview-widget-container__widget" style="width:100%;height:100%"></div><script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>{"autosize":false,"symbol":${JSON.stringify(tv)},"interval":"60","timezone":"Etc/UTC","theme":"dark","style":"1","locale":"en","allow_symbol_change":false,"calendar":false,"support_host":"https://www.tradingview.com","width":${w},"height":${h},"hide_top_toolbar":true,"hide_side_toolbar":true,"hide_legend":false,"withdateranges":false,"save_image":false,"studies":["Volume@tv-basicstudies","RSI@tv-basicstudies"]}</script></div></div>`;}
+async function main(){const frozen=await load('data/live/authoritative_opportunity.json'),pre=await load('data/live/editorial_preflight.json'),ctx=await load('data/live/publication_context.json'),report=await latestReport(),brief=await load('data/live/content_director_brief.json');const syms=chooseSymbols(frozen,pre,ctx,report,brief),W=1800,H=900,pair=syms.length>1,cells=syms.map(s=>widget(s,pair?900:1800,H)).join('');const html=`<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;width:${W}px;height:${H}px;background:#131722;overflow:hidden}body{display:flex}</style></head><body>${cells}</body></html>`;await fs.mkdir('data/live',{recursive:true});await fs.writeFile(path.resolve('data/live/tradingview_capture.html'),html,'utf8');const server=http.createServer(async(req,res)=>{try{if(req.url!=='/'){res.writeHead(404);return res.end();}res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store'});res.end(await fs.readFile(path.resolve('data/live/tradingview_capture.html')));}catch(e){res.writeHead(500);res.end(String(e));}});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port,browser=await chromium.launch({headless:true,args:['--disable-blink-features=AutomationControlled','--disable-dev-shm-usage']}),page=await browser.newPage({viewport:{width:W,height:H},deviceScaleFactor:1});page.on('console',m=>console.log(`[TradingView] ${m.type()}: ${m.text()}`));page.on('pageerror',e=>console.log(`[TradingView] pageerror: ${e.message}`));try{await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'domcontentloaded',timeout:30000});await page.waitForSelector('iframe',{timeout:30000});await page.waitForTimeout(45000);const boxes=await page.locator('iframe').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height,src:e.src||''};}));const usable=boxes.filter(b=>b.width>=700&&b.height>=600);if(usable.length<syms.length)throw new Error(`TradingView iframes not usable: ${JSON.stringify(boxes)}`);const bad=await page.evaluate(()=>document.querySelectorAll('[id="level-panel"],[id="story-panel"],[id="news-panel"],[id="question-panel"]').length);if(bad)throw new Error('Custom overlay detected in chart-only renderer');await page.screenshot({path:path.resolve(LIVE_VISUAL),type:'png',fullPage:false});const stat=await fs.stat(LIVE_VISUAL);if(stat.size<40000)throw new Error(`TradingView screenshot too small: ${stat.size} bytes`);const meta={status:'TRADINGVIEW_CREATED',provider:'TradingView',tradingview_symbols:syms.map(tvSymbol),timeframe:'1H',visual_mode:pair?'TRADINGVIEW_CHART_PAIR':'TRADINGVIEW_CHART_ONLY',overlays:false,iframe_boxes:boxes,bytes:stat.size,output:LIVE_VISUAL};await fs.writeFile(path.resolve(META),JSON.stringify(meta,null,2));console.log(JSON.stringify({status:'OK',symbols:syms,mode:pair?'PAIR':'SINGLE',bytes:stat.size},null,2));}finally{await browser.close();server.close();}}main().catch(e=>{console.error(e.stack||e);process.exit(1);});
