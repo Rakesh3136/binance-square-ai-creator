@@ -9,6 +9,12 @@ def load(path,default):
         value=json.loads(path.read_text(encoding='utf-8')); return value if isinstance(value,type(default)) else default
     except Exception:return default
 
+def save_status(status,message,**extra):
+    payload={'status':status,'message':message,'updated_at':datetime.now(timezone.utc).isoformat()}
+    payload.update(extra)
+    STATUS.parent.mkdir(parents=True,exist_ok=True)
+    STATUS.write_text(json.dumps(payload,indent=2,ensure_ascii=False),encoding='utf-8')
+
 def latest_report():
     reports=sorted(REPORT_DIR.glob('*-multi-agent.json'),key=lambda p:p.stat().st_mtime,reverse=True)
     return reports[0] if reports else None
