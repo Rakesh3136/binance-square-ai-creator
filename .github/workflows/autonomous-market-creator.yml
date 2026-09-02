@@ -119,12 +119,12 @@ jobs:
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Render TradingView chart
+      - name: Render TradingView chart package
         run: |
           python src/visual_renderer.py
           test -s data/live/visual.png
-          python src/pipeline_stage.py visual success 'TradingView chart rendered'
-      - name: Validate TradingView chart
+          python src/pipeline_stage.py visual success 'TradingView visual package rendered'
+      - name: Validate TradingView chart package
         run: |
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
@@ -163,24 +163,40 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
         run: python src/workflow_helpers.py extract
-      - name: Final image validation
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
+      - name: Prepare article title
+        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'article' }}
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          ctx=json.loads(Path('data/live/publication_context.json').read_text())
+          title=ctx.get('article_title') or ctx.get('news_title') or 'Crypto Market Update'
+          Path('data/live/article_title.txt').write_text(title[:180],encoding='utf-8')
+          PY
+      - name: Final TradingView validation
+        if: ${{ steps.gate.outputs.publish == 'true' }}
         run: |
           test -s data/live/visual.png
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
       - name: Download Binance Square publisher
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
+        if: ${{ steps.gate.outputs.publish == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
       - name: Publish to Binance Square
         id: publish
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'image' }}
+        if: ${{ steps.gate.outputs.publish == 'true' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
           set -o pipefail
-          python src/pipeline_stage.py publish running 'Publishing validated TradingView image'
-          node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
+          mode='${{ steps.gate.outputs.mode }}'
+          if [ "$mode" = 'article' ]; then
+            python src/pipeline_stage.py publish running 'Publishing verified TradingView article with cover'
+            node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --title "$(cat data/live/article_title.txt)" --cover data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
+          else
+            python src/pipeline_stage.py publish running 'Publishing validated TradingView image post'
+            node binance-skills-hub/skills/binance/square-post/scripts/post-image.mjs --images data/live/visual.png --text "$(cat data/live/publish_text.txt)" 2>&1 | tee /tmp/publish-result.txt
+          fi
           grep -q '^ID:' /tmp/publish-result.txt
           python src/pipeline_stage.py publish success 'Binance Square returned a post ID'
           python src/pipeline_stage.py verify-publish
@@ -196,6 +212,7 @@ jobs:
         run: |
           echo '=== PIPELINE STATUS ==='; test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
           echo '=== NEWS SNAPSHOT ==='; test -f data/live/news_snapshot.json && cat data/live/news_snapshot.json || true
+          echo '=== PUBLICATION CONTEXT ==='; test -f data/live/publication_context.json && cat data/live/publication_context.json || true
           echo '=== CONTENT DIRECTOR ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
           echo '=== SCRIPT DIRECTOR ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
           echo '=== CANDIDATE SCORECARD ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
