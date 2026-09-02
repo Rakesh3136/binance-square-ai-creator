@@ -85,6 +85,16 @@ def main():
     if any(g in hook for g in GENERIC_HOOKS): failures.append("generic_repetitive_hook")
 
     selected_news=bool(selected.get("news_title") or context.get("news_title"))
+    # When news is authoritative, prevent the model from inventing unrelated cashtags.
+    allowed_news_symbols=set()
+    for raw in (selected.get("news_symbols") or []):
+        sx=symbol_of(raw)
+        if sx: allowed_news_symbols.add(sx)
+    allowed_symbols={sym} | allowed_news_symbols
+    cashtags={m.upper() for m in re.findall(r"\$([A-Z][A-Z0-9]{0,14})\b", text.upper())}
+    foreign=sorted(x for x in cashtags if x not in allowed_symbols)
+    if selected_news and foreign:
+        failures.append("foreign_cashtag_not_supported_by_story:" + ",".join(foreign))
     if selected_news:
         title=str(selected.get("news_title") or context.get("news_title") or "").strip()
         if title and title.lower() not in text.lower():
