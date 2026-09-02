@@ -22,10 +22,13 @@ GOAL: maximize genuine attention, useful interaction, follower growth and eligib
 
 MONETIZATION & ATTRIBUTION: Include the natural cashtag for the primary tradeable asset discussed (e.g. $TRUMP, $BTC, $ETH) in the text.
 VISUAL-FIRST: For a single-asset market story, prefer a REAL Binance 1h candlestick chart. Use only real OHLCV-derived levels/patterns. Never invent a pattern or level.
-WRITING: Normal target 180-500 characters; hard maximum 750. First line creates curiosity. Use 2-5 short mobile-friendly lines. Sound conversational, not like a financial report. Do not automatically provide TP/SL/entry calls.
-INTERACTION: End with exactly ONE low-friction question answerable in under five seconds. Avoid generic "What do you think?" and never beg for likes/follows.
-STYLE ROTATION: Do not reuse the same opening cadence, editorial_style, or paragraph structure as the immediately previous post. Prefer visibly different structures such as CHOICE, CHART CHALLENGE, COIN VS COIN, DATA SURPRISE, BREAKOUT/FAKEOUT, NEWS REACTION, LIQUIDATION STORY, TOP MOVERS, quick observation, or mini-story.
-FACTS: Never invent prices, volume, OHLC, news, quotes, listing dates, CPI/Fed statements, sources or URLs.
+WRITING: Target 300-700 characters for normal posts; hard maximum 900. Write like a sharp human crypto newsroom/editor, not a ticker bot. The first 1-2 lines must contain the concrete reason the story matters NOW. Use varied sentence length, specific nouns/verbs, and short mobile paragraphs. Never pad with "fresh check", "quick market check", or generic filler.
+NEWS MODE: When the selected opportunity contains verified news, the post MUST be news-first: state the actual event, identify the source naturally, explain why it matters, then connect it to the affected asset/market. Never convert a news story into a generic percentage-move recap. For macro stories, explain the transmission into crypto. When no material news is selected, do not manufacture a news angle.
+TECHNICAL MODE: When the story is a chart setup, explain the setup using current verified OHLCV evidence. Give support/resistance/trigger/target/invalidation only when supported. Prefer a clear bull/bear scenario over empty hype.
+COMPARISON MODE: For related assets, build the narrative around the relationship (e.g. Gold vs Silver, BTC vs ETH) and use a pair of real TradingView charts when helpful. Never pretend the second asset is part of the catalyst unless verified.
+INTERACTION: End with exactly ONE low-friction question that is specific to the story. Avoid generic "What do you think?" and never beg for likes/follows.
+STYLE ROTATION: Do not reuse the same opening cadence, editorial_style, or paragraph structure as the immediately previous post. Rotate among NEWSROOM, ANALYST, CONVERSATIONAL, CONTRARIAN, DATA, COMPARISON, CHART CHALLENGE, LIQUIDATION STORY, BREAKOUT/FAKEOUT, FOLLOW-UP and MINI-STORY.
+FACTS: Never invent prices, volume, OHLC, news, quotes, listing dates, CPI/Fed statements, sources, URLs, creator calls, targets or outcomes. If a fact is not in the supplied evidence, omit it.
 Return ONLY valid JSON with research, critique, draft and visual_plan fields.'''
 
 
@@ -209,34 +212,31 @@ def local_market_fallback(live, preflight, memory):
         hook = f"One detail on ${symbol} is easy to miss: {intraday:.1f}% intraday range."
         detail = f"Last ${last:.8g} • {fmt_money(volume)} spot volume" if volume else f"Last ${last:.8g}"
         question = f"Is ${symbol} setting up, or simply getting noisy?"
-        style = "fallback_quick_observation"
-
-    text = "\n".join(x for x in (hook, detail, question) if x)
-    return {
-        "research": {"summary": "Quota-safe draft built only from the verified live market snapshot.", "strongest_signal": symbol, "source_mode": "local_fallback", "opportunity_score": float(selected.get("adjusted_score") or 80)},
-        "critique": {"summary": "Gemini was unavailable; deterministic editorial fallback preserved verified market facts.", "reason": "gemini_quota_or_rate_limit", "revised_opportunity_score": float(selected.get("adjusted_score") or 80)},
-        "draft": {"post": text[:740], "text": text[:740], "hook": hook, "discussion_question": question, "quality_score": 82, "editorial_style": style, "generation_mode": "LOCAL_FALLBACK", "experiment_id": exp_id, "experiment_format": exp_format},
-        "visual_plan": {"type": "candlestick_chart", "use_visual": bool(candles), "title": f"{symbol}: real 1H market structure", "data_points": [{"symbol": symbol}], "purpose": "Show real OHLCV structure, observed levels and detected patterns."}
-    }
-
-
-def local_news_fallback(news):
-    articles = [x for x in (news.get("articles") or []) if isinstance(x, dict)]
+        style = "fallback_quick_def local_news_fallback(news):
+    articles = [x for x in (news.get("articles") or []) if isinstance(x, dict) and str(x.get("title") or "").strip()]
     if not articles:
         return None
-    article = articles[0]
-    title = str(article.get("title") or article.get("headline") or "").strip()
-    if not title:
-        return None
-    text = f"This is the crypto story I’m watching right now:\n{title}\n\nBullish catalyst or headline noise?"
+    article = sorted(articles, key=lambda x: (float(x.get("news_score") or 0), str(x.get("published_at") or "")), reverse=True)[0]
+    title = str(article.get("title") or "").strip()
+    source = str(article.get("source") or "").strip()
+    symbols = article.get("symbols") or []
+    symbol = str(symbols[0] if symbols else "").upper().replace("USDT","")
+    source_line = f"Source: {source}" if source else "Source: verified news feed"
+    if symbol:
+        hook = "🚨 $" + symbol + ": " + title
+        visual = {"type":"candlestick_chart","use_visual":True}
+    else:
+        hook = "🚨 " + title
+        visual = {"type":"market_comparison","use_visual":True}
+    body = hook + "\n\n" + source_line + "\n\nWhy it matters: the market reaction is what we need to watch next."
+    question = "Does this change your view on $" + symbol + "?" if symbol else "Headline catalyst or temporary noise?"
+    text = (body + "\n\n" + question)[:880]
     return {
-        "research": {"summary": "Quota-safe news draft built from the latest supplied news snapshot.", "source_mode": "local_news_fallback", "opportunity_score": 80},
-        "critique": {"summary": "Gemini unavailable; kept the supplied headline unchanged rather than inventing context.", "revised_opportunity_score": 80},
-        "draft": {"post": text[:740], "text": text[:740], "hook": "This is the crypto story I’m watching right now:", "discussion_question": "Bullish catalyst or headline noise?", "quality_score": 78, "editorial_style": "fallback_news", "generation_mode": "LOCAL_FALLBACK"},
-        "visual_plan": {"type": "none", "use_visual": False}
+        "research": {"summary":"Fresh verified headline selected from news snapshot.", "source_mode":"local_news_fallback", "strongest_signal":symbol or "macro", "opportunity_score":90},
+        "critique": {"summary":"News-first fallback preserved the supplied event and source without inventing details.", "revised_opportunity_score":90},
+        "draft": {"post":text,"text":text,"hook":hook,"discussion_question":question,"quality_score":86,"editorial_style":"fallback_newsroom","generation_mode":"LOCAL_FALLBACK","symbol":symbol},
+        "visual_plan": visual
     }
-
-
 def call_creator(client, prompt):
     response = client.interactions.create(model=MODEL, input=prompt, system_instruction=SYSTEM)
     text = (response.output_text or "").strip()
