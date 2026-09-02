@@ -1,4 +1,5 @@
 import json
+import re
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -14,6 +15,24 @@ FEEDS = [
     ("SEC", "https://www.sec.gov/news/pressreleases.rss", "regulation_official"),
 ]
 MAX_ITEMS_PER_FEED = 20
+
+KNOWN_ASSET_NAMES={
+    'bitcoin':'BTC','ethereum':'ETH','solana':'SOL','bnb':'BNB','xrp':'XRP','dogecoin':'DOGE','cardano':'ADA',
+    'tron':'TRX','avalanche':'AVAX','chainlink':'LINK','sui':'SUI','toncoin':'TON','polkadot':'DOT','litecoin':'LTC',
+    'shiba inu':'SHIB','pepe':'PEPE','uniswap':'UNI','aave':'AAVE','curve':'CRV','arbitrum':'ARB','optimism':'OP',
+    'aptos':'APT','near protocol':'NEAR','cosmos':'ATOM','injective':'INJ','sei':'SEI','celestia':'TIA',
+    'hedera':'HBAR','stellar':'XLM','secret network':'SCRT','terra classic':'LUNC','gold':'XAUUSD','silver':'XAGUSD'
+}
+
+def extract_symbols(text: str) -> list[str]:
+    found=[]
+    upper=(text or '').upper()
+    for m in re.findall(r'\\$([A-Z][A-Z0-9]{0,14})\\b',upper):
+        if m not in found: found.append(m)
+    lower=(text or '').lower()
+    for name,sym in KNOWN_ASSET_NAMES.items():
+        if name in lower and sym not in found: found.append(sym)
+    return found[:5]
 
 KEYWORD_WEIGHTS={
     'hack':24,'exploit':24,'breach':22,'etf':20,'sec':18,'fed':18,'rate':14,'inflation':14,
@@ -81,6 +100,7 @@ def parse_feed(source: str, category: str, payload: bytes) -> list[dict]:
             "url": link,
             "summary": description[:1200],
             "published_at": parse_date(pub),
+            "symbols": extract_symbols(title + ' ' + description),
             "news_score": score_article(title, description[:1200], category, parse_date(pub)),
         })
     return items
