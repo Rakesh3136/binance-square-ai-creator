@@ -15,6 +15,32 @@ FEEDS = [
 ]
 MAX_ITEMS_PER_FEED = 20
 
+KEYWORD_WEIGHTS={
+    'hack':24,'exploit':24,'breach':22,'etf':20,'sec':18,'fed':18,'rate':14,'inflation':14,
+    'tariff':12,'regulation':16,'lawsuit':16,'listing':18,'delist':20,'launch':12,'upgrade':12,
+    'partnership':10,'whale':12,'liquidation':16,'airdrop':14,'unlock':14,'approval':18,
+    'ban':20,'reserve':12,'treasury':12,'stablecoin':12,'acquisition':12,'integration':12,
+    'mainnet':12,'protocol':8,'funding':8,'institutional':10
+}
+
+
+def score_article(title: str, summary: str, category: str, published_at: str | None) -> float:
+    text = (title + ' ' + summary).lower()
+    score = 30.0
+    for keyword, weight in KEYWORD_WEIGHTS.items():
+        if keyword in text:
+            score += weight
+    if category.endswith('_official'):
+        score += 8.0
+    try:
+        dt = datetime.fromisoformat(str(published_at).replace('Z','+00:00')) if published_at else None
+        if dt:
+            age = max(0.0, (datetime.now(timezone.utc)-dt.astimezone(timezone.utc)).total_seconds()/60.0)
+            score += max(0.0, 20.0-age/9.0)
+    except Exception:
+        pass
+    return round(min(100.0, score),2)
+
 
 def fetch(url: str) -> bytes:
     request = urllib.request.Request(
@@ -55,6 +81,7 @@ def parse_feed(source: str, category: str, payload: bytes) -> list[dict]:
             "url": link,
             "summary": description[:1200],
             "published_at": parse_date(pub),
+            "news_score": score_article(title, description[:1200], category, parse_date(pub)),
         })
     return items
 
@@ -81,7 +108,7 @@ def main() -> None:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sources": [name for name, _, _ in FEEDS],
         "categories": ["crypto_news", "macro_official", "regulation_official"],
-        "articles": deduped[:80],
+        "articles": sorted(deduped[:80], key=lambda x: (float(x.get('news_score') or 0), str(x.get('published_at') or '')), reverse=True),
         "failures": failures,
         "note": "RSS items are discovery leads. Official feeds are preferred for primary-source verification. The AI must verify material claims before publication and distinguish announcements from interpretation.",
     }
