@@ -128,115 +128,64 @@ def _previous_style(preflight):
 def local_market_fallback(live, preflight, memory):
     selected = preflight.get("selected_opportunity") or {}
     item = find_item(live, selected.get("symbol"))
-    if not item:
-        return None
+    if not item: return None
     symbol = str(item.get("symbol", "")).upper().replace("USDT", "")
-    try:
-        move = float(item.get("price_change_percent") or 0)
-    except Exception:
-        move = 0.0
-    try:
-        volume = max(0.0, float(item.get("quote_volume_usdt") or item.get("quote_volume") or 0))
-    except Exception:
-        volume = 0.0
-    try:
-        intraday = float(item.get("intraday_range_percent") or 0)
-    except Exception:
-        intraday = 0.0
+    try: move = float(item.get("price_change_percent") or 0)
+    except Exception: move = 0.0
+    try: volume = max(0.0, float(item.get("quote_volume_usdt") or item.get("quote_volume") or 0))
+    except Exception: volume = 0.0
+    try: intraday = float(item.get("intraday_range_percent") or 0)
+    except Exception: intraday = 0.0
     candles = item.get("candles_1h") or []
-    closes = [float(c["close"]) for c in candles if c.get("close") is not None]
-    highs = [float(c["high"]) for c in candles if c.get("high") is not None]
-    lows = [float(c["low"]) for c in candles if c.get("low") is not None]
+    closes = [float(x.get("close")) for x in candles if isinstance(x,dict) and x.get("close") is not None]
+    highs = [float(x.get("high")) for x in candles if isinstance(x,dict) and x.get("high") is not None]
+    lows = [float(x.get("low")) for x in candles if isinstance(x,dict) and x.get("low") is not None]
     last = float(item.get("last_price") or (closes[-1] if closes else 0))
-    resistance = max(highs[-8:]) if highs else last
-    support = min(lows[-8:]) if lows else last
-    category = str(selected.get("category") or "market_opportunity").lower()
-    engagement = preflight.get("engagement_strategy") or {}
-    experiment = engagement.get("experiment") or {}
-    exp_id = str(engagement.get("experiment_id") or selected.get("experiment_id") or "A").upper()
-    exp_format = str(experiment.get("format") or "CHOICE").upper()
-    previous_style = _previous_style(preflight)
-
-    # Each experiment has a genuinely different fallback structure. This is
-    # intentionally not driven by a simple counter, because a counter can keep
-    # producing the same prose pattern when AI is unavailable for a long period.
-    if exp_id == "A" or exp_format == "CHOICE":
-        hook = f"${symbol} moved {move:+.1f}% today. The interesting part is what price does after the first impulse."
-        detail = f"Last ${last:.8g} • {fmt_money(volume)} spot volume" if volume else f"Last ${last:.8g}"
-        question = f"Would you chase ${symbol} now, or wait for a pullback?"
-        style = "fallback_choice"
-    elif exp_id == "B" or exp_format == "CHART CHALLENGE":
-        hook = f"Quick chart challenge on ${symbol}: price is sitting after a {move:+.1f}% move."
-        detail = f"Observed 1h range: ${support:.8g} → ${resistance:.8g}"
-        question = "Which level would you mark first: the recent high or the recent low?"
-        style = "fallback_chart_challenge"
-    elif exp_id == "C" or exp_format == "COIN VS COIN":
-        # Use one real comparison partner from the current market snapshot.
-        partner = next((x for x in all_market_items(live) if str(x.get("symbol", "")).upper() != str(item.get("symbol", "")).upper() and x.get("price_change_percent") is not None), None)
-        psym = str(partner.get("symbol", "BTC")).upper().replace("USDT", "") if partner else "BTC"
-        try: pmove = float(partner.get("price_change_percent")) if partner else 0.0
-        except Exception: pmove = 0.0
-        hook = f"${symbol} vs ${psym}: one market move is clearly stronger right now."
-        detail = f"${symbol} {move:+.1f}% | ${psym} {pmove:+.1f}%"
-        question = f"Which chart would you watch next: ${symbol} or ${psym}?"
-        style = "fallback_coin_vs_coin"
-    elif exp_id == "D" or exp_format == "DATA SURPRISE":
-        hook = f"The number that stands out on ${symbol}: {intraday:.1f}% intraday range."
-        detail = f"Spot volume {fmt_money(volume)} • last ${last:.8g}"
-        question = "Did you notice the volatility before looking at the headline move?"
-        style = "fallback_data_surprise"
-    elif exp_id == "E" or exp_format == "BREAKOUT OR FAKEOUT":
-        hook = f"${symbol} is testing the edge of its recent range after a {move:+.1f}% move."
-        detail = f"Resistance ${resistance:.8g} • support ${support:.8g}"
-        question = "Breakout or fakeout?"
-        style = "fallback_breakout_fakeout"
-    elif exp_id == "F" or exp_format == "NEWS REACTION":
-        hook = f"${symbol} has the market's attention today. Here's the price action I would watch."
-        detail = f"{move:+.1f}% today • {fmt_money(volume)} spot volume" if volume else f"{move:+.1f}% today"
-        question = "Bullish follow-through or headline fade?"
-        style = "fallback_news_reaction"
-    elif exp_id == "G" or exp_format == "LIQUIDATION STORY":
-        hook = f"${symbol}: this move looks more like a flush than a quiet trend."
-        detail = f"{intraday:.1f}% intraday range • ${support:.8g} low" if intraday else f"Observed low ${support:.8g}"
-        question = "Reversal or continuation from here?"
-        style = "fallback_liquidation_story"
+    resistance = max(highs[-12:]) if highs else last
+    support = min(lows[-12:]) if lows else last
+    volume_text = fmt_money(volume) + " spot volume" if volume else "fresh spot data"
+    if move >= 15:
+        hook = "🔥 $" + symbol + " just moved " + f"{move:+.1f}%" + " — the next reaction matters more than the first spike."
+        body = "Spot volume is " + volume_text + ", while the 1H range is " + f"{intraday:.1f}%" + ". Watch whether buyers can sustain the move."
+        question = "Would you wait for $" + symbol + " to hold above the recent high, or expect a pullback first?"
+        style = "momentum_context"
+    elif move <= -15:
+        hook = "⚠️ $" + symbol + " just dropped " + f"{abs(move):.1f}%" + " — now the reaction matters more than the headline."
+        body = "Spot volume is " + volume_text + ", with a " + f"{intraday:.1f}%" + " intraday range. The key test is whether sellers keep control."
+        question = "Would you watch a reclaim on $" + symbol + ", or wait for another lower high?"
+        style = "breakdown_context"
     else:
-        hook = f"Top-mover check: ${symbol} is up {move:+.1f}% with {fmt_money(volume)} in spot volume."
-        detail = f"Last ${last:.8g} • range {intraday:.1f}%" if intraday else f"Last ${last:.8g}"
-        question = f"Chase ${symbol}, fade it, or wait?"
-        style = "fallback_top_movers"
+        hook = "📊 $" + symbol + ": the next 1H reaction matters."
+        body = "Price is around $" + f"{last:.8g}" + " with " + volume_text + ". Recent 1H range: $" + f"{support:.8g}" + " support → $" + f"{resistance:.8g}" + " resistance."
+        question = "Which side would you wait to confirm on $" + symbol + ": breakout or rejection?"
+        style = "chart_context"
+    text = "\n\n".join([hook, body, "Bull case: price accepts above resistance and volume follows through. Bear case: the move fails and support breaks.", question])
+    return {
+        "research": {"summary":"Verified market opportunity from live market data.","strongest_signal":symbol,"source_mode":"local_fallback","opportunity_score":float(selected.get("adjusted_score") or selected.get("raw_score") or 80)},
+        "critique": {"summary":"Fallback contains current market evidence and conditional scenarios only.","reason":"gemini_unavailable","revised_opportunity_score":float(selected.get("adjusted_score") or selected.get("raw_score") or 80)},
+        "draft": {"post":text[:880],"text":text[:880],"hook":hook,"discussion_question":question,"quality_score":86,"editorial_style":style,"generation_mode":"LOCAL_FALLBACK","symbol":symbol},
+        "visual_plan": {"type":"candlestick_chart","use_visual":True,"provider":"TradingView","timeframe":"1H","data_points":[{"symbol":symbol}]},
+    }
 
-    # Absolute anti-repetition guard: if the strategy reports the same style as
-    # recent content, switch the structure without changing the market facts.
-    if previous_style == style.upper():
-        hook = f"One detail on ${symbol} is easy to miss: {intraday:.1f}% intraday range."
-        detail = f"Last ${last:.8g} • {fmt_money(volume)} spot volume" if volume else f"Last ${last:.8g}"
-        question = f"Is ${symbol} setting up, or simply getting noisy?"
-        style = "fallback_quick_def local_news_fallback(news):
-    articles = [x for x in (news.get("articles") or []) if isinstance(x, dict) and str(x.get("title") or "").strip()]
-    if not articles:
-        return None
-    article = sorted(articles, key=lambda x: (float(x.get("news_score") or 0), str(x.get("published_at") or "")), reverse=True)[0]
+def local_news_fallback(news):
+    articles = [x for x in (news.get("articles") or []) if isinstance(x,dict) and str(x.get("title") or "").strip()]
+    if not articles: return None
+    article = sorted(articles,key=lambda x:(float(x.get("news_score") or 0),str(x.get("published_at") or "")),reverse=True)[0]
     title = str(article.get("title") or "").strip()
     source = str(article.get("source") or "").strip()
     symbols = article.get("symbols") or []
     symbol = str(symbols[0] if symbols else "").upper().replace("USDT","")
-    source_line = f"Source: {source}" if source else "Source: verified news feed"
-    if symbol:
-        hook = "🚨 $" + symbol + ": " + title
-        visual = {"type":"candlestick_chart","use_visual":True}
-    else:
-        hook = "🚨 " + title
-        visual = {"type":"market_comparison","use_visual":True}
-    body = hook + "\n\n" + source_line + "\n\nWhy it matters: the market reaction is what we need to watch next."
-    question = "Does this change your view on $" + symbol + "?" if symbol else "Headline catalyst or temporary noise?"
-    text = (body + "\n\n" + question)[:880]
+    hook = ("🚨 $"+symbol+": " if symbol else "🚨 ") + title
+    source_line = "Source: "+source if source else "Source: verified news feed"
+    q = "Does this change your view on $"+symbol+"?" if symbol else "Headline catalyst or temporary noise?"
+    post = "\n\n".join([hook,source_line,"Why it matters: the market reaction is the next thing to verify.",q])
     return {
-        "research": {"summary":"Fresh verified headline selected from news snapshot.", "source_mode":"local_news_fallback", "strongest_signal":symbol or "macro", "opportunity_score":90},
-        "critique": {"summary":"News-first fallback preserved the supplied event and source without inventing details.", "revised_opportunity_score":90},
-        "draft": {"post":text,"text":text,"hook":hook,"discussion_question":question,"quality_score":86,"editorial_style":"fallback_newsroom","generation_mode":"LOCAL_FALLBACK","symbol":symbol},
-        "visual_plan": visual
+        "research": {"summary":"Fresh verified headline selected from news snapshot.","source_mode":"local_news_fallback","strongest_signal":symbol or "macro","opportunity_score":90},
+        "critique": {"summary":"News-first fallback preserves supplied event and source without inventing details.","revised_opportunity_score":90},
+        "draft": {"post":post[:880],"text":post[:880],"hook":hook,"discussion_question":q,"quality_score":86,"editorial_style":"fallback_newsroom","generation_mode":"LOCAL_FALLBACK","symbol":symbol},
+        "visual_plan": {"type":"candlestick_chart","use_visual":True,"provider":"TradingView","timeframe":"1H"},
     }
+
 def call_creator(client, prompt):
     response = client.interactions.create(model=MODEL, input=prompt, system_instruction=SYSTEM)
     text = (response.output_text or "").strip()
