@@ -1,7 +1,7 @@
-"""Creator 4.1 human editorial layer.
+"""Creator 4.2 final human editorial layer.
 
-Keeps researched facts while producing a stronger mobile-first Binance Square
-post with varied hooks, evidence, chart-derived levels and one real question.
+Preserves the AI's researched angle, enforces mobile readability and one question,
+and prevents the final editor from collapsing every post into the same template.
 """
 from __future__ import annotations
 import json, os, re
@@ -10,14 +10,23 @@ from pathlib import Path
 
 NEWS=Path('data/live/news_snapshot.json')
 OUT=Path('data/live/editorial_polish.json')
-STYLE={
- 'NEWS':('📰',['Does the chart confirm the headline?','Bullish reaction or headline fade?']),
- 'CHART':('📊',['Breakout or fakeout?','Which level would you watch first?']),
- 'VOLUME':('🔥',['Is volume confirming the move?','Would you wait for follow-through?']),
- 'CHOICE':('👀',['Chase, pullback, or wait?','What would change your view?']),
- 'BREAKOUT':('⚡',['Breakout or fakeout?','Would you wait for another candle?']),
- 'DATA':('🔎',['Did you notice this signal?','Does this data change your read?']),
- 'UPDATE':('🔄',['Did this change your read?','What signal would you watch next?'])}
+
+STYLE_QUESTIONS={
+ 'NEWS':['Is the market confirming this catalyst, or fading it?','Does this headline change your crypto outlook today?','Bullish repricing or temporary headline noise?','Would you trade the headline or wait for price confirmation?'],
+ 'CHART':['Breakout or fakeout?','Which level would you watch first?','Would you wait for confirmation on the next candle?'],
+ 'VOLUME':['Is volume confirming the move?','Would you wait for follow-through?'],
+ 'CHOICE':['Chase, pullback, or wait?','What would change your view?'],
+ 'BREAKOUT':['Breakout or fakeout?','Would you wait for another candle?'],
+ 'DATA':['Did you notice this signal?','Does this data change your read?'],
+ 'UPDATE':['Did this change your read?','What signal would you watch next?']}
+NEWS_HOOKS=[
+ '📰 Fresh headline, real market reaction: ${symbol} is where I’m looking next.',
+ '🚨 The news just changed the backdrop. Now watch how ${symbol} responds.',
+ 'The headline is interesting. The ${symbol} reaction is what makes it tradeable.',
+ '⚡ New information is hitting crypto — and ${symbol} is giving us the first clue.',
+ 'One fresh crypto headline is getting attention. Here is why ${symbol} matters now.'
+]
+
 
 def load(path, default=None):
     if default is None: default={}
@@ -46,15 +55,19 @@ def choose_style(draft):
     if 'CHOICE' in raw:return 'CHOICE'
     return 'CHART' if ('CHART' in raw or draft.get('visual_plan')) else 'CHOICE'
 
-def fresh_news():
+def fresh_news(selected=None):
     data=load(NEWS,{})
-    try: age=(datetime.now(timezone.utc)-datetime.fromisoformat(str(data.get('generated_at','')).replace('Z','+00:00'))).total_seconds()
-    except Exception:return {}
-    if age<0 or age>48*3600:return {}
-    for a in data.get('articles') or []:
+    articles=data.get('articles') or []
+    if not articles:return {}
+    selected_title=clean((selected or {}).get('news_title'))
+    if selected_title:
+        for a in articles:
+            if isinstance(a,dict) and clean(a.get('title') or a.get('headline'))==selected_title:
+                return {'source':clean(a.get('source') or ''),'title':selected_title[:240],'url':clean(a.get('url') or ''),'published_at':clean(a.get('published_at') or '')}
+    for a in articles:
         if isinstance(a,dict):
             title=clean(a.get('title') or a.get('headline'))
-            if title:return {'source':clean(a.get('source') or ''),'title':title[:220]}
+            if title:return {'source':clean(a.get('source') or ''),'title':title[:240],'url':clean(a.get('url') or ''),'published_at':clean(a.get('published_at') or '')}
     return {}
 
 def fmt(v):
@@ -70,52 +83,63 @@ def make_post(draft,data):
     if not original:raise SystemExit('Draft has no post text')
     symbol=get_symbol(draft,original)
     if not symbol:raise SystemExit('Editorial layer: primary symbol missing')
-    style=choose_style(draft); emoji,questions=STYLE[style]; question=questions[datetime.now(timezone.utc).day%len(questions)]
-    lines=[clean(x) for x in original.splitlines() if clean(x) and '?' not in x]
-    banned={'key levels:','key scenario levels:','fresh check:','quick market check:','this is the crypto story i’m watching right now:','this is the crypto story i\'m watching right now:'}
-    lines=[x for x in lines if x.lower() not in banned]
-    evidence=[]
-    for line in lines:
-        if line.lower().startswith(('$'+symbol.lower(),'current price')):continue
-        if len(line)>=18:evidence.append(line)
-    evidence=evidence[:5]
-    if not evidence:evidence=[f'${symbol} is active on the verified market snapshot, so the next reaction matters more than the first spike.']
-    hooks={
-      'NEWS':f'{emoji} The headline is only half the story. ${symbol} has to confirm it on price.',
-      'CHART':f'{emoji} The ${symbol} chart is at a level worth watching — here is what matters next.',
-      'VOLUME':f'{emoji} Price got attention. The participation behind ${symbol} is what I’m watching.',
-      'CHOICE':f'{emoji} I’m not chasing the first candle on ${symbol}. I want to see what happens next.',
-      'BREAKOUT':f'{emoji} ${symbol} is testing a decisive zone. This is where breakout and fakeout separate.',
-      'DATA':f'{emoji} One number on ${symbol} matters more than the headline percentage.',
-      'UPDATE':f'{emoji} Update on ${symbol}: the market gave us another clue.'}
-    body=hooks[style]+'\n\n'+'\n'.join(evidence)
+    style=choose_style(draft); selected=data.get('selected_editorial_lane') or data.get('selected_opportunity') or {}
+    news=fresh_news(selected)
+    lines=[clean(x) for x in original.splitlines() if clean(x)]
+    lines=[x for x in lines if x.lower() not in {'key levels:','key scenario levels:','fresh check:','quick market check:','this is the crypto story i’m watching right now:','this is the crypto story i\'m watching right now:'}]
+
+    if style=='NEWS' and news:
+        # The final editor must keep the actual news event at the top. It may polish
+        # the hook, but it must never replace a news post with a generic price recap.
+        raw_hook=lines[0] if lines else ''
+        generic=('headline is only half the story' in raw_hook.lower() or 'watching right now' in raw_hook.lower() or len(raw_hook)<18)
+        if generic:
+            idx=(sum(ord(c) for c in (symbol+news['title'])) % len(NEWS_HOOKS))
+            hook=NEWS_HOOKS[idx].replace('${symbol}',f'${symbol}')
+        else:
+            hook=raw_hook
+        event=f"📰 {news['source']}: {news['title']}" if news.get('source') else f"📰 {news['title']}"
+        body_lines=[hook,event]
+        # Keep useful AI evidence/interpretation, but do not duplicate the raw headline.
+        for line in lines[1:]:
+            if news['title'].lower() not in line.lower() and len(line)>=18:
+                body_lines.append(line)
+        body_lines=body_lines[:7]
+    else:
+        hook=lines[0] if lines else f'${symbol} is giving the market a signal worth watching.'
+        body_lines=[hook]
+        body_lines.extend([x for x in lines[1:] if len(x)>=18][:5])
+
     lv=chart_levels(draft,data)
     if lv:
         p=[]
         for key,label in [('current_price','price'),('support','support'),('resistance','resistance'),('tp1','TP1'),('target','target'),('invalidation','invalidation')]:
             if lv.get(key) is not None:p.append(f'{label} ${fmt(lv[key])}')
-        if p:body+='\n\n📍 '+' • '.join(p)
+        if p:body_lines.append('📍 '+' • '.join(p))
         direction=str(lv.get('direction') or '').lower()
-        if 'long' in direction:body+='\nBull case: a sustained move above resistance strengthens the upside scenario; losing support weakens it.'
-        elif 'short' in direction:body+='\nBear case: a failed reclaim keeps downside risk active; invalidation is the level to watch.'
-        body+='\nThese are chart-derived scenarios, not guarantees.'
-    news=fresh_news()
-    if style=='NEWS' and news:body+='\n\n📰 '+((news['source']+': ') if news.get('source') else '')+news['title']
-    if 'level' in question.lower():question=question[:-1]+f' on ${symbol}?'
-    body=re.sub(r'\?','.',body).rstrip(' .')
+        if 'long' in direction:body_lines.append('Bull case: a sustained move above resistance strengthens the upside scenario; losing support weakens it.')
+        elif 'short' in direction:body_lines.append('Bear case: a failed reclaim keeps downside risk active; invalidation is the level to watch.')
+        body_lines.append('These are chart-derived scenarios, not guarantees.')
+
+    # Exactly one question, selected from a small rotating family rather than a fixed daily line.
+    questions=STYLE_QUESTIONS[style]
+    qidx=(sum(ord(c) for c in (symbol+style+datetime.now(timezone.utc).strftime('%Y-%m-%d-%H'))) % len(questions))
+    question=questions[qidx]
+    if '$' not in question and style=='NEWS' and symbol: question=question.rstrip('?')+f' for ${symbol}?'
+    body='\n\n'.join(body_lines)
+    body=re.sub(r'\?','.',body).strip(' .')
     text=(body+'\n\n'+question)[:900]
     if text.count('?')!=1:text=re.sub(r'\?','.',text).rstrip('.')+'\n\n'+question
-    return text,style,emoji,question,news
+    return text,style,question,news
 
 def main():
     path=Path(os.environ.get('DRAFT_PATH',''))
     if not path.exists():raise SystemExit('DRAFT_PATH is missing')
     data=load(path,{ }); draft=data.setdefault('draft',{})
-    text,style,emoji,question,news=make_post(draft,data)
-    draft.update({'post':text,'text':text,'editorial_style':style.lower(),'human_editor':{'status':'POLISHED','version':'human-editor-v6','style':style,'emoji':emoji,'question':question,'fresh_news_used':bool(news),'question_count':1,'fact_policy':'preserve supplied evidence only'}})
-    data['editorial_style_version']='human-editor-v6'; data['news_context']=news
+    text,style,question,news=make_post(draft,data)
+    draft.update({'post':text,'text':text,'editorial_style':style.lower(),'human_editor':{'status':'POLISHED','version':'human-editor-v7','style':style,'question':question,'fresh_news_used':bool(news),'question_count':1,'fact_policy':'preserve supplied evidence only'}})
     OUT.parent.mkdir(parents=True,exist_ok=True)
-    OUT.write_text(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v6','style':style,'characters':len(text),'question':question,'fresh_news':bool(news)},indent=2,ensure_ascii=False),encoding='utf-8')
+    OUT.write_text(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v7','style':style,'characters':len(text),'question':question,'fresh_news':bool(news)},indent=2,ensure_ascii=False),encoding='utf-8')
     path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8')
-    print(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v6','characters':len(text),'style':style,'question':question,'fresh_news':bool(news)}))
+    print(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v7','characters':len(text),'style':style,'question':question,'fresh_news':bool(news)}))
 if __name__=='__main__':main()
