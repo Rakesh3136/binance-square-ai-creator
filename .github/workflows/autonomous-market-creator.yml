@@ -44,6 +44,8 @@ jobs:
         run: python src/pipeline_stage.py reset 'Fresh Creator 4.2 production cycle'
       - name: Refresh live market
         run: python src/live_market_scanner.py
+      - name: Refresh fresh crypto and macro news
+        run: python src/news_scanner.py
       - name: Run creator intelligence
         run: python src/run_creator_intelligence.py
       - name: Run editorial preflight
@@ -193,6 +195,7 @@ jobs:
         if: always()
         run: |
           echo '=== PIPELINE STATUS ==='; test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
+          echo '=== NEWS SNAPSHOT ==='; test -f data/live/news_snapshot.json && cat data/live/news_snapshot.json || true
           echo '=== CONTENT DIRECTOR ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
           echo '=== SCRIPT DIRECTOR ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
           echo '=== CANDIDATE SCORECARD ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
