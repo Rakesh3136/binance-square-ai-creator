@@ -35,7 +35,7 @@ def add_market(pool,cat,item,boost=0):
     elif cat=='volume_leaders':raw=min(100,raw+10)
     elif cat=='new_listings':raw=min(100,raw+max(0,25-float(item.get('days_since_listing') or 30)*3))
     pool.append({'type':'market','category':cat,'topic':str(item['symbol']).upper(),'raw_score':round(min(100,raw+boost),2),'reason':cat})
-def add_news(pool,a):
+def add_news(pool,a,known_symbols=None):
     if not isinstance(a,dict):return
     title=str(a.get('title') or '').strip();pub=str(a.get('published_at') or '')
     try:age=(datetime.now(timezone.utc)-datetime.fromisoformat(pub.replace('Z','+00:00'))).total_seconds()/60
@@ -44,7 +44,11 @@ def add_news(pool,a):
     score=float(a.get('news_score') or 0)
     if score<NEWS_MATERIAL_SCORE:return
     syms=list(a.get('symbols') or []) or list(extract_symbols(title+' '+str(a.get('summary') or '')))
-    if not syms:syms=['BTC']
+    known_symbols=known_symbols or set()
+    if known_symbols:
+        normalized={str(x).upper().replace('USDT','') for x in known_symbols}
+        syms=[s for s in syms if str(s).upper().replace('USDT','') in normalized]
+    if not syms: syms=['BTC']
     for s in syms[:2]:
         s=str(s).upper().replace('USDT','')
         if not re.fullmatch(r'[A-Z0-9]{1,10}',s):continue
@@ -60,7 +64,8 @@ def main():
     for x in rows(market.get('highest_volume'))[:10]:add_market(pool,'volume_leaders',x)
     for x in rows(market.get('new_listing_market'))[:10]:add_market(pool,'new_listings',x,5)
     for x in sorted([z for z in rows(market.get('top_content_signals')) if isinstance(z,dict)],key=lambda z:float(z.get('intraday_range_percent') or 0),reverse=True)[:8]:add_market(pool,'high_volatility',x,3)
-    for a in rows(news.get('articles')):add_news(pool,a)
+    known_symbols={str(x.get('symbol')).upper().replace('USDT','') for group in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market') for x in rows(market.get(group)) if isinstance(x,dict) and x.get('symbol')}
+    for a in rows(news.get('articles')):add_news(pool,a,known_symbols)
     pool=list({(x['type'],x['category'],x['topic'],x.get('title','')):x for x in pool}.values());now=datetime.now(timezone.utc)
     for c in pool:
         b=c['topic'][:-4] if c['topic'].endswith('USDT') else c['topic'];recent=pc.get(b,0);mem=mc.get(b,0);cat=cc.get(c['category'],0);active=bool(last.get(b) and now-last[b]<timedelta(hours=ASSET_COOLDOWN_HOURS));news_override=c.get('type')=='news';penalty=0 if news_override else min(55,recent*22)+min(54,mem*MEMORY_REPEAT_PENALTY)+min(35,cat*CATEGORY_REPEAT_PENALTY)+(45 if active else 0);c.update({'recent_count':recent,'memory_count':mem,'category_recent_count':cat,'cooldown_active':active,'news_override':news_override,'adjusted_score':round(c['raw_score']-penalty,2),'repeated':False if news_override else (recent>=2 or mem>=MEMORY_HARD_BLOCK_COUNT or active)})
