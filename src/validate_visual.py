@@ -17,20 +17,12 @@ def latest_report() -> Path:
 
 
 def tickers(text: str) -> list[str]:
-    # Prefer explicit Binance Square-style cashtags ($HEMI), while also
-    # accepting a full HEMIUSDT market symbol when the model emits one.
     found = re.findall(r"\$([A-Z0-9]{2,12})(?:USDT)?\b", text.upper())
     found += re.findall(r"\b([A-Z0-9]{2,12})USDT\b", text.upper())
     return list(dict.fromkeys(found))
 
 
 def main() -> None:
-    report = json.loads(latest_report().read_text(encoding="utf-8"))
-    plan = report.get("visual_plan") or {}
-    if not plan.get("use_visual") or plan.get("type") == "none":
-        print(json.dumps({"status": "VISUAL_NOT_REQUESTED"}))
-        return
-
     if not META.exists() or not VISUAL.exists():
         raise SystemExit("TradingView visual metadata/image missing")
 
@@ -38,23 +30,38 @@ def main() -> None:
     if meta.get("provider") != "TradingView" or meta.get("status") != "TRADINGVIEW_CREATED":
         raise SystemExit("Visual is not a verified TradingView snapshot")
 
+    # The renderer records the exact report it used. This prevents a later
+    # report write from racing the validator and falsely reporting a symbol mismatch.
+    report_name = str(meta.get("report_file") or "")
+    report_path = REPORT_DIR / report_name if report_name else latest_report()
+    if not report_path.exists():
+        raise SystemExit(f"TradingView source report missing: {report_name or '<latest>'}")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    plan = report.get("visual_plan") or {}
+    if not plan.get("use_visual") or plan.get("type") == "none":
+        print(json.dumps({"status": "VISUAL_NOT_REQUESTED"}))
+        return
+
     post = str((report.get("draft") or {}).get("post") or (report.get("draft") or {}).get("text") or "")
     post_tickers = tickers(post)
     base = str(meta.get("base_symbol") or "").upper()
     if not base or base not in post_tickers:
         raise SystemExit(f"TradingView chart symbol {base or '<missing>'} does not match post tickers {post_tickers}")
 
-    if not str(meta.get("tradingview_symbol", "")).startswith("BINANCE:"):
+    tv_symbol = str(meta.get("tradingview_symbol", ""))
+    if base not in {str(x).upper() for x in meta.get("post_tickers", [])}:
+        raise SystemExit(f"TradingView metadata tickers do not contain rendered symbol {base}")
+    if not tv_symbol.startswith("BINANCE:"):
         raise SystemExit("TradingView symbol is not a Binance market symbol")
-
     if VISUAL.stat().st_size < 20_000:
         raise SystemExit("TradingView image is suspiciously small")
 
     print(json.dumps({
         "status": "VISUAL_MATCH_CONFIRMED",
         "provider": "TradingView",
-        "symbol": meta["tradingview_symbol"],
+        "symbol": tv_symbol,
         "post_tickers": post_tickers,
+        "report_file": report_path.name,
         "image_bytes": VISUAL.stat().st_size,
     }, indent=2))
 
