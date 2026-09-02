@@ -39,7 +39,7 @@ def authoritative_symbol(data):
     pre=load(PREFLIGHT_PATH); s=pre.get('selected_opportunity') or {}
     for value in (s.get('symbol'),s.get('topic'),(pre.get('content_director_4') or {}).get('primary_story',{}).get('symbol'),(data.get('draft') or {}).get('symbol')):
         x=re.sub(r'USDT$','',str(value or '').upper().replace('$','').strip())
-        if re.fullmatch(r'[A-Z0-9]{2,15}',x):return x
+        if re.fullmatch(r'[A-Z0-9]{1,15}',x):return x
     return ''
 
 def visual_is_verified(expected_symbol=''):
