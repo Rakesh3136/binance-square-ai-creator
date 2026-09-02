@@ -219,6 +219,10 @@ jobs:
         if: always()
         run: |
           set -e
+          # self_repair_agent may touch source files during the run. Those runtime
+          # edits are deliberately not persisted as part of the analytics commit.
+          git restore --source=HEAD --staged --worktree src/ 2>/dev/null || true
+          git clean -fd node_modules src/__pycache__ data/reports 2>/dev/null || true
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add analytics data/live data/intelligence
@@ -228,12 +232,5 @@ jobs:
           fi
           git commit -m 'Record Creator 4.2 cycle'
           git fetch origin main
-          if git merge --no-edit origin/main; then
-            echo 'Merged latest main without conflicts.'
-          else
-            echo 'Generated-state conflict detected; keeping this completed Creator cycle for generated state.'
-            git checkout --ours -- analytics data/live data/intelligence
-            git add analytics data/live data/intelligence
-            git -c core.mergeoptions=--no-edit commit --no-edit -m 'Resolve generated Creator state conflict'
-          fi
+          git rebase --autostash origin/main
           git push origin HEAD:main
