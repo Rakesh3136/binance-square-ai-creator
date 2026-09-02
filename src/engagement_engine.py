@@ -104,8 +104,21 @@ def main():
       "avoid":["generic What do you think?","follow/like begging","fake urgency","guaranteed returns","copying another creator","same script template every post","unsupported 10x/20x claims","automatic TP/SL without chart evidence"],
       "recent_style_counts":dict(style_count)
     }
-    selected=dict(selected); selected["instruction"]=(f"Use category {category.replace('_',' ')} and experiment {exp['id']} ({exp['format']}). Hook: {exp['hook']}. End with exactly one easy question: {exp['question']}. Make the structure visibly different from the last two posts. Use real evidence only; include a TradingView chart for single-asset technical stories; use verified news when material; use natural cashtag tagging."); selected["engagement_strategy"]=strategy
+    selected=dict(selected)
+    authoritative_news=bool(selected.get("news_title") or selected.get("news_source"))
+    if authoritative_news:
+        instruction=(f"Preserve the verified news story and asset. Use experiment {exp['id']} ({exp['format']}) only to vary presentation. Hook direction: {exp['hook']}. End with exactly one specific question: {exp['question']}. Lead with the actual verified event and source; explain why it matters; connect only to the selected/news-supported asset(s). Never substitute a generic mover.")
+    else:
+        instruction=(f"Use category {category.replace('_',' ')} and experiment {exp['id']} ({exp['format']}). Hook: {exp['hook']}. End with exactly one easy question: {exp['question']}. Make the structure visibly different from the last two posts. Use real evidence only; include a TradingView chart for single-asset technical stories; use verified news when material; use natural cashtag tagging.")
+    selected["instruction"]=instruction
+    selected["engagement_strategy"]=strategy
     result={"generated_at":datetime.now(timezone.utc).isoformat(),"selected":selected,"ranked_candidates":ranked[:20],"recent_assets":dict(asset_count),"recent_categories":dict(cat_count),"recent_styles":dict(style_count),"experiment_counts":dict(exp_count),"experiments":EXPERIMENTS,"interaction_blueprint":strategy,"learning_note":"Observed reply/follower rates influence future experiments only after verified evidence exists."}
-    OUTPUT.parent.mkdir(parents=True,exist_ok=True);OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8"); pre["selected_opportunity"]=selected;pre["engagement_strategy"]=strategy;pre["engagement_ranked_candidates"]=ranked[:20];PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding="utf-8");print(json.dumps(result,indent=2,ensure_ascii=False))
+    OUTPUT.parent.mkdir(parents=True,exist_ok=True);OUTPUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
+    if not authoritative_news:
+        pre["selected_opportunity"]=selected
+    else:
+        pre["selected_opportunity"]=pre.get("selected_opportunity") or selected
+    pre["engagement_strategy"]=strategy;pre["engagement_ranked_candidates"]=ranked[:20]
+    PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding="utf-8");print(json.dumps(result,indent=2,ensure_ascii=False))
 
 if __name__=="__main__":main()
