@@ -15,7 +15,7 @@ def clean(x):return re.sub(r'[ \t]+',' ',str(x or '')).strip()
 def get_symbol(draft,text):
     for v in (draft.get('symbol'),draft.get('primary_symbol')):
         s=re.sub(r'USDT$','',str(v or '').upper().replace('$','').strip())
-        if re.fullmatch(r'[A-Z0-9]{2,15}',s):return s
+        if re.fullmatch(r'[A-Z0-9]{1,15}',s):return s
     m=re.search(r'\$([A-Z][A-Z0-9]{1,14})\b',text.upper());return m.group(1) if m else ''
 def choose_style(draft,selected):
     raw=str(draft.get('experiment_format') or draft.get('editorial_style') or selected.get('category') or '').upper()
