@@ -48,6 +48,8 @@ jobs:
         run: |
           python src/editorial_preflight.py
           if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
+      - name: TradingView asset eligibility gate
+        run: python src/tradingview_asset_gate.py
       - name: Creator 4.2 Content Director
         run: python src/content_director_4.py
       - name: Creator 4.2 Script Director
