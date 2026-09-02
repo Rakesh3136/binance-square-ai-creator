@@ -9,11 +9,28 @@ def load(path,default):
         value=json.loads(path.read_text(encoding='utf-8')); return value if isinstance(value,type(default)) else default
     except Exception:return default
 
-def save_status(status,reason,**extra):
-    STATUS.parent.mkdir(parents=True,exist_ok=True); STATUS.write_text(json.dumps({'updated_at':datetime.now(timezone.utc).isoformat(),'status':status,'reason':reason,**extra},indent=2,ensure_ascii=False),encoding='utf-8')
+def latest_report():
+    reports=sorted(REPORT_DIR.glob('*-multi-agent.json'),key=lambda p:p.stat().st_mtime,reverse=True)
+    return reports[0] if reports else None
+
+def report_has_publishable_text(path):
+    if not path: return False
+    try:
+        report=json.loads(path.read_text(encoding='utf-8'))
+        draft=report.get('draft') if isinstance(report.get('draft'),dict) else {}
+        candidates=(draft.get('text'),draft.get('post'),draft.get('body'),draft.get('content'),draft.get('caption'),report.get('text'),report.get('post'))
+        return any(isinstance(x,str) and x.strip() for x in candidates)
+    except Exception:
+        return False
 
 def run_creator():
-    import multi_agent_creator; multi_agent_creator.main()
+    before=latest_report()
+    before_mtime=before.stat().st_mtime if before else 0
+    import multi_agent_creator
+    multi_agent_creator.main()
+    after=latest_report()
+    if not after or after.stat().st_mtime <= before_mtime or not report_has_publishable_text(after):
+        raise RuntimeError('Gemini creator completed without producing a fresh publishable draft')
 
 def emergency_verified_draft(reason):
     """Evidence-rich local rescue: never invents news or trading levels."""
