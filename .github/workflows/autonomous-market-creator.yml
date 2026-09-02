@@ -1,4 +1,4 @@
-name: Binance Square AI Creator 4.2
+name: Binance Square AI Creator 4.4
 
 on:
   schedule:
@@ -35,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Reset production cycle
-        run: python src/pipeline_stage.py reset 'Fresh Creator 4.2 production cycle'
+        run: python src/pipeline_stage.py reset 'Fresh Creator 4.4 production cycle'
       - name: Refresh live market
         run: python src/live_market_scanner.py
       - name: Refresh fresh crypto and macro news
@@ -50,15 +50,20 @@ jobs:
           if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
       - name: TradingView asset eligibility gate
         run: python src/tradingview_asset_gate.py
-      - name: Creator 4.2 Content Director
+      - name: Refresh performance learning before story selection
+        run: |
+          python src/signal_outcome_tracker.py
+          python src/performance_feedback.py
+          python src/creator_growth_system.py
+          python src/living_brain.py
+      - name: Creator 4.4 Content Director
         run: python src/content_director_4.py
-      - name: Creator 4.2 Script Director
+      - name: Creator 4.4 Script Director
         run: python src/script_director_4.py
       - name: Creator 4.2 Candidate Generation Brief
         run: python src/candidate_generation_4.py
       - name: Run growth and engagement intelligence
         run: |
-          python src/signal_outcome_tracker.py
           python src/engagement_engine.py
           python src/freeze_opportunity.py
           python src/performance_feedback.py
@@ -68,7 +73,7 @@ jobs:
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
-          python src/pipeline_stage.py creator_brain success 'Creator 4.2 Brain decision completed'
+          python src/pipeline_stage.py creator_brain success 'Creator 4.4 Brain decision completed'
       - name: Prepare publication context
         run: |
           python src/publication_context.py
@@ -214,13 +219,12 @@ jobs:
           echo '=== CONTENT DIRECTOR ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
           echo '=== SCRIPT DIRECTOR ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
           echo '=== CANDIDATE SCORECARD ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
+          echo '=== PERFORMANCE FEEDBACK ==='; test -f data/intelligence/performance_feedback.json && cat data/intelligence/performance_feedback.json || true
           echo '=== PUBLICATION GATE ==='; test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
       - name: Persist state
         if: always()
         run: |
           set -e
-          # self_repair_agent may touch source files during the run. Those runtime
-          # edits are deliberately not persisted as part of the analytics commit.
           git restore --source=HEAD --staged --worktree src/ 2>/dev/null || true
           git clean -fd node_modules src/__pycache__ data/reports 2>/dev/null || true
           git config user.name 'github-actions[bot]'
@@ -230,7 +234,7 @@ jobs:
             echo 'No Creator state changes to persist.'
             exit 0
           fi
-          git commit -m 'Record Creator 4.2 cycle'
+          git commit -m 'Record Creator 4.4 cycle'
           git fetch origin main
           git rebase --autostash origin/main
           git push origin HEAD:main
