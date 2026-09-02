@@ -95,15 +95,51 @@ def main():
         volume = 0.0
 
     volume_text = (
-        f"${volume/1_000_000:.1f}M spot volume"
-        if volume >= 1_000_000
+        f"${volume/1_000_000:.1f}M spot volume" if volume >= 1_000_000
         else f"${volume/1_000:.0f}K spot volume" if volume >= 1_000 else "fresh spot data"
     )
-    post = (
-        f"Fresh check: ${symbol} is {move:+.1f}% with {volume_text}. "
-        "The move is strong enough to watch, but confirmation matters more than chasing it. "
-        f"Which signal are you watching next on ${symbol}?"
-    )
+    news_title = str(selected.get("news_title") or "").strip()
+    news_source = str(selected.get("news_source") or "").strip()
+    category = str(selected.get("category") or "market_opportunity").lower()
+
+    if news_title:
+        source_line = f"Source: {news_source}" if news_source else "Source: verified news feed"
+        post = (
+            "🚨 $" + symbol + ": " + news_title + "\n\n" +
+            source_line + "\n\n" +
+            "The key question now is whether price confirms the catalyst. $" + symbol +
+            " is currently showing " + f"{move:+.1f}%" + " with " + volume_text + ".\n\n" +
+            "Does the market confirm the headline, or fade it?"
+        )
+        hook = "🚨 $" + symbol + ": " + news_title
+        style = "publish_rescue_newsroom"
+    elif move >= 15:
+        post = (
+            "🔥 $" + symbol + " just moved " + f"{move:+.1f}%" + " with " + volume_text + ".\n\n" +
+            "That is enough to put it on the radar, but the next reaction matters more than the first spike. " +
+            "Recent 1H support is $" + f"{support:.8g}" + " and resistance is $" + f"{resistance:.8g}" + ".\n\n" +
+            "Would you wait for $" + symbol + " to hold the breakout, or expect a pullback first?"
+        )
+        hook = "🔥 $" + symbol + " just moved " + f"{move:+.1f}%" + " — what happens next?"
+        style = "publish_rescue_momentum"
+    elif move <= -15:
+        post = (
+            "⚠️ $" + symbol + " just dropped " + f"{abs(move):.1f}%" + " with " + volume_text + ".\n\n" +
+            "The important part is whether sellers keep control below the recent range: support $" + f"{support:.8g}" +
+            " / resistance $" + f"{resistance:.8g}" + ".\n\n" +
+            "Would you watch a reclaim on $" + symbol + ", or wait for another lower high?"
+        )
+        hook = "⚠️ $" + symbol + " just dropped " + f"{abs(move):.1f}%" + " — now watch the reaction."
+        style = "publish_rescue_breakdown"
+    else:
+        post = (
+            "📊 $" + symbol + ": price is around $" + f"{last:.8g}" + " with " + volume_text + ".\n\n" +
+            "Recent 1H range: $" + f"{support:.8g}" + " support → $" + f"{resistance:.8g}" + " resistance. " +
+            "The current classification is " + category.replace("_"," ") + ".\n\n" +
+            "Which side would you wait to confirm on $" + symbol + ": breakout or rejection?"
+        )
+        hook = "📊 $" + symbol + ": the next 1H reaction matters."
+        style = "publish_rescue_chart"
 
     draft = report.get("draft") or {}
     if not isinstance(draft, dict):
@@ -112,10 +148,10 @@ def main():
         {
             "post": post[:740],
             "text": post[:740],
-            "hook": f"Fresh check: ${symbol} is {move:+.1f}%.",
-            "discussion_question": f"Which signal are you watching next on ${symbol}?",
+            "hook": hook,
+            "discussion_question": post.splitlines()[-1],
             "quality_score": 90,
-            "editorial_style": "publish_rescue_concise",
+            "editorial_style": style,
             "generation_mode": "LOCAL_FALLBACK",
             "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
             "symbol": symbol,
@@ -138,7 +174,7 @@ def main():
     })
 
     meta = load(VISUAL_META, {})
-    chart_symbol = str(meta.get("tradingview_symbol") or meta.get("symbol") or "").upper()
+    chart_symbols = [str(x).upper() for x in (meta.get("tradingview_symbols") or [])]\n    chart_symbol = chart_symbols[0] if chart_symbols else str(meta.get("tradingview_symbol") or meta.get("symbol") or "").upper()
     expected = f"BINANCE:{symbol}USDT"
     if chart_symbol and chart_symbol != expected:
         raise SystemExit(
