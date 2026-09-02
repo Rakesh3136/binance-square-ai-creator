@@ -1,10 +1,10 @@
-"""Creator 4.2 final editorial layer: preserve the researched story and improve readability without flattening it into a template."""
+"""Creator 4.3 final editorial layer: preserve the researched story while improving readability, variety and signal clarity."""
 from __future__ import annotations
 import json,os,re
 from datetime import datetime,timezone
 from pathlib import Path
 NEWS=Path('data/live/news_snapshot.json');OUT=Path('data/live/editorial_polish.json')
-STYLE_QUESTIONS={'NEWS':['Is the market confirming this catalyst, or fading it?','Would you trade the headline now, or wait for price confirmation?','Is this a real repricing event or temporary headline noise?','Which asset is giving the clearest confirmation?'],'CHART':['Breakout or fakeout?','Which level would you watch first?','Would you wait for confirmation on the next candle?'],'VOLUME':['Is volume confirming the move?','Would you wait for follow-through?'],'CHOICE':['Chase, pullback, or wait?','What would change your view?'],'BREAKOUT':['Breakout or fakeout?','Would you wait for another candle?'],'DATA':['Did you notice this signal?','Does this data change your read?'],'UPDATE':['Did this change your read?','What signal would you watch next?']}
+STYLE_QUESTIONS={'NEWS':['Is the market confirming this catalyst, or fading it?','Would you trade the headline now, or wait for price confirmation?','Is this a real repricing event or temporary headline noise?','Which asset is giving the clearest confirmation?'],'CHART':['Breakout or fakeout?','Which level would you watch first?','Would you wait for confirmation on the next candle?'],'VOLUME':['Is volume confirming the move?','Would you wait for follow-through?'],'CHOICE':['Chase, pullback, or wait?','What would change your view?'],'BREAKOUT':['Breakout or fakeout?','Would you wait for another candle?'],'DATA':['Did you notice this signal?','Does this data change your read?'],'UPDATE':['Did this change your read?','What signal would you watch next?']]}
 
 def load(path,default=None):
     if default is None:default={}
@@ -38,6 +38,12 @@ def fmt(v):
     except Exception:return str(v)
 def chart_levels(draft,data):
     src=draft.get('technical_levels') or (data.get('research') or {}).get('chart_levels') or {};return src if isinstance(src,dict) else {}
+def polish_repetitions(text):
+    """Remove obvious duplicated metric wording without rewriting researched facts."""
+    text=re.sub(r'\bSpot volume is (\$[0-9][^,.\n]*?) spot volume\b',r'Spot volume is \1',text,flags=re.I)
+    text=re.sub(r'\b(\$[0-9][0-9.,]*[KMB]?)\s+\1\b',r'\1',text,flags=re.I)
+    text=re.sub(r'\b(the market market|price price|volume volume)\b',lambda m:m.group(1).split()[0],text,flags=re.I)
+    return re.sub(r'\n{3,}','\n\n',text).strip()
 def make_post(draft,data):
     original=clean(draft.get('post') or draft.get('text') or '')
     if not original:raise SystemExit('Draft has no post text')
@@ -47,7 +53,6 @@ def make_post(draft,data):
     lines=[clean(x) for x in original.splitlines() if clean(x)]
     lines=[x for x in lines if x.lower() not in {'key levels:','key scenario levels:','fresh check:','quick market check:','this is the crypto story i’m watching right now:','this is the crypto story i\'m watching right now:'}]
     if style=='NEWS' and news:
-        # Real headline first; no canned "headline is only half the story" template.
         hook=f"🚨 {news['title']}"
         source_line=f"Source: {news['source']}" if news.get('source') else ''
         body_lines=[hook]+([source_line] if source_line else [])
@@ -65,16 +70,15 @@ def make_post(draft,data):
         direction=str(lv.get('direction') or '').lower()
         if 'long' in direction:body_lines.append('Bull case: sustained acceptance above resistance strengthens the upside scenario; losing support weakens it.')
         elif 'short' in direction:body_lines.append('Bear case: a failed reclaim keeps downside risk active; invalidation is the level to watch.')
-        body_lines.append('These are chart-derived scenarios, not guarantees.')
     questions=STYLE_QUESTIONS[style];qidx=sum(ord(c) for c in (symbol+style+datetime.now(timezone.utc).strftime('%Y-%m-%d-%H')))%len(questions);question=questions[qidx]
     if style=='NEWS' and symbol and '$' not in question:question=question.rstrip('?')+f' for ${symbol}?'
-    body='\n\n'.join(body_lines);body=re.sub(r'\?','.',body).strip(' .');text=(body+'\n\n'+question)[:1200]
+    body='\n\n'.join(body_lines);body=re.sub(r'\?','.',body).strip(' .');text=polish_repetitions((body+'\n\n'+question)[:1200])
     if text.count('?')!=1:text=re.sub(r'\?','.',text).rstrip('.')+'\n\n'+question
     return text,style,question,news
 def main():
     path=Path(os.environ.get('DRAFT_PATH',''))
     if not path.exists():raise SystemExit('DRAFT_PATH is missing')
     data=load(path,{});draft=data.setdefault('draft',{});text,style,question,news=make_post(draft,data)
-    draft.update({'post':text,'text':text,'editorial_style':style.lower(),'human_editor':{'status':'POLISHED','version':'human-editor-v8','style':style,'question':question,'fresh_news_used':bool(news),'question_count':1,'fact_policy':'preserve supplied evidence only'}})
-    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v8','style':style,'characters':len(text),'question':question,'fresh_news':bool(news)},indent=2,ensure_ascii=False),encoding='utf-8');path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v8','characters':len(text),'style':style,'question':question,'fresh_news':bool(news)}))
+    draft.update({'post':text,'text':text,'editorial_style':style.lower(),'human_editor':{'status':'POLISHED','version':'human-editor-v9','style':style,'question':question,'fresh_news_used':bool(news),'question_count':1,'fact_policy':'preserve supplied evidence only','repetition_cleanup':True}})
+    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v9','style':style,'characters':len(text),'question':question,'fresh_news':bool(news),'repetition_cleanup':True},indent=2,ensure_ascii=False),encoding='utf-8');path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v9','characters':len(text),'style':style,'question':question,'fresh_news':bool(news)}))
 if __name__=='__main__':main()
