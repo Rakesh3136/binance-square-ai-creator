@@ -94,51 +94,40 @@ def main():
     except Exception:
         volume = 0.0
 
-    volume_text = (
-        f"${volume/1_000_000:.1f}M spot volume" if volume >= 1_000_000
-        else f"${volume/1_000:.0f}K spot volume" if volume >= 1_000 else "fresh spot data"
-    )
+    try: intraday = float(match.get("intraday_range_percent") or 0)
+    except Exception: intraday = 0.0
+    candles = match.get("candles_1h") or []
+    highs = [float(x.get("high")) for x in candles if isinstance(x,dict) and x.get("high") is not None]
+    lows = [float(x.get("low")) for x in candles if isinstance(x,dict) and x.get("low") is not None]
+    closes = [float(x.get("close")) for x in candles if isinstance(x,dict) and x.get("close") is not None]
+    last = float(match.get("last_price") or (closes[-1] if closes else 0))
+    resistance = max(highs[-12:]) if highs else last
+    support = min(lows[-12:]) if lows else last
+    if volume >= 1_000_000:
+        volume_text = f"${volume/1_000_000:.1f}M spot volume"
+    elif volume >= 1_000:
+        volume_text = f"${volume/1_000:.0f}K spot volume"
+    else:
+        volume_text = "fresh spot data"
     news_title = str(selected.get("news_title") or "").strip()
     news_source = str(selected.get("news_source") or "").strip()
     category = str(selected.get("category") or "market_opportunity").lower()
-
     if news_title:
         source_line = f"Source: {news_source}" if news_source else "Source: verified news feed"
-        post = (
-            "🚨 $" + symbol + ": " + news_title + "\n\n" +
-            source_line + "\n\n" +
-            "The key question now is whether price confirms the catalyst. $" + symbol +
-            " is currently showing " + f"{move:+.1f}%" + " with " + volume_text + ".\n\n" +
-            "Does the market confirm the headline, or fade it?"
-        )
         hook = "🚨 $" + symbol + ": " + news_title
+        post = "\n\n".join([hook, source_line, "Why it matters: the catalyst still needs price confirmation. $"+symbol+" is currently "+f"{move:+.1f}%"+" with "+volume_text+".", "Does the market confirm the headline, or fade it?"])
         style = "publish_rescue_newsroom"
     elif move >= 15:
-        post = (
-            "🔥 $" + symbol + " just moved " + f"{move:+.1f}%" + " with " + volume_text + ".\n\n" +
-            "That is enough to put it on the radar, but the next reaction matters more than the first spike. " +
-            "Recent 1H support is $" + f"{support:.8g}" + " and resistance is $" + f"{resistance:.8g}" + ".\n\n" +
-            "Would you wait for $" + symbol + " to hold the breakout, or expect a pullback first?"
-        )
-        hook = "🔥 $" + symbol + " just moved " + f"{move:+.1f}%" + " — what happens next?"
+        hook = "🔥 $" + symbol + " just moved " + f"{move:+.1f}%" + " — now the follow-through matters."
+        post = "\n\n".join([hook, "Spot volume is "+volume_text+", with a "+f"{intraday:.1f}%"+" intraday range. Recent 1H resistance is $"+f"{resistance:.8g}"+" and support is $"+f"{support:.8g}"+".", "Bull case: price holds above resistance with follow-through. Bear case: the impulse fails and support breaks.", "Would you wait for confirmation, or expect a pullback first?"])
         style = "publish_rescue_momentum"
     elif move <= -15:
-        post = (
-            "⚠️ $" + symbol + " just dropped " + f"{abs(move):.1f}%" + " with " + volume_text + ".\n\n" +
-            "The important part is whether sellers keep control below the recent range: support $" + f"{support:.8g}" +
-            " / resistance $" + f"{resistance:.8g}" + ".\n\n" +
-            "Would you watch a reclaim on $" + symbol + ", or wait for another lower high?"
-        )
-        hook = "⚠️ $" + symbol + " just dropped " + f"{abs(move):.1f}%" + " — now watch the reaction."
+        hook = "⚠️ $" + symbol + " just dropped " + f"{abs(move):.1f}%" + " — now the reaction matters."
+        post = "\n\n".join([hook, "Spot volume is "+volume_text+", with a "+f"{intraday:.1f}%"+" intraday range. Recent 1H support is $"+f"{support:.8g}"+" and resistance is $"+f"{resistance:.8g}"+".", "Bear case: sellers keep control below support. Bull case: price reclaims the range.", "Would you watch a reclaim, or wait for another lower high?"])
         style = "publish_rescue_breakdown"
     else:
-        post = (
-            "📊 $" + symbol + ": price is around $" + f"{last:.8g}" + " with " + volume_text + ".\n\n" +
-            "Recent 1H range: $" + f"{support:.8g}" + " support → $" + f"{resistance:.8g}" + " resistance. " +
-            "The current classification is " + category.replace("_"," ") + ".\n\n" +
-            "Which side would you wait to confirm on $" + symbol + ": breakout or rejection?"
-        )
         hook = "📊 $" + symbol + ": the next 1H reaction matters."
+        post = "\n\n".join([hook, "Price is around $"+f"{last:.8g}"+" with "+volume_text+". Recent 1H support is $"+f"{support:.8g}"+" and resistance is $"+f"{resistance:.8g}"+".", "Bull case: acceptance above resistance. Bear case: rejection and a support break.", "Breakout or rejection — which would you wait to confirm?"])
         style = "publish_rescue_chart"
 
     draft = report.get("draft") or {}
@@ -174,7 +163,8 @@ def main():
     })
 
     meta = load(VISUAL_META, {})
-    chart_symbols = [str(x).upper() for x in (meta.get("tradingview_symbols") or [])]\n    chart_symbol = chart_symbols[0] if chart_symbols else str(meta.get("tradingview_symbol") or meta.get("symbol") or "").upper()
+    chart_symbols = [str(x).upper() for x in (meta.get("tradingview_symbols") or [])]
+    chart_symbol = chart_symbols[0] if chart_symbols else str(meta.get("tradingview_symbol") or meta.get("symbol") or "").upper()
     expected = f"BINANCE:{symbol}USDT"
     if chart_symbol and chart_symbol != expected:
         raise SystemExit(
