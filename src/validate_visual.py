@@ -17,8 +17,14 @@ def latest_report() -> Path:
 
 
 def tickers(text: str) -> list[str]:
-    found = re.findall(r"\$([A-Z0-9]{2,12})(?:USDT)?\b", text.upper())
-    found += re.findall(r"\b([A-Z0-9]{2,12})USDT\b", text.upper())
+    """Extract real cashtags/USDT pairs without treating $150 or $77 as tickers.
+
+    Binance/TradingView supports one-character symbols (for example T), so the
+    first character must be a letter but the total symbol length may be 1.
+    """
+    upper = text.upper()
+    found = re.findall(r"\$([A-Z][A-Z0-9]{0,11})(?:USDT)?\b", upper)
+    found += re.findall(r"\b([A-Z][A-Z0-9]{0,11})USDT\b", upper)
     return list(dict.fromkeys(found))
 
 
