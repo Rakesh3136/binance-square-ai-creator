@@ -10,12 +10,6 @@ on:
         required: false
         default: ''
         type: string
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - '.github/workflows/autonomous-market-creator.yml'
-
 env:
   PYTHONUNBUFFERED: '1'
 
@@ -111,6 +105,20 @@ jobs:
         run: |
           python src/candidate_generation_4.py
           python src/candidate_script_scorer_4.py
+      - name: Locate fresh draft
+        id: draft
+        run: |
+          draft=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          if [ -z "$draft" ]; then echo '::error::No fresh AI draft found'; exit 1; fi
+          echo "path=$draft" >> "$GITHUB_OUTPUT"
+      - name: Apply human editorial layer
+        run: |
+          DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          if [ -z "$DRAFT_PATH" ]; then echo '::error::No fresh AI draft found for editorial layer'; exit 1; fi
+          DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
+          python -m json.tool "$DRAFT_PATH" >/dev/null
+      - name: Hard content integrity gate
+        run: python src/content_integrity_gate_4.py
       - name: Setup Node and Playwright
         uses: actions/setup-node@v4
         with:
@@ -128,18 +136,6 @@ jobs:
         run: |
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
-      - name: Locate fresh draft
-        id: draft
-        run: |
-          draft=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          if [ -z "$draft" ]; then echo '::error::No fresh AI draft found'; exit 1; fi
-          echo "path=$draft" >> "$GITHUB_OUTPUT"
-      - name: Apply human editorial layer
-        env:
-          DRAFT_PATH: ${{ steps.draft.outputs.path }}
-        run: |
-          python src/human_editor.py
-          python -m json.tool "$DRAFT_PATH" >/dev/null
       - name: Run publication gate
         id: gate
         run: |
