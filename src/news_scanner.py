@@ -4,6 +4,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from datetime import timedelta
 from pathlib import Path
 
 OUTPUT = Path("data/live/news_snapshot.json")
@@ -15,13 +16,15 @@ FEEDS = [
     ("SEC", "https://www.sec.gov/news/pressreleases.rss", "regulation_official"),
 ]
 MAX_ITEMS_PER_FEED = 20
+MAX_NEWS_AGE_HOURS = 36
 
 KNOWN_ASSET_NAMES={
     'bitcoin':'BTC','ethereum':'ETH','solana':'SOL','bnb':'BNB','xrp':'XRP','dogecoin':'DOGE','cardano':'ADA',
     'tron':'TRX','avalanche':'AVAX','chainlink':'LINK','sui':'SUI','toncoin':'TON','polkadot':'DOT','litecoin':'LTC',
     'shiba inu':'SHIB','pepe':'PEPE','uniswap':'UNI','aave':'AAVE','curve':'CRV','arbitrum':'ARB','optimism':'OP',
     'aptos':'APT','near protocol':'NEAR','cosmos':'ATOM','injective':'INJ','sei':'SEI','celestia':'TIA',
-    'hedera':'HBAR','stellar':'XLM','secret network':'SCRT','terra classic':'LUNC','gold':'XAUUSD','silver':'XAGUSD'
+    'hedera':'HBAR','stellar':'XLM','secret network':'SCRT','terra classic':'LUNC','gold':'XAUUSD','silver':'XAGUSD',
+    'ondo':'ONDO','hyperliquid':'HYPE','uniswap':'UNI','chainlink':'LINK','aave':'AAVE','curve finance':'CRV'
 }
 
 def extract_symbols(text: str) -> list[str]:
@@ -93,6 +96,16 @@ def parse_feed(source: str, category: str, payload: bytes) -> list[dict]:
         pub = text(item.find("pubDate")) or text(item.find("published")) or text(item.find("updated"))
         if not title or not link:
             continue
+        dt=parse_date(pub)
+        if dt:
+            try:
+                age=(datetime.now(timezone.utc)-datetime.fromisoformat(dt)).total_seconds()/3600
+                if age < -1 or age > MAX_NEWS_AGE_HOURS:
+                    continue
+            except Exception:
+                continue
+        else:
+            continue
         items.append({
             "source": source,
             "category": category,
@@ -101,7 +114,7 @@ def parse_feed(source: str, category: str, payload: bytes) -> list[dict]:
             "summary": description[:1200],
             "published_at": parse_date(pub),
             "symbols": extract_symbols(title + ' ' + description),
-            "news_score": score_article(title, description[:1200], category, parse_date(pub)),
+            "news_score": score_article(title, description[:1200], category, dt),
         })
     return items
 
@@ -130,6 +143,7 @@ def main() -> None:
         "categories": ["crypto_news", "macro_official", "regulation_official"],
         "articles": sorted(deduped[:80], key=lambda x: (float(x.get('news_score') or 0), str(x.get('published_at') or '')), reverse=True),
         "failures": failures,
+        "max_age_hours": MAX_NEWS_AGE_HOURS,
         "note": "RSS items are discovery leads. Official feeds are preferred for primary-source verification. The AI must verify material claims before publication and distinguish announcements from interpretation.",
     }
 
