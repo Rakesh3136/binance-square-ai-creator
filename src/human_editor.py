@@ -54,6 +54,140 @@ def make_post(draft,data):
     if not symbol:raise SystemExit('Editorial layer: primary symbol missing')
     lines=[clean(x) for x in original.splitlines() if clean(x)]
     lines=[x for x in lines if x.lower() not in {'key levels:','key scenario levels:','fresh check:','quick market check:','this is the crypto story i’m watching right now:','this is the crypto story i\'m watching right now:'}]
+    # Never carry an unsupported cashtag from an earlier/generic model response into publication.
+    allowed={symbol}
+    for raw in (selected.get('news_symbols') or []):
+        sx=re.sub(r'USDT
+    if style=='NEWS' and news:
+        hook=f"🚨 {news['title']}";source_line=f"Source: {news['source']}" if news.get('source') else '';body_lines=[hook]+([source_line] if source_line else [])
+        for line in lines:
+            if news['title'].lower() not in line.lower() and line.lower()!=source_line.lower() and len(line)>=18:body_lines.append(line)
+        body_lines=body_lines[:8]
+    else:body_lines=[lines[0] if lines else f'${symbol} is giving the market a signal worth watching.']+[x for x in lines[1:] if len(x)>=18][:6]
+    lv=chart_levels(draft,data)
+    if lv:
+        p=[]
+        for key,label in [('current_price','price'),('support','support'),('resistance','resistance'),('tp1','TP1'),('target','target'),('invalidation','invalidation')]:
+            if lv.get(key) is not None:p.append(f'{label} ${fmt(lv[key])}')
+        if p:body_lines.append('📍 '+' • '.join(p))
+        direction=str(lv.get('direction') or '').lower()
+        if 'long' in direction:body_lines.append('Bull case: sustained acceptance above resistance strengthens the upside scenario; losing support weakens it.')
+        elif 'short' in direction:body_lines.append('Bear case: a failed reclaim keeps downside risk active; invalidation is the level to watch.')
+    questions=STYLE_QUESTIONS[style];qidx=sum(ord(c) for c in (symbol+style+datetime.now(timezone.utc).strftime('%Y-%m-%d-%H')))%len(questions);question=questions[qidx]
+    if style=='NEWS' and symbol and '$' not in question:question=question.rstrip('?')+f' for ${symbol}?'
+    body='\n\n'.join(body_lines);body=re.sub(r'\?','.',body).strip(' .');text=polish_repetitions((body+'\n\n'+question)[:1200])
+    if text.count('?')!=1:text=re.sub(r'\?','.',text).rstrip('.')+'\n\n'+question
+    return text,style,question,news
+def main():
+    path=Path(os.environ.get('DRAFT_PATH',''))
+    if not path.exists():raise SystemExit('DRAFT_PATH is missing')
+    data=load(path,{});draft=data.setdefault('draft',{});text,style,question,news=make_post(draft,data)
+    draft.update({'post':text,'text':text,'editorial_style':style.lower(),'human_editor':{'status':'POLISHED','version':'human-editor-v11','style':style,'question':question,'fresh_news_used':bool(news),'question_count':1,'fact_policy':'preserve supplied evidence only','repetition_cleanup':True}})
+    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v10','style':style,'characters':len(text),'question':question,'fresh_news':bool(news),'repetition_cleanup':True},indent=2,ensure_ascii=False),encoding='utf-8');path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v10','characters':len(text),'style':style,'question':question,'fresh_news':bool(news)}))
+if __name__=='__main__':main()
+,'',str(raw or '').upper().replace('
+    if style=='NEWS' and news:
+        hook=f"🚨 {news['title']}";source_line=f"Source: {news['source']}" if news.get('source') else '';body_lines=[hook]+([source_line] if source_line else [])
+        for line in lines:
+            if news['title'].lower() not in line.lower() and line.lower()!=source_line.lower() and len(line)>=18:body_lines.append(line)
+        body_lines=body_lines[:8]
+    else:body_lines=[lines[0] if lines else f'${symbol} is giving the market a signal worth watching.']+[x for x in lines[1:] if len(x)>=18][:6]
+    lv=chart_levels(draft,data)
+    if lv:
+        p=[]
+        for key,label in [('current_price','price'),('support','support'),('resistance','resistance'),('tp1','TP1'),('target','target'),('invalidation','invalidation')]:
+            if lv.get(key) is not None:p.append(f'{label} ${fmt(lv[key])}')
+        if p:body_lines.append('📍 '+' • '.join(p))
+        direction=str(lv.get('direction') or '').lower()
+        if 'long' in direction:body_lines.append('Bull case: sustained acceptance above resistance strengthens the upside scenario; losing support weakens it.')
+        elif 'short' in direction:body_lines.append('Bear case: a failed reclaim keeps downside risk active; invalidation is the level to watch.')
+    questions=STYLE_QUESTIONS[style];qidx=sum(ord(c) for c in (symbol+style+datetime.now(timezone.utc).strftime('%Y-%m-%d-%H')))%len(questions);question=questions[qidx]
+    if style=='NEWS' and symbol and '$' not in question:question=question.rstrip('?')+f' for ${symbol}?'
+    body='\n\n'.join(body_lines);body=re.sub(r'\?','.',body).strip(' .');text=polish_repetitions((body+'\n\n'+question)[:1200])
+    if text.count('?')!=1:text=re.sub(r'\?','.',text).rstrip('.')+'\n\n'+question
+    return text,style,question,news
+def main():
+    path=Path(os.environ.get('DRAFT_PATH',''))
+    if not path.exists():raise SystemExit('DRAFT_PATH is missing')
+    data=load(path,{});draft=data.setdefault('draft',{});text,style,question,news=make_post(draft,data)
+    draft.update({'post':text,'text':text,'editorial_style':style.lower(),'human_editor':{'status':'POLISHED','version':'human-editor-v10','style':style,'question':question,'fresh_news_used':bool(news),'question_count':1,'fact_policy':'preserve supplied evidence only','repetition_cleanup':True}})
+    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v10','style':style,'characters':len(text),'question':question,'fresh_news':bool(news),'repetition_cleanup':True},indent=2,ensure_ascii=False),encoding='utf-8');path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v10','characters':len(text),'style':style,'question':question,'fresh_news':bool(news)}))
+if __name__=='__main__':main()
+,'').strip())
+        if re.fullmatch(r'[A-Z0-9]{1,15}',sx): allowed.add(sx)
+    for raw in ((data.get('publication_context') or {}).get('news_symbols') or []):
+        sx=re.sub(r'USDT
+    if style=='NEWS' and news:
+        hook=f"🚨 {news['title']}";source_line=f"Source: {news['source']}" if news.get('source') else '';body_lines=[hook]+([source_line] if source_line else [])
+        for line in lines:
+            if news['title'].lower() not in line.lower() and line.lower()!=source_line.lower() and len(line)>=18:body_lines.append(line)
+        body_lines=body_lines[:8]
+    else:body_lines=[lines[0] if lines else f'${symbol} is giving the market a signal worth watching.']+[x for x in lines[1:] if len(x)>=18][:6]
+    lv=chart_levels(draft,data)
+    if lv:
+        p=[]
+        for key,label in [('current_price','price'),('support','support'),('resistance','resistance'),('tp1','TP1'),('target','target'),('invalidation','invalidation')]:
+            if lv.get(key) is not None:p.append(f'{label} ${fmt(lv[key])}')
+        if p:body_lines.append('📍 '+' • '.join(p))
+        direction=str(lv.get('direction') or '').lower()
+        if 'long' in direction:body_lines.append('Bull case: sustained acceptance above resistance strengthens the upside scenario; losing support weakens it.')
+        elif 'short' in direction:body_lines.append('Bear case: a failed reclaim keeps downside risk active; invalidation is the level to watch.')
+    questions=STYLE_QUESTIONS[style];qidx=sum(ord(c) for c in (symbol+style+datetime.now(timezone.utc).strftime('%Y-%m-%d-%H')))%len(questions);question=questions[qidx]
+    if style=='NEWS' and symbol and '$' not in question:question=question.rstrip('?')+f' for ${symbol}?'
+    body='\n\n'.join(body_lines);body=re.sub(r'\?','.',body).strip(' .');text=polish_repetitions((body+'\n\n'+question)[:1200])
+    if text.count('?')!=1:text=re.sub(r'\?','.',text).rstrip('.')+'\n\n'+question
+    return text,style,question,news
+def main():
+    path=Path(os.environ.get('DRAFT_PATH',''))
+    if not path.exists():raise SystemExit('DRAFT_PATH is missing')
+    data=load(path,{});draft=data.setdefault('draft',{});text,style,question,news=make_post(draft,data)
+    draft.update({'post':text,'text':text,'editorial_style':style.lower(),'human_editor':{'status':'POLISHED','version':'human-editor-v10','style':style,'question':question,'fresh_news_used':bool(news),'question_count':1,'fact_policy':'preserve supplied evidence only','repetition_cleanup':True}})
+    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v10','style':style,'characters':len(text),'question':question,'fresh_news':bool(news),'repetition_cleanup':True},indent=2,ensure_ascii=False),encoding='utf-8');path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v10','characters':len(text),'style':style,'question':question,'fresh_news':bool(news)}))
+if __name__=='__main__':main()
+,'',str(raw or '').upper().replace('
+    if style=='NEWS' and news:
+        hook=f"🚨 {news['title']}";source_line=f"Source: {news['source']}" if news.get('source') else '';body_lines=[hook]+([source_line] if source_line else [])
+        for line in lines:
+            if news['title'].lower() not in line.lower() and line.lower()!=source_line.lower() and len(line)>=18:body_lines.append(line)
+        body_lines=body_lines[:8]
+    else:body_lines=[lines[0] if lines else f'${symbol} is giving the market a signal worth watching.']+[x for x in lines[1:] if len(x)>=18][:6]
+    lv=chart_levels(draft,data)
+    if lv:
+        p=[]
+        for key,label in [('current_price','price'),('support','support'),('resistance','resistance'),('tp1','TP1'),('target','target'),('invalidation','invalidation')]:
+            if lv.get(key) is not None:p.append(f'{label} ${fmt(lv[key])}')
+        if p:body_lines.append('📍 '+' • '.join(p))
+        direction=str(lv.get('direction') or '').lower()
+        if 'long' in direction:body_lines.append('Bull case: sustained acceptance above resistance strengthens the upside scenario; losing support weakens it.')
+        elif 'short' in direction:body_lines.append('Bear case: a failed reclaim keeps downside risk active; invalidation is the level to watch.')
+    questions=STYLE_QUESTIONS[style];qidx=sum(ord(c) for c in (symbol+style+datetime.now(timezone.utc).strftime('%Y-%m-%d-%H')))%len(questions);question=questions[qidx]
+    if style=='NEWS' and symbol and '$' not in question:question=question.rstrip('?')+f' for ${symbol}?'
+    body='\n\n'.join(body_lines);body=re.sub(r'\?','.',body).strip(' .');text=polish_repetitions((body+'\n\n'+question)[:1200])
+    if text.count('?')!=1:text=re.sub(r'\?','.',text).rstrip('.')+'\n\n'+question
+    return text,style,question,news
+def main():
+    path=Path(os.environ.get('DRAFT_PATH',''))
+    if not path.exists():raise SystemExit('DRAFT_PATH is missing')
+    data=load(path,{});draft=data.setdefault('draft',{});text,style,question,news=make_post(draft,data)
+    draft.update({'post':text,'text':text,'editorial_style':style.lower(),'human_editor':{'status':'POLISHED','version':'human-editor-v10','style':style,'question':question,'fresh_news_used':bool(news),'question_count':1,'fact_policy':'preserve supplied evidence only','repetition_cleanup':True}})
+    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v10','style':style,'characters':len(text),'question':question,'fresh_news':bool(news),'repetition_cleanup':True},indent=2,ensure_ascii=False),encoding='utf-8');path.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'HUMAN_EDITOR_APPLIED','version':'human-editor-v10','characters':len(text),'style':style,'question':question,'fresh_news':bool(news)}))
+if __name__=='__main__':main()
+,'').strip())
+        if re.fullmatch(r'[A-Z0-9]{1,15}',sx): allowed.add(sx)
+    if news:
+        news_title_text=clean(selected.get('news_title') or (data.get('publication_context') or {}).get('news_title'))
+        if 'gold' in news_title_text.lower(): allowed.add('XAUUSD')
+        if 'silver' in news_title_text.lower(): allowed.add('XAGUSD')
+    def foreign_cashtags(line):
+        return [m.upper() for m in re.findall(r'\\$([A-Z][A-Z0-9]{0,14})\\b', line.upper()) if m.upper() not in allowed]
+    sanitized=[]
+    for line in lines:
+        foreign=foreign_cashtags(line)
+        # A foreign ticker is not supported by the selected story; dropping that line is safer than publishing an unrelated claim.
+        if foreign:
+            continue
+        sanitized.append(line)
+    lines=sanitized
     if style=='NEWS' and news:
         hook=f"🚨 {news['title']}";source_line=f"Source: {news['source']}" if news.get('source') else '';body_lines=[hook]+([source_line] if source_line else [])
         for line in lines:
