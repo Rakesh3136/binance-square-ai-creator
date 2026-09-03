@@ -11,6 +11,8 @@ OUTPUT_DIR = Path("data/reports")
 LIVE_SNAPSHOT = Path("data/live/market_snapshot.json")
 NEWS_SNAPSHOT = Path("data/live/news_snapshot.json")
 PREFLIGHT = Path("data/live/editorial_preflight.json")
+CREATOR_BRAIN = Path("data/live/creator_brain_decision.json")
+PUBLICATION_CONTEXT = Path("data/live/publication_context.json")
 STRATEGY_MEMORY = Path("analytics/strategy_memory.json")
 CREATOR_PATTERNS = Path("data/intelligence/creator_patterns.json")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -200,6 +202,8 @@ def main():
     preflight = load(PREFLIGHT)
     memory = load(STRATEGY_MEMORY)
     creator_patterns = load(CREATOR_PATTERNS)
+    creator_brain = load(CREATOR_BRAIN)
+    publication_context = load(PUBLICATION_CONTEXT)
     selected = preflight.get("selected_opportunity") or {}
 
     if os.getenv("LOCAL_FALLBACK", "").lower() == "true":
@@ -215,6 +219,9 @@ def main():
         engagement = preflight.get("engagement_strategy") or {}
         instruction = TOPIC or selected.get("instruction") or "Choose the strongest evidence-based opportunity across all supplied market and news lanes."
         prompt = (
+            "CREATOR BRAIN 5.1 — AUTHORITATIVE STORY DECISION:\n" + json.dumps(creator_brain, ensure_ascii=False, indent=2) +
+            "\n\nPUBLICATION CONTEXT — AUTHORITATIVE ASSET/FORMAT/VISUAL CONTRACT:\n" + json.dumps(publication_context, ensure_ascii=False, indent=2) +
+            "\n\nNON-NEGOTIABLE: preserve the frozen primary asset, story engine, editorial format and verified TradingView chart symbols. Produce the final finished Binance Square post itself, not instructions.\n\n" +
             "EDITORIAL LANE:\n" + instruction +
             "\n\nOUR ENGAGEMENT STRATEGY:\n" + json.dumps(engagement, ensure_ascii=False, indent=2) +
             "\n\nPUBLIC CREATOR PATTERNS:\n" + json.dumps(creator_patterns, ensure_ascii=False, indent=2) +
@@ -233,7 +240,7 @@ def main():
     visual = normalize_visual(result.get("visual_plan"))
     draft["experiment_id"] = (preflight.get("engagement_strategy") or {}).get("experiment_id") or preflight.get("recommended_experiment") or "A"
     draft["experiment_format"] = ((preflight.get("engagement_strategy") or {}).get("experiment") or {}).get("format")
-    draft["symbol"] = selected.get("symbol") or research.get("strongest_signal") or ""
+    draft["symbol"] = publication_context.get("symbol") or selected.get("symbol") or research.get("strongest_signal") or ""
     draft["content_category"] = selected.get("category") or selected.get("reason") or "market_opportunity"
     draft["publication_status"] = "DRAFT_ONLY_NOT_PUBLISHED"
     draft["generation_mode"] = generation_mode
@@ -259,6 +266,8 @@ def main():
         "draft": draft,
         "visual_plan": visual,
         "status": "DRAFT_ONLY_NOT_PUBLISHED",
+        "creator_brain": creator_brain,
+        "publication_context": publication_context,
         "generation_mode": generation_mode,
         "gemini_requests_used": 1 if generation_mode == "GEMINI" else 0,
     }
