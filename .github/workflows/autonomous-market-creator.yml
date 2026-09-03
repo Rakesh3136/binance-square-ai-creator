@@ -50,9 +50,14 @@ jobs:
           if [ -n "$TOPIC" ]; then python src/workflow_helpers.py manual-topic; fi
       - name: TradingView asset eligibility gate
         run: python src/tradingview_asset_gate.py
-      - name: Refresh performance learning before story selection
+      - name: Refresh performance learning and engagement strategy
         run: |
           python src/signal_outcome_tracker.py
+          python src/performance_feedback.py
+          python src/creator_growth_system.py
+          python src/living_brain.py
+          python src/engagement_engine.py
+          python src/freeze_opportunity.py
           python src/performance_feedback.py
           python src/creator_growth_system.py
           python src/living_brain.py
@@ -62,14 +67,7 @@ jobs:
         run: python src/script_director_4.py
       - name: Creator 4.2 Candidate Generation Brief
         run: python src/candidate_generation_4.py
-      - name: Run growth and engagement intelligence
-        run: |
-          python src/engagement_engine.py
-          python src/freeze_opportunity.py
-          python src/performance_feedback.py
-          python src/creator_growth_system.py
-          python src/living_brain.py
-      - name: Run Creator Brain
+      - name: Run Creator Brain after authoritative story selection
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
