@@ -70,7 +70,7 @@ def choose_mode():
 
 def evaluate(report):
     data=load(report); draft=data.get('draft') or {}; post=str(draft.get('post') or draft.get('text') or '').strip(); rescue=data.get('publish_rescue') is True
-    ctx=load(CONTEXT_PATH); expected=authoritative_symbol(data); pre=load(PREFLIGHT_PATH); visual=dict(data.get('visual_plan') or {}); visual.update({'type':'candlestick_chart','use_visual':True,'provider':'TradingView'})
+    ctx=load(CONTEXT_PATH); expected=authoritative_symbol(data); pre=load(PREFLIGHT_PATH); visual=dict(data.get('visual_plan') or {}); visual.update({'type':'candlestick_chart','use_visual':True,'provider':'TradingView','publication_mode':choose_mode()})
     if ctx.get('symbol') and clean_symbol(ctx.get('symbol'))!=expected:
         raise SystemExit(f'Publication context inconsistency: context={ctx.get("symbol")}, expected={expected}')
     try:
