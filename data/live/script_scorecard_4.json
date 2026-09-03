@@ -1,29 +1,14 @@
 {
-  "version": "4.4",
+  "version": "5.1",
   "format": "BREAKING NEWS + MARKET IMPACT",
+  "story_engine": "NEWSROOM",
   "candidate_count": 3,
-  "winner": {
-    "index": 0,
-    "script": "🚨 The headline changed the setup. The real question is whether the market agrees.\n\nUse verified current data and explain what matters next.\n\nWhat are you watching?",
-    "total": 84,
-    "breakdown": {
-      "attention": 25,
-      "usefulness": 10,
-      "interaction": 15,
-      "evidence": 15,
-      "originality": 10,
-      "safety": 5,
-      "story": 4
-    },
-    "risk_flag": false,
-    "word_count": 26,
-    "question_count": 1
-  },
+  "winner": null,
   "candidates": [
     {
       "index": 0,
       "script": "🚨 The headline changed the setup. The real question is whether the market agrees.\n\nUse verified current data and explain what matters next.\n\nWhat are you watching?",
-      "total": 84,
+      "total": 59,
       "breakdown": {
         "attention": 25,
         "usefulness": 10,
@@ -35,12 +20,19 @@
       },
       "risk_flag": false,
       "word_count": 26,
-      "question_count": 1
+      "question_count": 1,
+      "completeness_failures": [
+        "missing_primary_cashtag",
+        "too_short_to_be_a_finished_story",
+        "news_story_not_grounded_in_selected_event",
+        "news_source_context_missing"
+      ],
+      "eligible": false
     },
     {
       "index": 2,
       "script": "Fresh information just hit — but the chart still has the final vote.\n\nUse verified current data and explain what matters next.\n\nWhat are you watching?",
-      "total": 80,
+      "total": 55,
       "breakdown": {
         "attention": 17,
         "usefulness": 10,
@@ -52,12 +44,19 @@
       },
       "risk_flag": false,
       "word_count": 25,
-      "question_count": 1
+      "question_count": 1,
+      "completeness_failures": [
+        "missing_primary_cashtag",
+        "too_short_to_be_a_finished_story",
+        "news_story_not_grounded_in_selected_event",
+        "news_source_context_missing"
+      ],
+      "eligible": false
     },
     {
       "index": 1,
       "script": "The news is easy to repeat. The interesting part is what price does with it.\n\nUse verified current data and explain what matters next.\n\nWhat are you watching?",
-      "total": 76,
+      "total": 51,
       "breakdown": {
         "attention": 17,
         "usefulness": 10,
@@ -69,14 +68,24 @@
       },
       "risk_flag": false,
       "word_count": 28,
-      "question_count": 1
+      "question_count": 1,
+      "completeness_failures": [
+        "missing_primary_cashtag",
+        "too_short_to_be_a_finished_story",
+        "news_story_not_grounded_in_selected_event",
+        "news_source_context_missing"
+      ],
+      "eligible": false
     }
   ],
   "minimum_publish_score": 70,
+  "evidence_gate": true,
   "policy": [
     "Never optimize for clicks alone.",
     "Reject unsupported certainty and fabricated claims.",
-    "Prefer evidence-rich interaction over empty engagement bait.",
+    "Reject instruction-like placeholder drafts that are too short to be finished stories.",
+    "Require the frozen primary cashtag and exactly one specific question.",
+    "When news is selected, require grounding in the selected event and source context.",
     "Use performance data as an experiment, not as knowledge of a private platform algorithm."
   ]
 }
