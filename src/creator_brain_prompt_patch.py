@@ -29,14 +29,13 @@ def main():
         print({"status": "CREATOR_BRAIN_5_1_BRIDGE_ALREADY_PRESENT"})
         return
 
-    bridge = '''        brain_context = (
+    bridge = """        brain_context = (
         "\\n\\nCREATOR_BRAIN_5_1_RUNTIME_BRIDGE:\\n"
         "AUTHORITATIVE CREATOR BRAIN DECISION:\\n" + json.dumps(brain, ensure_ascii=False, indent=2) +
         "\\nAUTHORITATIVE PUBLICATION CONTEXT:\\n" + json.dumps(context, ensure_ascii=False, indent=2) +
         "\\nRULE: frozen primary asset, story engine, editorial format and verified chart symbols are authoritative. The final output must be a finished Binance Square post, not instructions to another writer. Use exactly one specific question. Never invent a second asset, news fact, source, price, target, creator call or outcome.\\n"
     )
-        )
-'''
+"""
 
     pattern = r"(\n\s*prompt\s*=\s*\(\s*\n)"
     text, count = re.subn(pattern, lambda _: "\n" + bridge + "\n", text, count=1)
