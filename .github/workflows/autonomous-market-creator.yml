@@ -77,7 +77,6 @@ jobs:
           python src/publication_context.py
           python src/self_repair_agent.py
           python src/editorial_prompt_patch.py
-          python src/creator_brain_prompt_patch.py
           python -m compileall -q src
       - name: Create AI draft
         env:
@@ -234,7 +233,7 @@ jobs:
             echo 'No Creator state changes to persist.'
             exit 0
           fi
-          git commit -m 'Record Creator 5.1 cycle'
+          git commit -m 'Record Creator 5.2 cycle'
           git fetch origin main
           git rebase --autostash origin/main
           git push origin HEAD:main
