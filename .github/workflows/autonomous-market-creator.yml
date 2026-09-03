@@ -1,4 +1,4 @@
-name: Binance Square AI Creator 4.4
+name: Binance Square AI Creator 5.1
 
 on:
   schedule:
@@ -35,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Reset production cycle
-        run: python src/pipeline_stage.py reset 'Fresh Creator 4.4 production cycle'
+        run: python src/pipeline_stage.py reset 'Fresh Creator 5.1 production cycle'
       - name: Refresh live market
         run: python src/live_market_scanner.py
       - name: Refresh fresh crypto and macro news
@@ -61,22 +61,23 @@ jobs:
           python src/performance_feedback.py
           python src/creator_growth_system.py
           python src/living_brain.py
-      - name: Creator 4.4 Content Director
-        run: python src/content_director_4.py
-      - name: Creator 4.4 Script Director
-        run: python src/script_director_4.py
-      - name: Creator 4.2 Candidate Generation Brief
-        run: python src/candidate_generation_4.py
-      - name: Run Creator Brain after authoritative story selection
+      - name: Creator 5.1 Brain - authoritative story decision
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
-          python src/pipeline_stage.py creator_brain success 'Creator 4.4 Brain decision completed'
+          python src/pipeline_stage.py creator_brain success 'Creator 5.1 Brain decision completed'
+      - name: Creator 5.0 Content Director
+        run: python src/content_director_4.py
+      - name: Creator 5.0 Script Director
+        run: python src/script_director_4.py
+      - name: Creator 5.0 Candidate Generation Brief
+        run: python src/candidate_generation_4.py
       - name: Prepare publication context
         run: |
           python src/publication_context.py
           python src/self_repair_agent.py
           python src/editorial_prompt_patch.py
+          python src/creator_brain_prompt_patch.py
           python -m compileall -q src
       - name: Create AI draft
         env:
@@ -102,7 +103,7 @@ jobs:
           if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
           if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
           exit 0
-      - name: Generate and score 4.2 candidate scripts
+      - name: Generate and score 5.1 candidate scripts
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -214,9 +215,10 @@ jobs:
           echo '=== PIPELINE STATUS ==='; test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
           echo '=== NEWS SNAPSHOT ==='; test -f data/live/news_snapshot.json && cat data/live/news_snapshot.json || true
           echo '=== PUBLICATION CONTEXT ==='; test -f data/live/publication_context.json && cat data/live/publication_context.json || true
-          echo '=== CONTENT DIRECTOR ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
-          echo '=== SCRIPT DIRECTOR ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
-          echo '=== CANDIDATE SCORECARD ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
+          echo '=== CREATOR BRAIN 5.1 ==='; test -f data/live/creator_brain_decision.json && cat data/live/creator_brain_decision.json || true
+          echo '=== CONTENT DIRECTOR 5.0 ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
+          echo '=== SCRIPT DIRECTOR 5.0 ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
+          echo '=== CANDIDATE SCORECARD 5.1 ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
           echo '=== PERFORMANCE FEEDBACK ==='; test -f data/intelligence/performance_feedback.json && cat data/intelligence/performance_feedback.json || true
           echo '=== PUBLICATION GATE ==='; test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
       - name: Persist state
@@ -232,7 +234,7 @@ jobs:
             echo 'No Creator state changes to persist.'
             exit 0
           fi
-          git commit -m 'Record Creator 4.4 cycle'
+          git commit -m 'Record Creator 5.1 cycle'
           git fetch origin main
           git rebase --autostash origin/main
           git push origin HEAD:main
