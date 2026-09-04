@@ -1,4 +1,9 @@
-"""Lock the production-cycle identity and publication package before AI generation."""
+"""Lock the production-cycle identity and publication package before AI generation.
+
+Creator 6.0: full-market newsroom/analyst mode.  News is an input lane, not an
+automatic reason to publish an article.  The story director explicitly chooses
+article mode; otherwise the normal TradingView/image format is used.
+"""
 from __future__ import annotations
 import json,re
 from datetime import datetime,timezone
@@ -24,7 +29,7 @@ def main():
  if fs and bs and fs!=bs:raise SystemExit(f'Asset drift detected: frozen={fs}, brain={bs}')
  title=str(selected.get('news_title') or frozen.get('news_title') or '').strip(); news_authoritative=bool(title)
  if selected.get('symbol') and clean(selected.get('symbol'))!=symbol and not news_authoritative:raise SystemExit(f'Asset drift detected: frozen={symbol}, selected={clean(selected.get("symbol"))}')
- category='breaking_news' if news_authoritative else str(frozen.get('category') or selected.get('category') or director.get('primary_story',{}).get('lane') or 'market_opportunity').lower()
+ category=str(frozen.get('category') or selected.get('category') or director.get('primary_story',{}).get('lane') or ('breaking_news' if news_authoritative else 'market_opportunity')).lower()
  fmt=str(brain.get('editorial_format') or director.get('recommended_format') or experiment.get('format') or 'NEWS REACTION').upper()
  requested=[]
  for obj in (brain.get('visual_decision') or {},director.get('visual_plan') or {}):
@@ -39,8 +44,12 @@ def main():
  if pair_requested:
   for s in requested:
    if s!=symbol:chart_symbols.append(s)
- news_source=str(selected.get('news_source') or frozen.get('news_source') or '').strip(); publication_mode='article' if news_authoritative else 'image'
+ news_source=str(selected.get('news_source') or frozen.get('news_source') or '').strip()
+ # Article mode is opt-in. A verified news story can still be a normal
+ # TradingView/image post, which is the default Creator 6.0 behavior.
+ explicit_article = str(director.get('publication_mode') or director.get('format_mode') or '').strip().lower() == 'article' or str(brain.get('publication_mode') or '').strip().lower() == 'article'
+ publication_mode='article' if explicit_article else 'image'
  visual_decision={**(brain.get('visual_decision') or {}),'type':'candlestick_chart','use_visual':True,'required':True,'provider':'TradingView','timeframe':'1H','chart_symbols':chart_symbols,'layout':'pair' if len(chart_symbols)>1 else 'single'}
- context={'version':5.5,'locked_at':datetime.now(timezone.utc).isoformat(),'symbol':symbol,'symbol_usdt':symbol+'USDT','category':category,'opportunity_score':float(frozen.get('score',0) or 0),'reason':str(frozen.get('reason') or brain.get('reason') or ''),'instruction':str(selected.get('instruction') or frozen.get('instruction') or ''),'editorial_format':fmt,'story_engine':str(brain.get('story_engine') or director.get('narrative_engine') or 'NEWSROOM'),'conversation_goal':str(brain.get('conversation_goal') or 'specific_reply'),'publication_mode':publication_mode,'article_title':title[:180] if news_authoritative else '','news_title':title[:240],'news_source':news_source,'headline_assets':headline_assets,'chart_symbols':chart_symbols,'experiment_id':str(engagement.get('experiment_id') or experiment.get('id') or ''),'experiment_format':str(experiment.get('format') or fmt),'experiment_hook':str(experiment.get('hook') or ''),'experiment_question':str(experiment.get('question') or ''),'market_phase':str(brain.get('market_phase') or 'UNKNOWN'),'visual_decision':visual_decision,'content_coverage':engagement.get('content_coverage') or [],'style_rule':str(engagement.get('style_rule') or ''),'hook_rule':str(engagement.get('hook_rule') or ''),'question_rule':str(engagement.get('question_rule') or ''),'writing_rule':str(engagement.get('writing_rule') or ''),'technical_rule':str(engagement.get('technical_rule') or ''),'creator_tracking_rule':str(engagement.get('creator_tracking_rule') or ''),'growth_rule':str(engagement.get('growth_rule') or ''),'monetization_rule':str(engagement.get('monetization_rule') or ''),'source':'frozen opportunity + Creator Brain + Content Director + engagement strategy + fresh news','guardrail':'Frozen primary asset is authoritative. If a verified news headline explicitly names another supported asset, it is treated as an explicit multi-asset news story: headline, body, cashtags and TradingView visuals must remain coherent. No arbitrary fallback asset is added.'}
+ context={'version':6.0,'locked_at':datetime.now(timezone.utc).isoformat(),'symbol':symbol,'symbol_usdt':symbol+'USDT','category':category,'opportunity_score':float(frozen.get('score',0) or 0),'reason':str(frozen.get('reason') or brain.get('reason') or ''),'instruction':str(selected.get('instruction') or frozen.get('instruction') or ''),'editorial_format':fmt,'story_engine':str(brain.get('story_engine') or director.get('narrative_engine') or 'FULL_MARKET_NEWSROOM'),'conversation_goal':str(brain.get('conversation_goal') or 'specific_reply'),'publication_mode':publication_mode,'article_title':title[:180] if publication_mode=='article' else '','news_title':title[:240],'news_source':news_source,'headline_assets':headline_assets,'chart_symbols':chart_symbols,'experiment_id':str(engagement.get('experiment_id') or experiment.get('id') or ''),'experiment_format':str(experiment.get('format') or fmt),'experiment_hook':str(experiment.get('hook') or ''),'experiment_question':str(experiment.get('question') or ''),'market_phase':str(brain.get('market_phase') or 'UNKNOWN'),'visual_decision':visual_decision,'content_coverage':engagement.get('content_coverage') or [],'style_rule':str(engagement.get('style_rule') or ''),'hook_rule':str(engagement.get('hook_rule') or ''),'question_rule':str(engagement.get('question_rule') or ''),'writing_rule':str(engagement.get('writing_rule') or ''),'technical_rule':str(engagement.get('technical_rule') or ''),'creator_tracking_rule':str(engagement.get('creator_tracking_rule') or ''),'growth_rule':str(engagement.get('growth_rule') or ''),'monetization_rule':str(engagement.get('monetization_rule') or ''),'source':'frozen opportunity + Creator Brain + Content Director + engagement strategy + fresh news','guardrail':'Creator 6.0 covers the full crypto market. News is one opportunity lane, not an automatic article trigger. Frozen primary asset is authoritative. If a verified news headline explicitly names another supported asset, it is treated as an explicit multi-asset story: headline, body, cashtags and TradingView visuals must remain coherent. No arbitrary fallback asset is added.'}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(context,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(context,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
