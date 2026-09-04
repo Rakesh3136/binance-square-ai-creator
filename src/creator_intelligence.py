@@ -141,33 +141,45 @@ def main():
     our_by_format=defaultdict(lambda:{"n":0,"views":0,"likes":0,"replies":0,"followers":0})
     our_by_experiment=defaultdict(lambda:{"n":0,"views":0,"likes":0,"replies":0,"followers":0})
     for r in our_results:
-        p=our_by_format[r["format"]]; p["n"]+=1
-        e=our_by_experiment[r["experiment"]]; e["n"]+=1
+        fmt=r["format"]; exp=r["experiment"]
+        of=our_by_format[fmt]; of["n"]+=1
+        oe=our_by_experiment[exp]; oe["n"]+=1
         for k in ("views","likes","replies","followers"):
-            p[k]+=r[k]; e[k]+=r[k]
+            of[k]+=r[k]; oe[k]+=r[k]
 
-    def summarize(group):
-        out=[]
-        for name,p in group.items():
-            n=max(1,p["n"])
-            out.append({"name":name,"samples":p["n"],"avg_views":round(p["views"]/n,2),"avg_likes":round(p["likes"]/n,2),"avg_replies":round(p["replies"]/n,2),"avg_followers":round(p["followers"]/n,2),"reply_rate":round(p["replies"]/max(1,p["views"]),5),"follower_rate":round(p["followers"]/max(1,p["views"]),5)})
-        return sorted(out,key=lambda x:(x["samples"],x["reply_rate"],x["follower_rate"]),reverse=True)
+    our_format_ranked=[]
+    for fmt,p in our_by_format.items():
+        n=max(1,p["n"])
+        our_format_ranked.append({"name":fmt,"samples":p["n"],"avg_views":round(p["views"]/n,2),"avg_likes":round(p["likes"]/n,2),"avg_replies":round(p["replies"]/n,2),"avg_followers":round(p["followers"]/n,2),"reply_rate":round(p["replies"]/max(1,p["views"]),5),"follower_rate":round(p["followers"]/max(1,p["views"]),5)})
 
-    our_ranked=summarize(our_by_format); our_experiment_ranked=summarize(our_by_experiment)
-    baseline_views=sum(r["views"] for r in our_results)/max(1,len(our_results))
-    baseline_replies=sum(r["replies"] for r in our_results)/max(1,len(our_results))
-    baseline_followers=sum(r["followers"] for r in our_results)/max(1,len(our_results))
+    our_exp_ranked=[]
+    for exp,p in our_by_experiment.items():
+        n=max(1,p["n"])
+        our_exp_ranked.append({"name":exp,"samples":p["n"],"avg_views":round(p["views"]/n,2),"avg_likes":round(p["likes"]/n,2),"avg_replies":round(p["replies"]/n,2),"avg_followers":round(p["followers"]/n,2),"reply_rate":round(p["replies"]/max(1,p["views"]),5),"follower_rate":round(p["followers"]/max(1,p["views"]),5)})
 
-    patterns={
+    total_views=sum(r["views"] for r in our_results)
+    total_replies=sum(r["replies"] for r in our_results)
+    total_followers=sum(r["followers"] for r in our_results)
+    n_our=max(1,len(our_results))
+    our_baseline={"samples":len(our_results),"avg_views":round(total_views/n_our,2),"avg_replies":round(total_replies/n_our,2),"avg_followers":round(total_followers/n_our,2)}
+
+    out={
         "generated_at":datetime.now(timezone.utc).isoformat(),
         "source_policy":"Public examples only; learn patterns, never copy creator wording, identities, branding or distinctive phrasing.",
-        "sample_count":len(examples)-len(rejected),"rejected_examples":rejected[:50],
-        "creator_count":len([x for x in creator_counts if x!="unknown"]),"source_count":len([x for x in source_counts if x!="unknown"]),
-        "archetype_counts":dict(archetype_counts),"format_counts":dict(format_counts),"length_buckets":dict(length_buckets),
-        "question_patterns":question_patterns.most_common(20),"visual_patterns":visual_patterns.most_common(20),
-        "performance_by_archetype":ranked,"creator_benchmarks":creator_ranked[:30],
-        "our_account_performance_by_format":our_ranked,"our_account_performance_by_experiment":our_experiment_ranked,
-        "our_baseline":{"samples":len(our_results),"avg_views":round(baseline_views,2),"avg_replies":round(baseline_replies,2),"avg_followers":round(baseline_followers,2)},
+        "sample_count":len(examples),
+        "rejected_examples":rejected,
+        "creator_count":len(creator_counts),
+        "source_count":len(source_counts),
+        "archetype_counts":dict(archetype_counts),
+        "format_counts":dict(format_counts),
+        "length_buckets":dict(length_buckets),
+        "question_patterns":question_patterns.most_common(10),
+        "visual_patterns":visual_patterns.most_common(10),
+        "performance_by_archetype":ranked,
+        "creator_benchmarks":creator_ranked,
+        "our_account_performance_by_format":our_format_ranked,
+        "our_account_performance_by_experiment":our_exp_ranked,
+        "our_baseline":our_baseline,
         "reusable_rules":[
             "Require multiple independent examples before treating a pattern as strong evidence.",
             "Treat creator benchmarks as directional evidence, not proof of causation.",
@@ -177,12 +189,12 @@ def main():
             "Do not claim to know Binance's proprietary recommendation algorithm from public observations.",
             "Test one major variable at a time when possible: hook, format, visual, topic or question.",
             "For technical posts, real OHLCV data and honest uncertainty outrank visual hype.",
-            "For monetization, include a relevant cashtag or real chart widget when discussing a tradeable asset; Binance says these enable attribution for Write to Earn.",
+            "For monetization, include a relevant cashtag or real chart widget when discussing a tradeable asset; Binance says these enable attribution for Write to Earn."
         ],
-        "next_test":"Choose a pattern with at least 3 independent examples, adapt it into an original post, and compare reply/follower rate against our baseline. Do not permanently adopt a pattern from one viral outlier.",
+        "next_test":"Choose a pattern with at least 3 independent examples, adapt it into an original post, and compare reply/follower rate against our baseline. Do not permanently adopt a pattern from one viral outlier."
     }
     OUTPUT.parent.mkdir(parents=True,exist_ok=True)
-    OUTPUT.write_text(json.dumps(patterns,indent=2,ensure_ascii=False),encoding="utf-8")
-    print(json.dumps(patterns,indent=2,ensure_ascii=False))
+    OUTPUT.write_text(json.dumps(out,indent=2),encoding="utf-8")
 
-if __name__=="__main__": main()
+if __name__=="__main__":
+    main()
