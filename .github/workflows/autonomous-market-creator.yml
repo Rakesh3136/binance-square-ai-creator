@@ -1,4 +1,4 @@
-name: Binance Square AI Creator 5.1
+name: Binance Square AI Creator 5.2
 
 on:
   schedule:
@@ -35,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Reset production cycle
-        run: python src/pipeline_stage.py reset 'Fresh Creator 5.1 production cycle'
+        run: python src/pipeline_stage.py reset 'Fresh Creator 5.2 production cycle'
       - name: Refresh live market
         run: python src/live_market_scanner.py
       - name: Refresh fresh crypto and macro news
@@ -57,20 +57,20 @@ jobs:
           python src/creator_growth_system.py
           python src/living_brain.py
           python src/engagement_engine.py
+      - name: Creator 5.2 Content Director - choose the story first
+        run: python src/content_director_4.py
+      - name: Freeze authoritative story and asset
+        run: |
           python src/freeze_opportunity.py
-          python src/performance_feedback.py
-          python src/creator_growth_system.py
-          python src/living_brain.py
-      - name: Creator 5.1 Brain - authoritative story decision
+          python src/pipeline_stage.py freeze success 'Authoritative story and asset frozen after Content Director selection'
+      - name: Creator 5.2 Brain - authoritative story decision
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
-          python src/pipeline_stage.py creator_brain success 'Creator 5.1 Brain decision completed'
-      - name: Creator 5.0 Content Director
-        run: python src/content_director_4.py
-      - name: Creator 5.0 Script Director
+          python src/pipeline_stage.py creator_brain success 'Creator 5.2 Brain decision completed'
+      - name: Creator 5.2 Script Director
         run: python src/script_director_4.py
-      - name: Creator 5.0 Candidate Generation Brief
+      - name: Creator 5.2 Candidate Generation Brief
         run: python src/candidate_generation_4.py
       - name: Prepare publication context
         run: |
@@ -102,7 +102,7 @@ jobs:
           if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
           if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
           exit 0
-      - name: Generate and score 5.1 candidate scripts
+      - name: Generate and score 5.2 candidate scripts
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -214,10 +214,11 @@ jobs:
           echo '=== PIPELINE STATUS ==='; test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
           echo '=== NEWS SNAPSHOT ==='; test -f data/live/news_snapshot.json && cat data/live/news_snapshot.json || true
           echo '=== PUBLICATION CONTEXT ==='; test -f data/live/publication_context.json && cat data/live/publication_context.json || true
-          echo '=== CREATOR BRAIN 5.1 ==='; test -f data/live/creator_brain_decision.json && cat data/live/creator_brain_decision.json || true
-          echo '=== CONTENT DIRECTOR 5.0 ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
-          echo '=== SCRIPT DIRECTOR 5.0 ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
-          echo '=== CANDIDATE SCORECARD 5.1 ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
+          echo '=== AUTHORITATIVE OPPORTUNITY ==='; test -f data/live/authoritative_opportunity.json && cat data/live/authoritative_opportunity.json || true
+          echo '=== CREATOR BRAIN 5.2 ==='; test -f data/live/creator_brain_decision.json && cat data/live/creator_brain_decision.json || true
+          echo '=== CONTENT DIRECTOR 5.2 ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
+          echo '=== SCRIPT DIRECTOR 5.2 ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
+          echo '=== CANDIDATE SCORECARD 5.2 ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
           echo '=== PERFORMANCE FEEDBACK ==='; test -f data/intelligence/performance_feedback.json && cat data/intelligence/performance_feedback.json || true
           echo '=== PUBLICATION GATE ==='; test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
       - name: Persist state
@@ -227,7 +228,7 @@ jobs:
           git restore --source=HEAD --staged --worktree src/ 2>/dev/null || true
           git clean -fd node_modules src/__pycache__ data/reports 2>/dev/null || true
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.email '41898282+github-actions[bot].github-actions[bot]@users.noreply.github.com'
           git add analytics data/live data/intelligence
           if git diff --cached --quiet; then
             echo 'No Creator state changes to persist.'
