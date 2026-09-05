@@ -1,0 +1,39 @@
+name: Creator 7.2 Outcome Learning
+
+on:
+  schedule:
+    - cron: '37 */2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: main-branch-writer
+  cancel-in-progress: false
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Collect verified Square performance
+        run: python src/square_performance_collector.py
+      - name: Run Creator 7.2 outcome and revenue learning
+        run: python src/creator_7_2_learning.py
+      - name: Apply learned strategy to creator memory
+        run: python src/creator_7_2_strategy_bridge.py
+      - name: Save Creator 7.2 learning state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analytics/creator_7_2_outcomes.jsonl analytics/creator_7_2_state.json analytics/creator_7_2_strategy.json analytics/strategy_memory.json data/intelligence/creator_7_2_report.json analytics/square_performance.jsonl analytics/square_performance_state.json
+          git diff --cached --quiet && exit 0
+          git pull --rebase --autostash origin main
+          git add analytics/creator_7_2_outcomes.jsonl analytics/creator_7_2_state.json analytics/creator_7_2_strategy.json analytics/strategy_memory.json data/intelligence/creator_7_2_report.json analytics/square_performance.jsonl analytics/square_performance_state.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'Learn Creator 7.2 outcomes and strategy'
+          git push origin main
