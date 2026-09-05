@@ -1,8 +1,8 @@
 """Creator 7.0 autonomous mission + adaptive cadence authority.
 
 The workflow wakes hourly, but this authority decides whether to publish, wait,
-pivot or research. It also maintains a seven-day strategic mission and models
-legitimate monetization opportunity without inventing account-level revenue.
+pivot or research. It consumes the persistent Creator 7.0 mission decision and
+never invents account-level revenue.
 """
 from __future__ import annotations
 import json
@@ -17,7 +17,7 @@ FEEDBACK = ROOT / "data/intelligence/performance_feedback.json"
 GROWTH = ROOT / "data/intelligence/creator_growth.json"
 LOG = ROOT / "analytics/publication_log.jsonl"
 OUT = ROOT / "data/live/autonomous_cadence_6.json"
-MISSION = ROOT / "data/live/mission_economic_brain_7.json"
+MISSION = ROOT / "data/live/creator_mission_7.json"
 GOAL = ROOT / "data/intelligence/creator_7_day_goal.json"
 
 
@@ -100,6 +100,7 @@ def main() -> None:
     pref = load(PREF)
     feedback = load(FEEDBACK)
     growth = load(GROWTH)
+    mission = load(MISSION)
     selected = ranking.get("selected") or pref.get("selected_opportunity") or identity.get("selected") or {}
     if not isinstance(selected, dict):
         selected = {}
@@ -119,6 +120,8 @@ def main() -> None:
     same_symbol_recent = sum(1 for r in recent[-5:] if symbol and str(r.get("symbol") or "").upper() == symbol)
     learned = feedback.get("learned_preferences") or {}
     growth_score = num(growth.get("growth_score") or growth.get("score"))
+    mission_decision = mission.get("decision") if isinstance(mission.get("decision"), dict) else {}
+    mission_action = str(mission_decision.get("action") or "").upper()
 
     evidence = []
     if score >= 110:
@@ -132,7 +135,6 @@ def main() -> None:
     if growth_score > 0:
         evidence.append("growth_signal_available")
 
-    # Known monetization mechanics, but deliberately no invented revenue.
     monetization = {
         "program": "Binance Square Write to Earn",
         "verified_revenue_available": False,
@@ -155,6 +157,18 @@ def main() -> None:
         reasons.append("manual_topic")
     elif not selected:
         reasons.append("no_selected_opportunity")
+    elif mission_action == "WAIT":
+        decision = "WAIT"
+        action = "mission_wait"
+        reasons.append("mission_wait")
+    elif mission_action == "RESEARCH_MORE":
+        decision = "RESEARCH"
+        action = "research_until_mission_quality_floor_is_met"
+        reasons.append("mission_research_more")
+    elif mission_action == "PIVOT" and same_symbol_recent >= 3:
+        decision = "PIVOT"
+        action = "choose_next_best_story_with_different_asset"
+        reasons.append("mission_pivot")
     elif previous is None:
         publish = True
         decision = "PUBLISH"
@@ -165,7 +179,12 @@ def main() -> None:
         decision = "PUBLISH"
         action = "publish_fresh_breaking_news"
         reasons.append("fresh_breaking_news")
-    elif score >= 110 and minutes_since >= 60:
+    elif mission_action == "ACT_NOW" and score >= 95 and (minutes_since is None or minutes_since >= 45):
+        publish = True
+        decision = "PUBLISH"
+        action = "mission_act_now"
+        reasons.append("mission_act_now")
+    elif score >= 110 and minutes_since is not None and minutes_since >= 60:
         publish = True
         decision = "PUBLISH"
         action = "publish_exceptional_opportunity"
@@ -195,12 +214,13 @@ def main() -> None:
         action = "choose_next_best_story_with_different_asset"
         reasons.append("recent_asset_overexposure")
 
-    mission = {
+    mission_output = {
         "version": "7.0",
         "decision": decision,
         "action": action,
         "primary_goal": goal["primary_goal"],
         "goal_expires_at": goal["expires_at"],
+        "mission_input_action": mission_action or None,
         "evidence": evidence,
         "monetization": monetization,
         "learned_preferences": learned,
@@ -220,7 +240,7 @@ def main() -> None:
         "publish": publish,
         "decision": decision,
         "strategic_action": action,
-        "mission": mission,
+        "mission": mission_output,
         "minutes_since_last_publication": None if minutes_since is None else round(minutes_since, 1),
         "selected_category": category,
         "selected_symbol": symbol or None,
@@ -233,6 +253,7 @@ def main() -> None:
         "policy": {
             "wake_interval": "hourly",
             "publication_interval": "adaptive",
+            "mission_authority": True,
             "fresh_breaking_news_override_hours": 6,
             "strong_opportunity_threshold": 78,
             "exceptional_opportunity_threshold": 110,
@@ -244,7 +265,7 @@ def main() -> None:
         },
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    MISSION.write_text(json.dumps(mission, indent=2, ensure_ascii=False), encoding="utf-8")
+    MISSION.write_text(json.dumps(mission_output, indent=2, ensure_ascii=False), encoding="utf-8")
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"publish={'true' if publish else 'false'}")
