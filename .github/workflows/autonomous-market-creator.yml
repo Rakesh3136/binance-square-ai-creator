@@ -1,4 +1,4 @@
-name: Binance Square AI Creator 6.6
+name: Binance Square AI Creator 7.0
 
 on:
   schedule:
@@ -35,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Reset production cycle
-        run: python src/pipeline_stage.py reset 'Fresh Creator 6.6 adaptive cycle'
+        run: python src/pipeline_stage.py reset 'Fresh Creator 7.0 autonomous mission cycle'
       - name: Refresh live market
         run: python src/live_market_scanner.py
       - name: Refresh fresh crypto and macro news
@@ -57,36 +57,38 @@ jobs:
           python src/creator_growth_system.py
           python src/living_brain.py
           python src/engagement_engine.py
-      - name: Creator 6.6 Content Director - generate market-wide candidates
+      - name: Creator 7.0 Content Director - generate market-wide candidates
         run: python src/content_director_4.py
-      - name: Creator 6.3 Opportunity Ranker - choose strongest opportunity
+      - name: Creator 7.0 Opportunity Ranker - choose strongest opportunity
         run: python src/opportunity_ranker_6.py
       - name: Creator 6.5 Identity + Anti-Repetition - rotate story and voice
         run: python src/creator_identity_6.py
       - name: Creator 6.6 Authenticity + Learned Style - enforce human creator voice
         run: python src/creator_identity_6_6.py
-      - name: Creator 6.6 Adaptive Cadence - decide whether to publish now
+      - name: Creator 7.0 Mission Brain - set seven-day economic objective and action
+        run: python src/creator_mission_7.py
+      - name: Creator 7.0 Adaptive Cadence - autonomous publish, wait, pivot or research
         id: cadence
         run: |
           python src/autonomous_cadence_6.py
           publish=$(python -c 'import json; print(str(json.load(open("data/live/autonomous_cadence_6.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "Adaptive cadence decision: $publish"
+          echo "Autonomous mission decision: $publish"
       - name: Freeze authoritative story and asset
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/freeze_opportunity.py
-          python src/pipeline_stage.py freeze success 'Creator 6.6 ranked story, asset, identity, authenticity and cadence constraints frozen'
-      - name: Creator 6.6 Brain - authoritative story decision
+          python src/pipeline_stage.py freeze success 'Creator 7.0 mission, ranked story, asset, identity and authenticity constraints frozen'
+      - name: Creator 7.0 Brain - authoritative story decision
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
-          python src/pipeline_stage.py creator_brain success 'Creator 6.6 Brain decision completed'
-      - name: Creator 6.6 Script Director
+          python src/pipeline_stage.py creator_brain success 'Creator 7.0 Brain decision completed'
+      - name: Creator 7.0 Script Director
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: python src/script_director_4.py
-      - name: Creator 6.6 Candidate Generation Brief
+      - name: Creator 7.0 Candidate Generation Brief
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: python src/candidate_generation_4.py
       - name: Prepare publication context
@@ -122,7 +124,7 @@ jobs:
           if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
           if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
           exit 0
-      - name: Generate and score 6.6 candidate scripts
+      - name: Generate and score 7.0 candidate scripts
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -241,7 +243,8 @@ jobs:
         if: always()
         run: |
           echo '=== PIPELINE STATUS ==='; test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
-          echo '=== AUTONOMOUS CADENCE 6.6 ==='; test -f data/live/autonomous_cadence_6.json && cat data/live/autonomous_cadence_6.json || true
+          echo '=== CREATOR 7.0 MISSION ==='; test -f data/live/creator_mission_7.json && cat data/live/creator_mission_7.json || true
+          echo '=== AUTONOMOUS CADENCE 7.0 ==='; test -f data/live/autonomous_cadence_6.json && cat data/live/autonomous_cadence_6.json || true
           echo '=== NEWS SNAPSHOT ==='; test -f data/live/news_snapshot.json && cat data/live/news_snapshot.json || true
           echo '=== MARKET INTELLIGENCE 6.2 ==='; test -f data/live/market_intelligence_6.json && cat data/live/market_intelligence_6.json || true
           echo '=== OPPORTUNITY RANKING 6.3 ==='; test -f data/live/opportunity_ranking_6.json && cat data/live/opportunity_ranking_6.json || true
@@ -249,10 +252,7 @@ jobs:
           echo '=== CREATOR IDENTITY 6.6 ==='; test -f data/live/creator_identity_6_6.json && cat data/live/creator_identity_6_6.json || true
           echo '=== PUBLICATION CONTEXT ==='; test -f data/live/publication_context.json && cat data/live/publication_context.json || true
           echo '=== AUTHORITATIVE OPPORTUNITY ==='; test -f data/live/authoritative_opportunity.json && cat data/live/authoritative_opportunity.json || true
-          echo '=== CREATOR BRAIN 6.6 ==='; test -f data/live/creator_brain_decision.json && cat data/live/creator_brain_decision.json || true
-          echo '=== CONTENT DIRECTOR 6.6 ==='; test -f data/live/content_director_brief.json && cat data/live/content_director_brief.json || true
-          echo '=== SCRIPT DIRECTOR 6.6 ==='; test -f data/live/script_director_4.json && cat data/live/script_director_4.json || true
-          echo '=== CANDIDATE SCORECARD 6.6 ==='; test -f data/live/script_scorecard_4.json && cat data/live/script_scorecard_4.json || true
+          echo '=== CREATOR BRAIN ==='; test -f data/live/creator_brain_decision.json && cat data/live/creator_brain_decision.json || true
           echo '=== PERFORMANCE FEEDBACK ==='; test -f data/intelligence/performance_feedback.json && cat data/intelligence/performance_feedback.json || true
           echo '=== PUBLICATION GATE ==='; test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
       - name: Persist state
@@ -268,7 +268,7 @@ jobs:
             echo 'No Creator state changes to persist.'
             exit 0
           fi
-          git commit -m 'Record Creator 6.6 cycle'
+          git commit -m 'Record Creator 7.0 cycle'
           git fetch origin main
           git rebase --autostash origin/main
           git push origin HEAD:main
