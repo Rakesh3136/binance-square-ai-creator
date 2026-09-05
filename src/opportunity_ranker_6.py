@@ -2,7 +2,8 @@
 
 Takes the Content Director's candidate set and performs a final evidence-weighted
 ranking across market, derivatives, news and learned-performance signals before
-the opportunity is frozen. It never invents missing evidence.
+the opportunity is frozen. It never invents missing evidence and never invents
+BTC as a chart proxy for an unrelated news story.
 """
 from __future__ import annotations
 import json
@@ -35,12 +36,10 @@ def score_story(s,intel):
     vol=num(s.get('quote_volume_usdt'))
     rng=num(s.get('intraday_range_percent'))
     signal=num(s.get('content_signal_score'))
-    # Evidence quality: prefer observable market structure, not just headline keywords.
     score += min(10.0, move*.15) + min(8.0, rng*.10) + min(8.0, signal*.08)
     if vol >= 1e8: score += 4
     if s.get('has_1h_ohlcv'): score += 3
     if lane in {'creator_signal_outcome','follow_up'}: score += 5
-    # Derivatives context is a confirmation bonus, never a standalone signal.
     for d in intel.get('derivatives') or []:
         if sym(d.get('symbol')) != sym(s.get('symbol')): continue
         fr=abs(num(d.get('last_funding_rate'))); oi=abs(num(d.get('open_interest_change_1h_pct')))
@@ -71,35 +70,51 @@ def main():
         if not isinstance(raw,dict):continue
         s=dict(raw)
         if s.get('title'):
-            s['ranker_score']=round(num(s.get('score'))+news_relevance(s),2)
-            if news_relevance(s) < 0 and not s.get('symbols'):
+            relevance=news_relevance(s)
+            s['ranker_score']=round(num(s.get('score'))+relevance,2)
+            s['chartable']=bool(s.get('symbols'))
+            if not s['chartable']:
+                # TradingView-only publication means an unbound news story cannot win.
+                s['ranker_score']=round(s['ranker_score']-40,2)
+                s['ranker_note']='No evidence-backed asset symbol; not eligible as primary TradingView story.'
+            if relevance < 0 and not s.get('symbols'):
                 s['ranker_score']=round(s['ranker_score']-5,2)
         else:
             s['ranker_score']=score_story(s,intel)
+            s['chartable']=bool(s.get('symbol'))
         ranked.append(s)
     ranked.sort(key=lambda x:num(x.get('ranker_score')),reverse=True)
     chosen=ranked[0] if ranked else {}
     current=pref.get('selected_opportunity') or {}
     current_category=str(current.get('category') or '').lower()
-    # Manual topics and verified creator follow-ups remain authoritative.
     manual=bool(pref.get('manual_topic')) or bool(current.get('manual_topic'))
     protected=current_category in {'creator_signal_outcome','follow_up'}
     if manual or protected:
         chosen=current
         reason='Protected manual/verified editorial selection retained.'
     else:
-        reason='Creator 6.3 cross-market ranker selected the strongest evidence-weighted opportunity.'
+        reason='Creator 6.3 cross-market ranker selected the strongest evidence-weighted chartable opportunity.'
         selected=dict(current)
         if chosen.get('title'):
-            selected.update({'category':'breaking_news' if num(chosen.get('score'))>=70 else 'news_and_macro','news_title':chosen.get('title'),'news_url':chosen.get('url'),'news_source':chosen.get('source'),'news_published_at':chosen.get('published_at'),'news_score':num(chosen.get('score')),'symbol':sym((chosen.get('symbols') or ['BTC'])[0]) if chosen.get('symbols') else 'BTC','reason':reason,'ranker_score':num(chosen.get('ranker_score'))})
+            symbols=chosen.get('symbols') or []
+            if not symbols:
+                # Do not silently convert unrelated news into a BTC chart.
+                alternatives=[x for x in ranked[1:] if x.get('symbols')]
+                if alternatives:
+                    chosen=dict(alternatives[0])
+                else:
+                    raise SystemExit('No chartable news/market opportunity available for TradingView-only publication policy')
+            selected.update({'category':'breaking_news' if num(chosen.get('score'))>=70 else 'news_and_macro','news_title':chosen.get('title'),'news_url':chosen.get('url'),'news_source':chosen.get('source'),'news_published_at':chosen.get('published_at'),'news_score':num(chosen.get('score')),'symbol':sym((chosen.get('symbols') or [])[0]),'reason':reason,'ranker_score':num(chosen.get('ranker_score'))})
         else:
             selected.update({'category':chosen.get('lane') or current.get('category') or 'top_mover','symbol':sym(chosen.get('symbol') or current.get('symbol')),'reason':reason,'ranker_score':num(chosen.get('ranker_score'))})
         chosen=selected
+    if not chosen.get('symbol'):
+        raise SystemExit('Selected opportunity has no evidence-backed chart asset')
     pref['selected_opportunity']=chosen
     pref['opportunity_ranking_6']={'version':'6.3','generated_at':datetime.now(timezone.utc).isoformat(),'selection_reason':reason,'manual_or_protected':manual or protected,'top_candidates':ranked[:15]}
-    pref['content_director_instruction']='Creator 6.3 ranker is authoritative. Use the selected opportunity exactly; do not substitute another asset or story.'
+    pref['content_director_instruction']='Creator 6.3 ranker is authoritative. Use the selected opportunity exactly; do not substitute another asset or story. Never use BTC as an arbitrary news-chart proxy.'
     OUT.parent.mkdir(parents=True,exist_ok=True)
-    OUT.write_text(json.dumps({'version':'6.3','generated_at':datetime.now(timezone.utc).isoformat(),'selected':chosen,'top_candidates':ranked[:25],'policy':['Market/news candidates compete on one score.','News gets relevance credit only when the headline demonstrates crypto connection.','Funding/OI/orderbook observations confirm rather than independently create a story.','Manual topics and verified creator outcomes/follow-ups remain protected.','No missing evidence is invented.']},indent=2,ensure_ascii=False),encoding='utf-8')
+    OUT.write_text(json.dumps({'version':'6.3','generated_at':datetime.now(timezone.utc).isoformat(),'selected':chosen,'top_candidates':ranked[:25],'policy':['Market/news candidates compete on one score.','News gets relevance credit only when the headline demonstrates crypto connection.','News without an evidence-backed asset symbol cannot become the primary TradingView story.','Funding/OI/orderbook observations confirm rather than independently create a story.','Manual topics and verified creator outcomes/follow-ups remain protected.','No missing evidence is invented.']},indent=2,ensure_ascii=False),encoding='utf-8')
     PREF.write_text(json.dumps(pref,indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps({'status':'OK','version':'6.3','selected_category':chosen.get('category'),'selected_symbol':chosen.get('symbol'),'selected_news':chosen.get('news_title'),'ranked_candidates':len(ranked),'ranker_score':chosen.get('ranker_score')},indent=2))
 
