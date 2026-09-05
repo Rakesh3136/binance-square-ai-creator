@@ -125,7 +125,6 @@ def main():
         if cat in {"technical_breakout", "top_mover", "volume_anomaly", "liquidation"} and recent_categories[-1:] and recent_categories[-1] == cat:
             novelty -= 8
             reasons.append("lane_repeat:-8")
-        # Material breaking news is allowed to override repetition when the evidence is fresh.
         if cat in {"breaking_news", "news_market_impact"} and c.get("title"):
             novelty += 4
             reasons.append("fresh_news:+4")
@@ -140,9 +139,7 @@ def main():
     elif scored:
         chosen = dict(scored[0])
         reason = "Creator 6.4 selected the strongest ranked opportunity after repetition and identity penalties."
-        # News candidates use their first evidence-backed symbol; never invent BTC as a chart proxy.
         if chosen.get("title") and not candidate_symbol(chosen):
-            # A no-symbol news item is not publishable under the TradingView-only chart policy.
             alternatives = [x for x in scored[1:] if candidate_symbol(x)]
             if alternatives:
                 chosen = dict(alternatives[0])
@@ -183,6 +180,14 @@ def main():
             "A fresh material breaking-news event may override repetition penalties.",
         ],
     }
+    identity_instruction = (
+        "Creator 6.4 identity rotation: avoid recent asset, hook, structure and CTA repetition. "
+        "Do not open with the same ticker-plus-percentage template. Use a materially different narrative rhythm. "
+        "Pick exactly one specific, low-friction interaction question. Preserve evidence and selected-story authority. "
+        "TradingView must be the only chart source and must match the selected asset; never use BTC as an arbitrary proxy."
+    )
+    chosen["instruction"] = identity_instruction
+    chosen["identity_rotation"] = rotation
     pref["selected_opportunity"] = chosen
     pref["creator_identity_6"] = {
         "version": "6.4",
@@ -196,12 +201,7 @@ def main():
         "recent_hook_families": recent_hooks,
         "recent_cta_families": recent_ctas,
     }
-    pref["content_director_instruction"] = (
-        "Creator 6.4 identity authority is active. Use the frozen selected opportunity exactly. "
-        "Create a materially different opening, structure, narrative rhythm and CTA from recent posts. "
-        "Avoid repeated asset/move openings. Choose one specific low-friction interaction question. "
-        "TradingView chart must match the selected asset; never use BTC as an arbitrary proxy."
-    )
+    pref["content_director_instruction"] = identity_instruction
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
         "version": "6.4",
