@@ -76,7 +76,11 @@ def history():
 
 
 def candidate_symbol(c):
-    s = str(c.get("symbol") or "").upper().replace("$", "").strip()
+    raw = c.get("symbol")
+    if not raw:
+        symbols = c.get("symbols") or []
+        raw = symbols[0] if symbols else ""
+    s = str(raw or "").upper().replace("$", "").strip()
     return s[:-4] if s.endswith("USDT") else s
 
 
@@ -92,7 +96,6 @@ def main():
     recent_ctas = [family(x.get("discussion_question"), "cta") for x in recent]
     symbol_counts = Counter(recent_symbols)
     category_counts = Counter(recent_categories)
-    format_counts = Counter(recent_formats)
     hook_counts = Counter(recent_hooks)
     cta_counts = Counter(recent_ctas)
 
@@ -128,6 +131,9 @@ def main():
         if cat in {"breaking_news", "news_market_impact"} and c.get("title"):
             novelty += 4
             reasons.append("fresh_news:+4")
+        if c.get("title") and not s:
+            novelty -= 40
+            reasons.append("no_chart_asset:-40")
         c["identity_score"] = round(base + novelty, 2)
         c["identity_adjustments"] = reasons
         scored.append(c)
