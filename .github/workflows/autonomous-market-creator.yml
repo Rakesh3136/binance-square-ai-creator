@@ -2,7 +2,7 @@ name: Binance Square AI Creator 6.6
 
 on:
   schedule:
-    - cron: '7 */3 * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       topic:
@@ -35,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Reset production cycle
-        run: python src/pipeline_stage.py reset 'Fresh Creator 6.6 production cycle'
+        run: python src/pipeline_stage.py reset 'Fresh Creator 6.6 adaptive cycle'
       - name: Refresh live market
         run: python src/live_market_scanner.py
       - name: Refresh fresh crypto and macro news
@@ -65,26 +65,39 @@ jobs:
         run: python src/creator_identity_6.py
       - name: Creator 6.6 Authenticity + Learned Style - enforce human creator voice
         run: python src/creator_identity_6_6.py
+      - name: Creator 6.6 Adaptive Cadence - decide whether to publish now
+        id: cadence
+        run: |
+          python src/autonomous_cadence_6.py
+          publish=$(python -c 'import json; print(str(json.load(open("data/live/autonomous_cadence_6.json")).get("publish", False)).lower())')
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Adaptive cadence decision: $publish"
       - name: Freeze authoritative story and asset
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/freeze_opportunity.py
-          python src/pipeline_stage.py freeze success 'Creator 6.6 ranked story, asset, identity and authenticity constraints frozen'
+          python src/pipeline_stage.py freeze success 'Creator 6.6 ranked story, asset, identity, authenticity and cadence constraints frozen'
       - name: Creator 6.6 Brain - authoritative story decision
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/creator_brain.py
           python src/creator_brain_gate.py
           python src/pipeline_stage.py creator_brain success 'Creator 6.6 Brain decision completed'
       - name: Creator 6.6 Script Director
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: python src/script_director_4.py
       - name: Creator 6.6 Candidate Generation Brief
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: python src/candidate_generation_4.py
       - name: Prepare publication context
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/publication_context.py
           python src/self_repair_agent.py
           python src/editorial_prompt_patch.py
           python -m compileall -q src
       - name: Create AI draft
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -96,6 +109,7 @@ jobs:
           python src/technical_enricher.py
           python src/call_tracker.py
       - name: Improve draft with Creator Intelligence
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -109,6 +123,7 @@ jobs:
           if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
           exit 0
       - name: Generate and score 6.6 candidate scripts
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -117,37 +132,45 @@ jobs:
           python src/candidate_generation_4.py
           python src/candidate_script_scorer_4.py
       - name: Locate fresh draft
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         id: draft
         run: |
           draft=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
           if [ -z "$draft" ]; then echo '::error::No fresh AI draft found'; exit 1; fi
           echo "path=$draft" >> "$GITHUB_OUTPUT"
       - name: Apply human editorial layer
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -mmin -30 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
           if [ -z "$DRAFT_PATH" ]; then echo '::error::No fresh AI draft found for editorial layer'; exit 1; fi
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           python -m json.tool "$DRAFT_PATH" >/dev/null
       - name: Hard content integrity gate
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: python src/content_integrity_gate_4.py
       - name: Setup Node and Playwright
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Install Chromium
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Render TradingView chart package
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/visual_renderer.py
           test -s data/live/visual.png
           python src/pipeline_stage.py visual success 'TradingView visual package rendered'
       - name: Validate TradingView chart package
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
       - name: Run publication gate
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         id: gate
         run: |
           set +e
@@ -166,12 +189,12 @@ jobs:
           if [ "$publish" = 'true' ]; then python src/pipeline_stage.py quality_gate success 'Publication authorized'; else python src/pipeline_stage.py quality_gate blocked 'Publication blocked by quality gate'; fi
           exit 0
       - name: Extract publication text
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
         run: python src/workflow_helpers.py extract
       - name: Prepare article title
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'article' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'article' }}
         run: |
           python - <<'PY'
           import json
@@ -181,17 +204,17 @@ jobs:
           Path('data/live/article_title.txt').write_text(title[:180],encoding='utf-8')
           PY
       - name: Final TradingView validation
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         run: |
           test -s data/live/visual.png
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
       - name: Download Binance Square publisher
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         run: git clone --depth 1 https://github.com/binance/binance-skills-hub.git binance-skills-hub
       - name: Publish to Binance Square
         id: publish
-        if: ${{ steps.gate.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         env:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
@@ -209,7 +232,7 @@ jobs:
           python src/pipeline_stage.py verify-publish
           echo 'verified=true' >> "$GITHUB_OUTPUT"
       - name: Record publication
-        if: ${{ steps.gate.outputs.publish == 'true' && steps.publish.outputs.verified == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' && steps.publish.outputs.verified == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.draft.outputs.path }}
           MODE: ${{ steps.gate.outputs.mode }}
@@ -218,6 +241,7 @@ jobs:
         if: always()
         run: |
           echo '=== PIPELINE STATUS ==='; test -f data/live/pipeline_status.json && cat data/live/pipeline_status.json || true
+          echo '=== AUTONOMOUS CADENCE 6.6 ==='; test -f data/live/autonomous_cadence_6.json && cat data/live/autonomous_cadence_6.json || true
           echo '=== NEWS SNAPSHOT ==='; test -f data/live/news_snapshot.json && cat data/live/news_snapshot.json || true
           echo '=== MARKET INTELLIGENCE 6.2 ==='; test -f data/live/market_intelligence_6.json && cat data/live/market_intelligence_6.json || true
           echo '=== OPPORTUNITY RANKING 6.3 ==='; test -f data/live/opportunity_ranking_6.json && cat data/live/opportunity_ranking_6.json || true
