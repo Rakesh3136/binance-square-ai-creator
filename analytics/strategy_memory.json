@@ -469,7 +469,7 @@
       "reliability",
       "repair"
     ],
-    "generated_at": "2026-09-06T15:34:10.617121+00:00",
+    "generated_at": "2026-09-06T20:31:55.534279+00:00",
     "next_action": "RESEARCH_AND_WAIT_FOR_STRONG_SIGNAL",
     "objective": "IMPROVE_OPPORTUNITY_SELECTION",
     "plan_id": "bb7787ac467225ba",
@@ -483,87 +483,102 @@
     ]
   },
   "creator_12_0": {
-    "schema_version": "12.0",
-    "status": "WAITING",
+    "created_at": "2026-09-06T20:23:59.262604+00:00",
     "execution": "WAIT_FOR_VALID_OPPORTUNITY",
     "reason": "The autonomous brain does not currently authorize a strong opportunity.",
-    "created_at": "2026-09-06T20:23:59.262604+00:00"
+    "schema_version": "12.0",
+    "status": "WAITING"
   },
   "creator_13_0": {
-    "decision_id": "self13_5f72d5f82136",
     "action": "RESEARCH_AND_WAIT_FOR_STRONG_SIGNAL",
-    "objective": "IMPROVE_WORLD_MODEL",
-    "mode": "SURVIVAL",
     "confidence": 0.45,
-    "urgency": 0.9,
-    "curiosity": 0.8
+    "curiosity": 0.8,
+    "decision_id": "self13_5f72d5f82136",
+    "mode": "SURVIVAL",
+    "objective": "IMPROVE_WORLD_MODEL",
+    "urgency": 0.9
   },
   "creator_14_0": {
-    "world_model_id": "wm14_1b8ea9e50145",
-    "status": "MONITORING",
+    "knowledge_gap_count": 0,
     "next_action": "DEEPEN_HIGHEST_VALUE_UNCERTAINTY",
-    "knowledge_gap_count": 0
+    "status": "MONITORING",
+    "world_model_id": "wm14_1b8ea9e50145"
+  },
+  "creator_17_0": {
+    "decision_impact": "BLOCK_UNTIL_VERIFIED",
+    "evidence_count": 6,
+    "official_evidence_count": 0,
+    "research_id": "research17_fc9d840005ab",
+    "status": "PARTIAL_RESEARCH"
   },
   "creator_7_2": {
-    "version": "7.2",
     "generated_at": "2026-09-06T18:36:58.163348+00:00",
     "learning_status": "EXPLORATION",
-    "sample_size": 0,
-    "wins": 0,
     "losses": 0,
     "mixed": 0,
-    "preference_changes": [],
     "next_strategy": {
-      "prefer": [],
+      "accuracy_and_originality_are_hard_constraints": true,
       "avoid": [],
       "exploration_rate": 0.35,
       "minimum_repeated_sample": 3,
       "never_promote_single_post": true,
-      "revenue_must_be_verified": true,
-      "accuracy_and_originality_are_hard_constraints": true
+      "prefer": [],
+      "revenue_must_be_verified": true
     },
+    "preference_changes": [],
     "revenue": {
-      "verified": false,
+      "note": "Revenue is never estimated from engagement metrics. Only explicitly verified earnings fields are used.",
       "sample": 0,
       "total": 0,
-      "note": "Revenue is never estimated from engagement metrics. Only explicitly verified earnings fields are used."
-    }
+      "verified": false
+    },
+    "sample_size": 0,
+    "version": "7.2",
+    "wins": 0
   },
   "creator_7_3": {
-    "version": "7.3",
-    "generated_at": "2026-09-06T15:49:23.661890+00:00",
-    "status": "EXPLORATION",
-    "sample_size": 0,
-    "effects": [],
-    "recommendations": [],
     "causal_claim_policy": "No causal claim from observational data alone. Treat effects as hypotheses until controlled A/B or randomized timing/format tests confirm them.",
+    "effects": [],
     "exploration_rate": 0.35,
-    "minimum_treatment_sample": 5,
-    "minimum_control_sample": 5,
-    "minimum_absolute_lift_percent": 15,
+    "generated_at": "2026-09-06T15:49:23.661890+00:00",
     "hard_constraints": [
       "factual_accuracy",
       "originality",
       "verified_market_data",
       "no_fake_engagement",
       "no_guaranteed_returns"
-    ]
+    ],
+    "minimum_absolute_lift_percent": 15,
+    "minimum_control_sample": 5,
+    "minimum_treatment_sample": 5,
+    "recommendations": [],
+    "sample_size": 0,
+    "status": "EXPLORATION",
+    "version": "7.3"
   },
   "creator_7_4": {
-    "version": "7.4",
-    "generated_at": "2026-09-06T17:55:50.064188+00:00",
-    "status": "ACTIVE",
-    "decision": "continue_active_experiment",
+    "controller_policy": {
+      "exploration_rate": 0.35,
+      "one_primary_variable_per_test": true,
+      "prefer_replication_before_promotion": true,
+      "revenue_policy": "Use revenue only when explicitly verified; never infer revenue from engagement.",
+      "skip_if_no_quality_story": true
+    },
     "current_experiment": {
-      "experiment_id": "74-exp-20260906051743",
-      "status": "ACTIVE",
-      "created_at": "2026-09-06T05:17:43.536764+00:00",
-      "mode": "EXPLORATION",
-      "hypothesis": "Test whether experiment_format=data_driven_breakdown improves the outcome versus the account baseline while holding other major choices stable.",
-      "primary_variable": "experiment_format",
       "control_value": "__baseline__",
-      "treatment_value": "data_driven_breakdown",
+      "created_at": "2026-09-06T05:17:43.536764+00:00",
+      "experiment_id": "74-exp-20260906051743",
+      "hypothesis": "Test whether experiment_format=data_driven_breakdown improves the outcome versus the account baseline while holding other major choices stable.",
+      "mode": "EXPLORATION",
       "objective_metric": "outcome_score",
+      "observed_context": {
+        "control_sample": 0,
+        "observed_lift_percent": 0,
+        "treatment_sample": 0
+      },
+      "primary_variable": "experiment_format",
+      "reason": "Choose the next test where additional evidence can reduce uncertainty without sacrificing editorial quality.",
+      "sample_target": 10,
       "secondary_metrics": [
         "views",
         "likes",
@@ -572,58 +587,49 @@
         "quotes",
         "follower_growth"
       ],
-      "sample_target": 10,
-      "observed_context": {
-        "treatment_sample": 0,
-        "control_sample": 0,
-        "observed_lift_percent": 0
-      },
-      "reason": "Choose the next test where additional evidence can reduce uncertainty without sacrificing editorial quality.",
+      "status": "ACTIVE",
       "stop_rules": [
         "Do not claim causality from observational evidence.",
         "Skip weak stories rather than manufacture a test post.",
         "Never use fake engagement or guaranteed-return language."
-      ]
+      ],
+      "treatment_value": "data_driven_breakdown"
     },
-    "controller_policy": {
-      "exploration_rate": 0.35,
-      "one_primary_variable_per_test": true,
-      "prefer_replication_before_promotion": true,
-      "skip_if_no_quality_story": true,
-      "revenue_policy": "Use revenue only when explicitly verified; never infer revenue from engagement."
-    },
+    "decision": "continue_active_experiment",
+    "generated_at": "2026-09-06T17:55:50.064188+00:00",
     "hard_constraints": [
       "factual_accuracy",
       "originality",
       "verified_market_data",
       "no_fake_engagement",
       "no_guaranteed_returns"
-    ]
+    ],
+    "status": "ACTIVE",
+    "version": "7.4"
   },
   "creator_7_5": {
-    "version": "7.5",
-    "generated_at": "2026-09-06T20:20:54.905698+00:00",
-    "sample_size": 0,
     "content_mix_target": {
       "BREAKING_MARKET": 0.2,
-      "EXPLAINER": 0.3,
       "DATA_DEEP_DIVE": 0.2,
       "DEBATE": 0.15,
+      "EXPLAINER": 0.3,
       "MACRO_REGULATION": 0.15
     },
-    "observed_bucket_counts": {},
-    "observed_bucket_mean_scores": {
-      "BREAKING_MARKET": 0,
-      "EXPLAINER": 0,
-      "DATA_DEEP_DIVE": 0,
-      "DEBATE": 0,
-      "MACRO_REGULATION": 0
-    },
+    "generated_at": "2026-09-06T20:20:54.905698+00:00",
+    "next_action": "Prefer a EXPLAINER opportunity when it passes the existing editorial and market-data gates; otherwise choose the strongest verified opportunity regardless of bucket.",
     "next_bucket_priority": [
       "EXPLAINER",
       "BREAKING_MARKET",
       "DATA_DEEP_DIVE"
     ],
+    "observed_bucket_counts": {},
+    "observed_bucket_mean_scores": {
+      "BREAKING_MARKET": 0,
+      "DATA_DEEP_DIVE": 0,
+      "DEBATE": 0,
+      "EXPLAINER": 0,
+      "MACRO_REGULATION": 0
+    },
     "rules": [
       "Diversify across market, education, data, debate and macro/regulation opportunities.",
       "Do not force a bucket when no verified high-quality story exists.",
@@ -632,72 +638,53 @@
       "Optimize for followers and substantive engagement, not fake engagement.",
       "Revenue is used only when explicitly verified; views never imply revenue."
     ],
-    "next_action": "Prefer a EXPLAINER opportunity when it passes the existing editorial and market-data gates; otherwise choose the strongest verified opportunity regardless of bucket."
+    "sample_size": 0,
+    "version": "7.5"
   },
   "creator_8_0": {
-    "status": "LEARNING_NO_VERIFIED_REVENUE",
-    "updated_at": "2026-09-06T15:35:13.307450+00:00",
+    "descriptive_revenue_patterns": {
+      "by_category": [],
+      "by_format": []
+    },
     "funnel": {
-      "reach": 0,
       "engagement": 0,
       "follower_growth": 0,
+      "reach": 0,
       "verified_conversion": 0,
       "verified_revenue": 0
-    },
-    "revenue": {
-      "verified_total": 0,
-      "verified_record_count": 0,
-      "allocated_verified_revenue": 0,
-      "unallocated_verified_revenue": 0.0,
-      "revenue_is_inferred": false
-    },
-    "descriptive_revenue_patterns": {
-      "by_format": [],
-      "by_category": []
-    },
-    "optimization_policy": {
-      "primary_goal": "move users through the funnel toward verified conversion and verified revenue",
-      "secondary_goals": [
-        "quality reach",
-        "substantive engagement",
-        "follower growth"
-      ],
-      "revenue_attribution_rule": "Only explicitly verified revenue is money; only explicit attribution is allocated.",
-      "causal_claims_allowed": false,
-      "never_infer_revenue_from_views": true,
-      "never_infer_revenue_from_followers": true,
-      "never_force_weak_story_for_monetization": true
     },
     "next_actions": [
       "Continue testing high-quality content formats with measurable funnel outcomes.",
       "Prefer experiments that can expose verified conversion signals when such signals exist.",
       "Keep revenue unallocated when the source does not explicitly link it to a post, experiment, or campaign."
     ],
-    "sample_size": 0
+    "optimization_policy": {
+      "causal_claims_allowed": false,
+      "never_force_weak_story_for_monetization": true,
+      "never_infer_revenue_from_followers": true,
+      "never_infer_revenue_from_views": true,
+      "primary_goal": "move users through the funnel toward verified conversion and verified revenue",
+      "revenue_attribution_rule": "Only explicitly verified revenue is money; only explicit attribution is allocated.",
+      "secondary_goals": [
+        "quality reach",
+        "substantive engagement",
+        "follower growth"
+      ]
+    },
+    "revenue": {
+      "allocated_verified_revenue": 0,
+      "revenue_is_inferred": false,
+      "unallocated_verified_revenue": 0.0,
+      "verified_record_count": 0,
+      "verified_total": 0
+    },
+    "sample_size": 0,
+    "status": "LEARNING_NO_VERIFIED_REVENUE",
+    "updated_at": "2026-09-06T15:35:13.307450+00:00"
   },
   "creator_9_0": {
-    "version": "9.0",
-    "generated_at": "2026-09-06T15:44:47.095507+00:00",
     "action": "RESEARCH_OR_WAIT",
     "confidence": "LOW",
-    "primary_asset": "BTC",
-    "observation_sample": 4,
-    "promotion_allowed": false,
-    "exploration_rate": 0.35,
-    "mission_goal": "maximize legitimate creator opportunity",
-    "strategy_layers": [
-      "7.2 outcomes",
-      "7.3 causal hypotheses",
-      "7.4 adaptive experiments",
-      "7.5 growth portfolio",
-      "8.0 revenue intelligence"
-    ],
-    "learned_preferences": [],
-    "recent_asset_pressure": {
-      "asset": "XRP",
-      "recent_count": 4,
-      "avoid_repetition": true
-    },
     "decision_order": [
       "hard_constraints",
       "verified_freshness",
@@ -707,25 +694,23 @@
       "controlled_experiment",
       "exploration"
     ],
-    "publisher_directive": {
-      "choose_market_wide_opportunity": true,
-      "prefer_fresh_verified_news_when_material": true,
-      "use_real_market_data": true,
-      "use_real_tradingview_visual_when_informative": true,
-      "one_primary_experiment_variable": true,
-      "optimize_for_substantive_engagement_and_follower_growth": true,
-      "monetization_goal_is_verified_conversion_only": true,
-      "revenue_must_be_explicitly_verified": true,
-      "never_force_story_for_experiment": true,
-      "never_infer_revenue_from_views": true,
-      "never_claim_causality_from_observational_data": true,
-      "never_publish_filler": true,
-      "never_use_fake_engagement": true,
-      "never_guarantee_returns": true
-    },
+    "exploration_rate": 0.35,
+    "generated_at": "2026-09-06T15:44:47.095507+00:00",
+    "guardrails": [
+      "factual_accuracy",
+      "originality",
+      "verified_market_data",
+      "no_fake_engagement",
+      "no_guaranteed_returns",
+      "no_revenue_inference",
+      "no_causal_overclaim"
+    ],
+    "learned_preferences": [],
+    "mission_goal": "maximize legitimate creator opportunity",
     "next_cycle": {
       "action": "RESEARCH_OR_WAIT",
       "instruction": "Continue research, diversification or a quality opportunity search; skipping is valid when evidence is weak.",
+      "metric_priority": "verified_conversion_and_verified_revenue_when_available; otherwise substantive_engagement_and_follower_growth",
       "success_metrics": [
         "views",
         "likes",
@@ -735,35 +720,57 @@
         "follower_growth",
         "verified_conversion",
         "verified_revenue"
-      ],
-      "metric_priority": "verified_conversion_and_verified_revenue_when_available; otherwise substantive_engagement_and_follower_growth"
+      ]
     },
-    "guardrails": [
-      "factual_accuracy",
-      "originality",
-      "verified_market_data",
-      "no_fake_engagement",
-      "no_guaranteed_returns",
-      "no_revenue_inference",
-      "no_causal_overclaim"
-    ]
+    "observation_sample": 4,
+    "primary_asset": "BTC",
+    "promotion_allowed": false,
+    "publisher_directive": {
+      "choose_market_wide_opportunity": true,
+      "monetization_goal_is_verified_conversion_only": true,
+      "never_claim_causality_from_observational_data": true,
+      "never_force_story_for_experiment": true,
+      "never_guarantee_returns": true,
+      "never_infer_revenue_from_views": true,
+      "never_publish_filler": true,
+      "never_use_fake_engagement": true,
+      "one_primary_experiment_variable": true,
+      "optimize_for_substantive_engagement_and_follower_growth": true,
+      "prefer_fresh_verified_news_when_material": true,
+      "revenue_must_be_explicitly_verified": true,
+      "use_real_market_data": true,
+      "use_real_tradingview_visual_when_informative": true
+    },
+    "recent_asset_pressure": {
+      "asset": "XRP",
+      "avoid_repetition": true,
+      "recent_count": 4
+    },
+    "strategy_layers": [
+      "7.2 outcomes",
+      "7.3 causal hypotheses",
+      "7.4 adaptive experiments",
+      "7.5 growth portfolio",
+      "8.0 revenue intelligence"
+    ],
+    "version": "9.0"
   },
   "creator_pattern_hypotheses": [
     {
-      "pattern": "Trend-aligned useful insight",
-      "hypothesis": "Timely, useful content is more likely to earn attention than generic recaps."
+      "hypothesis": "Timely, useful content is more likely to earn attention than generic recaps.",
+      "pattern": "Trend-aligned useful insight"
     },
     {
-      "pattern": "Cashtag + chart widget",
-      "hypothesis": "Cashtags and chart widgets can connect readers to trading activity for Write to Earn attribution."
+      "hypothesis": "Cashtags and chart widgets can connect readers to trading activity for Write to Earn attribution.",
+      "pattern": "Cashtag + chart widget"
     },
     {
-      "pattern": "Specific debate question",
-      "hypothesis": "A concrete binary or multi-choice question lowers the effort required to reply."
+      "hypothesis": "A concrete binary or multi-choice question lowers the effort required to reply.",
+      "pattern": "Specific debate question"
     },
     {
-      "pattern": "Format diversity",
-      "hypothesis": "Rotating formats reduces audience fatigue and creates more experiments."
+      "hypothesis": "Rotating formats reduces audience fatigue and creates more experiments.",
+      "pattern": "Format diversity"
     }
   ],
   "editorial_principles": {
@@ -780,6 +787,52 @@
   },
   "generated_at": "2026-09-06T18:36:58.212952+00:00",
   "learning_overlay": {
+    "active_research": {
+      "decision_impact": "BLOCK_UNTIL_VERIFIED",
+      "evidence_count": 6,
+      "official_evidence_count": 0,
+      "research_id": "research17_fc9d840005ab",
+      "status": "PARTIAL_RESEARCH"
+    },
+    "autonomous_experiment_execution": {
+      "execution": "WAIT_FOR_VALID_OPPORTUNITY",
+      "experiment_id": null,
+      "primary_variable": null,
+      "status": "WAITING"
+    },
+    "continuous_improvement": {
+      "confidence": "MEDIUM",
+      "constraints": {
+        "no_blind_code_rewrites": true,
+        "no_fake_engagement": true,
+        "no_guaranteed_returns": true,
+        "no_inferred_revenue": true,
+        "no_quality_gate_bypass": true,
+        "one_primary_experiment_variable": true
+      },
+      "evidence_sources": [
+        "outcomes",
+        "causal",
+        "experiment",
+        "portfolio",
+        "monetization",
+        "brain",
+        "reliability",
+        "repair"
+      ],
+      "generated_at": "2026-09-06T20:31:55.534279+00:00",
+      "next_action": "RESEARCH_AND_WAIT_FOR_STRONG_SIGNAL",
+      "objective": "IMPROVE_OPPORTUNITY_SELECTION",
+      "plan_id": "bb7787ac467225ba",
+      "priority_order": [
+        "SAFETY_AND_RELIABILITY",
+        "FACTUAL_AND_EDITORIAL_QUALITY",
+        "OPPORTUNITY_SELECTION",
+        "CONTROLLED_EXPERIMENTS",
+        "GROWTH",
+        "VERIFIED_MONETIZATION"
+      ]
+    },
     "growth_portfolio": {
       "instruction": "Prefer a EXPLAINER opportunity when it passes the existing editorial and market-data gates; otherwise choose the strongest verified opportunity regardless of bucket.",
       "priority_buckets": [
@@ -789,64 +842,44 @@
       ],
       "target_mix": {
         "BREAKING_MARKET": 0.2,
-        "EXPLAINER": 0.3,
         "DATA_DEEP_DIVE": 0.2,
         "DEBATE": 0.15,
+        "EXPLAINER": 0.3,
         "MACRO_REGULATION": 0.15
       }
-    },
-    "active_research": {
-      "research_id": "research17_fc9d840005ab",
-      "status": "PARTIAL_RESEARCH",
-      "decision_impact": "BLOCK_UNTIL_VERIFIED",
-      "evidence_count": 6,
-      "official_evidence_count": 0
-    },
-    "autonomous_experiment_execution": {
-      "status": "WAITING",
-      "experiment_id": null,
-      "primary_variable": null,
-      "execution": "WAIT_FOR_VALID_OPPORTUNITY"
     }
   },
   "recent_performance_observations": [
     {
-      "topic": "XRP",
-      "views": 43,
+      "engagement_score": 0.0,
       "likes": 0,
       "replies": 0,
-      "engagement_score": 0.0
+      "topic": "XRP",
+      "views": 43
     },
     {
-      "topic": "XRP",
-      "views": 73,
+      "engagement_score": 0.0,
       "likes": 0,
       "replies": 0,
-      "engagement_score": 0.0
+      "topic": "XRP",
+      "views": 73
     },
     {
-      "topic": "XRP",
-      "views": 1,
+      "engagement_score": 0.0,
       "likes": 0,
       "replies": 0,
-      "engagement_score": 0.0
+      "topic": "XRP",
+      "views": 1
     },
     {
-      "topic": "XRP",
-      "views": 32,
+      "engagement_score": 0.0,
       "likes": 0,
       "replies": 0,
-      "engagement_score": 0.0
+      "topic": "XRP",
+      "views": 32
     }
   ],
   "recommended_strategy": "Run a two-loop editorial system: learn from our measured post outcomes and from public creator patterns. Use public patterns as hypotheses, never as copied templates. Prioritize replies and follower conversion over raw views. Keep testing different assets, hooks, formats, visuals and questions; retire repeated zero-conversion patterns.",
   "sample_size": 4,
-  "version": 4,
-  "creator_17_0": {
-    "research_id": "research17_fc9d840005ab",
-    "status": "PARTIAL_RESEARCH",
-    "decision_impact": "BLOCK_UNTIL_VERIFIED",
-    "evidence_count": 6,
-    "official_evidence_count": 0
-  }
+  "version": 4
 }
