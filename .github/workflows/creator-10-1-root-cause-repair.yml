@@ -1,0 +1,41 @@
+name: Binance Square AI Creator 10.1 - Root Cause Repair
+
+on:
+  schedule:
+    - cron: '11 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: main-branch-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  root-cause-repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run root cause repair diagnostics
+        run: python src/creator_10_1_root_cause_repair.py
+
+      - name: Persist Creator 10.1 state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analytics/creator_10_1_repair_state.json data/intelligence/creator_10_1_report.json
+          if git diff --cached --quiet; then
+            echo 'No Creator 10.1 state changes.'
+          else
+            git commit -m 'chore: persist Creator 10.1 repair diagnostics'
+            git push
+          fi
