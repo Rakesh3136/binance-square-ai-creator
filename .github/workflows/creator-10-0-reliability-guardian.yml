@@ -1,0 +1,45 @@
+name: Binance Square AI Creator 10.0 - Reliability Guardian
+
+on:
+  schedule:
+    - cron: '53 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: main-branch-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  reliability-guardian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run reliability guardian
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python src/creator_10_0_reliability_guardian.py
+
+      - name: Persist Creator 10.0 state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analytics/creator_10_0_recovery_state.json data/intelligence/creator_10_0_report.json
+          if git diff --cached --quiet; then
+            echo 'No Creator 10.0 state changes.'
+          else
+            git commit -m 'chore: persist Creator 10.0 reliability state'
+            git push
+          fi
