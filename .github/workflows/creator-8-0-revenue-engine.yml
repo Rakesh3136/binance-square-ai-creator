@@ -1,0 +1,46 @@
+name: Binance Square AI Creator 8.0 - Revenue Engine
+
+on:
+  schedule:
+    - cron: '27 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: main-branch-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  revenue-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Creator 8.0 Revenue Engine
+        run: python src/creator_8_0_revenue_engine.py
+
+      - name: Commit monetization intelligence
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analytics/creator_8_0_monetization_engine.json \
+                  data/intelligence/creator_8_0_report.json \
+                  analytics/strategy_memory.json
+          if git diff --cached --quiet; then
+            echo 'No Creator 8.0 changes to commit.'
+            exit 0
+          fi
+          git commit -m 'chore: update Creator 8.0 revenue intelligence'
+          git pull --rebase origin main
+          git push origin HEAD:main
