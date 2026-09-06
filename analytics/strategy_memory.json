@@ -557,28 +557,20 @@
     ]
   },
   "creator_7_4": {
-    "controller_policy": {
-      "exploration_rate": 0.35,
-      "one_primary_variable_per_test": true,
-      "prefer_replication_before_promotion": true,
-      "revenue_policy": "Use revenue only when explicitly verified; never infer revenue from engagement.",
-      "skip_if_no_quality_story": true
-    },
+    "version": "7.4",
+    "generated_at": "2026-09-06T20:56:58.467632+00:00",
+    "status": "ACTIVE",
+    "decision": "continue_active_experiment",
     "current_experiment": {
-      "control_value": "__baseline__",
-      "created_at": "2026-09-06T05:17:43.536764+00:00",
       "experiment_id": "74-exp-20260906051743",
-      "hypothesis": "Test whether experiment_format=data_driven_breakdown improves the outcome versus the account baseline while holding other major choices stable.",
+      "status": "ACTIVE",
+      "created_at": "2026-09-06T05:17:43.536764+00:00",
       "mode": "EXPLORATION",
-      "objective_metric": "outcome_score",
-      "observed_context": {
-        "control_sample": 0,
-        "observed_lift_percent": 0,
-        "treatment_sample": 0
-      },
+      "hypothesis": "Test whether experiment_format=data_driven_breakdown improves the outcome versus the account baseline while holding other major choices stable.",
       "primary_variable": "experiment_format",
-      "reason": "Choose the next test where additional evidence can reduce uncertainty without sacrificing editorial quality.",
-      "sample_target": 10,
+      "control_value": "__baseline__",
+      "treatment_value": "data_driven_breakdown",
+      "objective_metric": "outcome_score",
       "secondary_metrics": [
         "views",
         "likes",
@@ -587,25 +579,33 @@
         "quotes",
         "follower_growth"
       ],
-      "status": "ACTIVE",
+      "sample_target": 10,
+      "observed_context": {
+        "treatment_sample": 0,
+        "control_sample": 0,
+        "observed_lift_percent": 0
+      },
+      "reason": "Choose the next test where additional evidence can reduce uncertainty without sacrificing editorial quality.",
       "stop_rules": [
         "Do not claim causality from observational evidence.",
         "Skip weak stories rather than manufacture a test post.",
         "Never use fake engagement or guaranteed-return language."
-      ],
-      "treatment_value": "data_driven_breakdown"
+      ]
     },
-    "decision": "continue_active_experiment",
-    "generated_at": "2026-09-06T17:55:50.064188+00:00",
+    "controller_policy": {
+      "exploration_rate": 0.35,
+      "one_primary_variable_per_test": true,
+      "prefer_replication_before_promotion": true,
+      "skip_if_no_quality_story": true,
+      "revenue_policy": "Use revenue only when explicitly verified; never infer revenue from engagement."
+    },
     "hard_constraints": [
       "factual_accuracy",
       "originality",
       "verified_market_data",
       "no_fake_engagement",
       "no_guaranteed_returns"
-    ],
-    "status": "ACTIVE",
-    "version": "7.4"
+    ]
   },
   "creator_7_5": {
     "content_mix_target": {
@@ -786,7 +786,15 @@
     "visual_quality": "Use a visual only when it adds truthful information. Market charts must use real supplied market data."
   },
   "generated_at": "2026-09-06T20:50:06.887663+00:00",
-  "learning_overlay": "Creator 7.2 outcome learning is authoritative for repeated performance preferences. Use it as a strategy signal, never as permission to violate factual accuracy, originality, or anti-manipulation rules. Revenue fields are usable only when explicitly verified.",
+  "learning_overlay": {
+    "adaptive_experiment_controller": {
+      "instruction": "When the next post is generated, follow creator_7_4.current_experiment as the primary learning test when the chosen story naturally supports it. Keep all other editorial constraints unchanged. Do not force a weak story merely to satisfy an experiment.",
+      "experiment_id": "74-exp-20260906051743",
+      "primary_variable": "experiment_format",
+      "treatment_value": "data_driven_breakdown",
+      "mode": "EXPLORATION"
+    }
+  },
   "recent_performance_observations": [
     {
       "engagement_score": 0.0,
