@@ -1,0 +1,44 @@
+{
+  "version": "7.4",
+  "generated_at": "2026-09-06T05:17:43.536826+00:00",
+  "sample_size": 0,
+  "decision": "explore_uncertainty",
+  "next_experiment": {
+    "experiment_id": "74-exp-20260906051743",
+    "status": "ACTIVE",
+    "created_at": "2026-09-06T05:17:43.536764+00:00",
+    "mode": "EXPLORATION",
+    "hypothesis": "Test whether experiment_format=data_driven_breakdown improves the outcome versus the account baseline while holding other major choices stable.",
+    "primary_variable": "experiment_format",
+    "control_value": "__baseline__",
+    "treatment_value": "data_driven_breakdown",
+    "objective_metric": "outcome_score",
+    "secondary_metrics": [
+      "views",
+      "likes",
+      "comments",
+      "shares",
+      "quotes",
+      "follower_growth"
+    ],
+    "sample_target": 10,
+    "observed_context": {
+      "treatment_sample": 0,
+      "control_sample": 0,
+      "observed_lift_percent": 0
+    },
+    "reason": "Choose the next test where additional evidence can reduce uncertainty without sacrificing editorial quality.",
+    "stop_rules": [
+      "Do not claim causality from observational evidence.",
+      "Skip weak stories rather than manufacture a test post.",
+      "Never use fake engagement or guaranteed-return language."
+    ]
+  },
+  "policy": {
+    "exploration_rate": 0.35,
+    "one_primary_variable_per_test": true,
+    "prefer_replication_before_promotion": true,
+    "skip_if_no_quality_story": true,
+    "revenue_policy": "Use revenue only when explicitly verified; never infer revenue from engagement."
+  }
+}
