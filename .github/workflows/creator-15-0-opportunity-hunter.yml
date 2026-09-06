@@ -1,0 +1,50 @@
+name: Creator 15.0 - Opportunity Hunter
+
+on:
+  schedule:
+    - cron: '59 */3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: main-branch-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate and run opportunity hunter
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: |
+          python -m compileall -q src/creator_15_0_opportunity_hunter.py
+          python src/creator_15_0_opportunity_hunter.py
+          test -s data/live/creator_15_0_opportunity_board.json
+          test -s data/intelligence/creator_15_0_report.json
+
+      - name: Commit opportunity state
+        run: |
+          git config user.name 'creator-15-0-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analytics/creator_15_0_opportunity_memory.json data/live/creator_15_0_opportunity_board.json data/intelligence/creator_15_0_report.json
+          if git diff --cached --quiet; then
+            echo 'No state changes to commit.'
+          else
+            git commit -m 'chore: update Creator 15.0 opportunity board'
+            git push origin main
+          fi
