@@ -1,0 +1,36 @@
+name: Creator 22.2 - Hook Format Intelligence
+
+on:
+  schedule:
+    - cron: '23 */3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: main-branch-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run hook and format intelligence
+        run: python src/creator_22_2_hook_format_intelligence.py
+      - name: Validate outputs
+        run: |
+          python -m compileall -q src/creator_22_2_hook_format_intelligence.py
+          python -m json.tool data/live/creator_22_2_editorial_intelligence.json >/dev/null
+          python -m json.tool data/intelligence/creator_22_2_report.json >/dev/null
+      - name: Persist learning state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/live/creator_22_2_editorial_intelligence.json data/intelligence/creator_22_2_report.json
+          git diff --cached --quiet || git commit -m 'chore: persist Creator 22.2 editorial intelligence'
+          git push
