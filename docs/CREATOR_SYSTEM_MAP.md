@@ -1,47 +1,68 @@
-# Binance Square AI Creator — Unified System Map
+# Binance Square AI Creator — Single Orchestrator System Map
 
 ## Purpose
 
-The repository contains multiple Creator generations. They are treated as capability layers, not separate products.
+The repository uses one autonomous Creator workflow. Older Creator generations remain as Python capability modules and persistent memory, but they no longer run as independent scheduled workflows.
 
-The production publisher remains the authoritative execution path. The new Control Plane coordinates state from the existing layers and makes one safety-aware control decision.
+The canonical publisher is `.github/workflows/autonomous-market-creator.yml`. It is the only scheduled publishing workflow and the only workflow with an autonomous Binance Square publishing path.
 
-## Canonical flow
+## Human-like creator loop
 
-Research & Market → Opportunity/World Model → Counterfactual Decision → Content Creation → Existing Quality Gates → Publication → Outcome Measurement → Experiment Learning → Self-Improvement → next cycle
+The workflow wakes frequently to observe the market and audience, but waking is **not** a requirement to publish.
 
-## Capability map
+`Observe → Research → Rank opportunities → Decide → Create → Quality check → Publish or Wait → Measure → Learn → Experiment → Improve → Observe again`
 
-| Layer | Responsibility | State consumed by Control Plane |
+The Creator can wait when there is no strong story, pivot to a better opportunity, research when evidence is weak, or publish quickly when a time-sensitive opportunity is strong enough.
+
+There is no hard "post every 3 hours" rule. Any cadence interval is a decision heartbeat only; the adaptive cadence and final production gates remain authoritative.
+
+## Capability layers inside the one orchestrator
+
+| Layer | Responsibility | Executed by the master workflow |
 |---|---|---|
-| Creator 7.0 | Production content/publishing brain and gates | `creator_7_0_brain_state.json` |
-| Creator 10.0 | Reliability/recovery | `creator_10_0_recovery_state.json` |
-| Creator 10.1 | Root-cause repair | `creator_10_1_repair_state.json` |
-| Creator 11.0 | Continuous improvement decisions | `creator_11_0_improvement_state.json` |
-| Creator 12.0 | Bounded controlled experiments | `creator_12_0_active_experiment.json` |
-| Creator 13.0 | Synthetic/self model | `creator_13_0_self_state.json` |
-| Creator 14.0 | World model | `creator_14_0_world_model.json` |
-| Creator 15.0 | Opportunity hunting/ranking | `creator_15_0_opportunity_board.json` |
-| Creator 16.0 | Counterfactual decisions | `creator_16_0_decision_board.json` |
-| Creator 17.0 | Active research | `creator_17_0_research_state.json` |
-| Creator 18.0 | Evidence-based value allocation | `creator_18_0_value_allocation.json` |
-| Creator 19.0 | Self-improvement planning | `creator_19_0_improvement_board.json` |
+| Creator 7.x | Outcome learning, causal strategy, adaptive experiments, growth portfolio | Yes |
+| Creator 8.0 | Monetization intelligence | Yes |
+| Creator 9.0 | Autonomous reasoning/brain | Yes |
+| Creator 10.0 | Reliability and recovery | Yes |
+| Creator 10.1 | Root-cause repair | Yes |
+| Creator 11.0 | Continuous improvement | Yes |
+| Creator 12.0 | Bounded controlled experiments | Yes |
+| Creator 13.0 | Self model | Yes |
+| Creator 14.0 | World model | Yes |
+| Creator 15.0 | Opportunity hunting | Yes |
+| Creator 16.0 | Counterfactual decision analysis | Yes |
+| Creator 17.0 | Active research | Yes |
+| Creator 18.0 | Evidence-based value allocation | Yes |
+| Creator 19.0 | Self-improvement planning | Yes |
+| Creator 20.0 | Publication truth verification | Yes |
+| Creator 21.0 | Human-level editorial intelligence | Yes |
+| Creator 22.x | Audience, hook/format and draft intelligence | Yes |
 
-## Control Plane
+## Canonical execution order
 
-`src/creator_control_plane.py` reads the capability state and writes:
+1. Refresh market, news and core intelligence.
+2. Collect verified outcomes and update strategy memory.
+3. Run reasoning, reliability, experiments, research, opportunity and improvement modules.
+4. Run publication-truth and audience/editorial intelligence.
+5. Build the current opportunity set and apply human-like adaptive cadence.
+6. **WAIT** when the opportunity is weak or the system is not ready.
+7. When authorized to publish, freeze the opportunity and create the content package.
+8. Apply factual/content integrity, visual validation, and final production gates.
+9. Publish through the single official Binance Square publisher path.
+10. Record the result, refresh publication truth and feed measured outcomes back into future decisions.
 
-- `data/live/creator_control_plane.json`
-- `data/intelligence/creator_control_plane_report.json`
+## Safety boundaries
 
-The workflow `.github/workflows/creator-control-plane.yml` runs every 3 hours and on manual dispatch.
+The Creator does not trade, withdraw funds, transfer funds, fabricate metrics, manufacture engagement, guarantee returns, bypass quality gates, or blindly rewrite source code.
 
-## Safety model
+Self-engineering is an optional guarded manual capability in the master workflow. It is not an independent scheduled workflow.
 
-The Control Plane does not publish directly, trade, withdraw funds, bypass editorial/factual/visual gates, fabricate outcomes, infer revenue from engagement, or rewrite source code automatically.
+## Workflow topology
 
-Creator 12.0 already enforces bounded experiments and explicitly prohibits invented data and gate bypasses. Creator 19.0 similarly records proposed improvements without blind self-modification. The Control Plane preserves those constraints.
+There is intentionally one file under `.github/workflows/`:
 
-## Cleanup policy
+`autonomous-market-creator.yml`
 
-Do **not** delete the older Creator workflows yet. They remain available while the Control Plane is observed. Once the unified architecture is verified in real Actions runs, redundant scheduled writers can be consolidated safely in a separate cleanup change.
+Legacy scheduled workflow files for Creators 4.1, 7.2–9.0, 10.0–19.0, 20.0–22.x, performance learning, duplicate publishing, optimization, manual dispatching, and the separate control plane were consolidated or removed.
+
+The Python implementations and historical state artifacts were retained so the Creator's learning memory is not discarded.
