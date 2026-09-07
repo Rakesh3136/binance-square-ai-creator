@@ -1,0 +1,44 @@
+name: Creator 22.0 Audience Intelligence
+
+on:
+  schedule:
+    - cron: '13 */3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: main-branch-writer
+  cancel-in-progress: false
+
+jobs:
+  audience-intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run Audience Intelligence
+        run: python src/creator_22_0_audience_intelligence.py
+      - name: Validate outputs
+        run: |
+          python -m json.tool data/live/creator_22_0_audience_board.json >/dev/null
+          python -m json.tool data/intelligence/creator_22_0_report.json >/dev/null
+          python -m compileall -q src
+      - name: Persist learning state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/live/creator_22_0_audience_board.json data/intelligence/creator_22_0_report.json
+          if git diff --cached --quiet; then
+            echo 'No Audience Intelligence state changes.'
+            exit 0
+          fi
+          git commit -m 'Run Creator 22.0 audience intelligence'
+          git fetch origin main
+          git rebase --autostash origin/main
+          git push origin HEAD:main
