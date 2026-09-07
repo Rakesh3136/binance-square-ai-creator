@@ -1,0 +1,47 @@
+name: Creator Control Plane
+
+on:
+  schedule:
+    - cron: '11 */3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: main-branch-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  control-plane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate code
+        run: python -m compileall -q src
+
+      - name: Run unified control plane
+        run: python src/creator_control_plane.py
+
+      - name: Validate control artifacts
+        run: |
+          python -m json.tool data/live/creator_control_plane.json >/dev/null
+          python -m json.tool data/intelligence/creator_control_plane_report.json >/dev/null
+
+      - name: Persist control state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/live/creator_control_plane.json data/intelligence/creator_control_plane_report.json
+          git diff --cached --quiet || git commit -m 'chore: update creator control plane state'
+          git push
