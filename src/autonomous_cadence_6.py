@@ -1,8 +1,9 @@
-"""Creator 7.1 strategic mission + adaptive cadence authority.
+"""Creator 7.1 human-like adaptive publication cadence authority.
 
-Hourly wake-ups are only sensing opportunities. This authority refreshes the
-persistent seven-day mission before deciding whether to publish, wait, pivot,
-or research. It keeps monetization evidence separate from performance proxies.
+GitHub wakes hourly only to sense the market. Publication timing is NOT a fixed
+3-hour quota: the creator decides when a human editor would reasonably post,
+wait, or research based on opportunity strength, freshness, repetition and the
+last verified publication time.
 """
 from __future__ import annotations
 import json
@@ -138,7 +139,10 @@ def main() -> None:
     publish = False
     decision = "WAIT"
     action = "wait_for_stronger_or_fresher_opportunity"
+    cooldown_minutes = 0
 
+    # Human-like cadence: event-driven rather than quota-driven. A strong story
+    # can publish quickly; an ordinary story waits; a weak story is skipped.
     if manual:
         publish = True
         decision = "PUBLISH"
@@ -161,33 +165,44 @@ def main() -> None:
         decision = "PUBLISH"
         action = "publish_first_valid_high_information_post"
         reasons.append("first_publication")
-    elif news_title and category in {"breaking_news", "news_market_impact"} and news_age_hours is not None and news_age_hours <= 6 and effective_score >= 65:
+    elif news_title and category in {"breaking_news", "news_market_impact"} and news_age_hours is not None and news_age_hours <= 3 and effective_score >= 72 and (minutes_since is None or minutes_since >= 45):
         publish = True
         decision = "PUBLISH"
         action = "publish_fresh_breaking_news"
+        cooldown_minutes = 45
         reasons.append("fresh_breaking_news")
-    elif mission_action == "ACT_NOW" and effective_score >= 95 and (minutes_since is None or minutes_since >= 45):
+    elif mission_action == "ACT_NOW" and effective_score >= 105 and (minutes_since is None or minutes_since >= 60):
         publish = True
         decision = "PUBLISH"
         action = "mission_act_now"
+        cooldown_minutes = 60
         reasons.append("mission_act_now")
-    elif effective_score >= 110 and (minutes_since is None or minutes_since >= 60):
+    elif effective_score >= 125 and (minutes_since is None or minutes_since >= 75):
         publish = True
         decision = "PUBLISH"
         action = "publish_exceptional_opportunity"
+        cooldown_minutes = 75
         reasons.append("exceptionally_strong_opportunity")
-    elif minutes_since is not None and minutes_since >= 90 and effective_score >= 78:
+    elif effective_score >= 100 and (minutes_since is None or minutes_since >= 120):
         publish = True
         decision = "PUBLISH"
-        action = "publish_strong_opportunity_after_cooldown"
-        reasons.append("strong_opportunity_after_cooldown")
-    elif minutes_since is not None and minutes_since >= 180 and effective_score >= 65:
+        action = "publish_high_value_opportunity"
+        cooldown_minutes = 120
+        reasons.append("high_value_opportunity")
+    elif effective_score >= 82 and (minutes_since is None or minutes_since >= 180):
         publish = True
         decision = "PUBLISH"
-        action = "publish_after_maximum_cooldown"
-        reasons.append("maximum_cadence_interval")
+        action = "publish_strong_opportunity"
+        cooldown_minutes = 180
+        reasons.append("strong_opportunity")
+    elif effective_score >= 68 and (minutes_since is None or minutes_since >= 300):
+        publish = True
+        decision = "PUBLISH"
+        action = "publish_normal_opportunity_after_longer_spacing"
+        cooldown_minutes = 300
+        reasons.append("normal_opportunity_after_spacing")
     else:
-        reasons.append("wait_for_stronger_or_fresher_opportunity")
+        reasons.append("wait_for_better_story_or_natural_spacing")
 
     if effective_score < 60 and not manual:
         publish = False
@@ -202,7 +217,7 @@ def main() -> None:
         reasons.append("recent_asset_overexposure")
 
     result = {
-        "version": "7.1",
+        "version": "7.1-human-cadence",
         "generated_at": now.isoformat(),
         "publish": publish,
         "decision": decision,
@@ -225,13 +240,16 @@ def main() -> None:
         },
         "reasons": reasons,
         "policy": {
-            "wake_interval": "hourly",
-            "publication_interval": "adaptive",
-            "mission_authority": True,
-            "mission_horizon_days": 7,
+            "scheduler_wake_interval": "hourly_sensing_only",
+            "fixed_three_hour_quota": False,
+            "publication_interval": "event_and_quality_driven",
+            "human_like_cadence": True,
+            "breaking_news_minimum_spacing_minutes": 45,
+            "exceptional_minimum_spacing_minutes": 75,
+            "high_value_minimum_spacing_minutes": 120,
+            "strong_minimum_spacing_minutes": 180,
+            "normal_minimum_spacing_minutes": 300,
             "minimum_quality_score": 60,
-            "normal_cooldown_minutes": 90,
-            "maximum_cooldown_minutes": 180,
             "accuracy_over_frequency": True,
             "revenue_claims_require_verified_account_evidence": True,
         },
