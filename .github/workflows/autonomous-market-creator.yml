@@ -166,6 +166,10 @@ jobs:
           test -n "$DRAFT_PATH"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           python -m json.tool "$DRAFT_PATH" >/dev/null
+      - name: Automatic news headline integrity repair
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        run: |
+          python src/news_headline_integrity_repair.py
       - name: Automatic hook diversity repair
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
