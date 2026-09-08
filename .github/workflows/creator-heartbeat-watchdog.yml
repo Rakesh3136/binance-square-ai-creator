@@ -21,14 +21,15 @@ jobs:
       - name: Ensure autonomous creator keeps waking
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           workflow='autonomous-market-creator.yml'
-          runs=$(gh run list --workflow "$workflow" --branch main --limit 1 --json status,createdAt,databaseId --jq '.[0] // empty')
+          runs=$(gh run list --repo "$GH_REPO" --workflow "$workflow" --branch main --limit 1 --json status,createdAt,databaseId --jq '.[0] // empty')
           now=$(date -u +%s)
           if [ -z "$runs" ]; then
             echo 'No creator run found; dispatching one.'
-            gh workflow run "$workflow" --ref main
+            gh workflow run "$workflow" --repo "$GH_REPO" --ref main
             exit 0
           fi
           status=$(printf '%s' "$runs" | jq -r '.status')
@@ -42,7 +43,7 @@ jobs:
           fi
           if [ "$age" -ge 1500 ]; then
             echo 'Creator has not run recently; dispatching a heartbeat run.'
-            gh workflow run "$workflow" --ref main
+            gh workflow run "$workflow" --repo "$GH_REPO" --ref main
           else
             echo 'Recent creator run exists; no dispatch needed.'
           fi
