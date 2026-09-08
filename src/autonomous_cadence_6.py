@@ -141,8 +141,9 @@ def main() -> None:
     action = "wait_for_stronger_or_fresher_opportunity"
     cooldown_minutes = 0
 
-    # Human-like cadence: event-driven rather than quota-driven. A strong story
-    # can publish quickly; an ordinary story waits; a weak story is skipped.
+    # Human-like cadence: event-driven rather than quota-driven. Exceptional
+    # ACT_NOW opportunities may use a short spacing override, but still must
+    # pass every downstream content, safety, visual and publication gate.
     if manual:
         publish = True
         decision = "PUBLISH"
@@ -171,12 +172,18 @@ def main() -> None:
         action = "publish_fresh_breaking_news"
         cooldown_minutes = 45
         reasons.append("fresh_breaking_news")
-    elif mission_action == "ACT_NOW" and effective_score >= 105 and (minutes_since is None or minutes_since >= 60):
+    elif mission_action == "ACT_NOW" and effective_score >= 110 and (minutes_since is None or minutes_since >= 15):
         publish = True
         decision = "PUBLISH"
-        action = "mission_act_now"
-        cooldown_minutes = 60
-        reasons.append("mission_act_now")
+        action = "mission_act_now_short_spacing_override"
+        cooldown_minutes = 15
+        reasons.append("mission_act_now_exception")
+    elif mission_action == "ACT_NOW" and effective_score >= 105 and (minutes_since is None or minutes_since >= 30):
+        publish = True
+        decision = "PUBLISH"
+        action = "mission_act_now_reduced_spacing"
+        cooldown_minutes = 30
+        reasons.append("mission_act_now_reduced_spacing")
     elif effective_score >= 125 and (minutes_since is None or minutes_since >= 75):
         publish = True
         decision = "PUBLISH"
@@ -245,12 +252,15 @@ def main() -> None:
             "publication_interval": "event_and_quality_driven",
             "human_like_cadence": True,
             "breaking_news_minimum_spacing_minutes": 45,
+            "act_now_exception_minimum_spacing_minutes": 15,
+            "act_now_reduced_spacing_minutes": 30,
             "exceptional_minimum_spacing_minutes": 75,
             "high_value_minimum_spacing_minutes": 120,
             "strong_minimum_spacing_minutes": 180,
             "normal_minimum_spacing_minutes": 300,
             "minimum_quality_score": 60,
             "accuracy_over_frequency": True,
+            "act_now_override_scoped": True,
             "revenue_claims_require_verified_account_evidence": True,
         },
     }
