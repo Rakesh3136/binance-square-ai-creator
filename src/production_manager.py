@@ -9,7 +9,7 @@ import json, os, re, subprocess, sys
 from datetime import datetime
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-REPORT_DIR=ROOT/'data/reports'; STATUS_PATH=ROOT/'data/live/creator_status.json'; PREFLIGHT_PATH=ROOT/'data/live/editorial_preflight.json'; CONTEXT_PATH=ROOT/'data/live/publication_context.json'; INTEL_PATH=ROOT/'data/live/creator_intelligence_2.json'; GATE_PATH=ROOT/'data/live/engagement_gate.json'; VISUAL_META=ROOT/'data/live/visual_metadata.json'; VISUAL=ROOT/'data/live/visual.png'; AUDIT_PATH=Path('/tmp/publish_gate.json')
+REPORT_DIR=ROOT/'data/reports'; STATUS_PATH=ROOT/'data/live/creator_status.json'; PREFLIGHT_PATH=ROOT/'data/live/editorial_preflight.json'; CONTEXT_PATH=ROOT/'data/live/publication_context.json'; INTEL_PATH=ROOT/'data/live/creator_intelligence_2.json'; GATE_PATH=ROOT/'data/live/engagement_gate.json'; VISUAL_META=ROOT/'data/live/visual_metadata.json'; VISUAL=ROOT/'data/live/visual.png'; FROZEN_PATH=ROOT/'data/live/authoritative_opportunity.json'; CADENCE_PATH=ROOT/'data/live/autonomous_cadence_6.json'; AUDIT_PATH=Path('/tmp/publish_gate.json')
 QUALITY_THRESHOLD=68.0; OPPORTUNITY_THRESHOLD=60.0; RESCUE_QUALITY_THRESHOLD=75.0; MAX_AGE_SECONDS=20*60
 
 def load(path,default=None):
@@ -30,9 +30,18 @@ def clean_symbol(value):
     x=re.sub(r'USDT$','',str(value or '').upper().replace('$','').strip())
     return x if re.fullmatch(r'[A-Z0-9]{1,15}',x) else ''
 
+def numeric_score(obj):
+    if not isinstance(obj,dict): return 0.0
+    for k in ('selected_score','effective_score','adjusted_score','engagement_score','raw_score','opportunity_score','content_signal_score','news_score'):
+        try:
+            v=float(obj.get(k) or 0)
+            if v>0:return v
+        except Exception: pass
+    return 0.0
+
 def opportunity_score(data):
-    pre=load(PREFLIGHT_PATH); vals=[]
-    for obj,keys in ((data.get('research') or {},('opportunity_score','adjusted_score','engagement_score')),(data.get('critique') or {},('revised_opportunity_score','opportunity_score','adjusted_score','engagement_score')),(data.get('selected_editorial_lane') or {},('adjusted_score','raw_score','engagement_score')),(pre.get('selected_opportunity') or {},('adjusted_score','raw_score','content_signal_score','engagement_score'))):
+    pre=load(PREFLIGHT_PATH); frozen=load(FROZEN_PATH); cadence=load(CADENCE_PATH); vals=[]
+    for obj,keys in ((data.get('research') or {},('opportunity_score','adjusted_score','engagement_score')),(data.get('critique') or {},('revised_opportunity_score','opportunity_score','adjusted_score','engagement_score')),(data.get('selected_editorial_lane') or {},('adjusted_score','raw_score','engagement_score')),(pre.get('selected_opportunity') or {},('selected_score','adjusted_score','raw_score','content_signal_score','engagement_score','news_score')),(frozen,('selected_score','effective_score','score','adjusted_score','raw_score','engagement_score')),(cadence,('effective_score','selected_score','opportunity_score','score')))):
         if isinstance(obj,dict):
             for k in keys:
                 try:v=float(obj.get(k) or 0)
@@ -43,7 +52,7 @@ def opportunity_score(data):
 def authoritative_symbol(data):
     """Frozen publication context outranks every downstream or legacy symbol field."""
     ctx=load(CONTEXT_PATH)
-    frozen=load(ROOT/'data/live/authoritative_opportunity.json')
+    frozen=load(FROZEN_PATH)
     pre=load(PREFLIGHT_PATH)
     for value in (ctx.get('symbol'),frozen.get('symbol'),(pre.get('selected_opportunity') or {}).get('symbol'),(data.get('draft') or {}).get('symbol')):
         x=clean_symbol(value)
@@ -83,7 +92,7 @@ def evaluate(report):
     threshold=RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD
     eligible=bool(post) and coherent and quality>=threshold and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok and (rescue or (intelligence_ok and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED'))
     mode=choose_mode()
-    audit={'version':'5.1','draft':str(report),'publish':eligible,'mode':mode,'quality_score':quality,'quality_threshold':threshold,'opportunity_score':opportunity,'creator_intelligence_2':intelligence,'interaction_gate':interaction,'tradingview_required':True,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'visual_mode':load(VISUAL_META).get('visual_mode'),'content_coherent':coherent,'rescue':rescue,'reason':'publish_eligible' if eligible else 'gate_rejected'}
+    audit={'version':'5.2','draft':str(report),'publish':eligible,'mode':mode,'quality_score':quality,'quality_threshold':threshold,'opportunity_score':opportunity,'creator_intelligence_2':intelligence,'interaction_gate':interaction,'tradingview_required':True,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'visual_mode':load(VISUAL_META).get('visual_mode'),'content_coherent':coherent,'rescue':rescue,'reason':'publish_eligible' if eligible else 'gate_rejected'}
     AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False)); GATE_PATH.write_text(json.dumps(interaction,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(audit,indent=2,ensure_ascii=False)); return eligible,mode
 
 def rescue_status():
