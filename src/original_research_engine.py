@@ -1,58 +1,49 @@
-"""Original Research Engine 1.0.
-Builds a compact, evidence-first research artifact from authoritative pipeline data.
-It does not invent facts and never changes market data.
+"""Original Research Engine 2.0 — deep coin due diligence.
+Builds evidence-led research candidates across the live market and news universe.
+It identifies potential asymmetric upside AND failure risk; it never predicts a
+certain 100x return or bankruptcy. Claims require evidence and primary verification.
 """
 from __future__ import annotations
-import json,re
-from pathlib import Path
+import json,math,re
 from datetime import datetime,timezone
+from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-MARKET=ROOT/'data/live/market_snapshot.json'; NEWS=ROOT/'data/live/news_snapshot.json'; PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; PUB=ROOT/'analytics/publication_log.jsonl'
-OUT=ROOT/'data/live/original_research.json'; REPORT=ROOT/'data/intelligence/original_research_report.json'
-def load(p,default=None):
-    try:return json.loads(p.read_text(encoding='utf-8'))
-    except Exception:return {} if default is None else default
+MARKET=ROOT/'data/live/market_snapshot.json'; NEWS=ROOT/'data/live/news_snapshot.json'; PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; PUB=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/original_research.json'; REPORT=ROOT/'data/intelligence/original_research_report.json'
+def load(p):
+ try:
+  x=json.loads(p.read_text(encoding='utf-8')); return x if isinstance(x,dict) else {}
+ except Exception:return {}
 def sym(v):return re.sub(r'USDT$','',str(v or '').upper().replace('$','').strip())
+def n(v):
+ try:return float(v)
+ except:return 0.0
+def clamp(x):return round(max(0,min(100,x)),2)
+def rows(m):
+ out=[];seen=set()
+ for g in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
+  for x in m.get(g) or []:
+   if not isinstance(x,dict):continue
+   s=sym(x.get('symbol'))
+   if s and s not in seen and x.get('last_price') is not None:seen.add(s);out.append(x)
+ return out[:150]
 def main():
-    market=load(MARKET); news=load(NEWS); pre=load(PREFLIGHT); selected=pre.get('selected_opportunity') or {}
-    symbol=sym(selected.get('symbol') or market.get('top_signal',{}).get('symbol') or pre.get('symbol'))
-    item=None
-    for group in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
-        for x in market.get(group) or []:
-            if isinstance(x,dict) and sym(x.get('symbol'))==symbol:item=x;break
-        if item:break
-    articles=[]
-    for a in news.get('articles') or []:
-        if isinstance(a,dict):articles.append({'title':a.get('title'),'source':a.get('source'),'published_at':a.get('published_at'),'symbols':a.get('symbols') or [],'news_score':a.get('news_score')})
-    recent=[]
-    if PUB.exists():
-        for line in PUB.read_text(encoding='utf-8').splitlines()[-30:]:
-            try:
-                r=json.loads(line); recent.append({'hook':r.get('hook'),'symbol':r.get('symbol'),'topic':r.get('topic'),'published_at':r.get('published_at')})
-            except Exception:pass
-    move=float((item or {}).get('price_change_percent') or 0); volume=float((item or {}).get('quote_volume_usdt') or 0); price=float((item or {}).get('last_price') or 0)
-    signal_score=float((item or {}).get('content_signal_score') or 0)
-    related=[a for a in articles if symbol and any(sym(v)==symbol for v in (a.get('symbols') or []))]
-    title=(related[0].get('title') if related else selected.get('news_title'))
-    same_topic=[r for r in recent if sym(r.get('symbol'))==symbol]
-    anomaly=[]
-    if abs(move)>=8: anomaly.append('large_intraday_move')
-    if float((item or {}).get('intraday_range_percent') or 0)>=20: anomaly.append('wide_intraday_range')
-    if volume>=100000000: anomaly.append('high_quote_volume')
-    if signal_score>=80: anomaly.append('high_content_signal')
-    mechanisms=[]
-    if abs(move)>=5 and volume>0: mechanisms.append('price_move_plus_volume_is_stronger_than_price_alone')
-    if float((item or {}).get('intraday_range_percent') or 0)>abs(move)*1.5 and abs(move)>0: mechanisms.append('wide_range_exceeds_net_move_suggesting_intraday_two_way_activity')
-    if related: mechanisms.append('news_asset_link_exists_but_news_does_not_by_itself_prove_price_causality')
-    info_advantage=0
-    info_advantage+=25 if anomaly else 0
-    info_advantage+=20 if mechanisms else 0
-    info_advantage+=15 if related else 0
-    info_advantage+=15 if selected else 0
-    info_advantage+=15 if not same_topic else 0
-    info_advantage+=10 if item else 0
-    thesis=(f"{symbol} is interesting because the live market evidence shows a measurable move/structure ({move:.2f}% price change, {volume:.0f} USDT quote volume) while the available context can be tested against the current narrative." if symbol else 'No authoritative asset available.')
-    invalidation='The thesis should be rejected if the cited market relationship cannot be reproduced from the authoritative snapshot or if the news context does not support the claimed connection.'
-    result={'version':'1.0','generated_at':datetime.now(timezone.utc).isoformat(),'symbol':symbol,'authoritative_market_item':item or {},'relevant_news':related[:5],'recent_same_symbol_publications':same_topic[-10:],'anomalies':anomaly,'derived_mechanisms':mechanisms,'thesis_seed':thesis,'invalidation':invalidation,'information_advantage_score':min(100,info_advantage),'research_status':'READY' if item else 'INSUFFICIENT_EVIDENCE','policy':['Facts come only from supplied snapshots.','Derived observations are labeled as derived.','News is not treated as proof of causality.','No invented targets, flows, whale activity, or trading outcomes.','Research can recommend WAIT when evidence is insufficient.']}
-    OUT.parent.mkdir(parents=True,exist_ok=True);REPORT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8');REPORT.write_text(json.dumps({'research':result,'decision':'RESEARCH_READY' if item else 'WAIT_FOR_EVIDENCE'},indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'OK','version':'1.0','symbol':symbol,'information_advantage_score':result['information_advantage_score'],'research_status':result['research_status']},indent=2))
+ m=load(MARKET);news=load(NEWS);pre=load(PREFLIGHT); articles=[a for a in news.get('articles') or [] if isinstance(a,dict)]; pubs=[]
+ if PUB.exists():
+  for line in PUB.read_text(encoding='utf-8').splitlines()[-80:]:
+   try:pubs.append(json.loads(line))
+   except:pass
+ results=[]
+ risk_words=('hack','exploit','lawsuit','delist','delisting','insolven','bankrupt','bankruptcy','unlock','rug','investigation','fraud','breach','halt','vulnerability')
+ for x in rows(m):
+  s=sym(x.get('symbol')); move=n(x.get('price_change_percent'));vol=n(x.get('quote_volume_usdt') or x.get('quote_volume'));rng=n(x.get('intraday_range_percent'));signal=n(x.get('content_signal_score'))
+  rel=[a for a in articles if s and (s in [sym(v) for v in a.get('symbols') or []] or re.search(r'\b'+re.escape(s.lower())+r'\b',(str(a.get('title',''))+' '+str(a.get('summary',''))).lower()))]
+  official=sum(1 for a in rel if str(a.get('category','')).endswith('_official'));risk_hits=sum(1 for a in rel if any(w in (str(a.get('title',''))+' '+str(a.get('summary',''))).lower() for w in risk_words))
+  evidence=clamp(30+min(40,len(rel)*8)+min(30,official*15)); liquidity=clamp(math.log10(max(vol,1))*12); anomaly=clamp(45+abs(move)*1.3+min(20,rng*.2)+signal*.2)
+  risk=clamp(risk_hits*20+(25 if liquidity<45 else 0)+(15 if rng>60 else 0)); upside=clamp(25+anomaly*.35+evidence*.3+liquidity*.2-risk*.4)
+  prior=sum(1 for p in pubs if sym(p.get('symbol'))==s)
+  results.append({'symbol':s,'price':n(x.get('last_price')),'move_pct':move,'quote_volume_usdt':vol,'range_pct':rng,'content_signal_score':signal,'news_count':len(rel),'official_evidence_count':official,'evidence_score':evidence,'liquidity_score':liquidity,'market_anomaly_score':anomaly,'risk_red_flag_score':risk,'upside_optionality_score':upside,'prior_publications':prior,'research_questions':['What fundamental product/use is creating demand?','What is the circulating supply versus fully diluted supply?','What unlocks/concentration could pressure holders?','What measurable adoption or revenue evidence exists?','What security/governance failures could break the thesis?','What catalyst is actually confirmed by a primary source?','What evidence would invalidate the upside thesis?','What evidence would indicate structural failure or insolvency risk?']})
+ gems=sorted(results,key=lambda r:(r['upside_optionality_score'],r['evidence_score']),reverse=True)[:10]; risks=sorted(results,key=lambda r:(r['risk_red_flag_score'],r['market_anomaly_score']),reverse=True)[:10]
+ selected=pre.get('selected_opportunity') or {}; selected_sym=sym(selected.get('symbol'))
+ state={'version':'2.0','generated_at':datetime.now(timezone.utc).isoformat(),'status':'READY_FOR_DEEP_RESEARCH' if results else 'NO_CANDIDATES','universe_size':len(results),'method':'market anomaly + evidence + liquidity + explicit risk signals; not a return predictor','potential_gems':gems,'potential_risks':risks,'selected_story_symbol':selected_sym,'required_deep_checks':['primary project documentation','tokenomics and unlocks','holder concentration','product usage/adoption','treasury/runway if disclosed','security/audits/incidents','developer/governance activity','confirmed catalysts','comparable valuation','failure/invalidation scenarios'],'epistemic_labels':['VERIFIED_FACT','DERIVED_OBSERVATION','INTERPRETATION','HYPOTHESIS','UNKNOWN'],'publication_policy':'Never state that a coin will 100x or go bankrupt. Use evidence-backed asymmetric-upside or failure-risk language, disclose uncertainty, and require primary verification for material claims.'}
+ OUT.parent.mkdir(parents=True,exist_ok=True);REPORT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(state,indent=2,ensure_ascii=False)+'\n',encoding='utf-8');REPORT.write_text(json.dumps({'module':'original_research_engine','generated_at':state['generated_at'],'top_gems':[r['symbol'] for r in gems],'top_risks':[r['symbol'] for r in risks],'universe_size':len(results)},indent=2,ensure_ascii=False)+'\n',encoding='utf-8');print(json.dumps({'status':state['status'],'universe_size':len(results),'potential_gems':[r['symbol'] for r in gems[:5]],'potential_risks':[r['symbol'] for r in risks[:5]]},indent=2))
 if __name__=='__main__':main()
