@@ -87,7 +87,9 @@ jobs:
           python src/creator_16_0_counterfactual_engine.py
           python src/creator_17_0_active_research.py
           python src/original_research_engine.py
+          python src/deep_coin_research_reporter.py
           python src/research_intelligence_layer.py
+          python src/thesis_ledger.py
           python src/creator_18_0_value_allocator.py
           python src/creator_19_0_self_improvement_v2.py
       - name: Superhuman Creator Core
@@ -97,6 +99,9 @@ jobs:
       - name: Unified control-plane snapshot
         run: |
           python -m compileall -q src
+          python -m json.tool data/live/original_research.json >/dev/null
+          python -m json.tool data/intelligence/deep_coin_research_report.json >/dev/null
+          python -m json.tool data/intelligence/thesis_ledger.json >/dev/null
           python src/creator_control_plane.py
           python -m json.tool data/live/creator_control_plane.json >/dev/null
           python -m json.tool data/intelligence/creator_control_plane_report.json >/dev/null
@@ -268,6 +273,8 @@ jobs:
         run: |
           echo '=== CADENCE ==='; test -f data/live/autonomous_cadence_6.json && cat data/live/autonomous_cadence_6.json || true
           echo '=== ORIGINAL RESEARCH ==='; test -f data/live/original_research.json && cat data/live/original_research.json || true
+          echo '=== DEEP COIN RESEARCH ==='; test -f data/intelligence/deep_coin_research_report.json && cat data/intelligence/deep_coin_research_report.json || true
+          echo '=== THESIS LEDGER ==='; test -f data/intelligence/thesis_ledger.json && cat data/intelligence/thesis_ledger.json || true
           echo '=== RESEARCH INTELLIGENCE ==='; test -f data/live/research_intelligence.json && cat data/live/research_intelligence.json || true
           echo '=== ELITE JUDGE ==='; test -f data/live/elite_prepublication_judge.json && cat data/live/elite_prepublication_judge.json || true
           echo '=== SUPERHUMAN CORE ==='; test -f data/live/superhuman_creator_core.json && cat data/live/superhuman_creator_core.json || true
