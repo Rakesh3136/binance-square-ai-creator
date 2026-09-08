@@ -30,18 +30,17 @@ def clean_symbol(value):
     x=re.sub(r'USDT$','',str(value or '').upper().replace('$','').strip())
     return x if re.fullmatch(r'[A-Z0-9]{1,15}',x) else ''
 
-def numeric_score(obj):
-    if not isinstance(obj,dict): return 0.0
-    for k in ('selected_score','effective_score','adjusted_score','engagement_score','raw_score','opportunity_score','content_signal_score','news_score'):
-        try:
-            v=float(obj.get(k) or 0)
-            if v>0:return v
-        except Exception: pass
-    return 0.0
-
 def opportunity_score(data):
     pre=load(PREFLIGHT_PATH); frozen=load(FROZEN_PATH); cadence=load(CADENCE_PATH); vals=[]
-    for obj,keys in ((data.get('research') or {},('opportunity_score','adjusted_score','engagement_score')),(data.get('critique') or {},('revised_opportunity_score','opportunity_score','adjusted_score','engagement_score')),(data.get('selected_editorial_lane') or {},('adjusted_score','raw_score','engagement_score')),(pre.get('selected_opportunity') or {},('selected_score','adjusted_score','raw_score','content_signal_score','engagement_score','news_score')),(frozen,('selected_score','effective_score','score','adjusted_score','raw_score','engagement_score')),(cadence,('effective_score','selected_score','opportunity_score','score')))):
+    sources=[
+        (data.get('research') or {},('opportunity_score','adjusted_score','engagement_score')),
+        (data.get('critique') or {},('revised_opportunity_score','opportunity_score','adjusted_score','engagement_score')),
+        (data.get('selected_editorial_lane') or {},('adjusted_score','raw_score','engagement_score')),
+        (pre.get('selected_opportunity') or {},('selected_score','adjusted_score','raw_score','content_signal_score','engagement_score','news_score')),
+        (frozen,('selected_score','effective_score','score','adjusted_score','raw_score','engagement_score')),
+        (cadence,('effective_score','selected_score','opportunity_score','score')),
+    ]
+    for obj,keys in sources:
         if isinstance(obj,dict):
             for k in keys:
                 try:v=float(obj.get(k) or 0)
