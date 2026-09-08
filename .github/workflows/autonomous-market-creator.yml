@@ -36,20 +36,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
-
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
-
       - name: Refresh market, news and core intelligence
         run: |
           python src/live_market_scanner.py
@@ -59,7 +55,6 @@ jobs:
           python src/tradingview_asset_gate.py
         env:
           TOPIC: ${{ github.event.inputs.topic || '' }}
-
       - name: Outcome learning and causal strategy update
         run: |
           python src/square_performance_collector.py
@@ -70,14 +65,12 @@ jobs:
           python src/creator_7_4_adaptive_experiment_controller.py
           python src/creator_7_5_growth_portfolio.py
           python src/creator_8_0_revenue_engine.py
-
       - name: Publication truth and audience intelligence
         run: |
           python src/creator_20_0_publication_verifier.py
           python src/creator_22_0_audience_intelligence.py
           python src/creator_22_2_hook_format_intelligence.py
           python src/creator_22_3_draft_intelligence.py
-
       - name: Reliability, repair and autonomous reasoning layers
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -95,17 +88,16 @@ jobs:
           python src/creator_17_0_active_research.py
           python src/creator_18_0_value_allocator.py
           python src/creator_19_0_self_improvement_v2.py
-
+      - name: Superhuman Creator Core
+        run: python src/superhuman_creator_core.py
       - name: Human-level editorial intelligence
         run: python src/creator_21_0_human_level_editor.py
-
       - name: Unified control-plane snapshot
         run: |
           python -m compileall -q src
           python src/creator_control_plane.py
           python -m json.tool data/live/creator_control_plane.json >/dev/null
           python -m json.tool data/intelligence/creator_control_plane_report.json >/dev/null
-
       - name: Optional guarded self-engineering
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_self_engineering == true }}
         env:
@@ -119,7 +111,6 @@ jobs:
           python src/creator_intelligence.py || true
           python src/self_engineer.py
           test -f data/live/self_engineering_report.json
-
       - name: Creator 7.x content director and adaptive cadence
         id: cadence
         run: |
@@ -132,7 +123,6 @@ jobs:
           publish=$(python -c 'import json; print(str(json.load(open("data/live/autonomous_cadence_6.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "Human-like adaptive cadence decision: $publish"
-
       - name: Freeze opportunity and run authoritative brain
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
@@ -140,7 +130,6 @@ jobs:
           python src/creator_brain.py
           python src/creator_brain_gate.py
           python src/pipeline_stage.py creator_brain success 'Authoritative creator brain completed'
-
       - name: Build and refine publishable content
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
@@ -164,7 +153,6 @@ jobs:
           if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
           if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
           exit 0
-
       - name: Score scripts and apply human editorial pass
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
@@ -178,19 +166,16 @@ jobs:
           test -n "$DRAFT_PATH"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           python -m json.tool "$DRAFT_PATH" >/dev/null
-
       - name: Integrity, visual and final publication gates
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/content_integrity_gate_4.py
           python -m compileall -q src
-
       - name: Setup Node and Chromium
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-
       - name: Render and validate TradingView package
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
@@ -200,7 +185,6 @@ jobs:
           test -s data/live/visual.png
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
-
       - name: Run final production gate
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         id: gate
@@ -220,7 +204,6 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           if [ "$publish" = 'true' ]; then python src/pipeline_stage.py quality_gate success 'Publication authorized'; else python src/pipeline_stage.py quality_gate blocked 'Publication blocked by production gate'; fi
           exit 0
-
       - name: Extract publication text
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         id: draft
@@ -229,7 +212,6 @@ jobs:
           test -n "$draft"
           echo "path=$draft" >> "$GITHUB_OUTPUT"
           DRAFT_PATH="$draft" python src/workflow_helpers.py extract
-
       - name: Prepare article title
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'article' }}
         run: |
@@ -240,7 +222,6 @@ jobs:
           title=ctx.get('article_title') or ctx.get('news_title') or 'Crypto Market Update'
           Path('data/live/article_title.txt').write_text(title[:180],encoding='utf-8')
           PY
-
       - name: Publish to Binance Square — only publisher
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         id: publish
@@ -259,7 +240,6 @@ jobs:
           python src/pipeline_stage.py publish success 'Binance Square returned a post ID'
           python src/pipeline_stage.py verify-publish
           echo 'verified=true' >> "$GITHUB_OUTPUT"
-
       - name: Record publication and update truth
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' && steps.publish.outputs.verified == 'true' }}
         env:
@@ -268,25 +248,21 @@ jobs:
         run: |
           python src/workflow_helpers.py record
           python src/creator_20_0_publication_verifier.py
-
       - name: Final diagnostics and state persistence
         if: always()
         run: |
           echo '=== CADENCE ==='; test -f data/live/autonomous_cadence_6.json && cat data/live/autonomous_cadence_6.json || true
+          echo '=== SUPERHUMAN CORE ==='; test -f data/live/superhuman_creator_core.json && cat data/live/superhuman_creator_core.json || true
           echo '=== CONTROL PLANE ==='; test -f data/live/creator_control_plane.json && cat data/live/creator_control_plane.json || true
           echo '=== PUBLICATION TRUTH ==='; test -f data/live/creator_20_0_publication_truth.json && cat data/live/creator_20_0_publication_truth.json || true
           echo '=== OUTCOME FEEDBACK ==='; test -f data/intelligence/performance_feedback.json && cat data/intelligence/performance_feedback.json || true
           echo '=== PUBLICATION GATE ==='; test -f /tmp/publish_gate.json && cat /tmp/publish_gate.json || true
-
           git restore --source=HEAD --staged --worktree src/ 2>/dev/null || true
           git clean -fd node_modules binance-skills-hub src/__pycache__ data/reports 2>/dev/null || true
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add analytics data/live data/intelligence
-          if git diff --cached --quiet; then
-            echo 'No creator state changes to persist.'
-            exit 0
-          fi
+          if git diff --cached --quiet; then echo 'No creator state changes to persist.'; exit 0; fi
           git commit -m 'Record unified autonomous creator cycle'
           git fetch origin main
           git rebase --autostash origin/main
