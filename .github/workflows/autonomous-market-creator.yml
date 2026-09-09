@@ -183,6 +183,13 @@ jobs:
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: '20'
         run: python src/hook_diversity_rewriter.py
+      - name: Automatic mechanism and reader-value repair
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.6-flash
+          GEMINI_DAILY_BUDGET: '20'
+        run: python src/mechanism_value_rewriter.py
       - name: Elite pre-publication judge
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: python src/elite_prepublication_judge.py
