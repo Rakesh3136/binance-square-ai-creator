@@ -161,6 +161,7 @@ jobs:
           if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
           exit 0
       - name: Score scripts and apply human editorial pass
+        id: editorial
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -171,10 +172,15 @@ jobs:
           python src/candidate_script_scorer_4.py
           DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -mmin -60 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
           test -n "$DRAFT_PATH"
+          test -f "$DRAFT_PATH"
+          echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
+          echo "Pinned editorial draft: $DRAFT_PATH"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           python -m json.tool "$DRAFT_PATH" >/dev/null
       - name: Automatic news headline integrity repair
         if: ${{ steps.cadence.outputs.publish == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/news_headline_integrity_repair.py
       - name: Automatic hook diversity repair
         if: ${{ steps.cadence.outputs.publish == 'true' }}
@@ -182,6 +188,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: '20'
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/hook_diversity_rewriter.py
       - name: Automatic mechanism and reader-value repair
         if: ${{ steps.cadence.outputs.publish == 'true' }}
@@ -189,12 +196,17 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: '20'
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/mechanism_value_rewriter.py
       - name: Elite pre-publication judge
         if: ${{ steps.cadence.outputs.publish == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/elite_prepublication_judge.py
       - name: Integrity, visual and final publication gates
         if: ${{ steps.cadence.outputs.publish == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
           python src/content_integrity_gate_4.py
           python -m compileall -q src
@@ -205,6 +217,8 @@ jobs:
           node-version: '24'
       - name: Render and validate TradingView package
         if: ${{ steps.cadence.outputs.publish == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
@@ -215,6 +229,8 @@ jobs:
       - name: Run final production gate
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         id: gate
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
           set +e
           python src/production_manager.py
@@ -234,11 +250,13 @@ jobs:
       - name: Extract publication text
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         id: draft
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          draft=$(find data/reports -type f -name '*-multi-agent.json' -mmin -90 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$draft"
-          echo "path=$draft" >> "$GITHUB_OUTPUT"
-          DRAFT_PATH="$draft" python src/workflow_helpers.py extract
+          test -n "$DRAFT_PATH"
+          test -f "$DRAFT_PATH"
+          echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
+          DRAFT_PATH="$DRAFT_PATH" python src/workflow_helpers.py extract
       - name: Prepare article title
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' && steps.gate.outputs.mode == 'article' }}
         run: |
@@ -270,7 +288,7 @@ jobs:
       - name: Record publication and update truth
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' && steps.publish.outputs.verified == 'true' }}
         env:
-          DRAFT_PATH: ${{ steps.draft.outputs.path }}
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           MODE: ${{ steps.gate.outputs.mode }}
         run: |
           python src/workflow_helpers.py record
@@ -278,7 +296,11 @@ jobs:
       - name: Final diagnostics and state persistence
         if: always()
         run: |
+          echo '=== PINNED EDITORIAL DRAFT ==='; echo '${{ steps.editorial.outputs.path }}'
           echo '=== CADENCE ==='; test -f data/live/autonomous_cadence_6.json && cat data/live/autonomous_cadence_6.json || true
+          echo '=== MECHANISM REPAIR ==='; test -f data/live/mechanism_value_repair.json && cat data/live/mechanism_value_repair.json || true
+          echo '=== HOOK REPAIR ==='; test -f data/live/hook_diversity_repair.json && cat data/live/hook_diversity_repair.json || true
+          echo '=== NEWS HEADLINE REPAIR ==='; test -f data/live/news_headline_integrity_repair.json && cat data/live/news_headline_integrity_repair.json || true
           echo '=== ORIGINAL RESEARCH ==='; test -f data/live/original_research.json && cat data/live/original_research.json || true
           echo '=== DEEP COIN RESEARCH ==='; test -f data/intelligence/deep_coin_research_report.json && cat data/intelligence/deep_coin_research_report.json || true
           echo '=== THESIS LEDGER ==='; test -f data/intelligence/thesis_ledger.json && cat data/intelligence/thesis_ledger.json || true
