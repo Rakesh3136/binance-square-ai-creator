@@ -83,7 +83,7 @@ def main():
     data=load(report); draft=data.get('draft') or {}; original=norm(draft.get('post') or draft.get('text') or '')
     if not original: raise SystemExit('Draft has no post text')
     lines=[x.strip() for x in original.splitlines() if x.strip()]; hook=lines[0] if lines else ''; recent=recent_hooks()
-    near=[(round(similarity(h,old),2),old) for old in recent if similarity(h,old)>=MAX_SIMILARITY]
+    near=[(round(similarity(hook,old),2),old) for old in recent if similarity(hook,old)>=MAX_SIMILARITY]
     if not near:
         OUT.write_text(json.dumps({'status':'NOT_NEEDED','original_hook':hook,'matches':[]},indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps({'status':'NOT_NEEDED','hook':hook},ensure_ascii=False)); return 0
     context=load(CONTEXT); preflight=load(PREFLIGHT); selected=preflight.get('selected_opportunity') or {}; symbol=norm(context.get('symbol') or selected.get('symbol') or draft.get('symbol')).upper().replace('$','').replace('USDT','').strip(); headline=norm(context.get('news_title') or selected.get('news_title') or draft.get('news_title')); body='\n'.join(lines[1:])
