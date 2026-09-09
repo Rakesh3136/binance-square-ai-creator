@@ -1,7 +1,12 @@
-"""Elite Pre-Publication Judge 1.3.
+"""Elite Pre-Publication Judge 1.4.
 Hard editorial gate: publication must earn its way through evidence, originality,
 reader value, specificity and integrity. The judge evaluates the exact draft
 selected by the editorial stage when DRAFT_PATH is supplied.
+
+Originality is scored from observable editorial signals rather than treating a
+low GLOBAL research score as proof that the finished post is derivative. The
+score remains a hard gate and is never used to waive evidence, safety or
+structural requirements.
 """
 from __future__ import annotations
 import json,re,os
@@ -17,6 +22,7 @@ GENERIC={'this is the crypto story im watching right now','quick market check','
 ENTITY_TERMS=('token','coin','asset','protocol','network','chain','stablecoin','bitcoin','ethereum','solana','binance','defi','layer 2','l2','exchange','wallet','users','developers','fees','revenue','tvl','liquidity','volume','supply','fdv','market cap','unlock','funding','flows','addresses')
 MECHANISM_TERMS=('because','mechanism','driven by','explains why','the reason','connects','through','as a result','which means','leads to','causes','due to','means that','translates into','shows up in','flows into','results in','comes from','depends on','hinges on','works through','is linked to','matters because','suggests that','implies that','so the effect','this matters because','in turn','which can make','which can leave')
 INVALIDATION_TERMS=('unless','if ','would change','would invalidate','invalidat','confirm','confirmation','fails if','what would','only if','watch for','signal')
+CAUSAL_OR_RELATIONAL_TERMS=('because','while','versus','vs','relative to','compared with','despite','instead of','rather than','but','yet','therefore','so','which means','as a result','in turn','linked to','flows into','depends on','hinges on','translates into')
 
 def resolve_report():
     explicit=os.getenv('DRAFT_PATH','').strip()
@@ -44,17 +50,19 @@ def semantic_specificity(text,facts):
     concrete=min(15,(facts+numeric)*5)
     return min(100,35+named+context+concrete)
 
+def discussed_symbols(text):
+    symbols=set(re.findall(r'\$([A-Z][A-Z0-9]{1,14})\b', text.upper()))
+    symbols |= set(x.upper() for x in re.findall(r'\b([A-Z][A-Z0-9]{1,14})USDT\b', text.upper()))
+    return symbols
+
 def research_advantage(research,data,text):
     """Prefer the research score for the asset actually discussed, then report/global scores."""
     vals=[]
-    symbols=set(re.findall(r'\$([A-Z][A-Z0-9]{1,14})\b', text.upper()))
-    symbols |= set(x.upper() for x in re.findall(r'\b([A-Z][A-Z0-9]{1,14})USDT\b', text.upper()))
-
-    # Candidate-specific research is the strongest evidence of originality.
+    symbols=discussed_symbols(text)
     for gem in (research.get('potential_gems') or []):
         if not isinstance(gem,dict):
             continue
-        sym=str(gem.get('symbol') or '').upper()
+        sym=str(gem.get('symbol') or '').upper().replace('USDT','')
         if sym and sym in symbols:
             for key in ('information_advantage_score','undercoverage_score','thesis_score','opportunity_score'):
                 v=gem.get(key)
@@ -66,8 +74,6 @@ def research_advantage(research,data,text):
                     v=nested.get(key)
                     if isinstance(v,(int,float)):
                         vals.append(float(v))
-
-    # Preserve any explicit per-draft research signal.
     for obj in (data, research):
         if isinstance(obj,dict):
             for key in ('information_advantage_score','research_information_advantage','originality_score','insight_score','thesis_score','opportunity_score'):
@@ -82,6 +88,31 @@ def research_advantage(research,data,text):
                         if isinstance(v,(int,float)):
                             vals.append(float(v))
     return max(vals) if vals else None
+
+def originality_score(text,facts,attribution,mechanism,invalidation,adv):
+    """Score finished-post originality from independent, inspectable editorial signals."""
+    low=text.lower()
+    symbols=discussed_symbols(text)
+    named_tokens=set(re.findall(r'\b[A-Z][A-Z0-9]{1,9}\b',text)) | set(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b',text))
+    causal_hits=sum(1 for term in CAUSAL_OR_RELATIONAL_TERMS if term in low)
+    sentence_count=max(1,len([s for s in re.split(r'[.!?]+',text) if s.strip()]))
+    distinct_words=len(set(re.findall(r"[A-Za-z][A-Za-z'-]{2,}",low)))
+    words=len(re.findall(r"[A-Za-z][A-Za-z'-]+",low))
+    lexical_diversity=distinct_words/max(1,words)
+
+    breakdown={
+        'base_editorial_synthesis':40,
+        'asset_specific_research':15 if adv is not None and adv>=50 else 0,
+        'mechanism':10 if mechanism else 0,
+        'invalidation_or_confirmation':10 if invalidation else 0,
+        'source_attribution':5 if attribution else 0,
+        'multi_entity_relationship':8 if len(symbols)>=2 or len(named_tokens)>=3 else 0,
+        'causal_or_contrast_language':7 if causal_hits>=2 else (4 if causal_hits==1 else 0),
+        'concrete_evidence_mix':5 if facts>=3 else (3 if facts==2 else 0),
+        'lexical_novelty':5 if lexical_diversity>=0.58 and sentence_count>=3 else (3 if lexical_diversity>=0.50 else 0),
+    }
+    value=min(100,sum(breakdown.values()))
+    return value,breakdown
 
 def main():
     p=resolve_report()
@@ -105,7 +136,7 @@ def main():
     specificity=semantic_specificity(text,facts)
     reader_value=min(100,45+(20 if mechanism else 0)+(15 if invalidation else 0)+(15 if watch else 0))
     adv=research_advantage(research,data,text)
-    originality=min(100,45+(25 if adv is not None and adv>=50 else 0)+(15 if mechanism else 0)+(10 if invalidation else 0)+(5 if len(set(re.findall(r'\b[A-Z][A-Z0-9]{1,9}\b',text)))>=2 else 0))
+    originality,originality_breakdown=originality_score(text,facts,attribution,mechanism,invalidation,adv)
     hook_score=max(0,90-(35 if generic_hook else 0)-(25 if len(hook.split())<8 else 0))
     conversation=max(0,90-(35 if generic_q else 0)) if len(questions)==1 else 20
     compliance=100 if not any(x in low for x in ('guaranteed profit','risk-free','guaranteed return','100% win')) else 0
@@ -124,7 +155,7 @@ def main():
     if not invalidation:failures.append('missing_invalidation_or_confirmation')
     if overall<85:failures.append('overall_below_85')
     if compliance<100:failures.append('policy_language_failure')
-    result={'version':'1.3','generated_at':datetime.now(timezone.utc).isoformat(),'draft_path':str(p),'publish':not failures,'overall':overall,'scores':{'evidence_density':evidence,'reader_value':reader_value,'originality':originality,'specificity':specificity,'hook':hook_score,'structure':structure,'conversation_quality':conversation,'compliance':compliance},'checks':{'exactly_one_question':len(questions)==1,'mechanism_present':mechanism,'invalidation_or_confirmation_present':invalidation,'watch_next_present':watch,'attribution_present':attribution,'generic_question':generic_q,'generic_hook':generic_hook},'research_information_advantage':adv,'research_advantage_scope':'asset_specific_when_available','failures':failures,'decision':'PUBLISH' if not failures else 'REGENERATE_OR_WAIT'}
+    result={'version':'1.4','generated_at':datetime.now(timezone.utc).isoformat(),'draft_path':str(p),'publish':not failures,'overall':overall,'scores':{'evidence_density':evidence,'reader_value':reader_value,'originality':originality,'specificity':specificity,'hook':hook_score,'structure':structure,'conversation_quality':conversation,'compliance':compliance},'checks':{'exactly_one_question':len(questions)==1,'mechanism_present':mechanism,'invalidation_or_confirmation_present':invalidation,'watch_next_present':watch,'attribution_present':attribution,'generic_question':generic_q,'generic_hook':generic_hook},'originality_breakdown':originality_breakdown,'research_information_advantage':adv,'research_advantage_scope':'asset_specific_when_available','failures':failures,'decision':'PUBLISH' if not failures else 'REGENERATE_OR_WAIT'}
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps(result,indent=2,ensure_ascii=False))
