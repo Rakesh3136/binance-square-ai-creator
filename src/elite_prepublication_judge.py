@@ -1,4 +1,4 @@
-"""Elite Pre-Publication Judge 1.2.
+"""Elite Pre-Publication Judge 1.3.
 Hard editorial gate: publication must earn its way through evidence, originality,
 reader value, specificity and integrity. The judge evaluates the exact draft
 selected by the editorial stage when DRAFT_PATH is supplied.
@@ -44,12 +44,43 @@ def semantic_specificity(text,facts):
     concrete=min(15,(facts+numeric)*5)
     return min(100,35+named+context+concrete)
 
-def research_advantage(research,data):
+def research_advantage(research,data,text):
+    """Prefer the research score for the asset actually discussed, then report/global scores."""
     vals=[]
-    for obj in (research,data):
-        for key in ('information_advantage_score','research_information_advantage','originality_score','insight_score','thesis_score','opportunity_score'):
-            v=obj.get(key) if isinstance(obj,dict) else None
-            if isinstance(v,(int,float)): vals.append(float(v))
+    symbols=set(re.findall(r'\$([A-Z][A-Z0-9]{1,14})\b', text.upper()))
+    symbols |= set(x.upper() for x in re.findall(r'\b([A-Z][A-Z0-9]{1,14})USDT\b', text.upper()))
+
+    # Candidate-specific research is the strongest evidence of originality.
+    for gem in (research.get('potential_gems') or []):
+        if not isinstance(gem,dict):
+            continue
+        sym=str(gem.get('symbol') or '').upper()
+        if sym and sym in symbols:
+            for key in ('information_advantage_score','undercoverage_score','thesis_score','opportunity_score'):
+                v=gem.get(key)
+                if isinstance(v,(int,float)):
+                    vals.append(float(v))
+            nested=gem.get('information_advantage')
+            if isinstance(nested,dict):
+                for key in ('score','information_advantage_score'):
+                    v=nested.get(key)
+                    if isinstance(v,(int,float)):
+                        vals.append(float(v))
+
+    # Preserve any explicit per-draft research signal.
+    for obj in (data, research):
+        if isinstance(obj,dict):
+            for key in ('information_advantage_score','research_information_advantage','originality_score','insight_score','thesis_score','opportunity_score'):
+                v=obj.get(key)
+                if isinstance(v,(int,float)):
+                    vals.append(float(v))
+            for container_key in ('selected_opportunity','selected_editorial_lane','research','original_research'):
+                sub=obj.get(container_key)
+                if isinstance(sub,dict):
+                    for key in ('information_advantage_score','research_information_advantage','originality_score','insight_score','thesis_score','opportunity_score'):
+                        v=sub.get(key)
+                        if isinstance(v,(int,float)):
+                            vals.append(float(v))
     return max(vals) if vals else None
 
 def main():
@@ -73,7 +104,7 @@ def main():
     evidence=min(100,35+facts*15+(20 if attribution else 0))
     specificity=semantic_specificity(text,facts)
     reader_value=min(100,45+(20 if mechanism else 0)+(15 if invalidation else 0)+(15 if watch else 0))
-    adv=research_advantage(research,data)
+    adv=research_advantage(research,data,text)
     originality=min(100,45+(25 if adv is not None and adv>=50 else 0)+(15 if mechanism else 0)+(10 if invalidation else 0)+(5 if len(set(re.findall(r'\b[A-Z][A-Z0-9]{1,9}\b',text)))>=2 else 0))
     hook_score=max(0,90-(35 if generic_hook else 0)-(25 if len(hook.split())<8 else 0))
     conversation=max(0,90-(35 if generic_q else 0)) if len(questions)==1 else 20
@@ -93,7 +124,7 @@ def main():
     if not invalidation:failures.append('missing_invalidation_or_confirmation')
     if overall<85:failures.append('overall_below_85')
     if compliance<100:failures.append('policy_language_failure')
-    result={'version':'1.2','generated_at':datetime.now(timezone.utc).isoformat(),'draft_path':str(p),'publish':not failures,'overall':overall,'scores':{'evidence_density':evidence,'reader_value':reader_value,'originality':originality,'specificity':specificity,'hook':hook_score,'structure':structure,'conversation_quality':conversation,'compliance':compliance},'checks':{'exactly_one_question':len(questions)==1,'mechanism_present':mechanism,'invalidation_or_confirmation_present':invalidation,'watch_next_present':watch,'attribution_present':attribution,'generic_question':generic_q,'generic_hook':generic_hook},'research_information_advantage':adv,'failures':failures,'decision':'PUBLISH' if not failures else 'REGENERATE_OR_WAIT'}
+    result={'version':'1.3','generated_at':datetime.now(timezone.utc).isoformat(),'draft_path':str(p),'publish':not failures,'overall':overall,'scores':{'evidence_density':evidence,'reader_value':reader_value,'originality':originality,'specificity':specificity,'hook':hook_score,'structure':structure,'conversation_quality':conversation,'compliance':compliance},'checks':{'exactly_one_question':len(questions)==1,'mechanism_present':mechanism,'invalidation_or_confirmation_present':invalidation,'watch_next_present':watch,'attribution_present':attribution,'generic_question':generic_q,'generic_hook':generic_hook},'research_information_advantage':adv,'research_advantage_scope':'asset_specific_when_available','failures':failures,'decision':'PUBLISH' if not failures else 'REGENERATE_OR_WAIT'}
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps(result,indent=2,ensure_ascii=False))
