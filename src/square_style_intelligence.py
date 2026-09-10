@@ -29,6 +29,7 @@ BENCHMARKS = {
         'Conversational language and a recognizable point of view outperform sterile report language.',
         'A useful post gives the reader something to watch, compare or test next.',
         'Memes work as a reach lane when the joke is immediately crypto-native and tied to a real market situation.',
+        'Public Square examples currently include posts above 100K views; reach is not limited to one content style, so the system should learn format/angle combinations rather than clone a single creator.',
     ],
     'anti_patterns': [
         'ticker + percentage + generic reaction sentence',
@@ -60,12 +61,13 @@ BENCHMARKS = {
 def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        'version': '1.0',
+        'version': '1.1',
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'sources': [
-            'Binance Square Official creator checklist/profile guidance',
-            'Binance Square public creator posts and trending-topic examples',
-            'CreatorPad public quality guidance',
+            {'name':'Binance Square Official creator checklist','url':'https://www.binance.com/en/square/profile/Binance_Square_Official'},
+            {'name':'Binance Square Skill Hub','url':'https://www.binance.com/en/skills/detail/binance/square-post'},
+            {'name':'Binance Square CreatorPad public quality guidance','url':'https://www.binance.com/en/square/profile/square-creator-404abde49cf46'},
+            {'name':'Public high-reach Square examples used as pattern evidence','urls':['https://www.binance.com/en/square/profile/square-creator-1c3744013','https://www.binance.com/en/square/profile/square-creator-d5cfa27e7811']},
         ],
         'benchmarks': BENCHMARKS,
     }
