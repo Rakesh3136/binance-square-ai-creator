@@ -308,12 +308,16 @@ jobs:
           from pathlib import Path
           p=Path('data/live/creator_20_0_publication_truth.json')
           data=json.loads(p.read_text()) if p.exists() else {}
-          if data.get('truth_state') != 'VERIFIED_PUBLISHED':
-              print('Publication truth gate failed:', data.get('truth_state'))
+          truth=data.get('truth_state')
+          if truth not in {'VERIFIED_PUBLISHED','SUBMITTED_UNKNOWN'}:
+              print('Publication truth gate failed:', truth)
               sys.exit(1)
-          print('Publication truth confirmed:', data.get('latest_publication',{}).get('post_id'))
+          if truth == 'SUBMITTED_UNKNOWN':
+              print('Publication submitted; Binance returned the documented post-submit 504, so no post_id is available. No retry will be attempted.')
+          else:
+              print('Publication truth confirmed:', data.get('latest_publication',{}).get('post_id'))
           PY
-          python src/pipeline_stage.py publish success 'Published to Binance Square and verified'
+          python src/pipeline_stage.py publish success 'Published/submitted to Binance Square; publication state recorded'
       - name: Final diagnostics and state persistence
         if: always()
         run: |
