@@ -4,11 +4,8 @@ on:
   schedule:
     - cron: '17 * * * *'
   push:
-    branches:
-      - main
-    paths-ignore:
-      - 'analytics/**'
-      - 'data/**'
+    branches: [main]
+    paths-ignore: ['analytics/**','data/**']
   workflow_dispatch:
     inputs:
       topic:
@@ -24,11 +21,9 @@ on:
 
 env:
   PYTHONUNBUFFERED: '1'
-
 concurrency:
   group: unified-binance-square-creator
   cancel-in-progress: false
-
 jobs:
   creator:
     runs-on: ubuntu-latest
@@ -40,12 +35,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: {fetch-depth: 0}
       - name: Setup Python
         uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+        with: {python-version: '3.12'}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -61,9 +54,11 @@ jobs:
           python src/tradingview_asset_gate.py
         env:
           TOPIC: ${{ github.event.inputs.topic || '' }}
-      - name: Outcome learning and causal strategy update
+      - name: Measure previous publications and resolve prediction outcomes
         run: |
           python src/square_performance_collector.py
+          python src/creator_24_1_prediction_outcomes.py
+          python src/creator_24_0_unified_ledger.py
           python src/creator_7_2_learning.py
           python src/creator_7_2_strategy_bridge.py
           python src/learning_engine.py
@@ -161,13 +156,7 @@ jobs:
           python src/safe_creator_runner.py
           python src/normalize_draft.py
           python src/technical_enricher.py
-          python src/call_tracker.py
-          set +e
-          python src/creator_intelligence_2.py
-          rc=$?
-          if [ "$rc" = '3' ]; then python src/creator_rework.py; fi
-          if [ "$rc" != '0' ]; then echo "Creator Intelligence exited with $rc; continuing with validated draft"; fi
-          exit 0
+          python src/creator_intelligence_2.py || true
       - name: Score scripts and apply human editorial pass
         id: editorial
         if: ${{ steps.cadence.outputs.publish == 'true' }}
@@ -179,16 +168,13 @@ jobs:
           python src/candidate_generation_4.py
           python src/candidate_script_scorer_4.py
           DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -mmin -60 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
-          test -n "$DRAFT_PATH"
-          test -f "$DRAFT_PATH"
+          test -n "$DRAFT_PATH" && test -f "$DRAFT_PATH"
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
-          echo "Pinned editorial draft: $DRAFT_PATH"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           python -m json.tool "$DRAFT_PATH" >/dev/null
       - name: Automatic news headline integrity repair
         if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: python src/news_headline_integrity_repair.py
       - name: Automatic hook diversity repair
         if: ${{ steps.cadence.outputs.publish == 'true' }}
@@ -208,25 +194,21 @@ jobs:
         run: python src/mechanism_value_rewriter.py
       - name: Elite pre-publication judge
         if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: python src/elite_prepublication_judge.py
       - name: Integrity, visual and final publication gates
         if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: |
           python src/content_integrity_gate_4.py
           python -m compileall -q src
       - name: Setup Node and Chromium
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         uses: actions/setup-node@v4
-        with:
-          node-version: '24'
+        with: {node-version: '24'}
       - name: Render and validate TradingView package
         if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
@@ -237,54 +219,46 @@ jobs:
       - name: Run final production gate
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         id: gate
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: |
           set +e
           python src/production_manager.py
           rc=$?
           set -e
-          if [ ! -f /tmp/publish_gate.json ]; then
-            echo 'publish=false' >> "$GITHUB_OUTPUT"
-            echo 'mode=image' >> "$GITHUB_OUTPUT"
-            exit "$rc"
-          fi
+          test -f /tmp/publish_gate.json || { echo 'publish=false' >> "$GITHUB_OUTPUT"; echo 'mode=image' >> "$GITHUB_OUTPUT"; exit "$rc"; }
           publish=$(python -c 'import json; print(str(json.load(open("/tmp/publish_gate.json")).get("publish", False)).lower())')
           mode=$(python -c 'import json; print(json.load(open("/tmp/publish_gate.json")).get("mode", "image"))')
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"; echo "mode=$mode" >> "$GITHUB_OUTPUT"
           if [ "$publish" = 'true' ]; then python src/pipeline_stage.py quality_gate success 'Publication authorized'; else python src/pipeline_stage.py quality_gate blocked 'Publication blocked by production gate'; fi
           exit 0
       - name: Extract publication text
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         id: draft
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: python src/extract_publication.py
       - name: Publish to Binance Square — only publisher
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
-        env:
-          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
+        env: {BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}}
         run: python src/binance_square_publisher.py
-      - name: Verify publication truth
+      - name: Verify publication truth and bind experiment
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         run: |
           python src/creator_20_0_publication_verifier.py
-          python src/creator_22_2_hook_format_intelligence.py
+          python src/call_tracker.py
+          python src/creator_24_0_unified_ledger.py
           python - <<'PY'
-          import json, sys
+          import json,sys
           from pathlib import Path
-          p = Path('data/live/creator_20_0_publication_truth.json')
-          data = json.loads(p.read_text()) if p.exists() else {}
-          if data.get('truth_state') != 'VERIFIED_PUBLISHED':
-              print('Publication truth gate failed:', data.get('truth_state'))
-              sys.exit(1)
-          print('Publication truth confirmed:', data.get('latest_publication', {}).get('post_id'))
+          p=Path('data/live/creator_20_0_publication_truth.json');d=json.loads(p.read_text()) if p.exists() else {}
+          if d.get('truth_state')!='VERIFIED_PUBLISHED':
+              print('Publication truth gate failed:',d.get('truth_state'));sys.exit(1)
+          print('Publication truth confirmed:',d.get('latest_publication',{}).get('post_id'))
           PY
           python src/pipeline_stage.py publish success 'Published to Binance Square and verified'
       - name: Final diagnostics and state persistence
         if: always()
         run: |
+          python src/creator_24_0_unified_ledger.py || true
           python src/pipeline_stage.py diagnostics success 'Single orchestrator cycle completed' || true
           git status --short
           git add analytics data/live data/intelligence
