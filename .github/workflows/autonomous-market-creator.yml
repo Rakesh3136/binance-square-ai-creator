@@ -27,7 +27,7 @@ env:
 
 concurrency:
   group: unified-binance-square-creator
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   creator:
@@ -111,8 +111,10 @@ jobs:
           python -m json.tool data/intelligence/deep_coin_research_report.json >/dev/null
           python -m json.tool data/intelligence/thesis_ledger.json >/dev/null
           python src/creator_control_plane.py
+          python src/creator_24_2_architecture_registry.py
           python -m json.tool data/live/creator_control_plane.json >/dev/null
           python -m json.tool data/intelligence/creator_control_plane_report.json >/dev/null
+          python -m json.tool data/intelligence/creator_24_2_architecture.json >/dev/null
       - name: Optional guarded self-engineering
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_self_engineering == true }}
         env:
