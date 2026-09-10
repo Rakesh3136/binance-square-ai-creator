@@ -263,16 +263,23 @@ jobs:
       - name: Publish to Binance Square — only publisher
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         env:
-          BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
-          BINANCE_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
-          BINANCE_SQUARE_COOKIE: ${{ secrets.BINANCE_SQUARE_COOKIE }}
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: python src/binance_square_publisher.py
       - name: Verify publication truth
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         run: |
           python src/creator_20_0_publication_verifier.py
           python src/creator_22_2_hook_format_intelligence.py
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          p = Path('data/live/creator_20_0_publication_truth.json')
+          data = json.loads(p.read_text()) if p.exists() else {}
+          if data.get('truth_state') != 'VERIFIED_PUBLISHED':
+              print('Publication truth gate failed:', data.get('truth_state'))
+              sys.exit(1)
+          print('Publication truth confirmed:', data.get('latest_publication', {}).get('post_id'))
+          PY
           python src/pipeline_stage.py publish success 'Published to Binance Square and verified'
       - name: Final diagnostics and state persistence
         if: always()
