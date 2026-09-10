@@ -23,7 +23,8 @@ HOOKS={
 'debate':['Two readings fit the current data. The next evidence should separate them.','The better setup is the one with the clearer evidence, not the louder narrative.','These two assets are telling different stories despite sharing the same market.'],
 'teacher':['One chart, one reusable rule: start with the decision point.','A simple chart habit can prevent a lot of bad entries.','This chart illustrates a rule worth keeping for the next setup.'],
 'flow_trader':['The useful signal is not BTC alone. It is the divergence between regime, relative strength and participation.','Capital rotation becomes actionable only when the larger regime and the asset-specific evidence agree.','The setup is conditional: the flow has to survive the next confirmation test.'],
-'research_analyst':['The opportunity is not the price move. It is the evidence gap around it.','A research anomaly matters only when the evidence behind it survives scrutiny.','The interesting part is what the available evidence says — and what is still missing.']}
+'research_analyst':['The opportunity is not the price move. It is the evidence gap around it.','A research anomaly matters only when the evidence behind it survives scrutiny.','The interesting part is what the available evidence says — and what is still missing.'],
+'conversational':['The interesting part of this move is what changed underneath it.','Price moved first. The useful question is what the evidence says now.','This setup is worth watching because the next piece of evidence can change the read.']}
 
 def load(p):
     try:
