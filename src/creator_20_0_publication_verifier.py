@@ -43,6 +43,13 @@ def main():
     if has_post_id and status.startswith("PUBLISHED"):
         truth_state = "VERIFIED_PUBLISHED"
         proof = "durable publication_log.jsonl record contains a concrete Binance Square post_id"
+    elif latest and status == "PUBLISHED_SUBMITTED_504":
+        # Binance documents that /content/add can return HTTP 504 after the
+        # submission has already been accepted. There is intentionally no post
+        # id to invent and no safe automatic retry. Keep this distinct from a
+        # verified publication so downstream analytics never fabricate a link.
+        truth_state = "SUBMITTED_UNKNOWN"
+        proof = "Binance Square image submission returned the documented post-submit 504 condition; publication may have succeeded but no post_id was returned"
     elif latest and status:
         truth_state = "ATTEMPTED_NOT_VERIFIED"
         proof = "publication record exists but does not contain sufficient publication proof"
@@ -51,14 +58,15 @@ def main():
         proof = "no durable publication record is available"
 
     result = {
-        "version": "20.0",
+        "version": "20.1",
         "checked_at": now,
         "truth_state": truth_state,
         "proof": proof,
         "latest_publication": latest,
         "publication_count_observed": len(rows),
         "rules": {
-            "post_id_required": True,
+            "post_id_required_for_verified_state": True,
+            "submission_unknown_is_not_verified": True,
             "revenue_inferred": False,
             "gate_bypass": False,
             "credential_changes": False,
@@ -68,7 +76,7 @@ def main():
     INTEL.mkdir(parents=True, exist_ok=True)
     (LIVE / "creator_20_0_publication_truth.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     report = {
-        "version": "20.0",
+        "version": "20.1",
         "generated_at": now,
         "truth_state": truth_state,
         "publication_count_observed": len(rows),
