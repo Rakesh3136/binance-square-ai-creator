@@ -28,10 +28,7 @@ jobs:
   creator:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    permissions:
-      contents: write
-      actions: write
-      pull-requests: write
+    permissions: {contents: write, actions: write, pull-requests: write}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,8 +49,7 @@ jobs:
           python src/run_creator_intelligence.py
           python src/editorial_preflight.py
           python src/tradingview_asset_gate.py
-        env:
-          TOPIC: ${{ github.event.inputs.topic || '' }}
+        env: {TOPIC: ${{ github.event.inputs.topic || '' }}}
       - name: Measure previous publications and resolve prediction outcomes
         run: |
           python src/square_performance_collector.py
@@ -104,8 +100,6 @@ jobs:
           python -m json.tool data/intelligence/deep_coin_research_report.json >/dev/null
           python -m json.tool data/intelligence/thesis_ledger.json >/dev/null
           python src/creator_control_plane.py
-          python -m json.tool data/live/creator_control_plane.json >/dev/null
-          python -m json.tool data/intelligence/creator_control_plane_report.json >/dev/null
       - name: Optional guarded self-engineering
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_self_engineering == true }}
         env:
@@ -131,7 +125,6 @@ jobs:
           python src/autonomous_cadence_6.py
           publish=$(python -c 'import json; print(str(json.load(open("data/live/autonomous_cadence_6.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "Human-like adaptive cadence decision: $publish"
       - name: Freeze opportunity and run authoritative brain
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
@@ -172,42 +165,39 @@ jobs:
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           python -m json.tool "$DRAFT_PATH" >/dev/null
-      - name: Automatic news headline integrity repair
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
-        run: python src/news_headline_integrity_repair.py
-      - name: Automatic hook diversity repair
+      - name: Editorial repairs and elite judge
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: '20'
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-        run: python src/hook_diversity_rewriter.py
-      - name: Automatic mechanism and reader-value repair
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-3.6-flash
-          GEMINI_DAILY_BUDGET: '20'
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-        run: python src/mechanism_value_rewriter.py
-      - name: Elite pre-publication judge
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
-        run: python src/elite_prepublication_judge.py
-      - name: Integrity, visual and final publication gates
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: |
+          python src/news_headline_integrity_repair.py
+          python src/hook_diversity_rewriter.py
+          python src/mechanism_value_rewriter.py
+          python src/elite_prepublication_judge.py
           python src/content_integrity_gate_4.py
           python -m compileall -q src
-      - name: Setup Node and Chromium
+      - name: Decide whether this lane needs a chart
+        id: visual_mode
         if: ${{ steps.cadence.outputs.publish == 'true' }}
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          ctx=json.loads(Path('data/live/publication_context.json').read_text()) if Path('data/live/publication_context.json').exists() else {}
+          cat=str(ctx.get('category','')).lower()
+          required=cat not in {'crypto_meme','market_meme','trader_humor','education','commentary','community'}
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write(f"required={'true' if required else 'false'}\n")
+          print({'category':cat,'chart_required':required})
+          PY
+      - name: Setup Node and Chromium
+        if: ${{ steps.visual_mode.outputs.required == 'true' }}
         uses: actions/setup-node@v4
         with: {node-version: '24'}
       - name: Render and validate TradingView package
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        if: ${{ steps.visual_mode.outputs.required == 'true' }}
         env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: |
           npm install --no-save playwright@1.55.0
@@ -230,10 +220,8 @@ jobs:
           mode=$(python -c 'import json; print(json.load(open("/tmp/publish_gate.json")).get("mode", "image"))')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"; echo "mode=$mode" >> "$GITHUB_OUTPUT"
           if [ "$publish" = 'true' ]; then python src/pipeline_stage.py quality_gate success 'Publication authorized'; else python src/pipeline_stage.py quality_gate blocked 'Publication blocked by production gate'; fi
-          exit 0
       - name: Extract publication text
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
-        id: draft
         env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: python src/extract_publication.py
       - name: Publish to Binance Square — only publisher
@@ -249,9 +237,8 @@ jobs:
           python - <<'PY'
           import json,sys
           from pathlib import Path
-          p=Path('data/live/creator_20_0_publication_truth.json');d=json.loads(p.read_text()) if p.exists() else {}
-          if d.get('truth_state')!='VERIFIED_PUBLISHED':
-              print('Publication truth gate failed:',d.get('truth_state'));sys.exit(1)
+          d=json.loads(Path('data/live/creator_20_0_publication_truth.json').read_text())
+          if d.get('truth_state')!='VERIFIED_PUBLISHED':sys.exit('Publication truth gate failed')
           print('Publication truth confirmed:',d.get('latest_publication',{}).get('post_id'))
           PY
           python src/pipeline_stage.py publish success 'Published to Binance Square and verified'
