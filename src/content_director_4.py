@@ -1,91 +1,97 @@
-"""Creator 6.0 full-market executive story director.
+"""Creator 7.0 evidence-first content director.
 
-Ranks the whole observable crypto/content opportunity set before publication:
-news, macro, technical structure, movers, volume, volatility, listings,
-creator-call outcomes, education, comparisons and follow-ups.
+The director compares fresh news, technical/momentum anomalies, capital rotation,
+research candidates and accountability lanes. News is a candidate, never an
+automatic override. All scores are normalized to 0-100.
 """
 from __future__ import annotations
 import json,re
 from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-MARKET=ROOT/'data/live/market_snapshot.json'; NEWS=ROOT/'data/live/news_snapshot.json'; PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; FEEDBACK=ROOT/'data/intelligence/performance_feedback.json'; OUT=ROOT/'data/live/content_director_brief.json'
-LANES={'breaking_news':32,'news_market_impact':28,'technical_breakout':23,'top_mover':18,'volume_anomaly':23,'liquidation':24,'new_listing':27,'macro':27,'creator_signal_outcome':27,'education':12,'comparison':17,'follow_up':23,'watchlist':18}
-FORMAT_BY_CATEGORY={'breaking_news':'BREAKING NEWS + MARKET IMPACT','news_and_macro':'NEWS + CHART','top_gainers':'TOP MOVERS','top_losers':'BREAKOUT / FAKEOUT','high_volatility':'LIQUIDATION STORY','volume_leaders':'DATA SURPRISE','new_listings':'NEW LISTING WATCH','technical_setup':'TRADINGVIEW CHART CHALLENGE','comparison':'COIN VS COIN','education':'EDUCATION FROM LIVE CHART','creator_signal_outcome':'CREATOR CALL OUTCOME','follow_up':'FOLLOW-UP / UPDATE','macro':'MACRO + MARKET IMPACT'}
-NARRATIVE_BY_CATEGORY={'breaking_news':'event_context_impact','news_and_macro':'event_context_impact','macro':'macro_chain','top_gainers':'momentum_question','top_losers':'contrarian_risk','high_volatility':'volatility_then_test','volume_leaders':'data_vs_price','new_listings':'price_discovery','technical_setup':'level_confirmation','comparison':'compare_tradeoffs','education':'one_chart_one_lesson','creator_signal_outcome':'call_result_next_test','follow_up':'thesis_update','watchlist':'what_to_watch'}
+MARKET=ROOT/'data/live/market_snapshot.json';NEWS=ROOT/'data/live/news_snapshot.json';PREFLIGHT=ROOT/'data/live/editorial_preflight.json';FEEDBACK=ROOT/'data/intelligence/performance_feedback.json';FLOW=ROOT/'data/live/capital_flow_intelligence.json';RESEARCH=ROOT/'data/live/original_research.json';OUT=ROOT/'data/live/content_director_brief.json'
+FORMAT={'breaking_news':'BREAKING NEWS + MARKET IMPACT','news_and_macro':'NEWS + CHART','top_gainers':'MOMENTUM + FOLLOW-THROUGH','top_losers':'BREAKOUT / FAKEOUT','high_volatility':'VOLATILITY + TEST','volume_leaders':'DATA SURPRISE','new_listings':'NEW LISTING WATCH','technical_setup':'TRADINGVIEW CHART CHALLENGE','comparison':'COIN VS COIN','education':'ONE CHART / ONE LESSON','creator_signal_outcome':'CALL OUTCOME / ACCOUNTABILITY','follow_up':'FOLLOW-UP / UPDATE','capital_flow_long':'CAPITAL FLOW LONG SETUP','capital_flow_short':'CAPITAL FLOW SHORT SETUP','watchlist':'MARKET RADAR'}
+NARRATIVE={'breaking_news':'event_context_impact','news_and_macro':'event_context_impact','top_gainers':'momentum_question','top_losers':'contrarian_risk','high_volatility':'volatility_then_test','volume_leaders':'data_vs_price','new_listings':'price_discovery','technical_setup':'level_confirmation','comparison':'compare_tradeoffs','education':'one_chart_one_lesson','creator_signal_outcome':'call_result_next_test','follow_up':'thesis_update','capital_flow_long':'capital_rotation','capital_flow_short':'capital_rotation','watchlist':'what_to_watch'}
 def load(p):
     try:
-        x=json.loads(p.read_text(encoding='utf-8')); return x if isinstance(x,dict) else {}
+        x=json.loads(p.read_text(encoding='utf-8'));return x if isinstance(x,dict) else {}
     except Exception:return {}
-def num(x):
-    try:return float(x)
-    except Exception:return 0.0
-def text(x):return str(x or '').strip()
-def symbol(x):
-    s=text(x).upper().replace('$','').replace('BINANCE:',''); return s[:-4] if s.endswith('USDT') else s
-def valid(s):return bool(re.fullmatch(r'[A-Z0-9]{1,15}',s))
-def news_score(a):
-    t=(text(a.get('title'))+' '+text(a.get('summary'))+' '+text(a.get('description'))).lower(); score=0
-    for k,w in [('breaking',14),('hack',18),('exploit',18),('etf',14),('sec',11),('fed',11),('rate',9),('inflation',9),('listing',13),('upgrade',9),('partnership',7),('regulation',10),('liquidation',11),('whale',10),('airdrop',8),('unlock',8),('gold',12),('silver',12)]:
-        if k in t:score+=w
-    return score
-def collect_market(m):
+def rows(v):return v if isinstance(v,list) else []
+def n(v,d=0):
+    try:return float(v)
+    except Exception:return d
+def clamp(v):return round(max(0,min(100,n(v))),2)
+def sym(v):
+    s=str(v or '').upper().replace('$','').replace('BINANCE:','').strip();return s[:-4] if s.endswith('USDT') else s
+def valid(s):return bool(re.fullmatch(r'[A-Z][A-Z0-9]{0,14}',str(s or '')))
+def research_map(r):return {sym(x.get('symbol')):x for x in rows(r.get('potential_gems'))+rows(r.get('potential_risks')) if isinstance(x,dict) and x.get('symbol')}
+def market_items(m):
     out=[]
     for g in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
-        for x in m.get(g) or []:
-            if isinstance(x,dict) and x.get('symbol'):out.append(x)
+        out.extend(x for x in rows(m.get(g)) if isinstance(x,dict) and x.get('symbol'))
     return out
-def market_story(x):
-    move=abs(num(x.get('price_change_percent'))); vol=num(x.get('quote_volume_usdt') or x.get('quote_volume')); signal=num(x.get('content_signal_score')); rng=num(x.get('intraday_range_percent')); lane='top_mover'
-    if rng>=20 or move>=25:lane='liquidation'
-    elif signal>=70:lane='technical_breakout'
-    elif vol>=1e8:lane='volume_anomaly'
-    return {'lane':lane,'symbol':symbol(x['symbol']),'score':round(LANES[lane]+min(30,move*.55)+min(18,signal*.18)+min(12,vol/1e8)+min(8,rng*.15),2),'price_change_percent':num(x.get('price_change_percent')),'last_price':num(x.get('last_price')),'quote_volume_usdt':vol,'intraday_range_percent':rng,'content_signal_score':signal,'has_1h_ohlcv':bool(x.get('candles_1h')),'reason':'verified live market move, liquidity or attention signal'}
-def performance_bonus(story, feedback):
-    prefs=feedback.get('learned_preferences') or {}; bonus=0.0; matches=[]; category=story.get('lane',''); fmt=FORMAT_BY_CATEGORY.get(category,'TRADINGVIEW CHART CHALLENGE')
-    for dim,label in [('category',category),('format',fmt)]:
-        pref=(prefs.get(dim) or {}).get('prefer')
-        if pref and str(pref).lower()==str(label).lower(): bonus+=6; matches.append(dim)
-    return min(12.0,bonus),matches
+def market_score(x,r=None):
+    move=abs(n(x.get('price_change_percent')));rng=n(x.get('intraday_range_percent'));signal=n(x.get('content_signal_score'));vol=n(x.get('quote_volume_usdt') or x.get('quote_volume'))
+    base=clamp(move*2.8+rng*.7+signal*.32+min(20,vol/1e8*20))
+    if r:
+        info=clamp(r.get('information_advantage_score'));ev=clamp(r.get('evidence_score'));under=clamp(r.get('undercoverage_score'));risk=clamp(r.get('risk_red_flag_score'));missing=len(rows(r.get('missing_evidence')))
+        base=clamp(base*.6+(info*.2+ev*.12+under*.08)-min(15,missing*2))
+    return base
+def news_score(a):
+    raw=clamp(a.get('news_score'));title=str(a.get('title') or '').lower()
+    if any(k in title for k in ('hack','exploit','etf','sec','approval','listing','launch','upgrade','regulation')):raw=clamp(raw+8)
+    return raw
+def flow_score(a):
+    m=a.get('multitimeframe') or {};conf=clamp(m.get('confidence') or a.get('confidence'));flow=clamp(m.get('flow_proxy_score'),50);rs=abs(n(a.get('relative_strength_to_btc')));setup=a.get('trade_setup') or {};complete=all(setup.get(k) is not None for k in ('trigger','invalidation'))
+    return clamp(conf*.45+flow*.3+clamp(50+rs*5)*.25+(8 if complete else -8))
 def main():
-    market,news,pre,feedback=load(MARKET),load(NEWS),load(PREFLIGHT),load(FEEDBACK); selected=pre.get('selected_opportunity') or {}; selected_symbol=symbol(selected.get('symbol') or selected.get('topic')); items=collect_market(market); stories=[market_story(x) for x in items]; news_stories=[]
-    for a in news.get('articles') or []:
+    market,news,pre,feedback,flow,research=load(MARKET),load(NEWS),load(PREFLIGHT),load(FEEDBACK),load(FLOW),load(RESEARCH);selected=pre.get('selected_opportunity') or {};rmap=research_map(research);stories=[]
+    for x in market_items(market):
+        s=sym(x.get('symbol'));cat='top_gainers' if n(x.get('price_change_percent'))>0 else 'top_losers';score=market_score(x,rmap.get(s));stories.append({'type':'market','category':cat,'symbol':s,'score':score,'reason':'live market anomaly with supplied evidence','has_chart':bool(x.get('candles_1h')),'data_quality':'OK' if x.get('candles_1h') else 'LIMITED'})
+    for a in rows(news.get('articles')):
+        title=str(a.get('title') or '').strip();
+        if not title:continue
+        age=None
+        try:age=(datetime.now(timezone.utc)-datetime.fromisoformat(str(a.get('published_at','')).replace('Z','+00:00'))).total_seconds()/60
+        except Exception:pass
+        if age is not None and (age < -10 or age > 180):continue
+        syms=[sym(x) for x in rows(a.get('symbols')) if valid(sym(x))]
+        if not syms:continue
+        for s in syms[:2]:stories.append({'type':'news','category':'breaking_news' if news_score(a)>=70 else 'news_and_macro','symbol':s,'score':news_score(a),'title':title[:240],'source':str(a.get('source') or ''),'url':str(a.get('url') or ''),'published_at':str(a.get('published_at') or '')})
+    for a in rows(flow.get('top_conditional_setups')):
         if not isinstance(a,dict):continue
-        ns=float(a.get('news_score') or news_score(a)); title=text(a.get('title')); low=(title+' '+text(a.get('summary'))).lower()
-        if ns<55 or not title:continue
-        syms=[symbol(x) for x in (a.get('symbols') or []) if valid(symbol(x))]
-        if not syms:
-            if 'gold' in low and 'silver' in low:syms=['XAUUSD','XAGUSD']
-            elif 'gold' in low:syms=['XAUUSD']
-            elif 'silver' in low:syms=['XAGUSD']
-        news_stories.append({'lane':'breaking_news' if ns>=70 else 'news_market_impact','score':round(ns,2),'title':title[:200],'url':text(a.get('url') or a.get('link')),'source':text(a.get('source')),'published_at':text(a.get('published_at')),'symbols':syms,'reason':'fresh source contains a material catalyst'})
-    news_stories.sort(key=lambda x:x['score'],reverse=True)
-    for story in stories:
-        bonus,matches=performance_bonus(story,feedback); story['performance_bonus']=bonus; story['performance_matches']=matches; story['score']=round(story['score']+bonus,2)
-    stories.extend(news_stories); stories.sort(key=lambda x:x['score'],reverse=True)
-    category=text(selected.get('category')).lower(); selected_news=bool(selected.get('news_title')); protected=category in {'creator_signal_outcome','follow_up'}
-    # A material news candidate may win, but it is only one lane in the market-wide ranking.
-    best_news=news_stories[0] if news_stories else None
-    if best_news and not selected_news and not protected and best_news['score']>=65:
-        selected=dict(selected); selected.update({'category':'breaking_news' if best_news['score']>=70 else 'news_and_macro','symbol':best_news['symbols'][0] if best_news['symbols'] else 'BTC','news_title':best_news['title'],'news_url':best_news['url'],'news_source':best_news['source'],'news_published_at':best_news['published_at'],'news_score':best_news['score'],'reason':'Executive story director promoted the strongest fresh material news opportunity.'}); category=text(selected.get('category')).lower(); selected_symbol=symbol(selected.get('symbol') or selected.get('topic')); selected_news=True
-    recommended=FORMAT_BY_CATEGORY.get(category,'TRADINGVIEW CHART CHALLENGE'); item=next((x for x in items if symbol(x.get('symbol'))==selected_symbol),None)
-    primary={'lane':category or 'market_opportunity','symbol':selected_symbol,'score':num(selected.get('adjusted_score') or selected.get('raw_score')),'reason':text(selected.get('reason') or 'verified selected market opportunity'),'source':'content_director_authoritative_selection'}
-    if selected.get('news_title'):primary.update({'news_title':text(selected.get('news_title'))[:240],'news_url':text(selected.get('news_url')),'news_source':text(selected.get('news_source')),'news_published_at':text(selected.get('news_published_at')),'news_score':num(selected.get('news_score'))})
-    if item:primary.update({'price_change_percent':num(item.get('price_change_percent')),'last_price':num(item.get('last_price')),'quote_volume_usdt':num(item.get('quote_volume_usdt') or item.get('quote_volume')),'intraday_range_percent':num(item.get('intraday_range_percent')),'content_signal_score':num(item.get('content_signal_score')),'has_1h_ohlcv':bool(item.get('candles_1h'))})
-    related=[]
-    if selected.get('news_title'):
-        for a in news_stories:
-            if a.get('title')==selected.get('news_title'):related=[symbol(x) for x in a.get('symbols') if valid(symbol(x))];break
-    if category=='comparison':related=[symbol(x.get('symbol')) for x in sorted(items,key=lambda x:num(x.get('content_signal_score')),reverse=True) if symbol(x.get('symbol'))!=selected_symbol][:1]
-    low=(text(selected.get('news_title'))+' '+text(selected.get('reason'))).lower()
-    if 'gold' in low and 'silver' in low:related=['XAUUSD','XAGUSD']
-    elif 'gold' in low and not related:related=['XAUUSD']
-    elif 'silver' in low and not related:related=['XAGUSD']
-    chart_symbols=[]
-    for s in [selected_symbol,*related]:
-        if valid(s) and s not in chart_symbols:chart_symbols.append(s)
-    chart_symbols=chart_symbols[:2]
-    narrative=NARRATIVE_BY_CATEGORY.get(category,'what_to_watch')
-    brief={'generated_at':datetime.now(timezone.utc).isoformat(),'director_version':'6.0','algorithm_policy':'Infer only from observable performance. Never claim knowledge of a private ranking algorithm.','performance_learning':feedback.get('learned_preferences',{}),'primary_story':{**primary,'chart_symbols':chart_symbols},'recommended_format':recommended,'narrative_engine':narrative,'authoritative_selection':selected,'news_context':news_stories[:10],'ranked_stories':stories[:40],'coverage_mix':['breaking_news','news_market_impact','macro','technical_breakout','top_mover','volume_anomaly','liquidation','new_listing','creator_signal_outcome','education','comparison','follow_up','watchlist'],'visual_plan':{'provider':'TradingView','layout':'two_panel' if len(chart_symbols)>1 else 'single_panel','symbols':chart_symbols,'timeframe':'1H','custom_overlays':False},'interaction_plan':{'primary_goal':'genuine_conversation','question':'one specific low-friction question','avoid':'generic what do you think CTA','mechanisms':['A/B choice','bullish/bearish','breakout/fakeout','chase/fade/wait','agree/disagree','which evidence matters','request for follow-up']},'creator_growth_plan':{'return_reason':'Create serial follow-ups and recurring series where evidence supports them.','series':['Market Radar','Breakout or Fakeout','Whale/Data Watch','Call Check','One Chart One Lesson','What Everyone Is Missing'],'identity':'sharp, evidence-aware crypto market observer'},'story_rules':['Fresh material news competes with every other market opportunity; it does not automatically force an article.','The Content Director is the final story selector before the asset is frozen.','Repeatedly proven formats/categories may receive a small performance bonus; sparse evidence never dominates editorial quality.','A specific creator-call outcome/follow-up can outrank generic news when it has verified evidence.','News posts lead with the actual verified event and source.','Every story must answer why-now and what-to-watch, not just repeat price data.','Use two clean TradingView charts only when the second asset adds verified context.','Macro gold/silver stories may use OANDA TradingView symbols; crypto stories use Binance TradingView symbols.','No custom panel may cover candles or price data.','Targets/SL/10x/20x are conditional scenarios only.','Never invent facts, sources, calls, prices, targets or outcomes.','Prefer a distinctive angle over a generic recap.','Rotate hooks, formats, narrative structures and CTA questions.'],'writing_contract':{'opening':'First 1-2 lines must create tension, curiosity, surprise or a concrete question without hiding the subject.','middle':'Move from verified fact/observation to why-now, evidence and interpretation.','ending':'Give a next-watch condition and exactly one concrete interaction question.','rhythm':'Short mobile-first paragraphs with varied sentence lengths; no repetitive template cadence.','value':'Every post must teach, explain, compare, report or track something beyond the price change.'}}
-    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(brief,indent=2,ensure_ascii=False),encoding='utf-8');pre['content_director_4']=brief;pre['selected_opportunity']=selected;pre['content_director_instruction']=f'Use authoritative asset ${selected_symbol}, format {recommended}, narrative engine {narrative}, and TradingView visual symbols {chart_symbols}.';PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'OK','version':'6.0','symbol':selected_symbol,'format':recommended,'narrative_engine':narrative,'chart_symbols':chart_symbols,'news_candidates':len(news_stories),'ranked_opportunities':len(stories),'performance_learning_used':bool(feedback.get('learned_preferences'))},indent=2))
+        s=sym(a.get('symbol'));setup=a.get('trade_setup') or {};side=str(setup.get('side') or 'WAIT').upper();conf=n((a.get('multitimeframe') or {}).get('confidence') or a.get('confidence'))
+        if valid(s) and side in {'LONG','SHORT'} and conf>=65:stories.append({'type':'flow','category':'capital_flow_long' if side=='LONG' else 'capital_flow_short','symbol':s,'score':flow_score(a),'reason':'multi-timeframe rotation setup','trade_setup':setup,'flow_confidence':conf,'relative_strength_to_btc':a.get('relative_strength_to_btc'),'flow_proxy_score':(a.get('multitimeframe') or {}).get('flow_proxy_score'),'flow_notes':a.get('flow_notes') or []})
+    # Research-only gems become editorial candidates only when evidence is usable.
+    for s,r in rmap.items():
+        info=clamp(r.get('information_advantage_score'));ev=clamp(r.get('evidence_score'));missing=len(rows(r.get('missing_evidence')));liq=clamp(r.get('liquidity_score'));risk=clamp(r.get('risk_red_flag_score'));score=clamp(.35*info+.25*ev+.2*liq+.2*(100-risk)-min(20,missing*3))
+        if score>=68:stories.append({'type':'research','category':'watchlist','symbol':s,'score':score,'reason':'asset-specific research anomaly with evidence','research':r,'data_quality':'RESEARCH'})
+    # Existing authoritative selection is only a hint. Re-rank it against the live lanes.
+    for st in stories:
+        if st['symbol']==sym(selected.get('symbol')) and selected.get('category'):st['score']=clamp(st['score']+4);st['authoritative_hint']=True
+    # Small learning bonus; never enough to override weak evidence.
+    prefs=feedback.get('learned_preferences') or {}
+    preferred=str((prefs.get('format') or {}).get('prefer') or '').lower()
+    for st in stories:
+        if preferred and FORMAT.get(st.get('category',''),'').lower()==preferred:st['score']=clamp(st['score']+4)
+    stories.sort(key=lambda x:x['score'],reverse=True);best=stories[0] if stories else None
+    publish=bool(best and best['score']>=72 and best.get('symbol'))
+    if not best:reason='no_candidates'
+    elif not publish:reason='best_candidate_below_quality_threshold'
+    else:reason='cross_lane_best_opportunity'
+    out_selected=None
+    if publish:
+        out_selected={'category':best['category'],'symbol':best['symbol']+'USDT' if best['symbol'] not in {'XAUUSD','XAGUSD'} else best['symbol'],'reason':best['reason'],'score':best['score'],'lane':best['type']}
+        for k in ('title','source','url','published_at','trade_setup','flow_confidence','relative_strength_to_btc','flow_proxy_score','flow_notes'):
+            if k in best:out_selected[k]=best[k]
+    # News symbol/chart coherence: no arbitrary BTC fallback.
+    chart=[]
+    if out_selected and best.get('type') in {'market','flow'} and valid(best.get('symbol')):chart=[best['symbol']]
+    if out_selected and best.get('type')=='news' and best.get('symbol'):chart=[best['symbol']]
+    visual_type='candlestick_chart' if chart else ('news_timeline' if best and best.get('type')=='news' else 'none')
+    brief={'generated_at':datetime.now(timezone.utc).isoformat(),'director_version':'7.0','run_ai':publish,'reason':reason,'primary_story':{'symbol':out_selected.get('symbol','') if out_selected else '','lane':best.get('category') if best else None,'score':best.get('score') if best else 0,'chart_symbols':chart} if best else {},'authoritative_selection':out_selected,'ranked_stories':stories[:40],'lane_scores':{'news':max([x['score'] for x in stories if x['type']=='news'],default=0),'flow':max([x['score'] for x in stories if x['type']=='flow'],default=0),'market':max([x['score'] for x in stories if x['type']=='market'],default=0),'research':max([x['score'] for x in stories if x['type']=='research'],default=0)},'recommended_format':FORMAT.get(best.get('category'),'MARKET RADAR') if best else 'WAIT','narrative_engine':NARRATIVE.get(best.get('category'),'what_to_watch') if best else 'what_to_watch','visual_plan':{'provider':'TradingView' if chart else 'none','layout':'single_panel','symbols':chart,'timeframe':'1H','custom_overlays':False,'type':visual_type,'required':bool(out_selected and best.get('type') in {'market','flow'}),'reason':'Chart must prove the selected market/flow thesis; news-only stories use a news visual.'},'interaction_plan':{'primary_goal':'specific conversation','question_rule':'exactly one story-specific question','avoid':['What do you think?','Thoughts?','Bullish, bearish, or wait?']},'writing_contract':['Choose the highest-information-gain lane, not automatically the freshest news.','Every selected asset must have an explicit reason, evidence and why-now.','News does not imply BTC; never manufacture an asset link.','Capital-flow LONG/SHORT content is conditional and requires trigger plus invalidation.','Research-only opportunities with material missing evidence should be WAIT/watchlist, not buy calls.','All scores are normalized to 0-100.','Never invent targets, stops, prices, sources or outcomes.']}
+    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(brief,indent=2,ensure_ascii=False),encoding='utf-8');pre['content_director_4']=brief
+    if out_selected:pre['selected_opportunity']=out_selected
+    else:pre['selected_opportunity']=None
+    PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'OK','version':'7.0','publish':publish,'reason':reason,'selected':out_selected,'lane_scores':brief['lane_scores']},indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
