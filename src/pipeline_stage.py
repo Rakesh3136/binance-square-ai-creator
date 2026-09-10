@@ -9,7 +9,7 @@ OUT=Path("data/live/pipeline_status.json")
 STAGES=[
     "creator_benchmark","intelligence","scan","select","freeze",
     "creator_brain","ai_draft","visual","visual_symbol","visual_content",
-    "quality_gate","publish","verify","record","learn","complete","finalize",
+    "quality_gate","publish","verify","record","learn","complete","finalize","diagnostics",
 ]
 
 def now(): return datetime.now(timezone.utc).isoformat()
