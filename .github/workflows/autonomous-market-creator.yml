@@ -280,6 +280,6 @@ jobs:
           python src/pipeline_stage.py diagnostics success 'Single orchestrator cycle completed' || true
           git status --short
           git add analytics data/live data/intelligence
-          git diff --cached --quiet || git commit -m 'Record autonomous creator cycle' || true
+          git diff --cached --quiet || (git config user.name 'github-actions[bot]' && git config user.email '41898282+github-actions[bot]@users.noreply.github.com' && git commit -m 'Record autonomous creator cycle') || true
           git pull --rebase --autostash origin main || true
           git push origin main || true
