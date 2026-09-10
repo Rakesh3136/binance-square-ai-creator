@@ -10,8 +10,9 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TRADINGVIEW = ROOT / 'tradingview_renderer.mjs'
-MEME = ROOT / 'meme_visual_renderer.py'
+SRC = Path(__file__).resolve().parent
+TRADINGVIEW = SRC / 'tradingview_renderer.mjs'
+MEME = SRC / 'meme_visual_renderer.py'
 CONTEXT = ROOT / 'data/live/publication_context.json'
 
 
