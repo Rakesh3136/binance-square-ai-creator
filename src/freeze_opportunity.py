@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import math
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,7 +22,7 @@ def score(v):
     for k in ('selected_score','effective_score','adjusted_score','engagement_score','raw_score','opportunity_score','content_signal_score','news_score'):
         try:
             n=float(v.get(k) or 0)
-            if n>0:return n
+            if math.isfinite(n) and n>0:return min(100.0,max(0.0,n))
         except Exception: pass
     return 0.0
 def fetch(url):
@@ -49,20 +50,28 @@ def main():
             for x in market.get(key) or []:
                 if isinstance(x,dict):pool.append(x)
         valid=trading_symbols(); seen=set(); chosen=None
-        for x in pool:
-            s=symbol(x)
-            if s and s not in seen:
-                seen.add(s)
-                if s in valid:
-                    chosen=x; break
-        source='validated_engagement_or_market_candidate'
+        # If preflight already selected a valid opportunity, preserve it. The
+        # freeze step must never silently replace the authoritative selection
+        # with an unrelated older candidate.
+        pre_symbol=symbol(selected)
+        if pre_symbol and pre_symbol in valid:
+            chosen=dict(selected)
+            source='preflight_selected_opportunity'
+        else:
+            for x in pool:
+                s=symbol(x)
+                if s and s not in seen:
+                    seen.add(s)
+                    if s in valid:
+                        chosen=x; break
+            source='validated_engagement_or_market_candidate'
     if not chosen or not symbol(chosen):raise SystemExit('No selected opportunity to freeze')
     usdt=symbol(chosen); valid=trading_symbols()
     if usdt not in valid:raise SystemExit(f'Frozen opportunity is not a currently trading Binance symbol: {usdt}')
     sym=usdt[:-4]; chosen=dict(chosen); chosen['symbol']=usdt
-    chosen_score=max(score(chosen),score(selected),score(cadence))
+    chosen_score=min(100.0,max(0.0,max(score(chosen),score(selected),score(cadence))))
     if chosen_score>0: chosen['selected_score']=chosen_score
     pre['selected_opportunity']=chosen
-    frozen={'version':6,'frozen_at':datetime.now(timezone.utc).isoformat(),'symbol':sym,'symbol_usdt':usdt,'binance_verified':True,'category':chosen.get('category',''),'reason':chosen.get('reason',''),'instruction':chosen.get('instruction',''),'score':chosen_score,'raw_score':score(chosen),'adjusted_score':score(chosen),'engagement_score':chosen.get('engagement_score',0),'selected_score':chosen_score,'effective_score':max(chosen_score,score(cadence)),'run_ai':bool(pre.get('run_ai',False)),'selection_source':source,'news_authoritative':news_authoritative,'news_title':chosen.get('news_title',''),'news_source':chosen.get('news_source',chosen.get('source',''))}
+    frozen={'version':7,'frozen_at':datetime.now(timezone.utc).isoformat(),'symbol':sym,'symbol_usdt':usdt,'binance_verified':True,'category':chosen.get('category',''),'reason':chosen.get('reason',''),'instruction':chosen.get('instruction',''),'score':chosen_score,'raw_score':min(100.0,max(0.0,score(chosen))),'adjusted_score':min(100.0,max(0.0,score(chosen))),'engagement_score':chosen.get('engagement_score',0),'selected_score':chosen_score,'effective_score':chosen_score,'run_ai':bool(pre.get('run_ai',False)),'selection_source':source,'news_authoritative':news_authoritative,'news_title':chosen.get('news_title',''),'news_source':chosen.get('news_source',chosen.get('source',''))}
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(frozen,indent=2,ensure_ascii=False),encoding='utf-8'); PRE.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(frozen,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
