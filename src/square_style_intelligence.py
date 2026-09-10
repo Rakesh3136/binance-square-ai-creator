@@ -1,0 +1,76 @@
+"""Binance Square style intelligence.
+
+This is a benchmark layer, not a creator-cloning layer. It turns public Square
+creator guidance and observed high-view patterns into reusable editorial rules,
+while explicitly avoiding copied wording or imitation of individual creators.
+"""
+from __future__ import annotations
+import json
+from pathlib import Path
+from datetime import datetime, timezone
+
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / 'data/intelligence/square_style_intelligence.json'
+
+BENCHMARKS = {
+    'platform_guidance': {
+        'hook_window': 'first_3_seconds',
+        'trading_formula': ['call_the_move', 'own_take', 'show_trade_when_relevant', 'natural_cta'],
+        'news_formula': ['what_is_happening', 'image_or_video_when_relevant', 'own_take', 'show_trade_when_relevant'],
+        'minimum_analysis_target_words': 50,
+        'visual_principle': 'Use a relevant image, chart, screenshot or original visual when it materially improves the story.',
+        'human_signal': 'Specific personal-style reasoning, observable decisions and concrete market context beat generic summaries.',
+    },
+    'observed_high_reach_patterns': [
+        'Strong posts create tension before explaining it.',
+        'The body adds a new fact or interpretation instead of repeating the headline.',
+        'High-view examples often connect an event to a second-order market mechanism.',
+        'Images and trading widgets act as proof/context rather than decoration.',
+        'Conversational language and a recognizable point of view outperform sterile report language.',
+        'A useful post gives the reader something to watch, compare or test next.',
+        'Memes work as a reach lane when the joke is immediately crypto-native and tied to a real market situation.',
+    ],
+    'anti_patterns': [
+        'ticker + percentage + generic reaction sentence',
+        'repeating the same support/resistance paragraph for every asset',
+        'statistics dumps without interpretation',
+        'generic AI transitions such as "the mechanism to watch"',
+        'generic questions appended only to manufacture comments',
+        'copying a creator or reproducing a recognizable meme verbatim',
+        'publishing text-only analysis when a chart or proof visual is clearly useful',
+        'entirely AI-generated or repetitive content with no distinctive editorial judgment',
+    ],
+    'format_mix': {
+        'technical_setup': {'visual': 'verified_chart', 'voice': 'decision_point'},
+        'capital_flow': {'visual': 'verified_chart', 'voice': 'conditional_trade_thesis'},
+        'research_radar': {'visual': 'evidence_card_or_chart', 'voice': 'evidence_gap'},
+        'news': {'visual': 'event_context_or_chart', 'voice': 'second_order_effect'},
+        'crypto_meme': {'visual': 'original_meme', 'voice': 'recognizable_trader_humor'},
+        'result_followup': {'visual': 'result_card_when_supported', 'voice': 'accountability'},
+    },
+    'training_policy': [
+        'Learn patterns, not sentences.',
+        'Learn which visual formats correlate with retention and engagement from our own verified publication data.',
+        'Use public creator examples as editorial benchmarks only; never clone identity, wording or signature jokes.',
+        'Prefer first-party evidence and the creator system’s own measured outcomes over generic internet advice.',
+    ],
+}
+
+
+def main():
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        'version': '1.0',
+        'generated_at': datetime.now(timezone.utc).isoformat(),
+        'sources': [
+            'Binance Square Official creator checklist/profile guidance',
+            'Binance Square public creator posts and trending-topic examples',
+            'CreatorPad public quality guidance',
+        ],
+        'benchmarks': BENCHMARKS,
+    }
+    OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding='utf-8')
+    print(json.dumps({'status': 'OK', 'output': str(OUT), 'visual_formats': sorted(BENCHMARKS['format_mix'])}, indent=2))
+
+if __name__ == '__main__':
+    main()
