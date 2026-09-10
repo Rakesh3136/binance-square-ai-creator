@@ -128,6 +128,10 @@ jobs:
           python src/creator_intelligence.py || true
           python src/self_engineer.py
           test -f data/live/self_engineering_report.json
+      - name: Square-native creator style intelligence
+        run: |
+          python src/square_style_intelligence.py
+          python -m json.tool data/intelligence/square_style_intelligence.json >/dev/null
       - name: Creator 7.x content director and adaptive cadence
         id: cadence
         run: |
@@ -216,7 +220,7 @@ jobs:
         run: |
           python src/content_integrity_gate_4.py
           python -m compileall -q src
-      - name: Decide whether this lane needs a chart
+      - name: Decide whether this lane needs a visual
         id: visual_mode
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
@@ -226,27 +230,41 @@ jobs:
           p=Path('data/live/publication_context.json')
           ctx=json.loads(p.read_text()) if p.exists() else {}
           cat=str(ctx.get('category','')).lower()
-          required=cat not in {'crypto_meme','market_meme','trader_humor','education','commentary','community'}
+          meme=cat == 'crypto_meme'
+          required = meme or cat not in {'education','commentary','community'}
+          mode = 'meme' if meme else 'tradingview'
           with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
               f.write(f"required={'true' if required else 'false'}\n")
-          print({'category':cat,'chart_required':required})
+              f.write(f"mode={mode}\n")
+          print({'category':cat,'visual_required':required,'mode':mode})
           PY
       - name: Setup Node and Chromium
-        if: ${{ steps.visual_mode.outputs.required == 'true' }}
+        if: ${{ steps.visual_mode.outputs.required == 'true' && steps.visual_mode.outputs.mode == 'tradingview' }}
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Render and validate TradingView package
+      - name: Render visual package
         if: ${{ steps.visual_mode.outputs.required == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
+          if [ "${{ steps.visual_mode.outputs.mode }}" = 'tradingview' ]; then
+            npm install --no-save playwright@1.55.0
+            npx playwright install --with-deps chromium
+          fi
           python src/visual_renderer.py
           test -s data/live/visual.png
-          python src/validate_visual.py
-          python src/validate_tradingview_visual.py data/live/visual.png
+          if [ "${{ steps.visual_mode.outputs.mode }}" = 'tradingview' ]; then
+            python src/validate_visual.py
+            python src/validate_tradingview_visual.py data/live/visual.png
+          else
+            python - <<'PY'
+          from PIL import Image
+          im=Image.open('data/live/visual.png')
+          assert im.width >= 1000 and im.height >= 500
+          print({'status':'MEME_VISUAL_VALID','size':im.size})
+          PY
+          fi
       - name: Run final production gate
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         id: gate
