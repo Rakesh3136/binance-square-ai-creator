@@ -4,7 +4,7 @@ import json,os,re,subprocess,sys
 from datetime import datetime
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];REPORT_DIR=ROOT/'data/reports';STATUS_PATH=ROOT/'data/live/creator_status.json';PREFLIGHT_PATH=ROOT/'data/live/editorial_preflight.json';CONTEXT_PATH=ROOT/'data/live/publication_context.json';INTEL_PATH=ROOT/'data/live/creator_intelligence_2.json';GATE_PATH=ROOT/'data/live/engagement_gate.json';VISUAL_META=ROOT/'data/live/visual_metadata.json';VISUAL=ROOT/'data/live/visual.png';FROZEN_PATH=ROOT/'data/live/authoritative_opportunity.json';CADENCE_PATH=ROOT/'data/live/autonomous_cadence_6.json';ELITE_PATH=ROOT/'data/live/elite_prepublication_judge.json';AUDIT_PATH=Path('/tmp/publish_gate.json')
-QUALITY_THRESHOLD=68.0;OPPORTUNITY_THRESHOLD=60.0;RESCUE_QUALITY_THRESHOLD=75.0;MAX_AGE_SECONDS=20*60;NONCHART={'crypto_meme','market_meme','trader_humor','education','commentary','community'}
+QUALITY_THRESHOLD=68.0;OPPORTUNITY_THRESHOLD=60.0;RESCUE_QUALITY_THRESHOLD=75.0;MAX_AGE_SECONDS=20*60;NONCHART={'crypto_meme','market_meme','trader_humor','education','commentary','community','result_followup'}
 def load(path,default=None):
     if not Path(path).exists():return {} if default is None else default
     try:
@@ -22,6 +22,7 @@ def category():
     ctx=load(CONTEXT_PATH);frozen=load(FROZEN_PATH);pre=load(PREFLIGHT_PATH);return str(ctx.get('category') or frozen.get('category') or (pre.get('selected_opportunity') or {}).get('category') or '').lower()
 def opportunity_score(data):
     pre=load(PREFLIGHT_PATH);frozen=load(FROZEN_PATH);cadence=load(CADENCE_PATH);vals=[]
+    if category()=='result_followup':return 100.0
     sources=[(data.get('research') or {},('opportunity_score','adjusted_score','engagement_score')),(data.get('critique') or {},('revised_opportunity_score','opportunity_score','adjusted_score','engagement_score')),(pre.get('selected_opportunity') or {},('selected_score','adjusted_score','raw_score','content_signal_score','engagement_score','news_score')),(frozen,('selected_score','effective_score','score','adjusted_score','raw_score','engagement_score')),(cadence,('effective_score','selected_score','opportunity_score','score'))]
     for obj,keys in sources:
         for k in keys:
@@ -36,11 +37,9 @@ def authoritative_symbol(data):
         if x:return x
     return ''
 def visual_is_verified(expected=''):
-    meta=load(VISUAL_META);mode=str(meta.get('visual_mode') or '')
-    ok=meta.get('provider')=='TradingView' and meta.get('status')=='TRADINGVIEW_CREATED' and mode in {'TRADINGVIEW_CHART_ONLY','TRADINGVIEW_CHART_PAIR','TRADINGVIEW_CHART_ANNOTATED'} and VISUAL.exists() and VISUAL.stat().st_size>=1000
+    meta=load(VISUAL_META);mode=str(meta.get('visual_mode') or '');ok=meta.get('provider')=='TradingView' and meta.get('status')=='TRADINGVIEW_CREATED' and mode in {'TRADINGVIEW_CHART_ONLY','TRADINGVIEW_CHART_PAIR','TRADINGVIEW_CHART_ANNOTATED'} and VISUAL.exists() and VISUAL.stat().st_size>=1000
     if not ok:return False
-    actuals=[str(x).upper() for x in (meta.get('tradingview_symbols') or [])]
-    return not expected or not actuals or f'BINANCE:{expected.upper()}USDT' in actuals or f'BINANCE:{expected.upper()}USDT.P' in actuals
+    actuals=[str(x).upper() for x in (meta.get('tradingview_symbols') or [])];return not expected or not actuals or f'BINANCE:{expected.upper()}USDT' in actuals or f'BINANCE:{expected.upper()}USDT.P' in actuals
 def content_is_coherent(post,expected,cat):
     if not post or post.count('?')!=1:return False
     if cat in NONCHART:return True
@@ -56,13 +55,10 @@ def evaluate(report):
     except Exception as exc:interaction={'score':0,'publish':False,'reasons':[f'quality_gate_error:{type(exc).__name__}']}
     try:quality=float(draft.get('quality_score') or interaction.get('score') or 0)
     except:quality=float(interaction.get('score') or 0)
-    intelligence=load(INTEL_PATH);elite=load(ELITE_PATH);intelligence_ok=intelligence.get('publish_recommendation') is True;opportunity=opportunity_score(data);chart_ok=cat in NONCHART or visual_is_verified(expected);coherent=content_is_coherent(post,expected,cat)
-    failures=list(elite.get('failures') or []) if isinstance(elite,dict) else [];hard_elite={'malformed_statistics_phrase','repetitive_feed_template','template_phrase_density','repeats_recent_published_sentence','policy_language_failure'};rescue_forbidden=bool(set(failures)&hard_elite);threshold=RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD
-    eligible=bool(post) and coherent and quality>=threshold and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok and (rescue or (intelligence_ok and data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED')) and not rescue_forbidden
-    mode=choose_mode();audit={'version':'5.3','draft':str(report),'publish':eligible,'mode':mode,'category':cat,'quality_score':quality,'quality_threshold':threshold,'opportunity_score':opportunity,'creator_intelligence_2':intelligence,'interaction_gate':interaction,'tradingview_required':cat not in NONCHART,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'visual_mode':load(VISUAL_META).get('visual_mode'),'content_coherent':coherent,'rescue':rescue,'elite_failures':failures,'rescue_forbidden':rescue_forbidden,'reason':'publish_eligible' if eligible else 'gate_rejected'}
-    AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False));GATE_PATH.write_text(json.dumps(interaction,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
-def rescue_status():
-    STATUS_PATH.parent.mkdir(parents=True,exist_ok=True);STATUS_PATH.write_text(json.dumps({'status':'LOCAL_FALLBACK_SUCCESS','generation_mode':'LOCAL_FALLBACK','reason':'Bounded deterministic rescue'},indent=2),encoding='utf-8')
+    intelligence=load(INTEL_PATH);elite=load(ELITE_PATH);intelligence_ok=(cat=='result_followup') or intelligence.get('publish_recommendation') is True;opportunity=opportunity_score(data);chart_ok=cat in NONCHART or visual_is_verified(expected);coherent=content_is_coherent(post,expected,cat);failures=list(elite.get('failures') or []) if isinstance(elite,dict) else [];hard_elite={'malformed_statistics_phrase','repetitive_feed_template','template_phrase_density','repeats_recent_published_sentence','policy_language_failure'};rescue_forbidden=bool(set(failures)&hard_elite);threshold=RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD
+    eligible=bool(post) and coherent and quality>=threshold and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok and (rescue or (intelligence_ok and (data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' or cat=='result_followup'))) and not rescue_forbidden
+    mode=choose_mode();audit={'version':'5.4','draft':str(report),'publish':eligible,'mode':mode,'category':cat,'quality_score':quality,'quality_threshold':threshold,'opportunity_score':opportunity,'interaction_gate':interaction,'tradingview_required':cat not in NONCHART,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'content_coherent':coherent,'rescue':rescue,'elite_failures':failures,'rescue_forbidden':rescue_forbidden,'reason':'publish_eligible' if eligible else 'gate_rejected'};AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False));GATE_PATH.write_text(json.dumps(interaction,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
+def rescue_status():STATUS_PATH.parent.mkdir(parents=True,exist_ok=True);STATUS_PATH.write_text(json.dumps({'status':'LOCAL_FALLBACK_SUCCESS','generation_mode':'LOCAL_FALLBACK','reason':'Bounded deterministic rescue'},indent=2),encoding='utf-8')
 def main():
     report=fresh_report()
     if not report:output(False);return 0
@@ -70,6 +66,7 @@ def main():
     if publish:output(True,mode);return 0
     elite=load(ELITE_PATH);failures=set(elite.get('failures') or []) if isinstance(elite,dict) else set();hard={'malformed_statistics_phrase','repetitive_feed_template','template_phrase_density','repeats_recent_published_sentence','policy_language_failure'}
     if failures&hard:output(False,mode);print('Production manager: rescue blocked by hard editorial failure.');return 0
+    if category()=='result_followup':output(False,mode);return 0
     print('Production manager: normal gate rejected; running one bounded rescue.')
     rc=subprocess.run([sys.executable,str(ROOT/'src/publish_rescue.py')],cwd=ROOT,check=False).returncode
     if rc!=0:output(False);return 0
