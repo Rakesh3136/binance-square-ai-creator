@@ -1,13 +1,15 @@
 """Single Binance Square publication adapter.
 
-Trading/editorial chart posts use the current Square image-upload flow; reach-only
-lanes remain text-only. The same API key is used only for Square publishing.
+Visual-first lanes use the current Square image-upload flow. Text-only is a
+fallback only when the lane explicitly does not require media. The same API key
+is used only for Square publishing.
 """
 from __future__ import annotations
 import json,os,subprocess,sys
 from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];LIVE=ROOT/'data/live';ANALYTICS=ROOT/'analytics';PAYLOAD_PATH=LIVE/'publication_payload.json';LOG_PATH=ANALYTICS/'publication_log.jsonl';RESULT_PATH=LIVE/'publication_result.json';CONTEXT_PATH=LIVE/'publication_context.json';FROZEN_PATH=LIVE/'authoritative_opportunity.json';VISUAL=LIVE/'visual.png';ENDPOINT='https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add'
+IMAGE_LANES={'crypto_meme','market_meme','trader_humor','technical_setup','capital_flow_long','capital_flow_short','result_followup','research_radar','news','breaking_news','news_and_macro'}
 
 def now():return datetime.now(timezone.utc).isoformat()
 def load(p):
@@ -30,7 +32,8 @@ def main():
     key=os.getenv('BINANCE_SQUARE_OPENAPI_KEY','').strip()
     if not key:return fail('BINANCE_SQUARE_OPENAPI_KEY is not configured','PUBLISHER_NOT_CONFIGURED')
     try:
-        text=text_payload();ctx=load(CONTEXT_PATH);frozen=load(FROZEN_PATH);cat=str(ctx.get('category') or frozen.get('category') or '').lower();use_image=VISUAL.exists() and VISUAL.stat().st_size>10000 and cat not in {'crypto_meme','market_meme','trader_humor','education','commentary','community'}
+        text=text_payload();ctx=load(CONTEXT_PATH);frozen=load(FROZEN_PATH);cat=str(ctx.get('category') or frozen.get('category') or '').lower()
+        use_image=VISUAL.exists() and VISUAL.stat().st_size>10000 and (cat in IMAGE_LANES or bool(ctx.get('visual_requested')))
         if use_image:
             proc=subprocess.run(['node',str(ROOT/'src/square_image_publisher.mjs'),str(VISUAL),text],env={**os.environ,'BINANCE_SQUARE_OPENAPI_KEY':key},cwd=ROOT,text=True,capture_output=True,check=False)
             if proc.stdout.strip():print(proc.stdout)
@@ -38,10 +41,10 @@ def main():
             result=json.loads(proc.stdout.strip().splitlines()[-1])
         else:
             import urllib.request
-            body=json.dumps({'bodyTextOnly':text},ensure_ascii=False).encode('utf-8');req=urllib.request.Request(ENDPOINT,data=body,method='POST',headers={'X-Square-OpenAPI-Key':key,'Content-Type':'application/json','clienttype':'binanceSkill','User-Agent':'binance-square-ai-creator/1.0'})
+            body=json.dumps({'bodyTextOnly':text},ensure_ascii=False).encode('utf-8');req=urllib.request.Request(ENDPOINT,data=body,method='POST',headers={'X-Square-OpenAPI-Key':key,'Content-Type':'application/json','clienttype':'binanceSkill','User-Agent':'binance-square-ai-creator/1.1'})
             with urllib.request.urlopen(req,timeout=30) as response:api=json.loads(response.read().decode('utf-8',errors='replace'))
             code=str(api.get('code',''));data=api.get('data') if isinstance(api.get('data'),dict) else {};result={'status':'PUBLISHED_VERIFIED_BY_API_RESPONSE' if code=='000000' and (data.get('id') or data.get('contentId')) else 'PUBLISH_REJECTED','post_id':str(data.get('id') or data.get('contentId') or '') or None,'link':f"https://www.binance.com/square/post/{data.get('id') or data.get('contentId')}" if (data.get('id') or data.get('contentId')) else None,'api_code':code,'error':api.get('message')}
-        if result.get('status') not in {'PUBLISHED_VERIFIED_BY_API_RESPONSE'} or not result.get('post_id'):raise RuntimeError(result.get('error') or 'publication response did not contain a verified post id')
+        if result.get('status')!='PUBLISHED_VERIFIED_BY_API_RESPONSE' or not result.get('post_id'):raise RuntimeError(result.get('error') or 'publication response did not contain a verified post id')
     except Exception as e:
         append({'timestamp':now(),'status':'PUBLISH_FAILED','post_id':None,'link':None,'error':str(e)});return fail(str(e),'PUBLISH_FAILED')
     post_id=str(result['post_id']);link=str(result.get('link') or f'https://www.binance.com/square/post/{post_id}');ctx=load(CONTEXT_PATH);frozen=load(FROZEN_PATH)
