@@ -66,9 +66,8 @@ def clean(v):
     return next((x.strip() for x in v.splitlines() if x.strip()),'')
 
 def deterministic_bridge(original):
-    symbol=(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b',original) or ['$this asset'])[0]
-    pct=(re.findall(r'\b[+-]?\d+(?:\.\d+)?%',original) or ['the observed move'])[0]
-    # Pull an existing market fact/statement; never invent a second fact.
+    symbol=(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b',original) or ['$THIS-ASSET'])[0]
+    pct=(re.findall(r'\b[+-]?\d+(?:\.\d+)%',original) or ['the observed move'])[0]
     fact=next((s for s in sentences(original) if pct in s or symbol in s), '')
     if fact:
         compact=re.sub(r'\s+',' ',fact).strip().rstrip('.!?')
@@ -86,15 +85,13 @@ def main():
     if not original: raise SystemExit(f'Mechanism repair: draft has no post text: {report}')
     qs=questions(original)
     if len(qs)!=1:
-        result={'status':'REPAIR_FAILED','draft_unchanged':True,'draft_path':str(report),'reasons':['ORIGINAL_QUESTION_COUNT_NOT_ONE']}; OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2),encoding='utf-8'); print(json.dumps(result,indent=2)); return 0
-    body=original
-    removed=[]
+        result={'status':'REPAIR_FAILED','draft_unchanged':True,'draft_path':str(report),'reasons':['ORIGINAL_QUESTION_COUNT_NOT_ONE']}; OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2),encoding='utf-8'); print(json.dumps(result,indent=2)); return 1
+    body=original; removed=[]
     for s in sentences(body):
         if generic_bridge(s): body=body.replace(s,'').strip(); removed.append(s)
     reps=recent_repetitions(body)
     bridge=gemini_bridge(body,reps) or deterministic_bridge(body)
     candidate=f'{body}\n\n{bridge}\n\n{qs[0].strip()}'.strip()
-    # Final local verification. Never silently leave a failing draft behind.
     reasons=[]
     if not mechanism_present(candidate): reasons.append('MECHANISM_STILL_MISSING')
     if generic_bridge(bridge): reasons.append('GENERIC_BRIDGE')
@@ -103,8 +100,8 @@ def main():
     if sorted(explicit_facts(original)-explicit_facts(candidate)): reasons.append('EXPLICIT_FACT_LOSS')
     if recent_repetitions(candidate): reasons.append('RECENT_SENTENCE_REPETITION_AFTER_REPAIR')
     if reasons:
-        # A second deterministic variant avoids a stock sentence without weakening the gate.
-        bridge=f'{(re.findall(r"\\$[A-Z][A-Z0-9]{1,14}\\b",body) or ["This asset"])[0]} is worth watching because the existing market reaction can either hold or fade, which changes how useful the current move is.'
+        symbol=(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b',body) or ['This asset'])[0]
+        bridge=f'{symbol} is worth watching because the existing market reaction can either hold or fade, which changes how useful the current move is.'
         candidate=f'{body}\n\n{bridge}\n\n{qs[0].strip()}'.strip()
         reasons=[]
         if not mechanism_present(candidate): reasons.append('MECHANISM_STILL_MISSING')
