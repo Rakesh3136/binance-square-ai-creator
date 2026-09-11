@@ -37,6 +37,8 @@ async function main(){
   }
   if(!status?.imageUrl) throw new Error('Square image processing timed out');
   const result=await api(V1,'/content/add',{contentType:1,bodyTextOnly:text,imageList:[status.imageUrl]});
-  console.log(JSON.stringify({status:result.publishStatus==='success_without_post_id'?'PUBLISHED_UNKNOWN':'PUBLISHED_VERIFIED_BY_API_RESPONSE',post_id:result.id||null,link:result.shareLink||null,image_url:status.imageUrl},null,2));
+  // Emit exactly one JSON line. The Python adapter consumes the final line;
+  // pretty-printed JSON previously caused it to parse the closing "}" only.
+  console.log(JSON.stringify({status:result.publishStatus==='success_without_post_id'?'PUBLISHED_UNKNOWN':'PUBLISHED_VERIFIED_BY_API_RESPONSE',post_id:result.id||null,link:result.shareLink||null,image_url:status.imageUrl}));
 }
 main().catch(e=>{console.error(e.stack||e);process.exit(1)});
