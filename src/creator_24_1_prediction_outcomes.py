@@ -5,7 +5,7 @@ WIN, LOSS or INVALIDATED when the candle path objectively crosses the frozen
 levels. Ambiguous candles remain OPEN. The original prediction is immutable.
 """
 from __future__ import annotations
-import json, urllib.parse, urllib.request
+import json, urllib.parse, urllib.request, subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -46,13 +46,13 @@ def main():
         if not cid or not symbol or ref is None or not targets or inv is None:continue
         try: raw=candles(symbol)
         except Exception as e:errors.append({'call_id':cid,'error':str(e)});continue
-        highs=[num(r[2]) for r in raw if isinstance(r,list) and len(r)>4]; lows=[num(r[3]) for r in raw if isinstance(r,list) and len(r)>4]; closes=[num(r[4]) for r in raw if isinstance(r,list) and len(r)>4]
+        highs=[num(r[2]) for r in raw if isinstance(r,list) and len(r)>4]; lows=[num(r[3]) for r in raw if isinstance(r,list) and len(r)>4]
         if not highs or not lows:continue
         outcome='OPEN'; hit_target=None; reason='no frozen level crossed in observed candles'
         if direction.startswith('SHORT'):
             if any(h is not None and h>=inv for h in highs): outcome='INVALIDATED'; reason='fresh candle high crossed frozen invalidation'
             else:
-                for i,t in enumerate(targets):
+                for t in targets:
                     if any(l is not None and l<=t for l in lows): hit_target=t; break
                 if hit_target is not None: outcome='WIN'; reason='fresh candle low crossed frozen target'
         else:
@@ -75,5 +75,10 @@ def main():
             except Exception:pass
     terminal=[x for x in all_rows if x.get('outcome') in {'WIN','LOSS','INVALIDATED'}]
     report={'version':'24.1','checked_at':now,'open_calls_seen':len(calls),'new_outcomes':len(outcomes),'wins':sum(x.get('outcome')=='WIN' for x in all_rows),'invalidated':sum(x.get('outcome')=='INVALIDATED' for x in all_rows),'terminal_outcomes':len(terminal),'errors':errors,'rules':['No guarantee is inferred.','Ambiguous paths remain OPEN.','Frozen reference/targets/invalidation are immutable.','No result is declared without fresh Binance OHLCV.']}
-    SUMMARY.parent.mkdir(parents=True,exist_ok=True);SUMMARY.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(report,indent=2,ensure_ascii=False))
+    SUMMARY.parent.mkdir(parents=True,exist_ok=True);SUMMARY.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
+    # Turn only verified wins into a downstream proof-content brief. Failure of
+    # this optional brief must never invalidate the market outcome calculation.
+    try: subprocess.run(['python',str(ROOT/'src/public_prediction_proof.py')],cwd=ROOT,check=False)
+    except Exception: pass
+    print(json.dumps(report,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
