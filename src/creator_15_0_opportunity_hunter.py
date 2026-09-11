@@ -70,6 +70,7 @@ def main() -> int:
     executive = load(LIVE / "creator_13_0_executive_decision.json", {})
     brain = load(LIVE / "creator_9_0_brain_state.json", {})
     market = load(LIVE / "market_snapshot.json", {})
+    flow = load(LIVE / "capital_flow_intelligence.json", {})
     news = load(LIVE / "news_snapshot.json", {})
     growth = load(ANALYTICS / "creator_7_5_growth_portfolio.json", {})
     experiment = load(LIVE / "creator_12_0_active_experiment.json", {})
@@ -79,34 +80,37 @@ def main() -> int:
     memory = load(memory_path, {"seen": [], "decisions": [], "updated_at": now})
 
     market_top = market.get("top_signal", {}) if isinstance(market, dict) else {}
+    flow_top = flow.get("highest_conviction", {}) if isinstance(flow, dict) else {}
     news_items = news.get("items", []) if isinstance(news, dict) else []
     if not isinstance(news_items, list):
         news_items = []
 
     symbol = text(market_top, "symbol")
+    flow_symbol = text(flow_top, "symbol")
     change = abs(num(market_top, "price_change_percent", "change_percent"))
     volume = num(market_top, "quote_volume_usdt", "volume_usdt")
     signal = num(market_top, "content_signal_score", "signal_score")
+    flow_score = num(flow_top, "flow_score")
     verified_revenue = num(revenue, "verified_revenue", "revenue_verified", "verified_earnings", "earnings_verified")
     urgent = text(executive, "action", "decision") or text(brain, "action", "decision")
 
     candidates: list[dict[str, Any]] = []
 
-    def add(kind: str, title: str, why: str, base: float, evidence: float, risk: float = 0.15) -> None:
+    def add(kind: str, title: str, why: str, base: float, evidence: float, risk: float = 0.15, primary_symbol: str | None = None, metadata: dict | None = None) -> None:
         if not title:
             return
-        novelty = 0.75 if kind in {"BREAKING_NEWS", "MARKET_ANOMALY", "NARRATIVE_SHIFT"} else 0.55
-        urgency_score = min(1.0, (change / 25.0) + (0.35 if kind == "BREAKING_NEWS" else 0.0))
+        novelty = 0.75 if kind in {"BREAKING_NEWS", "MARKET_ANOMALY", "NARRATIVE_SHIFT", "CAPITAL_FLOW"} else 0.55
+        urgency_score = min(1.0, (change / 25.0) + (0.35 if kind == "BREAKING_NEWS" else 0.0) + (0.15 if kind == "CAPITAL_FLOW" else 0.0))
         audience = 0.72
         monetization = 0.55 if verified_revenue > 0 else 0.35
         execution = max(0.2, evidence)
         score = 100 * (0.24 * base + 0.18 * evidence + 0.14 * urgency_score + 0.12 * novelty + 0.12 * audience + 0.10 * monetization + 0.10 * execution - 0.10 * risk)
-        candidates.append({
-            "opportunity_id": f"15-{kind.lower()}-{symbol or 'general'}-{len(candidates)+1}",
+        row = {
+            "opportunity_id": f"15-{kind.lower()}-{primary_symbol or symbol or 'general'}-{len(candidates)+1}",
             "category": kind,
             "title": title,
             "why_now": why,
-            "primary_symbol": symbol or None,
+            "primary_symbol": primary_symbol or symbol or None,
             "score": round(max(0.0, min(100.0, score)), 2),
             "evidence_strength": round(evidence, 3),
             "risk": round(risk, 3),
@@ -114,9 +118,19 @@ def main() -> int:
             "publishable": evidence >= 0.45 and risk < 0.65,
             "requires_fact_check": True,
             "generated_at": now,
-        })
+        }
+        if metadata:
+            row.update(metadata)
+        candidates.append(row)
 
     ev = evidence_strength(market, world, strategy)
+    flow_ev = evidence_strength(flow, market, world)
+    if flow_symbol and flow_score != 0:
+        flow_state = str(flow.get("rotation_state") or "UNKNOWN")
+        flow_change = num(flow_top, "return_6h_pct")
+        flow_volume_ratio = num(flow_top, "volume_ratio_6h_vs_prior_12h")
+        add("CAPITAL_FLOW", f"Track {flow_symbol} capital-flow rotation", f"Relative-strength evidence shows {flow_change:.2f}% 6H movement, {flow_volume_ratio:.2f}x recent-vs-prior volume and flow score {flow_score:.2f}; rotation state: {flow_state}.", 0.88, max(flow_ev, 0.60), 0.30, flow_symbol, {"flow_score": flow_score, "rotation_state": flow_state, "volume_ratio": flow_volume_ratio, "directional_bias": "LONG_BIAS" if flow_score > 0 else "SHORT_BIAS"})
+
     if symbol and (change >= 8 or signal >= 60):
         add("MARKET_ANOMALY", f"Investigate {symbol} market anomaly", f"Live signal shows {change:.2f}% absolute price movement with content signal {signal:.1f}.", 0.90, max(ev, 0.65), 0.30)
 
@@ -164,6 +178,7 @@ def main() -> int:
         "selected_opportunity_id": candidates[0]["opportunity_id"] if candidates else None,
         "candidate_count": len(candidates),
         "verified_revenue": verified_revenue,
+        "capital_flow_candidate": flow_top if flow_top else None,
         "research_priority": knowledge.get("next_action") if isinstance(knowledge, dict) else None,
     })
 
