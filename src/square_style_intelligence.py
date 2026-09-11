@@ -1,78 +1,58 @@
 """Binance Square style intelligence.
 
-This is a benchmark layer, not a creator-cloning layer. It turns public Square
-creator guidance and observed high-view patterns into reusable editorial rules,
-while explicitly avoiding copied wording or imitation of individual creators.
+Benchmark layer only: learns visual/editorial patterns from public Square guidance
+and examples without cloning creators, wording or recognizable meme assets.
 """
 from __future__ import annotations
 import json
 from pathlib import Path
 from datetime import datetime, timezone
 
-ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'data/intelligence/square_style_intelligence.json'
-
-BENCHMARKS = {
-    'platform_guidance': {
-        'hook_window': 'first_3_seconds',
-        'trading_formula': ['call_the_move', 'own_take', 'show_trade_when_relevant', 'natural_cta'],
-        'news_formula': ['what_is_happening', 'image_or_video_when_relevant', 'own_take', 'show_trade_when_relevant'],
-        'minimum_analysis_target_words': 50,
-        'visual_principle': 'Use a relevant image, chart, screenshot or original visual when it materially improves the story.',
-        'human_signal': 'Specific personal-style reasoning, observable decisions and concrete market context beat generic summaries.',
-    },
-    'observed_high_reach_patterns': [
-        'Strong posts create tension before explaining it.',
-        'The body adds a new fact or interpretation instead of repeating the headline.',
-        'High-view examples often connect an event to a second-order market mechanism.',
-        'Images and trading widgets act as proof/context rather than decoration.',
-        'Conversational language and a recognizable point of view outperform sterile report language.',
-        'A useful post gives the reader something to watch, compare or test next.',
-        'Memes work as a reach lane when the joke is immediately crypto-native and tied to a real market situation.',
-        'Public Square examples currently include posts above 100K views; reach is not limited to one content style, so the system should learn format/angle combinations rather than clone a single creator.',
-    ],
-    'anti_patterns': [
-        'ticker + percentage + generic reaction sentence',
-        'repeating the same support/resistance paragraph for every asset',
-        'statistics dumps without interpretation',
-        'generic AI transitions such as "the mechanism to watch"',
-        'generic questions appended only to manufacture comments',
-        'copying a creator or reproducing a recognizable meme verbatim',
-        'publishing text-only analysis when a chart or proof visual is clearly useful',
-        'entirely AI-generated or repetitive content with no distinctive editorial judgment',
-    ],
-    'format_mix': {
-        'technical_setup': {'visual': 'verified_chart', 'voice': 'decision_point'},
-        'capital_flow': {'visual': 'verified_chart', 'voice': 'conditional_trade_thesis'},
-        'research_radar': {'visual': 'evidence_card_or_chart', 'voice': 'evidence_gap'},
-        'news': {'visual': 'event_context_or_chart', 'voice': 'second_order_effect'},
-        'crypto_meme': {'visual': 'original_meme', 'voice': 'recognizable_trader_humor'},
-        'result_followup': {'visual': 'result_card_when_supported', 'voice': 'accountability'},
-    },
-    'training_policy': [
-        'Learn patterns, not sentences.',
-        'Learn which visual formats correlate with retention and engagement from our own verified publication data.',
-        'Use public creator examples as editorial benchmarks only; never clone identity, wording or signature jokes.',
-        'Prefer first-party evidence and the creator system’s own measured outcomes over generic internet advice.',
-    ],
-}
-
+ROOT=Path(__file__).resolve().parents[1]; OUT=ROOT/'data/intelligence/square_style_intelligence.json'
+BENCHMARKS={
+ 'platform_guidance':{
+  'hook_window':'first_3_seconds','trading_formula':['call_the_move','own_take','show_trade_when_relevant','natural_cta'],
+  'news_formula':['what_is_happening','image_or_video_when_relevant','own_take','show_trade_when_relevant'],
+  'minimum_analysis_target_words':50,
+  'visual_principle':'Use a relevant image, chart, screenshot or original visual when it materially improves the story.',
+  'human_signal':'Specific personal-style reasoning, observable decisions and concrete market context beat generic summaries.'},
+ 'observed_high_reach_patterns':[
+  'Strong posts create tension before explaining it.','The body adds a new fact or interpretation instead of repeating the headline.',
+  'High-view examples often connect an event to a second-order market mechanism.','Images and trading widgets act as proof/context rather than decoration.',
+  'Conversational language and a recognizable point of view outperform sterile report language.','A useful post gives the reader something to watch, compare or test next.',
+  'Meme posts commonly use a simple immediately readable joke paired with an image rather than a synthetic infographic.',
+  'Real-world reaction scenes, recognizable trader situations and genuine-looking market screenshots can make the joke feel native to a social feed.',
+  'Public Square examples show both simple image memes and data-heavy posts; the creator should learn which visual/angle combinations work from its own verified outcomes.' ],
+ 'anti_patterns':[
+  'ticker + percentage + generic reaction sentence','repeating the same support/resistance paragraph for every asset','statistics dumps without interpretation',
+  'generic AI transitions such as "the mechanism to watch"','generic questions appended only to manufacture comments',
+  'copying a creator or reproducing a recognizable meme verbatim','publishing text-only analysis when a chart or proof visual is clearly useful',
+  'reusing the same meme image, four-panel cartoon or synthetic card repeatedly','inventing a fake trade screenshot or fake real-world event image',
+  'using a copyrighted reaction meme without a compatible license','entirely AI-generated or repetitive content with no distinctive editorial judgment'],
+ 'format_mix':{
+  'technical_setup':{'visual':'verified_chart','voice':'decision_point'},
+  'capital_flow':{'visual':'verified_chart','voice':'conditional_trade_thesis'},
+  'research_radar':{'visual':'evidence_card_or_chart','voice':'evidence_gap'},
+  'news':{'visual':'event_context_or_chart','voice':'second_order_effect'},
+  'crypto_meme':{'visual':'real_world_photo_meme_or_original_scene','voice':'recognizable_trader_humor'},
+  'result_followup':{'visual':'result_card_when_supported','voice':'accountability'}},
+ 'meme_visual_policy':{
+  'preferred':'real-world human/reaction photograph from public-domain or CC0 sources, with original crypto caption tied to current market context',
+  'secondary':'real market chart integrated into an original meme composition',
+  'avoid':'repeated cartoon panels, generic AI-looking cards, copied famous memes, fake screenshots, fabricated statistics',
+  'memory':'record recent source image and treatment so the next meme changes visual format',
+  'copyright':'only public-domain or CC0 external photos are eligible for automatic use'},
+ 'training_policy':[
+  'Learn patterns, not sentences.','Learn which visual formats correlate with retention and engagement from verified publication data.',
+  'Use public creator examples as editorial benchmarks only; never clone identity, wording or signature jokes.',
+  'Prefer first-party evidence and the creator system’s own measured outcomes over generic internet advice.']}
 
 def main():
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        'version': '1.1',
-        'generated_at': datetime.now(timezone.utc).isoformat(),
-        'sources': [
-            {'name':'Binance Square Official creator checklist','url':'https://www.binance.com/en/square/profile/Binance_Square_Official'},
-            {'name':'Binance Square Skill Hub','url':'https://www.binance.com/en/skills/detail/binance/square-post'},
-            {'name':'Binance Square CreatorPad public quality guidance','url':'https://www.binance.com/en/square/profile/square-creator-404abde49cf46'},
-            {'name':'Public high-reach Square examples used as pattern evidence','urls':['https://www.binance.com/en/square/profile/square-creator-1c3744013','https://www.binance.com/en/square/profile/square-creator-d5cfa27e7811']},
-        ],
-        'benchmarks': BENCHMARKS,
-    }
-    OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding='utf-8')
-    print(json.dumps({'status': 'OK', 'output': str(OUT), 'visual_formats': sorted(BENCHMARKS['format_mix'])}, indent=2))
-
-if __name__ == '__main__':
-    main()
+ OUT.parent.mkdir(parents=True,exist_ok=True); payload={'version':'1.2','generated_at':datetime.now(timezone.utc).isoformat(),'sources':[
+  {'name':'Binance Square Official creator checklist','url':'https://www.binance.com/en/square/profile/Binance_Square_Official'},
+  {'name':'Binance Square Skill Hub','url':'https://www.binance.com/en/skills/detail/binance/square-post'},
+  {'name':'Binance Square CreatorPad public quality guidance','url':'https://www.binance.com/en/square/profile/square-creator-404abde49cf46'},
+  {'name':'Public high-reach Square examples used as pattern evidence','urls':['https://www.binance.com/en/square/profile/square-creator-1c3744013','https://www.binance.com/en/square/profile/square-creator-d5cfa27e7811']},
+  {'name':'Public Square meme hashtag/examples','url':'https://www.binance.com/en/square/hashtag/meme'}], 'benchmarks':BENCHMARKS}
+ OUT.write_text(json.dumps(payload,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps({'status':'OK','output':str(OUT),'visual_formats':sorted(BENCHMARKS['format_mix'])},indent=2))
+if __name__=='__main__':main()
