@@ -105,6 +105,23 @@ def ensure_goal(now):
     return goal
 
 
+def run_guard(script_name: str) -> dict:
+    script = ROOT / "src" / script_name
+    try:
+        proc = subprocess.run([sys.executable, str(script)], cwd=ROOT, capture_output=True, text=True, timeout=30)
+        if proc.stdout:
+            print(proc.stdout, end="")
+        if proc.returncode == 0:
+            if script_name == "signal_first_router.py":
+                return load(ROOT / "data/live/signal_first_routing.json")
+            if script_name == "content_portfolio_guard.py":
+                return load(ROOT / "data/live/content_portfolio_guard.json")
+        print(f"{script_name}_failed; preserving prior cadence decision")
+    except Exception as exc:
+        print(f"{script_name}_unavailable={exc}")
+    return {}
+
+
 def main() -> None:
     now = datetime.now(timezone.utc)
     mission = refresh_mission()
@@ -139,7 +156,6 @@ def main() -> None:
     publish = False
     decision = "WAIT"
     action = "wait_for_stronger_or_fresher_opportunity"
-    cooldown_minutes = 0
 
     if manual:
         publish = True
@@ -167,43 +183,36 @@ def main() -> None:
         publish = True
         decision = "PUBLISH"
         action = "publish_fresh_breaking_news"
-        cooldown_minutes = 45
         reasons.append("fresh_breaking_news")
     elif mission_action == "ACT_NOW" and effective_score >= 110 and (minutes_since is None or minutes_since >= 15):
         publish = True
         decision = "PUBLISH"
         action = "mission_act_now_short_spacing_override"
-        cooldown_minutes = 15
         reasons.append("mission_act_now_exception")
     elif mission_action == "ACT_NOW" and effective_score >= 105 and (minutes_since is None or minutes_since >= 30):
         publish = True
         decision = "PUBLISH"
         action = "mission_act_now_reduced_spacing"
-        cooldown_minutes = 30
         reasons.append("mission_act_now_reduced_spacing")
     elif effective_score >= 125 and (minutes_since is None or minutes_since >= 75):
         publish = True
         decision = "PUBLISH"
         action = "publish_exceptional_opportunity"
-        cooldown_minutes = 75
         reasons.append("exceptionally_strong_opportunity")
     elif effective_score >= 100 and (minutes_since is None or minutes_since >= 120):
         publish = True
         decision = "PUBLISH"
         action = "publish_high_value_opportunity"
-        cooldown_minutes = 120
         reasons.append("high_value_opportunity")
     elif effective_score >= 82 and (minutes_since is None or minutes_since >= 180):
         publish = True
         decision = "PUBLISH"
         action = "publish_strong_opportunity"
-        cooldown_minutes = 180
         reasons.append("strong_opportunity")
     elif effective_score >= 68 and (minutes_since is None or minutes_since >= 300):
         publish = True
         decision = "PUBLISH"
         action = "publish_normal_opportunity_after_longer_spacing"
-        cooldown_minutes = 300
         reasons.append("normal_opportunity_after_spacing")
     else:
         reasons.append("wait_for_better_story_or_natural_spacing")
@@ -214,14 +223,8 @@ def main() -> None:
         action = "research_market_until_quality_floor_is_met"
         reasons.append("quality_floor")
 
-    if same_symbol_recent >= 3 and category not in {"breaking_news", "news_market_impact"} and not manual:
-        publish = False
-        decision = "PIVOT"
-        action = "choose_next_best_story_with_different_asset"
-        reasons.append("recent_asset_overexposure")
-
     result = {
-        "version": "7.1-human-cadence",
+        "version": "7.2-human-cadence-signal-first-portfolio",
         "generated_at": now.isoformat(),
         "publish": publish,
         "decision": decision,
@@ -248,47 +251,46 @@ def main() -> None:
             "fixed_three_hour_quota": False,
             "publication_interval": "event_and_quality_driven",
             "human_like_cadence": True,
-            "breaking_news_minimum_spacing_minutes": 45,
-            "act_now_exception_minimum_spacing_minutes": 15,
-            "act_now_reduced_spacing_minutes": 30,
-            "exceptional_minimum_spacing_minutes": 75,
-            "high_value_minimum_spacing_minutes": 120,
-            "strong_minimum_spacing_minutes": 180,
-            "normal_minimum_spacing_minutes": 300,
-            "minimum_quality_score": 60,
             "accuracy_over_frequency": True,
-            "act_now_override_scoped": True,
+            "no_repetitive_posting": True,
+            "generic_news_cannot_create_btc_fallback": True,
+            "wait_for_different_story_when_portfolio_is_repetitive": True,
+            "qualified_signal_beats_meme": True,
             "revenue_claims_require_verified_account_evidence": True,
         },
     }
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    # Signal-first routing is the final cadence authority: it can only tighten
-    # publication, never loosen safety or quality. Memes are fallback-only.
-    router = ROOT / "src/signal_first_router.py"
-    try:
-        proc = subprocess.run([sys.executable, str(router)], cwd=ROOT, capture_output=True, text=True, timeout=30)
-        if proc.stdout:
-            print(proc.stdout, end="")
-        if proc.returncode == 0:
-            routed = load(OUT)
-            route = load(ROOT / "data/live/signal_first_routing.json")
-            result["signal_first_routing"] = route
-            if route.get("publish") is False:
-                result["publish"] = False
-                result["decision"] = route.get("decision", "WAIT")
-                result["strategic_action"] = "signal_first_wait_or_research"
-                result["reasons"] = reasons + [route.get("reason", "signal_first_router")]
-            elif route.get("primary_signal"):
-                result["signal_first_routing"] = route
-                result["reasons"] = reasons + ["signal_first_primary_lane"]
-            OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-        else:
-            print("signal_first_router_failed; preserving cadence decision")
-    except Exception as exc:
-        print(f"signal_first_router_unavailable={exc}")
+    # Signal-first routing selects the primary market thesis. The content
+    # portfolio manager then prevents one asset/story from consuming the feed.
+    if publish:
+        route = run_guard("signal_first_router.py")
+        result["signal_first_routing"] = route
+        if route and route.get("publish") is False:
+            publish = False
+            result["publish"] = False
+            result["decision"] = route.get("decision", "WAIT")
+            result["strategic_action"] = "signal_first_wait_or_research"
+            result["reasons"] = reasons + [route.get("reason", "signal_first_router")]
 
+    if publish:
+        portfolio = run_guard("content_portfolio_guard.py")
+        result["content_portfolio_guard"] = portfolio
+        if portfolio and portfolio.get("publish") is False:
+            publish = False
+            result["publish"] = False
+            result["decision"] = portfolio.get("decision", "WAIT_FOR_DIFFERENT_STORY")
+            result["strategic_action"] = "wait_or_research_for_non_repetitive_story"
+            result["reasons"] = reasons + [portfolio.get("reason", "content_portfolio_guard")]
+        elif portfolio.get("selected"):
+            selected_after_guard = portfolio.get("selected")
+            result["selected_category"] = str(selected_after_guard.get("category") or selected_after_guard.get("lane") or "").lower()
+            result["selected_symbol"] = str(selected_after_guard.get("symbol") or "").upper()
+            result["reasons"] = reasons + ["content_portfolio_diversity_pass"]
+
+    OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"publish={'true' if result.get('publish') else 'false'}")
 
