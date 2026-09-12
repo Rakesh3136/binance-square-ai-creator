@@ -95,40 +95,64 @@ def portfolio_candidates(portfolio):
 
 
 def candidate_pool(portfolio, pre, engagement, market, stale_portfolio=False):
-    """Build an ordered recovery pool.
-
-    A stale portfolio selection is a hard context boundary: recover only from
-    researched portfolio/ranker/market candidates and never from generic BTC
-    news or engagement fallbacks. This prevents the exact failure where a
-    delisted coin caused the old BTC story to become the published story.
-    """
     pool, seen = [], set()
-    candidates = portfolio_candidates(portfolio)
-    for source, item in candidates:
+    for source, item in portfolio_candidates(portfolio):
         add_candidate(pool, seen, item, source)
 
     ranking = pre.get('opportunity_ranking_6') or {}
     for x in ranking.get('top_candidates') or []:
         add_candidate(pool, seen, x, 'opportunity_ranker')
 
-    # When portfolio selection became stale, these are still acceptable because
-    # they are market/research signals, not generic audience/news fallbacks.
     if stale_portfolio:
         for key in ('top_content_signals', 'top_gainers', 'top_losers', 'highest_volume', 'new_listing_market'):
             for x in market.get(key) or []:
-                add_candidate(pool, seen, x, 'market_candidate')
+                add_candidate(pool, seen, x, f'market_candidate:{key}')
         return pool
 
     selected_pre = pre.get('selected_opportunity')
     if isinstance(selected_pre, dict):
         add_candidate(pool, seen, selected_pre, 'preflight_selected_opportunity')
-
     for x in (engagement.get('selected'),) + tuple(engagement.get('ranked_candidates') or []):
         add_candidate(pool, seen, x, 'engagement_candidate')
     for key in ('top_content_signals', 'top_gainers', 'top_losers', 'highest_volume', 'new_listing_market'):
         for x in market.get(key) or []:
-            add_candidate(pool, seen, x, 'market_candidate')
+            add_candidate(pool, seen, x, f'market_candidate:{key}')
     return pool
+
+
+def infer_category(candidate, source):
+    existing = str(candidate.get('category') or candidate.get('lane') or '').strip().lower()
+    allowed = {'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','technical_setup','comparison','education','watchlist','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','crypto_meme'}
+    if existing in allowed:
+        return existing
+    if source.endswith(':top_gainers'):
+        return 'top_gainers'
+    if source.endswith(':top_losers'):
+        return 'top_losers'
+    if source.endswith(':highest_volume'):
+        return 'volume_leaders'
+    if source.endswith(':new_listing_market'):
+        return 'new_listings'
+    if source.endswith(':top_content_signals'):
+        return 'technical_setup'
+    if source == 'opportunity_ranker':
+        return 'technical_setup'
+    if source.startswith('content_portfolio_guard'):
+        return 'technical_setup'
+    return 'technical_setup'
+
+
+def prepare_candidate(candidate, source):
+    item = dict(candidate)
+    item['symbol'] = symbol(item)
+    item['category'] = infer_category(item, source)
+    item['lane'] = str(item.get('lane') or item['category'])
+    item['chart_symbols'] = [item['symbol']]
+    if not str(item.get('reason') or '').strip():
+        item['reason'] = f'Fresh {item["category"].replace("_", " ")} market opportunity for {base_symbol(item)}; validate the move before acting.'
+    if not str(item.get('instruction') or '').strip():
+        item['instruction'] = f'Explain the evidence for {base_symbol(item)}, the confirmation condition, and the invalidation condition; do not present the setup as guaranteed.'
+    return item
 
 
 def main():
@@ -156,15 +180,10 @@ def main():
             if s == portfolio_symbol:
                 print(f'Skipping stale portfolio candidate: {s}')
             continue
-
-        # A stale portfolio decision may not fall back to BTC/ETH. Those assets
-        # are only allowed when the portfolio itself deliberately selected them
-        # as a fresh story. They are never recovery assets after invalidation.
         if stale_portfolio and base_symbol(candidate) in {'BTC', 'ETH'}:
             print(f'Skipping reserve-asset recovery candidate: {base_symbol(candidate)}')
             continue
-
-        chosen = candidate
+        chosen = prepare_candidate(candidate, str(candidate.get('_freeze_source') or 'validated_candidate'))
         source = str(candidate.get('_freeze_source') or 'validated_candidate')
         break
 
@@ -176,7 +195,6 @@ def main():
         raise SystemExit(f'Frozen opportunity is not a currently trading Binance symbol: {usdt}')
 
     sym = usdt[:-4]
-    chosen = dict(chosen)
     chosen.pop('_freeze_source', None)
     chosen['symbol'] = usdt
     chosen_score = min(100.0, max(0.0, max(score(chosen), score(cadence))))
@@ -184,20 +202,26 @@ def main():
         chosen['selected_score'] = chosen_score
     pre['selected_opportunity'] = chosen
 
-    news_authoritative = bool(
-        chosen.get('news_title') and (
-            chosen.get('news_override')
-            or chosen.get('type') == 'news'
-            or chosen.get('category') in {'breaking_news', 'news_and_macro', 'news_market_impact'}
-        )
-    )
+    # Keep the authoritative content-director snapshot coherent with the frozen
+    # asset. This is essential for chart validation: a recovered market asset
+    # must not inherit the previous story's chart symbol/category.
+    director = pre.get('content_director_4')
+    if not isinstance(director, dict):
+        director = {}
+    primary = director.get('primary_story') if isinstance(director.get('primary_story'), dict) else {}
+    primary.update({'symbol': sym, 'category': chosen.get('category'), 'lane': chosen.get('lane'), 'chart_symbols': [sym], 'reason': chosen.get('reason'), 'instruction': chosen.get('instruction')})
+    director['primary_story'] = primary
+    pre['content_director_4'] = director
+
+    news_authoritative = bool(chosen.get('news_title') and (chosen.get('news_override') or chosen.get('type') == 'news' or chosen.get('category') in {'breaking_news', 'news_and_macro', 'news_market_impact'}))
     frozen = {
-        'version': 11,
+        'version': 12,
         'frozen_at': datetime.now(timezone.utc).isoformat(),
         'symbol': sym,
         'symbol_usdt': usdt,
         'binance_verified': True,
-        'category': chosen.get('category', ''),
+        'category': chosen.get('category', 'technical_setup'),
+        'lane': chosen.get('lane', chosen.get('category', 'technical_setup')),
         'reason': chosen.get('reason', ''),
         'instruction': chosen.get('instruction', ''),
         'score': chosen_score,
@@ -214,6 +238,7 @@ def main():
         'news_authoritative': news_authoritative,
         'news_title': chosen.get('news_title', ''),
         'news_source': chosen.get('news_source', chosen.get('source', '')),
+        'chart_symbols': [sym],
         'fallback_policy': 'NEVER_FALLBACK_TO_BTC',
         'recovery_policy': 'STALE_PORTFOLIO_ONLY_NON_BTC_RESEARCHED_CANDIDATES',
     }
