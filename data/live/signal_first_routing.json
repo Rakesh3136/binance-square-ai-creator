@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-12T10:46:42.002123+00:00",
-  "router_version": "1.2-signal-first",
+  "generated_at": "2026-09-12T11:08:14.354639+00:00",
+  "router_version": "1.3-signal-first-diversity-prediction",
   "publish": true,
   "decision": "PRIMARY_SIGNAL",
-  "reason": "qualified_capital_flow_or_outcome_signal_selected",
+  "reason": "qualified_non_repetitive_signal_selected",
   "primary_signal": true,
   "secondary_meme": false,
   "selected": {
@@ -17,6 +17,7 @@
   },
   "cadence_publish": true,
   "existing_category": "top_losers",
+  "blocked_candidates": [],
   "policy": {
     "primary_lane": "capital_flow_and_measurable_market_outcomes",
     "secondary_lane": "controlled_memes",
@@ -27,10 +28,19 @@
     ],
     "minimum_primary_score": 72.0,
     "minimum_flow_confidence": 65.0,
+    "prediction_required": [
+      "direction",
+      "entry_trigger",
+      "tp1",
+      "tp2",
+      "sl",
+      "confidence"
+    ],
     "target_meme_share_max": 0.25,
     "meme_cannot_displace_qualified_signal": true,
     "meme_quota_is_rolling_20_publications": true,
     "no_signal_means_no_signal_post": true,
-    "flow_requires_trigger_and_invalidation": true
+    "anti_repetition_window": 5,
+    "text_similarity_block": 0.72
   }
 }
