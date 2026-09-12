@@ -26,17 +26,9 @@ ASSET_MAX_RECENT = int(os.getenv("PORTFOLIO_ASSET_MAX_RECENT", "2"))
 SIMILARITY_BLOCK = float(os.getenv("PORTFOLIO_SIMILARITY_BLOCK", "0.58"))
 
 PRIMARY = {
-    "creator_signal_outcome",
-    "capital_flow_long",
-    "capital_flow_short",
-    "follow_up",
-    "technical_setup",
-    "top_gainers",
-    "top_losers",
-    "high_volatility",
-    "volume_leaders",
+    "creator_signal_outcome", "capital_flow_long", "capital_flow_short", "follow_up",
+    "technical_setup", "top_gainers", "top_losers", "high_volatility", "volume_leaders",
 }
-
 NON_SIGNAL = {"breaking_news", "news_and_macro", "watchlist", "comparison", "education", "crypto_meme"}
 STOPWORDS = {
     "the", "a", "an", "and", "or", "to", "of", "for", "in", "on", "with", "from",
@@ -70,6 +62,14 @@ def category(item: dict) -> str:
     return str(item.get("category") or item.get("lane") or item.get("content_category") or item.get("type") or "").lower()
 
 
+def lane_priority(cat: str) -> int:
+    if cat in PRIMARY:
+        return 2
+    if cat in NON_SIGNAL:
+        return 1 if cat != "crypto_meme" else 0
+    return 1
+
+
 def words(text: str) -> set[str]:
     raw = re.findall(r"[a-z0-9]{3,}", str(text or "").lower())
     return {x for x in raw if x not in STOPWORDS}
@@ -83,10 +83,7 @@ def similarity(left: str, right: str) -> float:
 
 
 def text_of(item: dict) -> str:
-    parts = [
-        item.get("topic"), item.get("title"), item.get("news_title"), item.get("hook"),
-        item.get("reason"), item.get("editorial_style"),
-    ]
+    parts = [item.get("topic"), item.get("title"), item.get("news_title"), item.get("hook"), item.get("reason"), item.get("editorial_style")]
     setup = item.get("trade_setup") or {}
     parts.extend([setup.get("side"), str(setup.get("trigger")), str(setup.get("invalidation"))])
     return " ".join(str(x or "") for x in parts if x)
@@ -124,11 +121,8 @@ def recent_same_category(rows: list[dict], cat: str) -> int:
 def is_material_followup(candidate: dict) -> bool:
     cat = category(candidate)
     return cat in {"creator_signal_outcome", "follow_up"} and bool(
-        candidate.get("proof_status")
-        or candidate.get("outcome")
-        or candidate.get("outcome_status")
-        or candidate.get("new_evidence")
-        or candidate.get("next_hook")
+        candidate.get("proof_status") or candidate.get("outcome") or candidate.get("outcome_status")
+        or candidate.get("new_evidence") or candidate.get("next_hook")
     )
 
 
@@ -141,15 +135,10 @@ def news_asset_evidence(candidate: dict) -> bool:
     s = symbol(candidate.get("symbol")).lower()
     if not s:
         return False
-    # Require the actual asset to appear in the supplied news evidence. This
-    # prevents generic crypto headlines from becoming arbitrary BTC stories.
     aliases = {
-        "btc": ["bitcoin", "$btc", "btc"],
-        "eth": ["ethereum", "$eth", "eth", "ether"],
-        "bnb": ["bnb", "binance coin"],
-        "sol": ["solana", "$sol", "sol"],
-        "xrp": ["xrp", "ripple"],
-        "doge": ["dogecoin", "$doge", "doge"],
+        "btc": ["bitcoin", "$btc", "btc"], "eth": ["ethereum", "$eth", "eth", "ether"],
+        "bnb": ["bnb", "binance coin"], "sol": ["solana", "$sol", "sol"],
+        "xrp": ["xrp", "ripple"], "doge": ["dogecoin", "$doge", "doge"],
     }
     names = aliases.get(s, [f"${s}", s])
     return any(re.search(r"(?<![a-z0-9])" + re.escape(name) + r"(?![a-z0-9])", title + " " + summary) for name in names)
@@ -187,6 +176,7 @@ def main() -> int:
         hard_block = False
         count = counts.get(s, 0)
         material_followup = is_material_followup(raw)
+        priority = lane_priority(cat)
 
         if not news_asset_evidence(raw):
             hard_block = True
@@ -210,16 +200,12 @@ def main() -> int:
             hard_block = True
             reasons.append(f"semantic_similarity_{max_sim:.2f}")
 
-        # Reward fresh assets and primary signal lanes, but never enough to
-        # override hard repetition blocks.
         if count == 0:
             score += 7
             reasons.append("new_asset_bonus")
-        if cat in PRIMARY:
-            score += 4
+        if priority == 2:
+            score += 8
             reasons.append("primary_signal_lane_bonus")
-        elif cat in NON_SIGNAL:
-            score += 0
         if cat in {"capital_flow_long", "capital_flow_short"} and num(raw.get("flow_confidence")) >= 70:
             score += 5
             reasons.append("high_flow_confidence_bonus")
@@ -228,6 +214,7 @@ def main() -> int:
             "candidate": raw,
             "score_before_guard": round(num(raw.get("ranker_score") or raw.get("score")), 2),
             "portfolio_score": round(score, 2),
+            "lane_priority": priority,
             "asset_recent_count": count,
             "recent_same_category": same_cat,
             "max_recent_semantic_similarity": round(max_sim, 3),
@@ -235,15 +222,20 @@ def main() -> int:
             "reasons": reasons,
         })
 
-    evaluated.sort(key=lambda x: (not x["hard_block"], x["portfolio_score"]), reverse=True)
     allowed = [x for x in evaluated if not x["hard_block"]]
-    chosen = allowed[0]["candidate"] if allowed else None
+    # Signal-first still wins: among non-blocked candidates, lane priority is
+    # considered before score, so a qualified signal is not displaced by a
+    # generic news item merely because the latter has a slightly higher score.
+    evaluated.sort(key=lambda x: (not x["hard_block"], x["lane_priority"], x["portfolio_score"]), reverse=True)
+    allowed.sort(key=lambda x: (x["lane_priority"], x["portfolio_score"]), reverse=True)
+    chosen_entry = allowed[0] if allowed else None
+    chosen = chosen_entry["candidate"] if chosen_entry else None
 
-    # Preserve a genuinely new protected outcome/follow-up when explicitly selected.
     if current and category(current) in {"creator_signal_outcome", "follow_up"} and is_material_followup(current):
         chosen = current
         decision = "PROTECTED_OUTCOME_OR_FOLLOWUP"
         reason = "material_outcome_update_is_allowed_to_revisit_a_recent_asset"
+        chosen_entry = None
     elif chosen:
         decision = "DIVERSIFIED_STORY_SELECTED"
         reason = "portfolio_manager_selected_the_best_non_repetitive_candidate"
@@ -255,16 +247,12 @@ def main() -> int:
     if publish:
         chosen = dict(chosen)
         chosen["portfolio_guard_selected"] = True
-        chosen["portfolio_score"] = round(max((x["portfolio_score"] for x in allowed if x["candidate"] is chosen), default=num(chosen.get("score"))), 2) if allowed else chosen.get("score", 0)
+        chosen["portfolio_score"] = round(chosen_entry["portfolio_score"], 2) if chosen_entry else num(chosen.get("score"))
         chosen["symbol"] = symbol(chosen.get("symbol")) + "USDT"
         pre["selected_opportunity"] = chosen
         pre["content_portfolio_guard"] = {
-            "decision": decision,
-            "reason": reason,
-            "selected_symbol": symbol(chosen.get("symbol")),
-            "selected_category": category(chosen),
-            "recent_asset_counts": counts,
-            "recent_window": len(recent),
+            "decision": decision, "reason": reason, "selected_symbol": symbol(chosen.get("symbol")),
+            "selected_category": category(chosen), "recent_asset_counts": counts, "recent_window": len(recent),
         }
         brief["authoritative_selection"] = chosen
         brief["portfolio_guard"] = pre["content_portfolio_guard"]
@@ -273,16 +261,13 @@ def main() -> int:
     else:
         pre["selected_opportunity"] = {}
         pre["content_portfolio_guard"] = {
-            "decision": decision,
-            "reason": reason,
-            "recent_asset_counts": counts,
-            "recent_window": len(recent),
+            "decision": decision, "reason": reason, "recent_asset_counts": counts, "recent_window": len(recent),
         }
         PREFLIGHT.write_text(json.dumps(pre, indent=2, ensure_ascii=False), encoding="utf-8")
 
     result = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "version": "1.0-content-portfolio",
+        "version": "1.1-content-portfolio",
         "publish": publish,
         "decision": decision,
         "reason": reason,
@@ -298,6 +283,7 @@ def main() -> int:
             "recent_window": RECENT_WINDOW,
             "semantic_similarity_block": SIMILARITY_BLOCK,
             "generic_news_cannot_create_btc_fallback": True,
+            "signal_lane_priority_over_generic_news": True,
             "wait_when_repetitive": True,
             "outcome_followups_can_revisit_asset": True,
         },
@@ -305,7 +291,7 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    return 0 if publish else 0
+    return 0
 
 
 if __name__ == "__main__":
