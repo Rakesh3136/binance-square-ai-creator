@@ -4,7 +4,6 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from datetime import timedelta
 from pathlib import Path
 
 OUTPUT = Path("data/live/news_snapshot.json")
@@ -18,26 +17,29 @@ FEEDS = [
 MAX_ITEMS_PER_FEED = 20
 MAX_NEWS_AGE_HOURS = 36
 
-KNOWN_ASSET_NAMES={
-    'bitcoin':'BTC','ethereum':'ETH','solana':'SOL','bnb':'BNB','xrp':'XRP','dogecoin':'DOGE','cardano':'ADA',
-    'tron':'TRX','avalanche':'AVAX','chainlink':'LINK','sui':'SUI','toncoin':'TON','polkadot':'DOT','litecoin':'LTC',
-    'shiba inu':'SHIB','pepe':'PEPE','uniswap':'UNI','aave':'AAVE','curve':'CRV','arbitrum':'ARB','optimism':'OP',
-    'aptos':'APT','near protocol':'NEAR','cosmos':'ATOM','injective':'INJ','sei':'SEI','celestia':'TIA',
-    'hedera':'HBAR','stellar':'XLM','secret network':'SCRT','terra classic':'LUNC','gold':'XAUUSD','silver':'XAGUSD',
-    'ondo':'ONDO','hyperliquid':'HYPE','uniswap':'UNI','chainlink':'LINK','aave':'AAVE','curve finance':'CRV'
+KNOWN_ASSET_NAMES = {
+    'bitcoin': 'BTC', 'ethereum': 'ETH', 'solana': 'SOL', 'bnb': 'BNB', 'xrp': 'XRP', 'dogecoin': 'DOGE', 'cardano': 'ADA',
+    'tron': 'TRX', 'avalanche': 'AVAX', 'chainlink': 'LINK', 'sui': 'SUI', 'toncoin': 'TON', 'polkadot': 'DOT', 'litecoin': 'LTC',
+    'shiba inu': 'SHIB', 'pepe': 'PEPE', 'uniswap': 'UNI', 'aave': 'AAVE', 'curve': 'CRV', 'arbitrum': 'ARB', 'optimism': 'OP',
+    'aptos': 'APT', 'near protocol': 'NEAR', 'cosmos': 'ATOM', 'injective': 'INJ', 'sei': 'SEI', 'celestia': 'TIA',
+    'hedera': 'HBAR', 'stellar': 'XLM', 'secret network': 'SCRT', 'terra classic': 'LUNC', 'gold': 'XAUUSD', 'silver': 'XAGUSD',
+    'ondo': 'ONDO', 'hyperliquid': 'HYPE', 'binance coin': 'BNB',
 }
 
+
 def extract_symbols(text: str) -> list[str]:
-    found=[]
-    upper=(text or '').upper()
-    for m in re.findall(r'\\$([A-Z][A-Z0-9]{0,14})\\b',upper):
-        if m not in found: found.append(m)
-    lower=(text or '').lower()
-    for name,sym in KNOWN_ASSET_NAMES.items():
-        if name in lower and sym not in found: found.append(sym)
+    found = []
+    upper = text or ''
+    for match in re.findall(r'\$([A-Z][A-Z0-9]{0,14})(?:USDT)?\b', upper.upper()):
+        if match not in found:
+            found.append(match)
+    lower = upper.lower()
+    for name, sym in sorted(KNOWN_ASSET_NAMES.items(), key=lambda item: -len(item[0])):
+        if re.search(r'(?<![a-z0-9])' + re.escape(name) + r'(?![a-z0-9])', lower) and sym not in found:
+            found.append(sym)
     return found[:5]
 
-KEYWORD_WEIGHTS={
+KEYWORD_WEIGHTS = {
     'hack':24,'exploit':24,'breach':22,'etf':20,'sec':18,'fed':18,'rate':14,'inflation':14,
     'tariff':12,'regulation':16,'lawsuit':16,'listing':18,'delist':20,'launch':12,'upgrade':12,
     'partnership':10,'whale':12,'liquidation':16,'airdrop':14,'unlock':14,'approval':18,
@@ -65,10 +67,7 @@ def score_article(title: str, summary: str, category: str, published_at: str | N
 
 
 def fetch(url: str) -> bytes:
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "BinanceSquareAI/1.0 contact=public-research-agent"},
-    )
+    request = urllib.request.Request(url, headers={"User-Agent": "BinanceSquareAI/1.0 contact=public-research-agent"})
     with urllib.request.urlopen(request, timeout=20) as response:
         return response.read()
 
@@ -96,16 +95,17 @@ def parse_feed(source: str, category: str, payload: bytes) -> list[dict]:
         pub = text(item.find("pubDate")) or text(item.find("published")) or text(item.find("updated"))
         if not title or not link:
             continue
-        dt=parse_date(pub)
+        dt = parse_date(pub)
         if dt:
             try:
-                age=(datetime.now(timezone.utc)-datetime.fromisoformat(dt)).total_seconds()/3600
+                age = (datetime.now(timezone.utc)-datetime.fromisoformat(dt)).total_seconds()/3600
                 if age < -1 or age > MAX_NEWS_AGE_HOURS:
                     continue
             except Exception:
                 continue
         else:
             continue
+        evidence_text = title + ' ' + description[:1200]
         items.append({
             "source": source,
             "category": category,
@@ -113,7 +113,7 @@ def parse_feed(source: str, category: str, payload: bytes) -> list[dict]:
             "url": link,
             "summary": description[:1200],
             "published_at": parse_date(pub),
-            "symbols": extract_symbols(title + ' ' + description),
+            "symbols": extract_symbols(evidence_text),
             "news_score": score_article(title, description[:1200], category, dt),
         })
     return items
@@ -155,7 +155,7 @@ def main() -> None:
         "failures": failures,
         "sources": snapshot["sources"],
         "output": str(OUTPUT),
-    }, indent=2, ensure_ascii=False))
+    }, indent=2))
 
 
 if __name__ == "__main__":
