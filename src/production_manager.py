@@ -3,7 +3,7 @@ from __future__ import annotations
 import json,os,re,subprocess,sys
 from datetime import datetime
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1];REPORT_DIR=ROOT/'data/reports';STATUS_PATH=ROOT/'data/live/creator_status.json';PREFLIGHT_PATH=ROOT/'data/live/editorial_preflight.json';CONTEXT_PATH=ROOT/'data/live/publication_context.json';INTEL_PATH=ROOT/'data/live/creator_intelligence_2.json';GATE_PATH=ROOT/'data/live/engagement_gate.json';VISUAL_META=ROOT/'data/live/visual_metadata.json';VISUAL=ROOT/'data/live/visual.png';FROZEN_PATH=ROOT/'data/live/authoritative_opportunity.json';CADENCE_PATH=ROOT/'data/live/autonomous_cadence_6.json';ELITE_PATH=ROOT/'data/live/elite_prepublication_judge.json';AUDIT_PATH=Path('/tmp/publish_gate.json')
+ROOT=Path(__file__).resolve().parents[1];REPORT_DIR=ROOT/'data/reports';STATUS_PATH=ROOT/'data/live/creator_status.json';PREFLIGHT_PATH=ROOT/'data/live/editorial_preflight.json';CONTEXT_PATH=ROOT/'data/live/publication_context.json';INTEL_PATH=ROOT/'data/live/creator_intelligence_2.json';GATE_PATH=ROOT/'data/live/engagement_gate.json';VISUAL_META=ROOT/'data/live/visual_metadata.json';VISUAL=ROOT/'data/live/visual.png';FROZEN_PATH=ROOT/'data/live/authoritative_opportunity.json';CADENCE_PATH=ROOT/'data/live/autonomous_cadence_6.json';ELITE_PATH=ROOT/'data/live/elite_prepublication_judge.json';ASSET_LOCK=ROOT/'src/final_asset_lock.py';AUDIT_PATH=Path('/tmp/publish_gate.json')
 QUALITY_THRESHOLD=68.0;OPPORTUNITY_THRESHOLD=60.0;RESCUE_QUALITY_THRESHOLD=75.0;MAX_AGE_SECONDS=20*60;NONCHART={'crypto_meme','market_meme','trader_humor','education','commentary','community','result_followup'}
 def load(path,default=None):
     if not Path(path).exists():return {} if default is None else default
@@ -48,16 +48,21 @@ def choose_mode():
     ctx=load(CONTEXT_PATH);mode=str(ctx.get('publication_mode') or '').lower();cat=category()
     if mode in {'article','image'}:return mode
     return 'article' if cat in {'breaking_news','news_and_macro','macro'} else 'image'
+def final_asset_ok(report):
+    env=dict(os.environ);env['DRAFT_PATH']=str(report)
+    result=subprocess.run([sys.executable,str(ASSET_LOCK)],cwd=ROOT,env=env,check=False)
+    return result.returncode==0
 def evaluate(report):
     data=load(report);draft=data.get('draft') or {};post=str(draft.get('post') or draft.get('text') or '').strip();rescue=data.get('publish_rescue') is True;ctx=load(CONTEXT_PATH);cat=category();expected=authoritative_symbol(data)
+    asset_ok=final_asset_ok(report)
     try:
         from engagement_quality_gate import evaluate as gate;interaction=gate(post,{'type':'none','use_visual':False} if cat in NONCHART else {'type':'candlestick_chart','use_visual':True,'provider':'TradingView'})
     except Exception as exc:interaction={'score':0,'publish':False,'reasons':[f'quality_gate_error:{type(exc).__name__}']}
     try:quality=float(draft.get('quality_score') or interaction.get('score') or 0)
     except:quality=float(interaction.get('score') or 0)
     intelligence=load(INTEL_PATH);elite=load(ELITE_PATH);intelligence_ok=(cat=='result_followup') or intelligence.get('publish_recommendation') is True;opportunity=opportunity_score(data);chart_ok=cat in NONCHART or visual_is_verified(expected);coherent=content_is_coherent(post,expected,cat);failures=list(elite.get('failures') or []) if isinstance(elite,dict) else [];hard_elite={'malformed_statistics_phrase','repetitive_feed_template','template_phrase_density','repeats_recent_published_sentence','policy_language_failure'};rescue_forbidden=bool(set(failures)&hard_elite);threshold=RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD
-    eligible=bool(post) and coherent and quality>=threshold and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok and (rescue or (intelligence_ok and (data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' or cat=='result_followup'))) and not rescue_forbidden
-    mode=choose_mode();audit={'version':'5.4','draft':str(report),'publish':eligible,'mode':mode,'category':cat,'quality_score':quality,'quality_threshold':threshold,'opportunity_score':opportunity,'interaction_gate':interaction,'tradingview_required':cat not in NONCHART,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'content_coherent':coherent,'rescue':rescue,'elite_failures':failures,'rescue_forbidden':rescue_forbidden,'reason':'publish_eligible' if eligible else 'gate_rejected'};AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False));GATE_PATH.write_text(json.dumps(interaction,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
+    eligible=bool(post) and asset_ok and coherent and quality>=threshold and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok and (rescue or (intelligence_ok and (data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' or cat=='result_followup'))) and not rescue_forbidden
+    mode=choose_mode();audit={'version':'5.5','draft':str(report),'publish':eligible,'mode':mode,'category':cat,'quality_score':quality,'quality_threshold':threshold,'opportunity_score':opportunity,'interaction_gate':interaction,'final_asset_lock':asset_ok,'tradingview_required':cat not in NONCHART,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'content_coherent':coherent,'rescue':rescue,'elite_failures':failures,'rescue_forbidden':rescue_forbidden,'reason':'publish_eligible' if eligible else 'gate_rejected'};AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False));GATE_PATH.write_text(json.dumps(interaction,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
 def rescue_status():STATUS_PATH.parent.mkdir(parents=True,exist_ok=True);STATUS_PATH.write_text(json.dumps({'status':'LOCAL_FALLBACK_SUCCESS','generation_mode':'LOCAL_FALLBACK','reason':'Bounded deterministic rescue'},indent=2),encoding='utf-8')
 def main():
     report=fresh_report()
