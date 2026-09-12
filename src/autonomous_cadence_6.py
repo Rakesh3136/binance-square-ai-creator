@@ -141,9 +141,6 @@ def main() -> None:
     action = "wait_for_stronger_or_fresher_opportunity"
     cooldown_minutes = 0
 
-    # Human-like cadence: event-driven rather than quota-driven. Exceptional
-    # ACT_NOW opportunities may use a short spacing override, but still must
-    # pass every downstream content, safety, visual and publication gate.
     if manual:
         publish = True
         decision = "PUBLISH"
@@ -266,8 +263,34 @@ def main() -> None:
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # Signal-first routing is the final cadence authority: it can only tighten
+    # publication, never loosen safety or quality. Memes are fallback-only.
+    router = ROOT / "src/signal_first_router.py"
+    try:
+        proc = subprocess.run([sys.executable, str(router)], cwd=ROOT, capture_output=True, text=True, timeout=30)
+        if proc.stdout:
+            print(proc.stdout, end="")
+        if proc.returncode == 0:
+            routed = load(OUT)
+            route = load(ROOT / "data/live/signal_first_routing.json")
+            result["signal_first_routing"] = route
+            if route.get("publish") is False:
+                result["publish"] = False
+                result["decision"] = route.get("decision", "WAIT")
+                result["strategic_action"] = "signal_first_wait_or_research"
+                result["reasons"] = reasons + [route.get("reason", "signal_first_router")]
+            elif route.get("primary_signal"):
+                result["signal_first_routing"] = route
+                result["reasons"] = reasons + ["signal_first_primary_lane"]
+            OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+        else:
+            print("signal_first_router_failed; preserving cadence decision")
+    except Exception as exc:
+        print(f"signal_first_router_unavailable={exc}")
+
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    print(f"publish={'true' if publish else 'false'}")
+    print(f"publish={'true' if result.get('publish') else 'false'}")
 
 
 if __name__ == "__main__":
