@@ -294,10 +294,21 @@ jobs:
       - name: Persist run state and diagnostics
         if: ${{ always() }}
         run: |
-          python src/creator_diagnostics.py || true
+          if [ -f src/creator_diagnostics.py ]; then
+            python src/creator_diagnostics.py || true
+          else
+            echo 'creator_diagnostics.py not present; skipping legacy diagnostics hook'
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Re-anchor the working tree to the newest main before staging generated state.
+          # This avoids rebasing a large generated-data commit after another cycle advanced main.
+          git fetch origin main
+          git reset --mixed origin/main
           git add analytics data
-          git diff --cached --quiet || git commit -m 'Record Creator 7.x cycle'
-          git pull --rebase --autostash origin main
-          git push origin main || true
+          if git diff --cached --quiet; then
+            echo 'No generated state changes to persist'
+          else
+            git commit -m 'Record Creator 7.x cycle'
+            git push origin HEAD:main
+          fi
