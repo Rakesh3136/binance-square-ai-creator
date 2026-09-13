@@ -1,10 +1,10 @@
 {
-  "version": "6.4",
-  "generated_at": "2026-09-13T05:27:35.809802+00:00",
+  "version": "6.5",
+  "generated_at": "2026-09-13T10:19:44.880734+00:00",
   "selected": {
     "category": "top_losers",
     "symbol": "PERL",
-    "reason": "Creator 6.4 evidence ranker + early-mover discovery + bounded audience preference selected the strongest eligible opportunity.",
+    "reason": "Creator 6.5 evidence ranker + live-symbol validation + early-mover discovery + bounded audience preference selected the strongest eligible opportunity.",
     "score": 100,
     "lane": "market",
     "ranker_score": 100.0,
@@ -47,19 +47,6 @@
       "symbol": "DREP",
       "score": 100,
       "reason": "live market anomaly with supplied evidence",
-      "has_chart": true,
-      "data_quality": "OK",
-      "ranker_score": 100.0,
-      "chartable": true,
-      "audience_learning_adjustment": 0.0,
-      "audience_learning_note": "No audience-learning adjustment available."
-    },
-    {
-      "type": "market",
-      "category": "top_losers",
-      "symbol": "DATA",
-      "score": 100,
-      "reason": "live market anomaly with supplied evidence",
       "has_chart": false,
       "data_quality": "LIMITED",
       "ranker_score": 100.0,
@@ -71,6 +58,19 @@
       "type": "market",
       "category": "top_gainers",
       "symbol": "PNT",
+      "score": 100,
+      "reason": "live market anomaly with supplied evidence",
+      "has_chart": false,
+      "data_quality": "LIMITED",
+      "ranker_score": 100.0,
+      "chartable": true,
+      "audience_learning_adjustment": 0.0,
+      "audience_learning_note": "No audience-learning adjustment available."
+    },
+    {
+      "type": "market",
+      "category": "top_losers",
+      "symbol": "WING",
       "score": 100,
       "reason": "live market anomaly with supplied evidence",
       "has_chart": false,
@@ -174,6 +174,19 @@
     {
       "type": "market",
       "category": "top_losers",
+      "symbol": "BETA",
+      "score": 100,
+      "reason": "live market anomaly with supplied evidence",
+      "has_chart": false,
+      "data_quality": "LIMITED",
+      "ranker_score": 100.0,
+      "chartable": true,
+      "audience_learning_adjustment": 0.0,
+      "audience_learning_note": "No audience-learning adjustment available."
+    },
+    {
+      "type": "market",
+      "category": "top_losers",
       "symbol": "CHESS",
       "score": 100,
       "reason": "live market anomaly with supplied evidence",
@@ -239,19 +252,6 @@
     {
       "type": "market",
       "category": "top_gainers",
-      "symbol": "STEEM",
-      "score": 100,
-      "reason": "live market anomaly with supplied evidence",
-      "has_chart": false,
-      "data_quality": "LIMITED",
-      "ranker_score": 100.0,
-      "chartable": true,
-      "audience_learning_adjustment": 0.0,
-      "audience_learning_note": "No audience-learning adjustment available."
-    },
-    {
-      "type": "market",
-      "category": "top_gainers",
       "symbol": "CREAM",
       "score": 100,
       "reason": "live market anomaly with supplied evidence",
@@ -277,8 +277,8 @@
     },
     {
       "type": "market",
-      "category": "top_gainers",
-      "symbol": "STEEM",
+      "category": "top_losers",
+      "symbol": "NFP",
       "score": 100,
       "reason": "live market anomaly with supplied evidence",
       "has_chart": false,
@@ -291,7 +291,7 @@
     {
       "type": "market",
       "category": "top_losers",
-      "symbol": "NFP",
+      "symbol": "BETA",
       "score": 100,
       "reason": "live market anomaly with supplied evidence",
       "has_chart": false,
@@ -413,6 +413,8 @@
       "audience_learning_note": "No audience-learning adjustment available."
     }
   ],
+  "stale_candidates_rejected": [],
+  "live_symbol_universe_size": 56,
   "early_mover_discovery": {
     "enabled": true,
     "candidates": [
@@ -475,6 +477,26 @@
         "chartable": true,
         "audience_learning_adjustment": 0.0,
         "audience_learning_note": "No audience-learning adjustment available."
+      },
+      {
+        "category": "next_loser_candidate",
+        "lane": "next_loser_candidate",
+        "symbol": "ZEC",
+        "score": 68.98,
+        "ranker_score": 68.98,
+        "price_change_percent": -4.998,
+        "directional_move": -4.998,
+        "intraday_range_percent": 8.4389,
+        "quote_volume_usdt": 319404872.8,
+        "content_signal_score": 39.04,
+        "reason": "early participation and price-structure acceleration; candidate requires confirmation",
+        "early_mover": true,
+        "confirmation_required": true,
+        "evidence": [],
+        "has_1h_ohlcv": false,
+        "chartable": true,
+        "audience_learning_adjustment": 0.0,
+        "audience_learning_note": "No audience-learning adjustment available."
       }
     ],
     "method": "price acceleration + participation + range + derivatives/orderbook confirmation",
@@ -492,13 +514,12 @@
     "only_terminal_win_allowed": true
   },
   "policy": [
-    "Market/news/early-mover candidates compete on one score.",
+    "All candidate symbols must exist in the fresh Binance market universe.",
     "Early movers are conditional discovery candidates, not guaranteed predictions.",
-    "An early mover must have measurable participation/structure evidence and a confirmation condition.",
-    "Already-extreme moves are discounted so the lane seeks earlier opportunities rather than simply copying the current leaderboard.",
+    "Already-extreme moves are discounted so the lane seeks earlier opportunities.",
     "Audience learning only changes bounded testing preference.",
-    "Verified prediction outcomes are published only as transparent proof when a terminal WIN exists.",
-    "News without an evidence-backed asset symbol cannot become the primary TradingView story.",
+    "Verified outcomes are shown only when a terminal WIN exists and its asset remains live.",
+    "News without an evidence-backed live asset cannot become the primary TradingView story.",
     "No missing evidence is invented."
   ]
 }
