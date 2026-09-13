@@ -156,6 +156,7 @@ jobs:
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
           python src/freeze_opportunity.py
+          python src/early_setup_gate.py
           python src/opportunity_contract_gate.py
           python src/creator_brain.py
           python src/creator_brain_gate.py
@@ -258,83 +259,45 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          if [ "${{ steps.visual_mode.outputs.mode }}" = 'tradingview' ]; then
-            npm install --no-save playwright@1.55.0
-            npx playwright install --with-deps chromium
-          fi
-          python src/visual_renderer.py
-          test -s data/live/visual.png
-          if [ "${{ steps.visual_mode.outputs.mode }}" = 'tradingview' ]; then
-            python src/validate_visual.py
-            python src/validate_tradingview_visual.py data/live/visual.png
+          if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then
+            python src/meme_renderer.py
           else
-            python - <<'PY'
-          from PIL import Image
-          im=Image.open('data/live/visual.png')
-          assert im.width >= 1000 and im.height >= 500
-          print({'status':'MEME_VISUAL_VALID','size':im.size})
-          PY
+            npm install --no-save playwright
+            npx playwright install --with-deps chromium
+            node src/tradingview_renderer.mjs
           fi
-      - name: Run final production gate
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
-        id: gate
+          test -s data/live/visual.png
+          python src/validate_visual.py
+          if [ "${{ steps.visual_mode.outputs.mode }}" = "tradingview" ]; then python src/validate_tradingview_visual.py data/live/visual.png; fi
+          python src/pipeline_stage.py visual success 'Professional visual package rendered and validated'
+      - name: Final production gate
+        id: production
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          set +e
           python src/production_manager.py
-          rc=$?
-          set -e
-          if [ ! -f /tmp/publish_gate.json ]; then
-            echo 'publish=false' >> "$GITHUB_OUTPUT"
-            echo 'mode=image' >> "$GITHUB_OUTPUT"
-            exit "$rc"
-          fi
-          publish=$(python -c 'import json; print(str(json.load(open("/tmp/publish_gate.json")).get("publish", False)).lower())')
-          mode=$(python -c 'import json; print(json.load(open("/tmp/publish_gate.json")).get("mode", "image"))')
+          publish=$(python -c 'import json; print(str(json.load(open("data/live/production_decision.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          if [ "$publish" = 'true' ]; then python src/pipeline_stage.py quality_gate success 'Publication authorized'; else python src/pipeline_stage.py quality_gate blocked 'Publication blocked by production gate'; fi
-          exit 0
-      - name: Extract publication text
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
-        id: draft
+          echo "Final production decision: $publish"
+      - name: Extract publication and submit to Binance Square
+        if: ${{ steps.production.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-        run: python src/extract_publication.py
-      - name: Publish to Binance Square — only publisher
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
-        env:
-          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
-        run: python src/binance_square_publisher.py
-      - name: Verify publication truth and bind experiment
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
+          BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY }}
         run: |
+          python src/extract_publication.py
+          python src/binance_square_publisher.py
           python src/creator_20_0_publication_verifier.py
           python src/call_tracker.py
-          python src/creator_24_0_unified_ledger.py
-          python - <<'PY'
-          import json, sys
-          from pathlib import Path
-          p=Path('data/live/creator_20_0_publication_truth.json')
-          data=json.loads(p.read_text()) if p.exists() else {}
-          truth=data.get('truth_state')
-          if truth not in {'VERIFIED_PUBLISHED','SUBMITTED_UNKNOWN'}:
-              print('Publication truth gate failed:', truth)
-              sys.exit(1)
-          if truth == 'SUBMITTED_UNKNOWN':
-              print('Publication submitted; Binance returned the documented post-submit 504, so no post_id is available. No retry will be attempted.')
-          else:
-              print('Publication truth confirmed:', data.get('latest_publication',{}).get('post_id'))
-          PY
-          python src/pipeline_stage.py publish success 'Published/submitted to Binance Square; publication state recorded'
-      - name: Final diagnostics and state persistence
-        if: always()
+          python src/creator_8_0_revenue_engine.py
+      - name: Persist run state and diagnostics
+        if: ${{ always() }}
         run: |
-          python src/creator_24_0_unified_ledger.py || true
-          python src/pipeline_stage.py diagnostics success 'Single orchestrator cycle completed' || true
-          git status --short
-          git add analytics data/live data/intelligence
-          git diff --cached --quiet || (git config user.name 'github-actions[bot]' && git config user.email '41898282+github-actions[bot]@users.noreply.github.com' && git commit -m 'Record autonomous creator cycle') || true
-          git pull --rebase --autostash origin main || true
+          python src/creator_diagnostics.py || true
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analytics data
+          git diff --cached --quiet || git commit -m 'Record Creator 7.x cycle'
+          git pull --rebase --autostash origin main
           git push origin main || true
