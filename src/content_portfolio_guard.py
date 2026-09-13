@@ -1,4 +1,4 @@
-"""Portfolio guard with publication-truth-aware deduplication."""
+"""Portfolio guard with publication-truth-aware deduplication and defensive record normalization."""
 from __future__ import annotations
 import json, os, re
 from datetime import datetime, timezone, timedelta
@@ -16,18 +16,20 @@ def num(v,d=0.0):
     try:return float(v)
     except (TypeError,ValueError):return d
 def symbol(v):return str(v or '').upper().replace('BINANCE:','').replace('$','').strip().removesuffix('USDT')
-def category(item):return str(item.get('category') or item.get('lane') or item.get('content_category') or item.get('type') or '').lower()
+def category(item):return str(item.get('category') or item.get('lane') or item.get('content_category') or item.get('type') or '').lower() if isinstance(item,dict) else ''
 def lane_priority(cat):return 2 if cat in PRIMARY else (0 if cat=='crypto_meme' else 1)
 def words(text):return {x for x in re.findall(r'[a-z0-9]{3,}',str(text or '').lower()) if x not in STOPWORDS}
 def similarity(a,b):
     x,y=words(a),words(b); return len(x&y)/max(1,len(x|y)) if x and y else 0.0
 def text_of(item):
+    if not isinstance(item,dict):return ''
     setup=item.get('trade_setup') or {}
     if not isinstance(setup,dict): setup={}
     evidence=item.get('evidence')
     if isinstance(evidence,(list,dict)): evidence=json.dumps(evidence,ensure_ascii=False)
     return ' '.join(str(x or '') for x in [item.get('topic'),item.get('title'),item.get('news_title'),item.get('hook'),item.get('reason'),item.get('editorial_style'),setup.get('side'),setup.get('trigger'),setup.get('invalidation'),evidence])
 def parse_time(row):
+    if not isinstance(row,dict):return None
     raw=row.get('published_at') or row.get('timestamp') or ''
     try:
         dt=datetime.fromisoformat(str(raw).replace('Z','+00:00'))
@@ -45,28 +47,32 @@ def recent_publications():
 def asset_counts(rows):
     out={}
     for r in rows:
+        if not isinstance(r,dict):continue
         s=symbol(r.get('symbol') or r.get('selected_lane_symbol'))
         if s:out[s]=out.get(s,0)+1
     return out
 def material_followup(c):
+    if not isinstance(c,dict):return False
     return category(c) in {'creator_signal_outcome','follow_up'} and bool(c.get('proof_status') or c.get('outcome') or c.get('outcome_status') or c.get('new_evidence') or c.get('next_hook'))
 def news_supported(c):
+    if not isinstance(c,dict):return False
     if category(c) not in {'breaking_news','news_and_macro','news_market_impact','news'}:return True
     s=symbol(c.get('symbol')).lower(); blob=(str(c.get('title') or '')+' '+str(c.get('news_title') or '')+' '+str(c.get('summary') or '')).lower()
     return bool(s) and bool(re.search(r'(?<![a-z0-9])(?:\$?'+re.escape(s)+r')(?![a-z0-9])',blob))
-def candidate_key(c):return f'{symbol(c.get("symbol"))}|{category(c)}|{str(c.get("type") or "").lower()}'
+def candidate_key(c):return f'{symbol(c.get("symbol"))}|{category(c)}|{str(c.get("type") or "").lower()}' if isinstance(c,dict) else ''
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); current=pre.get('selected_opportunity') or {}; current=current if isinstance(current,dict) else {}; recent=recent_publications(); counts=asset_counts(recent); recent_texts=[text_of(r) for r in recent[-8:]]
     ranked=[x for x in (brief.get('ranked_stories') or []) if isinstance(x,dict) and symbol(x.get('symbol'))]
     extra=(pre.get('opportunity_ranking_6') or {}).get('top_candidates') or []; ranked += [x for x in extra if isinstance(x,dict) and symbol(x.get('symbol'))]
     evaluated=[]; seen=set(); now=datetime.now(timezone.utc)
     for raw in ranked:
+        if not isinstance(raw,dict):continue
         s=symbol(raw.get('symbol')); cat=category(raw); key=candidate_key(raw)
-        if key in seen:continue
+        if not s or key in seen:continue
         seen.add(key); base=num(raw.get('ranker_score') or raw.get('score')); score=base; reasons=[]; blocked=False; count=counts.get(s,0); follow=material_followup(raw)
         if base<MIN_SCORE:continue
         if not news_supported(raw):blocked=True;reasons.append('news_asset_not_explicitly_supported')
-        last_same=[r for r in recent if symbol(r.get('symbol') or r.get('selected_lane_symbol'))==s]
+        last_same=[r for r in recent if isinstance(r,dict) and symbol(r.get('symbol') or r.get('selected_lane_symbol'))==s]
         within_window=False
         for r in last_same:
             t=parse_time(r)
@@ -74,7 +80,7 @@ def main():
         if within_window and not follow:blocked=True;reasons.append('same_asset_recently_published')
         if s=='BTC' and count>=BTC_MAX_RECENT and not follow:blocked=True;reasons.append(f'btc_overexposed_{count}_recent_posts')
         elif count>=ASSET_MAX_RECENT and not follow:blocked=True;reasons.append(f'asset_overexposed_{count}_recent_posts')
-        same_cat=sum(1 for r in recent[-5:] if category(r)==cat)
+        same_cat=sum(1 for r in recent[-5:] if isinstance(r,dict) and category(r)==cat)
         if same_cat>=2 and cat not in {'creator_signal_outcome','follow_up'}:score-=6;reasons.append('category_repeat_penalty')
         sim=max((similarity(text_of(raw),text_of(r)) for r in recent_texts),default=0.0)
         if sim>=SIMILARITY_BLOCK and not follow:blocked=True;reasons.append(f'semantic_similarity_{sim:.2f}')
@@ -90,6 +96,6 @@ def main():
     if publish:
         chosen=dict(chosen);chosen['portfolio_guard_selected']=True;chosen['portfolio_score']=round(chosen_entry['portfolio_score'],2) if chosen_entry else num(chosen.get('score'));chosen['symbol']=symbol(chosen.get('symbol'))+'USDT';pre['selected_opportunity']=chosen;brief['authoritative_selection']=chosen;brief['portfolio_guard']={'decision':decision,'reason':reason,'selected_symbol':symbol(chosen.get('symbol')),'selected_category':category(chosen),'recent_asset_counts':counts,'recent_window':len(recent)};PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8');DIRECTOR.write_text(json.dumps(brief,indent=2,ensure_ascii=False),encoding='utf-8')
     else:pre['selected_opportunity']={};PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'version':'1.4-robust-publication-truth-dedupe','publish':publish,'decision':decision,'reason':reason,'selected':chosen,'recent_asset_counts':counts,'recent_window':len(recent),'candidates_considered':len(evaluated),'blocked_candidates':[x for x in evaluated if x['hard_block']][:20],'top_allowed_candidates':allowed[:12],'policy':{'btc_max_recent_posts':BTC_MAX_RECENT,'asset_max_recent_posts':ASSET_MAX_RECENT,'same_asset_cooldown_hours':SAME_ASSET_HOURS,'publication_statuses_counted':['PUBLISHED_AUTONOMOUSLY','PUBLISHED_VERIFIED_BY_API_RESPONSE','PUBLISHED_SUBMITTED_504','VERIFIED_PUBLISHED'],'semantic_similarity_block':SIMILARITY_BLOCK,'generic_news_cannot_create_btc_fallback':True,'wait_when_repetitive':True,'outcome_followups_can_revisit_asset':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'version':'1.5-defensive-record-normalization','publish':publish,'decision':decision,'reason':reason,'selected':chosen,'recent_asset_counts':counts,'recent_window':len(recent),'candidates_considered':len(evaluated),'blocked_candidates':[x for x in evaluated if x['hard_block']][:20],'top_allowed_candidates':allowed[:12],'policy':{'btc_max_recent_posts':BTC_MAX_RECENT,'asset_max_recent_posts':ASSET_MAX_RECENT,'same_asset_cooldown_hours':SAME_ASSET_HOURS,'publication_statuses_counted':['PUBLISHED_AUTONOMOUSLY','PUBLISHED_VERIFIED_BY_API_RESPONSE','PUBLISHED_SUBMITTED_504','VERIFIED_PUBLISHED'],'semantic_similarity_block':SIMILARITY_BLOCK,'generic_news_cannot_create_btc_fallback':True,'wait_when_repetitive':True,'outcome_followups_can_revisit_asset':True,'malformed_records_fail_closed':True}}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(result,indent=2,ensure_ascii=False));return 0
 if __name__=='__main__':raise SystemExit(main())
