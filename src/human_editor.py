@@ -2,6 +2,8 @@
 
 The editor is a preservation layer, not a second author. It performs only
 truth-preserving cleanup and rejects obvious template/generated-prose artifacts.
+A rejected draft is a normal fail-closed editorial decision, not a workflow
+error: downstream production gates must record the block and wait.
 """
 from __future__ import annotations
 import json, os, re
@@ -32,6 +34,14 @@ def title_assets(title):
         if re.search(r'(?<![a-z0-9])'+re.escape(name)+r'(?![a-z0-9])',low) and sym not in found: found.append(sym)
     return found
 
+def write_block(report,path,reason,count):
+    OUT.parent.mkdir(parents=True,exist_ok=True)
+    result={'status':'BLOCKED','version':'human-editor-v18','hook_preserved':False,'question_count':count,'reason':reason,'draft_path':str(path),'fail_closed':True,'edited_at':datetime.now(timezone.utc).isoformat()}
+    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
+    report.setdefault('draft',{})['human_editor']={'status':'BLOCKED','version':'human-editor-v18','question_count':count,'reason':reason,'fail_closed':True,'edited_at':result['edited_at']}
+    path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
+    print(json.dumps(result,ensure_ascii=False))
+
 def clean_question_count(text, original_question):
     lines=[norm(x) for x in text.splitlines() if norm(x)]
     qs=[x for x in lines if '?' in x]
@@ -49,7 +59,6 @@ def strip_unsupported_cashtags(text,allowed):
     return text.strip()
 
 def surgical_cleanup(text):
-    # Repair obvious model repetition without changing the underlying fact.
     text=re.sub(r'\b(the market market|price price|volume volume|crypto crypto)\b',lambda m:m.group(1).split()[0],text,flags=re.I)
     text=re.sub(r'\b(spot volume)\s+is\s+(\$[\d,.]+[KMB]?)\s+spot volume\b',r'\1 is \2',text,flags=re.I)
     text=re.sub(r'\b(\$[\d,.]+[KMB]?)\s+spot volume\s+with\b',r'\1 in spot volume, with',text,flags=re.I)
@@ -62,7 +71,6 @@ def repetition_artifact(text):
     low=re.sub(r'\s+',' ',text.lower()).strip()
     hits=sum(1 for p in GENERIC_PHRASES if p in low)
     template_hits=sum(1 for p in TEMPLATE_SENTENCES if p in low)
-    # This exact structure is the kind of feed spam we must not publish.
     fixed_drop=bool(re.search(r'\$[a-z0-9]+\s+just dropped\s+[\d.]+%\s*[—-]\s*now the reaction matters',low))
     fixed_cases=bool(re.search(r'bear case:.*bull case:.*would you (watch|wait)',low))
     return hits,template_hits,fixed_drop or fixed_cases
@@ -90,17 +98,16 @@ def main():
     hook_preserved=(norm(first_before)==norm(first_after))
     generic_found=[p for p in GENERIC_PHRASES if p in edited.lower()]
     hits,template_hits,hard_template=repetition_artifact(edited)
-    warnings=[]
-    if not hook_preserved: warnings.append('hook_changed_by_cleanup')
-    if generic_found: warnings.append('generic_phrase_present')
     if hard_template:
-        # Fail closed: this content needs regeneration, not cosmetic editing.
-        raise SystemExit('Human editor rejected repetitive feed-template prose; regenerate from the story-specific brief')
+        write_block(report,path,'repetitive_feed_template',edited.count('?'))
+        return 0
     questions=re.findall(r'[^\n.!?]*\?',edited)
-    if len(questions)!=1: raise SystemExit(f'Human editor refused unsafe question count: {len(questions)}')
-    draft.update({'post':edited,'text':edited,'editorial_style':draft.get('editorial_style') or 'authored','human_editor':{'status':'PRESERVED','version':'human-editor-v17','hook_preserved':hook_preserved,'question_count':1,'fact_policy':'preserve supplied evidence only','generic_phrases_detected':generic_found,'template_hits':template_hits,'news_headline_not_injected':True,'authored_narrative_preserved':True,'edited_at':datetime.now(timezone.utc).isoformat()}})
+    if len(questions)!=1:
+        write_block(report,path,f'unsafe_question_count:{len(questions)}',len(questions))
+        return 0
+    draft.update({'post':edited,'text':edited,'editorial_style':draft.get('editorial_style') or 'authored','human_editor':{'status':'PRESERVED','version':'human-editor-v18','hook_preserved':hook_preserved,'question_count':1,'fact_policy':'preserve supplied evidence only','generic_phrases_detected':generic_found,'template_hits':template_hits,'news_headline_not_injected':True,'authored_narrative_preserved':True,'edited_at':datetime.now(timezone.utc).isoformat()}})
     OUT.parent.mkdir(parents=True,exist_ok=True)
-    OUT.write_text(json.dumps({'status':'PRESERVED','version':'human-editor-v17','hook_preserved':hook_preserved,'question_count':1,'warnings':warnings,'template_hits':template_hits,'characters':len(edited),'draft_path':str(path)},indent=2,ensure_ascii=False),encoding='utf-8')
+    OUT.write_text(json.dumps({'status':'PRESERVED','version':'human-editor-v18','hook_preserved':hook_preserved,'question_count':1,'warnings':[] if not generic_found else ['generic_phrase_present'],'template_hits':template_hits,'characters':len(edited),'draft_path':str(path)},indent=2,ensure_ascii=False),encoding='utf-8')
     path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
-    print(json.dumps({'status':'PRESERVED','version':'human-editor-v17','hook_preserved':hook_preserved,'question_count':1,'warnings':warnings,'template_hits':template_hits,'characters':len(edited)}))
+    print(json.dumps({'status':'PRESERVED','version':'human-editor-v18','hook_preserved':hook_preserved,'question_count':1,'warnings':[] if not generic_found else ['generic_phrase_present'],'template_hits':template_hits,'characters':len(edited)}))
 if __name__=='__main__':main()
