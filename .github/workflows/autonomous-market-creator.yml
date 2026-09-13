@@ -219,29 +219,121 @@ jobs:
         run: python src/mechanism_value_rewriter.py
       - name: Elite pre-publication judge
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/elite_prepublication_judge.py
-      - name: Final production gate
+      - name: Integrity and final content gates
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
-        run: python src/production_manager.py
-      - name: Publish to Binance Square
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/content_integrity_gate_4.py
+          python -m compileall -q src
+      - name: Decide whether this lane needs a visual
+        id: visual_mode
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=Path('data/live/publication_context.json')
+          ctx=json.loads(p.read_text()) if p.exists() else {}
+          cat=str(ctx.get('category','')).lower()
+          meme=cat == 'crypto_meme'
+          required = meme or cat not in {'education','commentary','community'}
+          mode = 'meme' if meme else 'tradingview'
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
+              f.write(f"required={'true' if required else 'false'}\n")
+              f.write(f"mode={mode}\n")
+          print({'category':cat,'visual_required':required,'mode':mode})
+          PY
+      - name: Setup Node and Chromium
+        if: ${{ steps.visual_mode.outputs.required == 'true' && steps.visual_mode.outputs.mode == 'tradingview' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Render visual package
+        if: ${{ steps.visual_mode.outputs.required == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          if [ "${{ steps.visual_mode.outputs.mode }}" = 'tradingview' ]; then
+            npm install --no-save playwright@1.55.0
+            npx playwright install --with-deps chromium
+          fi
+          python src/visual_renderer.py
+          test -s data/live/visual.png
+          if [ "${{ steps.visual_mode.outputs.mode }}" = 'tradingview' ]; then
+            python src/validate_visual.py
+            python src/validate_tradingview_visual.py data/live/visual.png
+          else
+            python - <<'PY'
+          from PIL import Image
+          im=Image.open('data/live/visual.png')
+          assert im.width >= 1000 and im.height >= 500
+          print({'status':'MEME_VISUAL_VALID','size':im.size})
+          PY
+          fi
+      - name: Run final production gate
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        id: gate
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          set +e
+          python src/production_manager.py
+          rc=$?
+          set -e
+          if [ ! -f /tmp/publish_gate.json ]; then
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            echo 'mode=image' >> "$GITHUB_OUTPUT"
+            exit "$rc"
+          fi
+          publish=$(python -c 'import json; print(str(json.load(open("/tmp/publish_gate.json")).get("publish", False)).lower())')
+          mode=$(python -c 'import json; print(json.load(open("/tmp/publish_gate.json")).get("mode", "image"))')
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          if [ "$publish" = 'true' ]; then python src/pipeline_stage.py quality_gate success 'Publication authorized'; else python src/pipeline_stage.py quality_gate blocked 'Publication blocked by production gate'; fi
+          exit 0
+      - name: Extract publication text
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
+        id: draft
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: python src/extract_publication.py
+      - name: Publish to Binance Square — only publisher
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
+        env:
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: python src/binance_square_publisher.py
-      - name: Verify publication truth, outcomes and ledger
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+      - name: Verify publication truth and bind experiment
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.gate.outputs.publish == 'true' }}
         run: |
           python src/creator_20_0_publication_verifier.py
-          python src/creator_24_1_prediction_outcomes.py
-          python src/creator_24_0_unified_ledger.py
           python src/call_tracker.py
-          python src/revenue_ledger.py
-          python src/creator_8_0_revenue_engine.py
-      - name: Commit creator state
+          python src/creator_24_0_unified_ledger.py
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          p=Path('data/live/creator_20_0_publication_truth.json')
+          data=json.loads(p.read_text()) if p.exists() else {}
+          truth=data.get('truth_state')
+          if truth not in {'VERIFIED_PUBLISHED','SUBMITTED_UNKNOWN'}:
+              print('Publication truth gate failed:', truth)
+              sys.exit(1)
+          if truth == 'SUBMITTED_UNKNOWN':
+              print('Publication submitted; Binance returned the documented post-submit 504, so no post_id is available. No retry will be attempted.')
+          else:
+              print('Publication truth confirmed:', data.get('latest_publication',{}).get('post_id'))
+          PY
+          python src/pipeline_stage.py publish success 'Published/submitted to Binance Square; publication state recorded'
+      - name: Final diagnostics and state persistence
         if: always()
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python src/creator_24_0_unified_ledger.py || true
+          python src/pipeline_stage.py diagnostics success 'Single orchestrator cycle completed' || true
+          git status --short
           git add analytics data/live data/intelligence
-          git diff --cached --quiet && exit 0
-          git commit -m 'Record autonomous creator cycle' || true
+          git diff --cached --quiet || (git config user.name 'github-actions[bot]' && git config user.email '41898282+github-actions[bot]@users.noreply.github.com' && git commit -m 'Record autonomous creator cycle') || true
           git pull --rebase --autostash origin main || true
           git push origin main || true
