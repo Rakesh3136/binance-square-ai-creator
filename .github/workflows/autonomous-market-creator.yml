@@ -183,22 +183,25 @@ jobs:
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: '20'
         run: |
-          python src/candidate_generation_4.py
           python src/candidate_script_scorer_4.py
           DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -mmin -60 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
           test -n "$DRAFT_PATH"
           test -f "$DRAFT_PATH"
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
+          echo "path=$DRAFT_PATH"
           echo "Pinned editorial draft: $DRAFT_PATH"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           python -m json.tool "$DRAFT_PATH" >/dev/null
+          blocked=$(python -c 'import json; print(str(json.load(open("data/live/editorial_polish.json")).get("status", "")).upper()=="BLOCKED")')
+          echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
+          echo "Editorial blocked=$blocked"
       - name: Automatic news headline integrity repair
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/news_headline_integrity_repair.py
       - name: Automatic hook diversity repair
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -206,7 +209,7 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/hook_diversity_rewriter.py
       - name: Automatic mechanism and reader-value repair
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
@@ -214,12 +217,12 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/mechanism_value_rewriter.py
       - name: Elite pre-publication judge
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/elite_prepublication_judge.py
       - name: Integrity and final content gates
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -227,7 +230,7 @@ jobs:
           python -m compileall -q src
       - name: Decide whether this lane needs a visual
         id: visual_mode
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         run: |
           python - <<'PY'
           import json, os
