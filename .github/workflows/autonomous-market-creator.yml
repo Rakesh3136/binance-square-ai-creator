@@ -116,6 +116,10 @@ jobs:
           python -m json.tool data/live/creator_control_plane.json >/dev/null
           python -m json.tool data/intelligence/creator_control_plane_report.json >/dev/null
           python -m json.tool data/intelligence/creator_24_2_architecture.json >/dev/null
+      - name: Bounded multi-agent supervisor
+        run: |
+          python src/creator_agent_supervisor.py
+          python -m json.tool data/live/creator_agent_supervisor.json >/dev/null
       - name: Optional guarded self-engineering
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_self_engineering == true }}
         env:
