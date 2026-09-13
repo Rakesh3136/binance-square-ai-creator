@@ -7,12 +7,11 @@ ROOT=Path(__file__).resolve().parents[1]
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; LOG=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/content_portfolio_guard.json'
 MIN_SCORE=float(os.getenv('PORTFOLIO_MIN_SCORE','68')); RECENT_WINDOW=int(os.getenv('PORTFOLIO_RECENT_WINDOW','12')); BTC_MAX_RECENT=int(os.getenv('PORTFOLIO_BTC_MAX_RECENT','1')); ASSET_MAX_RECENT=int(os.getenv('PORTFOLIO_ASSET_MAX_RECENT','1')); SIMILARITY_BLOCK=float(os.getenv('PORTFOLIO_SIMILARITY_BLOCK','0.58')); SAME_ASSET_HOURS=float(os.getenv('PORTFOLIO_SAME_ASSET_HOURS','6'))
 PRIMARY={'creator_signal_outcome','capital_flow_long','capital_flow_short','follow_up','technical_setup','top_gainers','top_losers','high_volatility','volume_leaders','next_gainer_candidate','next_loser_candidate'}
-NON_SIGNAL={'breaking_news','news_and_macro','watchlist','comparison','education','crypto_meme'}
 STOPWORDS={'the','a','an','and','or','to','of','for','in','on','with','from','as','is','are','this','that','it','its','at','by','be','has','have','will','can','now','why','what','how','than','into','after','over','under','market','crypto','price','today','latest','update','binance'}
 def load(p):
     try:
         x=json.loads(p.read_text(encoding='utf-8')); return x if isinstance(x,dict) else {}
-    except Exception: return {}
+    except Exception:return {}
 def num(v,d=0.0):
     try:return float(v)
     except (TypeError,ValueError):return d
@@ -23,10 +22,16 @@ def words(text):return {x for x in re.findall(r'[a-z0-9]{3,}',str(text or '').lo
 def similarity(a,b):
     x,y=words(a),words(b); return len(x&y)/max(1,len(x|y)) if x and y else 0.0
 def text_of(item):
-    setup=item.get('trade_setup') or {}; return ' '.join(str(x or '') for x in [item.get('topic'),item.get('title'),item.get('news_title'),item.get('hook'),item.get('reason'),item.get('editorial_style'),setup.get('side'),setup.get('trigger'),setup.get('invalidation'),item.get('evidence')])
+    setup=item.get('trade_setup') or {}
+    if not isinstance(setup,dict): setup={}
+    evidence=item.get('evidence')
+    if isinstance(evidence,(list,dict)): evidence=json.dumps(evidence,ensure_ascii=False)
+    return ' '.join(str(x or '') for x in [item.get('topic'),item.get('title'),item.get('news_title'),item.get('hook'),item.get('reason'),item.get('editorial_style'),setup.get('side'),setup.get('trigger'),setup.get('invalidation'),evidence])
 def parse_time(row):
     raw=row.get('published_at') or row.get('timestamp') or ''
-    try:return datetime.fromisoformat(str(raw).replace('Z','+00:00'))
+    try:
+        dt=datetime.fromisoformat(str(raw).replace('Z','+00:00'))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except Exception:return None
 def recent_publications():
     if not LOG.exists():return []
@@ -61,9 +66,6 @@ def main():
         seen.add(key); base=num(raw.get('ranker_score') or raw.get('score')); score=base; reasons=[]; blocked=False; count=counts.get(s,0); follow=material_followup(raw)
         if base<MIN_SCORE:continue
         if not news_supported(raw):blocked=True;reasons.append('news_asset_not_explicitly_supported')
-        # Publication history is now status-aware. The old guard only counted
-        # PUBLISHED_AUTONOMOUSLY, so verified API publications became invisible
-        # and the same asset could be selected again immediately.
         last_same=[r for r in recent if symbol(r.get('symbol') or r.get('selected_lane_symbol'))==s]
         within_window=False
         for r in last_same:
@@ -88,6 +90,6 @@ def main():
     if publish:
         chosen=dict(chosen);chosen['portfolio_guard_selected']=True;chosen['portfolio_score']=round(chosen_entry['portfolio_score'],2) if chosen_entry else num(chosen.get('score'));chosen['symbol']=symbol(chosen.get('symbol'))+'USDT';pre['selected_opportunity']=chosen;brief['authoritative_selection']=chosen;brief['portfolio_guard']={'decision':decision,'reason':reason,'selected_symbol':symbol(chosen.get('symbol')),'selected_category':category(chosen),'recent_asset_counts':counts,'recent_window':len(recent)};PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8');DIRECTOR.write_text(json.dumps(brief,indent=2,ensure_ascii=False),encoding='utf-8')
     else:pre['selected_opportunity']={};PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'version':'1.3-publication-truth-dedupe','publish':publish,'decision':decision,'reason':reason,'selected':chosen,'recent_asset_counts':counts,'recent_window':len(recent),'candidates_considered':len(evaluated),'blocked_candidates':[x for x in evaluated if x['hard_block']][:20],'top_allowed_candidates':allowed[:12],'policy':{'btc_max_recent_posts':BTC_MAX_RECENT,'asset_max_recent_posts':ASSET_MAX_RECENT,'same_asset_cooldown_hours':SAME_ASSET_HOURS,'publication_statuses_counted':sorted(accepted) if 'accepted' in locals() else ['PUBLISHED_AUTONOMOUSLY','PUBLISHED_VERIFIED_BY_API_RESPONSE','PUBLISHED_SUBMITTED_504','VERIFIED_PUBLISHED'],'semantic_similarity_block':SIMILARITY_BLOCK,'generic_news_cannot_create_btc_fallback':True,'wait_when_repetitive':True,'outcome_followups_can_revisit_asset':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'version':'1.4-robust-publication-truth-dedupe','publish':publish,'decision':decision,'reason':reason,'selected':chosen,'recent_asset_counts':counts,'recent_window':len(recent),'candidates_considered':len(evaluated),'blocked_candidates':[x for x in evaluated if x['hard_block']][:20],'top_allowed_candidates':allowed[:12],'policy':{'btc_max_recent_posts':BTC_MAX_RECENT,'asset_max_recent_posts':ASSET_MAX_RECENT,'same_asset_cooldown_hours':SAME_ASSET_HOURS,'publication_statuses_counted':['PUBLISHED_AUTONOMOUSLY','PUBLISHED_VERIFIED_BY_API_RESPONSE','PUBLISHED_SUBMITTED_504','VERIFIED_PUBLISHED'],'semantic_similarity_block':SIMILARITY_BLOCK,'generic_news_cannot_create_btc_fallback':True,'wait_when_repetitive':True,'outcome_followups_can_revisit_asset':True}}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(result,indent=2,ensure_ascii=False));return 0
 if __name__=='__main__':raise SystemExit(main())
