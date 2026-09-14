@@ -1,10 +1,10 @@
-"""Creator 8.1 — Verified Revenue Attribution & Monetization Intelligence.
+"""Creator 8.2 — Revenue Attribution Feedback Loop.
 
-Builds a conservative monetization layer from explicit, attributable outcomes.
-Money is never inferred from views, likes, followers, clicks, or engagement.
-The engine separates verified revenue from unallocated revenue and descriptive
-patterns from causal claims, then exposes bounded learning signals to the
-portfolio/experiment layers without overriding editorial quality.
+Connects explicitly verified revenue back to the post, asset, category,
+format, hook, thesis, signal, experiment and portfolio decision that produced
+it when those identifiers are actually present. This is descriptive learning,
+not proof of causality. Missing attribution stays missing rather than being
+invented.
 """
 from __future__ import annotations
 
@@ -22,11 +22,14 @@ OUTCOMES = ANALYTICS / "creator_7_2_outcomes.jsonl"
 PLAN = ANALYTICS / "creator_8_0_monetization_engine.json"
 REPORT = INTEL / "creator_8_0_report.json"
 
-VERIFIED_REVENUE_KEYS = ("revenue_verified", "verified_revenue", "earnings_verified", "verified_earnings")
-REVENUE_VALUE_KEYS = ("revenue_amount", "verified_revenue_amount", "earnings_amount", "verified_earnings_amount", "revenue", "earnings")
+REVENUE_FLAGS = ("revenue_verified", "verified_revenue", "earnings_verified", "verified_earnings")
+REVENUE_VALUES = ("revenue_amount", "verified_revenue_amount", "earnings_amount", "verified_earnings_amount", "revenue", "earnings")
 CONVERSION_KEYS = ("verified_conversions", "conversions_verified", "verified_conversion_count")
-FUNNEL = ("reach", "engagement", "follower_growth", "verified_conversion", "verified_revenue")
-ATTRIBUTION_KEYS = ("experiment_id", "post_id", "canonical_post_id", "campaign_id")
+ATTRIBUTION_KEYS = ("canonical_post_id", "post_id", "experiment_id", "campaign_id")
+LEARNING_DIMS = (
+    "symbol", "category", "format", "experiment_format", "hook_type", "thesis_type",
+    "signal_type", "story_lane", "market_regime", "visual_type", "experiment_id",
+)
 
 
 def load_json(path: Path, default):
@@ -43,9 +46,9 @@ def load_outcomes():
         return rows
     for line in OUTCOMES.read_text(encoding="utf-8").splitlines():
         try:
-            obj = json.loads(line)
-            if isinstance(obj, dict):
-                rows.append(obj)
+            value = json.loads(line)
+            if isinstance(value, dict):
+                rows.append(value)
         except Exception:
             continue
     return rows
@@ -61,167 +64,157 @@ def num(obj, *keys):
     return 0.0
 
 
-def verified_revenue(obj):
-    if not any(obj.get(k) is True for k in VERIFIED_REVENUE_KEYS):
+def revenue(row):
+    if not any(row.get(k) is True for k in REVENUE_FLAGS):
         return None
-    value = num(obj, *REVENUE_VALUE_KEYS)
-    return value if value >= 0 and math.isfinite(value) else None
+    value = num(row, *REVENUE_VALUES)
+    return value if math.isfinite(value) and value >= 0 else None
 
 
-def metric(row, *keys):
-    return num(row, *keys)
+def label(row, *keys):
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, "", False):
+            return str(value)
+    return "unknown"
 
 
-def canonical_attribution(row):
-    """Return the strongest explicit attribution identifier available."""
-    for key in ("canonical_post_id", "post_id", "experiment_id", "campaign_id"):
+def attribution(row):
+    for key in ATTRIBUTION_KEYS:
         value = row.get(key)
         if value not in (None, "", False):
             return str(value), key
     return None, None
 
 
-def label(row, *keys):
-    for key in keys:
-        value = row.get(key)
-        if value not in (None, ""):
-            return str(value)
-    return "unknown"
+def metric(row, *keys):
+    return num(row, *keys)
 
 
-def summarize_revenue(rows):
-    buckets = defaultdict(lambda: {"revenue": 0.0, "records": 0, "conversions": 0})
-    for row, rev in rows:
-        category = label(row, "category")
-        fmt = label(row, "format", "experiment_format")
-        symbol = label(row, "symbol", "asset").upper()
-        for dimension, value in (("category", category), ("format", fmt), ("symbol", symbol)):
-            item = buckets[(dimension, value)]
-            item["revenue"] += rev
-            item["records"] += 1
-            item["conversions"] += metric(row, *CONVERSION_KEYS)
-    result = defaultdict(list)
-    for (dimension, value), item in buckets.items():
-        result[dimension].append({
-            "value": value,
-            "verified_revenue": round(item["revenue"], 8),
-            "verified_revenue_records": item["records"],
-            "verified_conversions": item["conversions"],
-        })
-    for dimension in result:
-        result[dimension].sort(key=lambda x: (x["verified_revenue"], x["verified_revenue_records"]), reverse=True)
-    return dict(result)
+def outcome_score(row):
+    if row.get("outcome_score") is not None:
+        return num(row, "outcome_score")
+    m = row.get("metrics") if isinstance(row.get("metrics"), dict) else row
+    views = num(m, "views", "reach", "impressions")
+    if views <= 0:
+        return 0.0
+    return (num(m, "likes") + 2 * num(m, "comments") + 3 * num(m, "shares") + 2 * num(m, "quotes")) / views * 1000
 
 
 def main():
     now = datetime.now(timezone.utc).isoformat()
-    outcomes = load_outcomes()
+    rows = load_outcomes()
+    verified = [(row, revenue(row)) for row in rows]
+    verified = [(row, rev) for row, rev in verified if rev is not None]
 
-    reach = sum(metric(r, "views", "reach", "impressions") for r in outcomes)
-    engagement = sum(metric(r, "likes") + metric(r, "comments") + metric(r, "shares") + metric(r, "quotes") for r in outcomes)
-    follower_growth = sum(metric(r, "follower_growth", "followers_gained", "new_followers") for r in outcomes)
-    verified_conversion = sum(metric(r, *CONVERSION_KEYS) for r in outcomes)
-
-    revenue_rows = []
-    for row in outcomes:
-        rev = verified_revenue(row)
-        if rev is not None:
-            revenue_rows.append((row, rev))
-
-    verified_total = sum(rev for _, rev in revenue_rows)
-    allocated = []
-    unallocated_total = 0.0
-    attribution_quality = Counter()
-    for row, rev in revenue_rows:
-        attribution, attribution_type = canonical_attribution(row)
-        if attribution:
-            allocated.append({
-                "attribution": attribution,
-                "attribution_type": attribution_type,
-                "revenue": round(rev, 8),
-                "post_id": row.get("post_id"),
-                "canonical_post_id": row.get("canonical_post_id"),
-                "experiment_id": row.get("experiment_id"),
-                "campaign_id": row.get("campaign_id"),
-                "symbol": label(row, "symbol", "asset").upper(),
-                "category": label(row, "category"),
-            })
-            attribution_quality[attribution_type] += 1
+    attributed = []
+    unallocated = 0.0
+    for row, rev in verified:
+        ident, ident_type = attribution(row)
+        if ident:
+            attributed.append((row, rev, ident, ident_type))
         else:
-            unallocated_total += rev
+            unallocated += rev
 
-    allocated_total = sum(item["revenue"] for item in allocated)
-    conversion_rate = verified_conversion / max(reach, 1) * 100
-    revenue_per_conversion = verified_total / verified_conversion if verified_conversion > 0 else None
-    revenue_per_attributed_record = allocated_total / len(allocated) if allocated else None
+    # Attribute only from fields explicitly carried by the outcome record.
+    # This produces a causal-style lineage graph without inventing missing links.
+    lineage = []
+    for row, rev, ident, ident_type in attributed:
+        lineage.append({
+            "attribution": ident,
+            "attribution_type": ident_type,
+            "verified_revenue": round(rev, 8),
+            "verified_conversions": metric(row, *CONVERSION_KEYS),
+            "outcome_score": round(outcome_score(row), 6),
+            "symbol": label(row, "symbol", "asset").upper(),
+            "category": label(row, "category"),
+            "format": label(row, "format", "experiment_format"),
+            "hook_type": label(row, "hook_type"),
+            "thesis_type": label(row, "thesis_type"),
+            "signal_type": label(row, "signal_type"),
+            "story_lane": label(row, "story_lane"),
+            "market_regime": label(row, "market_regime"),
+            "visual_type": label(row, "visual_type"),
+            "experiment_id": row.get("experiment_id"),
+            "portfolio_bucket": row.get("portfolio_bucket") or row.get("growth_bucket"),
+            "source_timestamp": row.get("timestamp") or row.get("created_at") or row.get("published_at"),
+        })
 
-    patterns = summarize_revenue(revenue_rows)
-    status = "LEARNING_NO_VERIFIED_REVENUE" if not revenue_rows else "VERIFIED_REVENUE_OBSERVED"
-    if allocated:
-        status = "VERIFIED_REVENUE_ATTRIBUTED"
+    # Repeated attributable observations are descriptive signals only.
+    patterns = defaultdict(lambda: {"records": 0, "revenue": 0.0, "conversions": 0.0, "scores": []})
+    for item in lineage:
+        for dim in LEARNING_DIMS:
+            value = item.get(dim)
+            if value in (None, "", "unknown"):
+                continue
+            bucket = patterns[(dim, str(value))]
+            bucket["records"] += 1
+            bucket["revenue"] += item["verified_revenue"]
+            bucket["conversions"] += item["verified_conversions"]
+            bucket["scores"].append(item["outcome_score"])
+
+    repeated = []
+    for (dim, value), item in patterns.items():
+        if item["records"] < 3:
+            continue
+        scores = sorted(item["scores"])
+        repeated.append({
+            "dimension": dim,
+            "value": value,
+            "records": item["records"],
+            "verified_revenue": round(item["revenue"], 8),
+            "verified_conversions": round(item["conversions"], 6),
+            "median_outcome_score": round(scores[len(scores) // 2], 6),
+            "evidence": "DESCRIPTIVE_REPEATED",
+        })
+    repeated.sort(key=lambda x: (x["verified_revenue"], x["records"]), reverse=True)
+
+    total_revenue = sum(rev for _, rev in verified)
+    allocated_revenue = sum(item["verified_revenue"] for item in lineage)
+    conversions = sum(metric(row, *CONVERSION_KEYS) for row, _ in verified)
+    reach = sum(metric(row, "views", "reach", "impressions") for row in rows)
 
     strategy = {
-        "version": "8.1",
-        "status": status,
+        "version": "8.2",
+        "status": "VERIFIED_REVENUE_ATTRIBUTED" if lineage else ("VERIFIED_REVENUE_OBSERVED" if verified else "LEARNING_NO_VERIFIED_REVENUE"),
         "updated_at": now,
+        "lineage": {
+            "attributed_record_count": len(lineage),
+            "unallocated_verified_record_count": len(verified) - len(lineage),
+            "verified_revenue": round(total_revenue, 8),
+            "allocated_verified_revenue": round(allocated_revenue, 8),
+            "unallocated_verified_revenue": round(unallocated, 8),
+            "attribution_coverage_percent": round(allocated_revenue / total_revenue * 100, 4) if total_revenue else 0.0,
+            "identifier_priority": list(ATTRIBUTION_KEYS),
+            "missing_links_are_not_inferred": True,
+        },
         "funnel": {
             "reach": round(reach, 4),
-            "engagement": round(engagement, 4),
-            "follower_growth": round(follower_growth, 4),
-            "verified_conversion": round(verified_conversion, 4),
-            "verified_revenue": round(verified_total, 8),
+            "verified_conversion": round(conversions, 4),
+            "verified_revenue": round(total_revenue, 8),
+            "verified_conversion_per_reach_percent": round(conversions / max(reach, 1) * 100, 8),
+            "revenue_per_verified_conversion": round(total_revenue / conversions, 8) if conversions else None,
         },
-        "funnel_rates": {
-            "verified_conversion_per_reach_percent": round(conversion_rate, 8),
-            "verified_revenue_per_conversion": round(revenue_per_conversion, 8) if revenue_per_conversion is not None else None,
-            "verified_revenue_per_attributed_record": round(revenue_per_attributed_record, 8) if revenue_per_attributed_record is not None else None,
-        },
-        "revenue": {
-            "verified_total": round(verified_total, 8),
-            "verified_record_count": len(revenue_rows),
-            "allocated_verified_revenue": round(allocated_total, 8),
-            "allocated_record_count": len(allocated),
-            "unallocated_verified_revenue": round(unallocated_total, 8),
-            "attribution_coverage_percent": round(allocated_total / verified_total * 100, 4) if verified_total > 0 else 0.0,
-            "revenue_is_inferred": False,
-            "attribution_quality": dict(attribution_quality),
-        },
-        "descriptive_revenue_patterns": patterns,
-        "monetization_learning": {
-            "eligible_for_strategy_learning": bool(allocated),
-            "strongest_attributed_dimension": None,
-            "minimum_records_for_pattern_signal": 3,
+        "revenue_lineage": lineage[-500:],
+        "repeated_monetization_signals": repeated[:100],
+        "learning_policy": {
+            "use_for_strategy": bool(repeated),
+            "minimum_repeated_records": 3,
             "causal_claims_allowed": False,
-        },
-        "optimization_policy": {
-            "primary_goal": "improve useful reader journeys toward verified conversion while preserving content quality",
-            "secondary_goals": ["quality reach", "substantive engagement", "follower growth"],
-            "revenue_attribution_rule": "Only explicitly verified revenue is money; only explicit identifiers create attribution.",
-            "causal_claims_allowed": False,
-            "never_infer_revenue_from_views": True,
-            "never_infer_revenue_from_followers": True,
-            "never_force_weak_story_for_monetization": True,
+            "promotion_requires_independent_experiment": True,
+            "revenue_alone_cannot_override_editorial_quality": True,
+            "revenue_alone_cannot_override_safety": True,
             "never_optimize_for_clicks_without_quality_evidence": True,
-            "never_use_revenue_to_override_safety_or_editorial_gates": True,
+            "never_force_weak_story_for_monetization": True,
         },
         "next_actions": [
-            "Use attributed revenue only as a bounded learning signal alongside Creator 7.3/7.4 and 7.5 outcomes.",
-            "Prefer content that naturally creates qualified reader intent through useful evidence and accurate asset tagging.",
-            "Keep verified revenue unallocated when the source cannot explicitly identify its post, experiment, or campaign.",
-            "Require repeated attributable observations before changing portfolio strategy on monetization evidence.",
+            "Feed repeated attributable signals into Creator 7.4 experiment selection as hypotheses, not guarantees.",
+            "Feed stable portfolio-level patterns into Creator 7.5 only after repeated attributable evidence.",
+            "Preserve exact post/experiment attribution so future outcomes can explain why revenue occurred.",
+            "Keep unallocated verified revenue visible but excluded from attribution-based strategy learning.",
         ],
-        "sample_size": len(outcomes),
+        "sample_size": len(rows),
     }
-
-    # Select a descriptive pattern only when it has repeated attributable records.
-    candidates = []
-    for dimension, values in patterns.items():
-        for item in values:
-            if item["verified_revenue_records"] >= 3:
-                candidates.append((item["verified_revenue"], dimension, item["value"]))
-    if candidates:
-        _, dimension, value = max(candidates)
-        strategy["monetization_learning"]["strongest_attributed_dimension"] = {"dimension": dimension, "value": value, "evidence": "DESCRIPTIVE_REPEATED"}
 
     ANALYTICS.mkdir(parents=True, exist_ok=True)
     INTEL.mkdir(parents=True, exist_ok=True)
@@ -234,27 +227,27 @@ def main():
     memory["creator_8_0"] = strategy
     overlay = memory.setdefault("learning_overlay", {})
     overlay["revenue_engine"] = {
-        "version": "8.1",
-        "status": status,
-        "verified_revenue": round(verified_total, 8),
-        "allocated_verified_revenue": round(allocated_total, 8),
-        "attribution_coverage_percent": strategy["revenue"]["attribution_coverage_percent"],
-        "funnel": strategy["funnel"],
-        "eligible_for_strategy_learning": bool(allocated),
-        "revenue_inference_disabled": True,
+        "version": "8.2",
+        "status": strategy["status"],
+        "allocated_verified_revenue": strategy["lineage"]["allocated_verified_revenue"],
+        "attribution_coverage_percent": strategy["lineage"]["attribution_coverage_percent"],
+        "repeated_signal_count": len(repeated),
+        "learning_policy": strategy["learning_policy"],
         "updated_at": now,
+        "revenue_inference_disabled": True,
     }
     MEMORY.write_text(json.dumps(memory, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     print(json.dumps({
-        "status": status,
-        "version": "8.1",
-        "outcome_records": len(outcomes),
-        "funnel": strategy["funnel"],
-        "verified_revenue_records": len(revenue_rows),
-        "allocated_verified_revenue": round(allocated_total, 8),
-        "unallocated_verified_revenue": round(unallocated_total, 8),
-        "attribution_coverage_percent": strategy["revenue"]["attribution_coverage_percent"],
+        "status": strategy["status"],
+        "version": "8.2",
+        "outcome_records": len(rows),
+        "verified_revenue_records": len(verified),
+        "attributed_records": len(lineage),
+        "repeated_signals": len(repeated),
+        "allocated_verified_revenue": round(allocated_revenue, 8),
+        "unallocated_verified_revenue": round(unallocated, 8),
+        "attribution_coverage_percent": strategy["lineage"]["attribution_coverage_percent"],
         "outputs": [str(PLAN), str(REPORT), str(MEMORY)],
     }, indent=2))
 
