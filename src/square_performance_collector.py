@@ -1,10 +1,15 @@
-import json, os, re, time, urllib.request
+"""Verified Binance Square performance collector with canonical ID attribution.
+
+The public Square feed has changed shapes over time. This collector therefore
+normalizes identifiers from both publication records and feed records, indexes
+all trustworthy aliases, and matches by exact canonical ID/URL identity only.
+It never fabricates performance metrics or fuzzy-matches posts by text.
+"""
+from __future__ import annotations
+import json, re, time, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Binance changes internal Square feed shapes periodically. Keep several public
-# read routes and parse recursively instead of assuming one {data:{list:[]}}
-# response shape. This collector is read-only and never uses trading/posting keys.
 BASES = [
     "https://www.binance.com/bapi/composite/v3/friendly/pgc/content/article/list",
     "https://www.binance.com/bapi/composite/v2/friendly/pgc/content/article/list",
@@ -16,66 +21,84 @@ PUB = Path("analytics/publication_log.jsonl")
 
 
 def get_json(url):
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; BinanceSquarePerformanceCollector/2.0)",
-            "Accept": "application/json,text/plain,*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.binance.com/en/square",
-        },
-    )
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (compatible; BinanceSquarePerformanceCollector/2.1)",
+        "Accept": "application/json,text/plain,*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.binance.com/en/square",
+    })
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.loads(r.read().decode("utf-8", errors="replace"))
 
 
 def load(path, default):
-    if not path.exists():
-        return default
+    if not path.exists(): return default
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
         return value if isinstance(value, type(default)) else default
-    except Exception:
-        return default
+    except Exception: return default
 
 
 def publications():
     rows = []
-    if not PUB.exists():
-        return rows
+    if not PUB.exists(): return rows
     for line in PUB.read_text(encoding="utf-8").splitlines():
         try:
             x = json.loads(line)
-            if isinstance(x, dict):
-                rows.append(x)
-        except Exception:
-            continue
+            if isinstance(x, dict): rows.append(x)
+        except Exception: continue
     return rows
 
 
-def post_id(row):
-    if not isinstance(row, dict):
-        return ""
-    for k in ("post_id", "postId", "id", "content_id", "contentId", "articleId", "publication_id"):
-        v = row.get(k)
-        if v is not None and str(v).strip():
-            return str(v).strip()
-    for k in ("link", "url", "webLink", "shareUrl", "share_url"):
-        link = str(row.get(k) or "")
-        m = re.search(r"(?:post|content|cpos|article)/([A-Za-z0-9_-]+)", link)
-        if m:
-            return m.group(1)
-    return ""
+def normalize_id(value):
+    """Normalize an ID without destroying meaningful alphanumeric Square IDs."""
+    if value is None: return ""
+    s = str(value).strip()
+    if not s: return ""
+    s = s.rstrip("/").split("?")[0].split("#")[0]
+    if s.startswith("$SQUARE:"): s = s[8:]
+    return s.lower()
+
+
+def ids_from_url(value):
+    url = str(value or "").strip()
+    if not url: return []
+    found = []
+    patterns = (
+        r"/(?:square/)?post/([A-Za-z0-9_-]+)",
+        r"/(?:square/)?content/([A-Za-z0-9_-]+)",
+        r"/(?:square/)?article/([A-Za-z0-9_-]+)",
+        r"/(?:square/)?cpos/([A-Za-z0-9_-]+)",
+    )
+    for pattern in patterns:
+        for match in re.findall(pattern, url, flags=re.I):
+            value = normalize_id(match)
+            if value and value not in found: found.append(value)
+    return found
+
+
+def id_candidates(row):
+    """Return all defensible post identifiers; never infer an ID from text."""
+    if not isinstance(row, dict): return []
+    out = []
+    for key in (
+        "post_id", "postId", "content_id", "contentId", "articleId",
+        "publication_id", "publicationId", "square_post_id", "squarePostId",
+        "contentID", "article_id", "article_id_str"
+    ):
+        value = normalize_id(row.get(key))
+        if value and value not in out: out.append(value)
+    for key in ("link", "url", "webLink", "shareUrl", "share_url", "web_url"):
+        for value in ids_from_url(row.get(key)):
+            if value not in out: out.append(value)
+    return out
 
 
 def looks_like_post(obj):
-    if not isinstance(obj, dict):
-        return False
-    pid = post_id(obj)
-    # Require an identifier plus at least one content/metric field. This avoids
-    # treating pagination metadata or unrelated nested objects as posts.
+    if not isinstance(obj, dict): return False
+    ids = id_candidates(obj)
     fields = set(obj.keys())
-    return bool(pid) and bool(fields & {
+    return bool(ids) and bool(fields & {
         "title", "content", "text", "body", "authorName", "author",
         "viewCount", "views", "likeCount", "commentCount", "replyCount",
         "shareCount", "createTime", "publishedAt", "webLink", "url"
@@ -83,22 +106,18 @@ def looks_like_post(obj):
 
 
 def walk_posts(node, found):
-    """Recursively collect post-shaped dicts from changing API envelopes."""
     if isinstance(node, dict):
         if looks_like_post(node):
-            found[post_id(node)] = node
-        for value in node.values():
-            walk_posts(value, found)
+            ids = id_candidates(node)
+            for pid in ids:
+                found[pid] = node
+        for value in node.values(): walk_posts(value, found)
     elif isinstance(node, list):
-        for value in node:
-            walk_posts(value, found)
+        for value in node: walk_posts(value, found)
 
 
 def fetch_recent(max_pages=20, page_size=50):
-    found = {}
-    attempts = []
-    # Internal endpoint parameter names have changed over time; try the common
-    # variants while keeping the request count bounded.
+    found, attempts = {}, []
     page_variants = (
         "pageIndex={page}&pageSize={size}&type=2",
         "pageNo={page}&pageSize={size}&type=2",
@@ -110,44 +129,29 @@ def fetch_recent(max_pages=20, page_size=50):
             for page in range(1, max_pages + 1):
                 url = f"{base}?{template.format(page=page, size=page_size)}"
                 attempts.append(url)
-                try:
-                    data = get_json(url)
-                except Exception:
-                    break
-                before = len(base_found)
-                walk_posts(data, base_found)
-                # A successful envelope with no posts means this parameter
-                # variant is not useful; move to the next one.
-                if len(base_found) == before and page == 1:
-                    break
-                # Stop once the response has clearly stopped yielding new rows.
-                if page > 1 and len(base_found) == before:
-                    break
+                try: data = get_json(url)
+                except Exception: break
+                before = len(base_found); walk_posts(data, base_found)
+                if len(base_found) == before and page == 1: break
+                if page > 1 and len(base_found) == before: break
                 time.sleep(0.15)
-            if base_found:
-                break
+            if base_found: break
         if base_found:
-            found.update(base_found)
-            break
+            found.update(base_found); break
     return found, attempts
 
 
 def metric(item, *keys):
-    if not isinstance(item, dict):
-        return 0.0
-    # Also accept nested metric objects used by some Square responses.
+    if not isinstance(item, dict): return 0.0
     containers = [item]
     for k in ("stats", "statistics", "metrics", "interaction", "engagement"):
-        if isinstance(item.get(k), dict):
-            containers.append(item[k])
+        if isinstance(item.get(k), dict): containers.append(item[k])
     for container in containers:
         for key in keys:
             v = container.get(key)
             if v is not None and v != "":
-                try:
-                    return float(v)
-                except Exception:
-                    continue
+                try: return float(v)
+                except Exception: pass
     return 0.0
 
 
@@ -164,17 +168,15 @@ def metric_presence(item):
 
 def main():
     state = load(STATE, {"last_run": "", "seen": {}})
-    pubs = publications()
-    recent, attempts = fetch_recent()
+    pubs = publications(); recent, attempts = fetch_recent()
     now = datetime.now(timezone.utc).isoformat()
-    matches = []
-    matched_ids = set()
+    matches, matched_ids = [], set(); unmatched_publications = []
 
-    # The publication log is authoritative for our own posts. Match by post ID
-    # first, then by URL-derived ID; never fabricate performance numbers.
     for pub in pubs:
-        pid = post_id(pub)
-        if not pid or pid not in recent:
+        candidates = id_candidates(pub)
+        pid = next((x for x in candidates if x in recent), "")
+        if not pid:
+            if candidates: unmatched_publications.append(candidates[0])
             continue
         item = recent[pid]
         metrics = {
@@ -187,59 +189,53 @@ def main():
         matches.append({
             "collected_at": now,
             "post_id": pid,
+            "canonical_post_id": pid,
+            "publication_id_aliases": candidates,
             "metrics": metrics,
             "metric_presence": metric_presence(item),
-            "author_name": item.get("authorName") or (item.get("author") or {}).get("name") if isinstance(item.get("author"), dict) else item.get("authorName"),
+            "author_name": item.get("authorName") or ((item.get("author") or {}).get("name") if isinstance(item.get("author"), dict) else ""),
             "web_link": item.get("webLink") or item.get("url") or pub.get("link"),
             "card_type": item.get("cardType") or item.get("contentType"),
             "source": "Binance Square public content feed",
-            "collector_version": "2.0-resilient",
+            "collector_version": "2.1-canonical-id-attribution",
+            "metrics_verified": True,
         })
         matched_ids.add(pid)
 
     seen = state.get("seen", {}) if isinstance(state.get("seen", {}), dict) else {}
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    written = 0
-    with OUT.open("a", encoding="utf-8") as f:
-        for r in matches:
-            # One observation per post/hour lets the learning engine calculate
-            # growth curves instead of treating the latest snapshot as a score.
-            key = f"{r['post_id']}:{r['collected_at'][:13]}"
-            if key in seen:
-                continue
-            seen[key] = r
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-            written += 1
+    OUT.parent.mkdir(parents=True, exist_ok=True); written = 0
+    for r in matches:
+        key = f"{r['canonical_post_id']}:{r['collected_at'][:13]}"
+        if key in seen: continue
+        seen[key] = r
+        with OUT.open("a", encoding="utf-8") as f: f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        written += 1
+    if len(seen) > 5000: seen = dict(sorted(seen.items(), key=lambda kv: kv[0])[-5000:])
 
-    # Keep state bounded. Old hourly observations remain in the JSONL history;
-    # the state file only needs a recent dedupe window.
-    if len(seen) > 5000:
-        seen = dict(sorted(seen.items(), key=lambda kv: kv[0])[-5000:])
-    STATE.write_text(
-        json.dumps({
-            "last_run": now,
-            "seen": seen,
-            "last_match_count": len(matches),
-            "last_written_count": written,
-            "published_records": len(pubs),
-            "feed_records": len(recent),
-            "matched_post_ids": len(matched_ids),
-            "request_attempts": len(attempts),
-        }, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    print(json.dumps({
-        "status": "OK",
+    diagnostics = {
+        "last_run": now,
+        "seen": seen,
+        "last_match_count": len(matches),
+        "last_written_count": written,
         "published_records": len(pubs),
         "feed_records": len(recent),
         "matched_post_ids": len(matched_ids),
-        "collected": len(matches),
-        "written": written,
-        "source": "Binance Square public feed",
-        "collector_version": "2.0-resilient",
+        "unmatched_publications": len(unmatched_publications),
+        "unmatched_with_id": len(unmatched_publications),
+        "request_attempts": len(attempts),
+        "collector_version": "2.1-canonical-id-attribution",
+        "attribution_policy": "exact_normalized_id_or_url_alias_only",
+        "fuzzy_text_matching": False,
+        "metrics_fabricated": False,
+    }
+    STATE.write_text(json.dumps(diagnostics, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(json.dumps({
+        "status": "OK", "published_records": len(pubs), "feed_records": len(recent),
+        "matched_post_ids": len(matched_ids), "collected": len(matches), "written": written,
+        "unmatched_publications": len(unmatched_publications),
+        "source": "Binance Square public feed", "collector_version": "2.1-canonical-id-attribution",
         "output": str(OUT),
     }, indent=2))
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()
