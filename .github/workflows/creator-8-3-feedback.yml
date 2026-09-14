@@ -1,0 +1,53 @@
+name: Creator 8.3 — Verified Monetization Feedback
+
+on:
+  workflow_run:
+    workflows:
+      - Binance Square AI Creator — Single Autonomous Orchestrator
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: creator-8-3-feedback
+  cancel-in-progress: true
+
+jobs:
+  monetization_feedback:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Creator 8.3 decision engine
+        run: |
+          python -m compileall -q src
+          python src/creator_8_3_monetization_decision_engine.py
+          python -m json.tool analytics/creator_8_3_monetization_decision.json >/dev/null
+          python -m json.tool data/intelligence/creator_8_3_report.json >/dev/null
+
+      - name: Persist verified monetization decision
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git reset --mixed origin/main
+          git add analytics data
+          if git diff --cached --quiet; then
+            echo 'No Creator 8.3 state changes to persist'
+          else
+            git commit -m 'Record Creator 8.3 monetization feedback'
+            git push origin HEAD:main
+          fi
