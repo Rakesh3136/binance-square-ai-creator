@@ -1,8 +1,9 @@
 """Deterministic publish-rescue draft for a fresh but gate-rejected cycle.
 
-Rescue must never change the authoritative asset or remove the required
-TradingView visual. It may only simplify the writing so the already-rendered
-chart and publication context remain synchronized.
+Rescue never changes the authoritative asset or removes the required
+TradingView visual. It only rewrites the already-researched evidence into a
+short, natural, testable Square post that is compatible with the final
+production and engagement gates.
 """
 from __future__ import annotations
 
@@ -39,7 +40,6 @@ def latest_report():
 
 
 def market_match(market: dict, symbol: str):
-    """Find the selected asset without ever silently switching assets."""
     wanted = symbol.upper().replace("USDT", "")
     groups = []
     for key in ("top_content_signals", "top_gainers", "top_losers", "highest_volume"):
@@ -59,6 +59,20 @@ def market_match(market: dict, symbol: str):
     return {}
 
 
+def fmt_price(value: float) -> str:
+    if value == 0:
+        return "0"
+    return f"{value:.8g}"
+
+
+def fmt_volume(volume: float) -> str:
+    if volume >= 1_000_000:
+        return f"${volume / 1_000_000:.1f}M spot volume"
+    if volume >= 1_000:
+        return f"${volume / 1_000:.0f}K spot volume"
+    return "fresh spot data"
+
+
 def main():
     report_path = latest_report()
     report = load(report_path, {})
@@ -69,8 +83,6 @@ def main():
     if not isinstance(selected, dict):
         selected = {}
 
-    # The frozen/preflight asset is authoritative. Rescue is not allowed to
-    # replace it with the first convenient market row.
     symbol = str(
         selected.get("symbol")
         or selected.get("topic")
@@ -93,64 +105,83 @@ def main():
         volume = float(match.get("quote_volume_usdt") or match.get("quote_volume") or 0)
     except Exception:
         volume = 0.0
+    try:
+        intraday = float(match.get("intraday_range_percent") or 0)
+    except Exception:
+        intraday = 0.0
 
-    try: intraday = float(match.get("intraday_range_percent") or 0)
-    except Exception: intraday = 0.0
     candles = match.get("candles_1h") or []
-    highs = [float(x.get("high")) for x in candles if isinstance(x,dict) and x.get("high") is not None]
-    lows = [float(x.get("low")) for x in candles if isinstance(x,dict) and x.get("low") is not None]
-    closes = [float(x.get("close")) for x in candles if isinstance(x,dict) and x.get("close") is not None]
+    highs = [float(x.get("high")) for x in candles if isinstance(x, dict) and x.get("high") is not None]
+    lows = [float(x.get("low")) for x in candles if isinstance(x, dict) and x.get("low") is not None]
+    closes = [float(x.get("close")) for x in candles if isinstance(x, dict) and x.get("close") is not None]
     last = float(match.get("last_price") or (closes[-1] if closes else 0))
     resistance = max(highs[-12:]) if highs else last
     support = min(lows[-12:]) if lows else last
-    if volume >= 1_000_000:
-        volume_text = f"${volume/1_000_000:.1f}M spot volume"
-    elif volume >= 1_000:
-        volume_text = f"${volume/1_000:.0f}K spot volume"
-    else:
-        volume_text = "fresh spot data"
+    volume_text = fmt_volume(volume)
     news_title = str(selected.get("news_title") or "").strip()
     news_source = str(selected.get("news_source") or "").strip()
-    category = str(selected.get("category") or "market_opportunity").lower()
+
+    # Avoid template labels such as "Bull case:" / "Bear case:". Those read
+    # like generated boilerplate and are explicitly penalized by the final
+    # human-content firewall. Write the same conditional logic as a sentence.
     if news_title:
         source_line = f"Source: {news_source}" if news_source else "Source: verified news feed"
-        hook = "🚨 $" + symbol + ": " + news_title
-        post = "\n\n".join([hook, source_line, "Why it matters: the catalyst still needs price confirmation. $"+symbol+" is currently "+f"{move:+.1f}%"+" with "+volume_text+".", "Does the market confirm the headline, or fade it?"])
+        hook = f"🚨 ${symbol}: {news_title}"
+        post = "\n\n".join([
+            hook,
+            source_line,
+            f"The headline matters only if price confirms it. ${symbol} is {move:+.1f}% with {volume_text}.",
+            f"Watch ${fmt_price(resistance)} as the decision area; a failed reaction puts ${fmt_price(support)} back in focus.",
+            "Does price confirm the catalyst, or fade it?",
+        ])
         style = "publish_rescue_newsroom"
     elif move >= 15:
-        hook = "🔥 $" + symbol + " just moved " + f"{move:+.1f}%" + " — now the follow-through matters."
-        post = "\n\n".join([hook, "Spot volume is "+volume_text+", with a "+f"{intraday:.1f}%"+" intraday range. Recent 1H resistance is $"+f"{resistance:.8g}"+" and support is $"+f"{support:.8g}"+".", "Bull case: price holds above resistance with follow-through. Bear case: the impulse fails and support breaks.", "Would you wait for confirmation, or expect a pullback first?"])
+        hook = f"🔥 ${symbol} moved {move:+.1f}% — the next reaction matters more than the headline."
+        post = "\n\n".join([
+            hook,
+            f"Spot activity is {volume_text}, with a {intraday:.1f}% intraday range.",
+            f"A hold above ${fmt_price(resistance)} would keep continuation in play; rejection there puts ${fmt_price(support)} back on watch.",
+            "Would you wait for a clean hold, or expect a pullback first?",
+        ])
         style = "publish_rescue_momentum"
     elif move <= -15:
-        hook = "⚠️ $" + symbol + " just dropped " + f"{abs(move):.1f}%" + " — now the reaction matters."
-        post = "\n\n".join([hook, "Spot volume is "+volume_text+", with a "+f"{intraday:.1f}%"+" intraday range. Recent 1H support is $"+f"{support:.8g}"+" and resistance is $"+f"{resistance:.8g}"+".", "Bear case: sellers keep control below support. Bull case: price reclaims the range.", "Would you watch a reclaim, or wait for another lower high?"])
+        hook = f"⚠️ ${symbol} fell {abs(move):.1f}% — the reaction now matters more than the drop itself."
+        post = "\n\n".join([
+            hook,
+            f"Spot activity is {volume_text}, with a {intraday:.1f}% intraday range.",
+            f"A reclaim of ${fmt_price(resistance)} would improve the read; losing ${fmt_price(support)} keeps sellers in control.",
+            "Would you wait for a reclaim, or another lower high?",
+        ])
         style = "publish_rescue_breakdown"
     else:
-        hook = "📊 $" + symbol + ": the next 1H reaction matters."
-        post = "\n\n".join([hook, "Price is around $"+f"{last:.8g}"+" with "+volume_text+". Recent 1H support is $"+f"{support:.8g}"+" and resistance is $"+f"{resistance:.8g}"+".", "Bull case: acceptance above resistance. Bear case: rejection and a support break.", "Breakout or rejection — which would you wait to confirm?"])
+        hook = f"📊 ${symbol}: the next 1H reaction matters."
+        post = "\n\n".join([
+            hook,
+            f"Price is around ${fmt_price(last)} with {volume_text} and a {intraday:.1f}% intraday range.",
+            f"A clean move through ${fmt_price(resistance)} would strengthen the upside read; rejection keeps ${fmt_price(support)} in focus.",
+            "Which level would you require before treating the setup as confirmed?",
+        ])
         style = "publish_rescue_chart"
 
+    # Keep the rescue comfortably inside the post-mode engagement limit and
+    # make one question the only conversation trigger.
+    post = post[:740]
     draft = report.get("draft") or {}
     if not isinstance(draft, dict):
         draft = {}
-    draft.update(
-        {
-            "post": post[:740],
-            "text": post[:740],
-            "hook": hook,
-            "discussion_question": post.splitlines()[-1],
-            "quality_score": 90,
-            "editorial_style": style,
-            "generation_mode": "LOCAL_FALLBACK",
-            "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
-            "symbol": symbol,
-            "content_category": selected.get("category") or selected.get("reason") or "market_opportunity",
-        }
-    )
+    draft.update({
+        "post": post,
+        "text": post,
+        "hook": hook,
+        "discussion_question": post.splitlines()[-1],
+        "quality_score": 90,
+        "editorial_style": style,
+        "generation_mode": "LOCAL_FALLBACK",
+        "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
+        "symbol": symbol,
+        "content_category": selected.get("category") or selected.get("reason") or "market_opportunity",
+    })
 
-    # CRITICAL: the rescue keeps TradingView mandatory. The chart was rendered
-    # before rescue from the frozen opportunity, so do not alter the asset or
-    # downgrade the visual plan to text-only.
     visual = report.get("visual_plan") or {}
     if not isinstance(visual, dict):
         visual = {}
@@ -167,9 +198,7 @@ def main():
     chart_symbol = chart_symbols[0] if chart_symbols else str(meta.get("tradingview_symbol") or meta.get("symbol") or "").upper()
     expected = f"BINANCE:{symbol}USDT"
     if chart_symbol and chart_symbol != expected:
-        raise SystemExit(
-            f"TradingView visual asset mismatch: chart={chart_symbol}, expected={expected}; refusing rescue"
-        )
+        raise SystemExit(f"TradingView visual asset mismatch: chart={chart_symbol}, expected={expected}; refusing rescue")
 
     report["draft"] = draft
     report["visual_plan"] = visual
@@ -180,18 +209,12 @@ def main():
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
     STATUS.parent.mkdir(parents=True, exist_ok=True)
-    STATUS.write_text(
-        json.dumps(
-            {
-                "status": "LOCAL_FALLBACK_SUCCESS",
-                "generation_mode": "LOCAL_FALLBACK",
-                "reason": "Production manager rescue simplified writing without changing the authoritative asset or TradingView visual",
-                "rescue": True,
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    STATUS.write_text(json.dumps({
+        "status": "LOCAL_FALLBACK_SUCCESS",
+        "generation_mode": "LOCAL_FALLBACK",
+        "reason": "Rescue rewrote the fresh evidence without template labels, asset drift, or visual downgrade",
+        "rescue": True,
+    }, indent=2), encoding="utf-8")
     print(json.dumps({"status": "PUBLISH_RESCUE_READY", "report": str(report_path), "symbol": symbol}, indent=2))
 
 
