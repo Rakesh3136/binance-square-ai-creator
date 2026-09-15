@@ -38,6 +38,7 @@ def clean_symbol(value):
 def main() -> None:
     cadence = load("data/live/autonomous_cadence_6.json")
     frozen = load("data/live/frozen_opportunity.json")
+    authoritative = load("data/live/authoritative_opportunity.json")
     contract = load("data/live/opportunity_contract.json")
     context = load("data/live/publication_context.json")
     preflight = load("data/live/editorial_preflight.json")
@@ -46,14 +47,24 @@ def main() -> None:
     performance = load("analytics/square_performance_state.json")
 
     selected = preflight.get("selected_opportunity") or {}
+    selected = selected if isinstance(selected, dict) else {}
     story = preflight.get("content_director_4", {}).get("primary_story") or {}
+    story = story if isinstance(story, dict) else {}
+
+    # publication_context is the authoritative identity at authoring time. The
+    # supervisor also runs earlier in the workflow, so frozen/portfolio state
+    # may legitimately be stale until the publish branch freezes a new asset.
+    # Prefer the current publication context, then the frozen/authoritative
+    # opportunity, and only then preflight. This prevents the strategy artifact
+    # from becoming the source of an asset-drift failure downstream.
     symbol = clean_symbol(first(
-        frozen.get("symbol_usdt"), frozen.get("symbol"), contract.get("symbol"),
-        selected.get("symbol"), context.get("symbol"), story.get("symbol")
+        context.get("symbol"), authoritative.get("symbol"), frozen.get("symbol_usdt"),
+        frozen.get("symbol"), contract.get("symbol"), selected.get("symbol"), story.get("symbol")
     ))
+
     category = str(first(
-        contract.get("category"), frozen.get("category"), selected.get("category"),
-        context.get("category"), story.get("lane")
+        context.get("category"), authoritative.get("category"), frozen.get("category"),
+        contract.get("category"), selected.get("category"), story.get("lane")
     ) or "").lower()
     publish = bool(cadence.get("publish", False))
 
@@ -61,10 +72,23 @@ def main() -> None:
     regime = rotation.get("market_regime") or "unknown"
     leaders = rotation.get("leaders") or []
     laggards = rotation.get("laggards") or []
-    trade_setup = selected.get("trade_setup") or {}
 
-    # The agents are bounded roles over existing evidence. Their output is a
-    # compact strategy contract, not free-form AI text.
+    selected_symbol = clean_symbol(selected.get("symbol"))
+    context_symbol = clean_symbol(context.get("symbol"))
+    selected_matches = not selected_symbol or not context_symbol or selected_symbol == context_symbol
+    trade_setup = selected.get("trade_setup") or {} if selected_matches else {}
+    if not isinstance(trade_setup, dict):
+        trade_setup = {}
+    if not trade_setup:
+        for x in flow.get("top_conditional_setups") or []:
+            if not isinstance(x, dict):
+                continue
+            if clean_symbol(x.get("symbol")) == symbol:
+                trade_setup = x.get("trade_setup") or x.get("prediction") or {}
+                if not isinstance(trade_setup, dict):
+                    trade_setup = {}
+                break
+
     if category in {"capital_flow_long", "capital_flow_short"}:
         thesis = "capital-flow setup: regime + relative strength + participation must agree"
         archetype = "flow_trader"
@@ -94,10 +118,6 @@ def main() -> None:
         blockers.append("missing_opportunity_category")
     if publish and not contract:
         blockers.append("missing_opportunity_contract")
-    if publish and symbol in {"BTC", "ETH"} and str(frozen.get("fallback_policy", "")).startswith("NEVER_FALLBACK"):
-        # BTC/ETH are allowed when genuinely selected; this only records that
-        # fallback protection is active rather than blocking legitimate stories.
-        pass
 
     decision = "PROCEED_TO_EXISTING_GATES" if publish and not blockers else "WAIT"
     performance_health = {
@@ -107,7 +127,7 @@ def main() -> None:
         "blind": int(performance.get("feed_records", 0) or 0) == 0,
     }
     strategy = {
-        "version": "1.1-agent-strategy-contract",
+        "version": "1.2-authoritative-publication-asset",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "symbol": symbol,
         "category": category,
@@ -117,26 +137,34 @@ def main() -> None:
         "leaders": leaders[:5],
         "laggards": laggards[:5],
         "trade_setup": trade_setup,
-        "story": story,
+        "story": story if (not context_symbol or not story.get("symbol") or clean_symbol(story.get("symbol")) == symbol) else {},
         "one_authoring_pass": True,
         "evidence_only": True,
         "performance_health": performance_health,
+        "authoritative_asset_source": "publication_context",
+        "selected_asset_aligned": selected_matches,
         "do_not_publish_if": blockers,
     }
     STRATEGY.parent.mkdir(parents=True, exist_ok=True)
     STRATEGY.write_text(json.dumps(strategy, indent=2, ensure_ascii=False), encoding="utf-8")
 
     result = {
-        "version": "1.1-bounded-agent-supervisor",
+        "version": "1.2-authoritative-publication-asset",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "decision": decision,
         "publish_intent": publish,
         "authoritative_symbol": symbol,
         "authoritative_category": category,
         "blockers": blockers,
+        "asset_alignment": {
+            "publication_context": context_symbol,
+            "selected_opportunity": selected_symbol,
+            "aligned": selected_matches,
+            "stale_selection_is_not_used_for_strategy": not selected_matches,
+        },
         "agents": {
             "research": {"status": "READY", "role": "verify market/news/flow evidence", "authority": "evidence"},
-            "strategy": {"status": "READY" if symbol else "BLOCKED", "role": "select one differentiated thesis", "authority": "frozen_opportunity"},
+            "strategy": {"status": "READY" if symbol else "BLOCKED", "role": "select one differentiated thesis", "authority": "publication_context"},
             "editorial": {"status": "READY" if publish else "WAIT", "role": "shape one human-style authoring pass", "authority": "editorial_gates"},
             "outcome": {"status": "READY", "role": "bind prior calls to outcomes and lessons", "authority": "performance_ledger"},
             "revenue": {"status": "OBSERVE_ONLY", "role": "measure eligible reader-intent signals", "authority": "analytics"},
@@ -146,6 +174,7 @@ def main() -> None:
         "performance_health": performance_health,
         "policy": {
             "single_authoritative_asset": True,
+            "publication_context_wins": True,
             "one_authoring_pass": True,
             "agents_cannot_publish": True,
             "agents_cannot_merge": True,
@@ -155,7 +184,7 @@ def main() -> None:
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({"decision": decision, "symbol": symbol, "category": category, "thesis": thesis, "performance_blind": performance_health["blind"]}))
+    print(json.dumps({"decision": decision, "symbol": symbol, "category": category, "thesis": thesis, "performance_blind": performance_health["blind"], "selected_asset_aligned": selected_matches}))
 
 
 if __name__ == "__main__":
