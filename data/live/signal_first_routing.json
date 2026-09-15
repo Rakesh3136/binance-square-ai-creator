@@ -1,14 +1,25 @@
 {
-  "generated_at": "2026-09-15T02:57:16.344214+00:00",
-  "router_version": "1.4-authoritative-cadence-recovery",
-  "publish": false,
-  "decision": "NO_PUBLISH",
-  "reason": "no_qualified_non_repetitive_signal",
+  "generated_at": "2026-09-15T06:42:44.626236+00:00",
+  "router_version": "1.6-current-cycle-cadence-recovery-shadow-fix",
+  "publish": true,
+  "decision": "MARKET_SIGNAL",
+  "reason": "qualified_non_repetitive_signal_selected",
   "primary_signal": false,
   "secondary_meme": false,
-  "selected": null,
-  "cadence_publish": false,
-  "existing_category": "top_losers",
+  "selected": {
+    "type": "market",
+    "category": "top_losers",
+    "symbol": "PERL",
+    "score": 100,
+    "reason": "live market anomaly with supplied evidence",
+    "has_chart": true,
+    "data_quality": "OK",
+    "signal_first_primary": false,
+    "prediction_contract_complete": false,
+    "thesis_key": "PERL||top_losers|None|None"
+  },
+  "cadence_publish_on_disk": false,
+  "current_cycle_cadence_recovery": true,
   "blocked_candidates": [],
   "candidate_counts": {
     "primary": 0,
@@ -17,11 +28,6 @@
   "policy": {
     "primary_lane": "capital_flow_and_measurable_market_outcomes",
     "secondary_lane": "controlled_market_signals_and_memes",
-    "primary_priority_order": [
-      "verified_outcome",
-      "capital_flow",
-      "market_signal"
-    ],
     "minimum_primary_score": 72.0,
     "minimum_flow_confidence": 65.0,
     "prediction_required": [
@@ -32,13 +38,9 @@
       "sl",
       "confidence"
     ],
-    "target_meme_share_max": 0.25,
-    "meme_cannot_displace_qualified_signal": true,
-    "meme_quota_is_rolling_20_publications": true,
-    "no_signal_means_no_signal_post": true,
     "anti_repetition_window": 5,
     "text_similarity_block": 0.72,
-    "cadence_selected_recovery": true,
-    "verified_publication_statuses_counted": true
+    "no_signal_means_no_signal_post": true,
+    "cadence_current_cycle_is_authoritative": true
   }
 }
