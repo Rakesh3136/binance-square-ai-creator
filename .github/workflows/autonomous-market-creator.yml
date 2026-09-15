@@ -170,8 +170,11 @@ jobs:
           TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           python src/script_director_4.py
-          python src/candidate_generation_4.py
+          # Lock the current frozen opportunity BEFORE candidate generation.
+          # Candidate generation and the agent supervisor must consume the same
+          # publication identity that was selected by this cycle, not stale context.
           python src/publication_context.py
+          python src/candidate_generation_4.py
           python src/self_repair_agent.py
           python src/editorial_prompt_patch.py
           python src/safe_creator_runner.py
@@ -180,7 +183,7 @@ jobs:
           python src/creator_intelligence_2.py || true
       - name: Score scripts and apply human editorial pass
         id: editorial
-        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
