@@ -1,9 +1,4 @@
-"""Extract a validated Binance Square publication payload from the selected draft.
-
-The workflow pins DRAFT_PATH before this step.  This adapter intentionally accepts
-several draft shapes so editorial modules can evolve without breaking publication.
-It does not publish anything; it only extracts and validates the final text.
-"""
+"""Extract a validated Binance Square publication payload from the selected draft."""
 from __future__ import annotations
 
 import json
@@ -12,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data/live/publication_payload.json"
+CONTEXT = ROOT / "data/live/publication_context.json"
 
 
 def load_json(path: Path) -> dict:
@@ -35,32 +31,38 @@ def first_text(obj: dict, keys: tuple[str, ...]) -> str:
 
 
 def extract(draft: dict) -> tuple[str, str, str]:
-    # Prefer explicit final/publication fields, then common editorial fields.
     title = first_text(draft, ("publication_title", "final_title", "title", "headline"))
-    body = first_text(
-        draft,
-        ("publication_text", "final_text", "body", "content", "post", "text", "article"),
-    )
+    body = first_text(draft, ("publication_text", "final_text", "body", "content", "post", "text", "article"))
+    symbol = first_text(draft, ("symbol", "ticker", "primary_symbol"))
 
-    # Some stages nest the final copy under publication/final/draft.
     for container_key in ("publication", "final", "selected_candidate", "draft"):
         nested = draft.get(container_key)
         if isinstance(nested, dict):
             if not title:
                 title = first_text(nested, ("publication_title", "final_title", "title", "headline"))
             if not body:
-                body = first_text(
-                    nested,
-                    ("publication_text", "final_text", "body", "content", "post", "text", "article"),
-                )
+                body = first_text(nested, ("publication_text", "final_text", "body", "content", "post", "text", "article"))
+            if not symbol:
+                symbol = first_text(nested, ("symbol", "ticker", "primary_symbol"))
 
-    # If the model stores title and body together, preserve it rather than
-    # silently publishing an empty payload.
     if not body and title and "\n" in title:
         lines = title.splitlines()
         title, body = lines[0].strip(), "\n".join(lines[1:]).strip()
 
-    return title, body, first_text(draft, ("symbol", "ticker", "primary_symbol"))
+    # The publication context is authoritative at the final handoff.
+    if CONTEXT.exists():
+        try:
+            context = json.loads(CONTEXT.read_text(encoding="utf-8"))
+            if isinstance(context, dict):
+                context_symbol = first_text(context, ("symbol", "frozen_symbol", "primary_symbol"))
+                if context_symbol:
+                    symbol = context_symbol
+                if not title:
+                    title = first_text(context, ("title", "headline", "publication_title"))
+        except Exception:
+            pass
+
+    return title, body, symbol
 
 
 def main() -> None:
@@ -75,19 +77,20 @@ def main() -> None:
     draft = load_json(draft_path)
     title, body, symbol = extract(draft)
 
-    # Binance Square needs actual publication text. Refuse an empty/placeholder
-    # payload instead of allowing the publisher to make an unsafe guess.
     if not body:
         raise SystemExit("Publication extraction: final publication text is missing")
     if len(body.strip()) < 20:
         raise SystemExit("Publication extraction: final publication text is too short")
+    if not symbol:
+        raise SystemExit("Publication extraction: authoritative publication symbol is missing")
 
+    symbol = symbol.upper().replace("USDT", "").replace("$", "").strip()
     payload = {
         "status": "READY_FOR_PUBLISH",
         "source_draft": str(draft_path.relative_to(ROOT)) if draft_path.is_relative_to(ROOT) else str(draft_path),
         "title": title,
         "text": body,
-        "symbol": symbol.upper().replace("USDT", "").replace("$", "").strip(),
+        "symbol": symbol,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -104,7 +107,7 @@ def main() -> None:
         "source_draft": payload["source_draft"],
         "title_present": bool(title),
         "text_length": len(body),
-        "symbol": payload["symbol"],
+        "symbol": symbol,
         "output": str(OUT),
     }, indent=2, ensure_ascii=False))
 
