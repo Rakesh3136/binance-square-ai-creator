@@ -287,7 +287,9 @@ jobs:
         if: ${{ steps.production.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+          # Support both historical and current Binance Square OpenAPI secret names.
           BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY }}
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
           python src/extract_publication.py
           python src/binance_square_publisher.py
