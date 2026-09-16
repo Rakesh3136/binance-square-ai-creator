@@ -23,11 +23,7 @@ CONTEXT_PATH = LIVE / "publication_context.json"
 FROZEN_PATH = LIVE / "authoritative_opportunity.json"
 VISUAL = LIVE / "visual.png"
 ENDPOINT = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
-IMAGE_LANES = {
-    "crypto_meme", "market_meme", "trader_humor", "technical_setup",
-    "capital_flow_long", "capital_flow_short", "result_followup",
-    "research_radar", "news", "breaking_news", "news_and_macro",
-}
+NO_IMAGE_LANES = {"education", "commentary", "community", "text_only"}
 DUPLICATE_HOURS = float(os.getenv("PUBLISH_DUPLICATE_HOURS", "6"))
 
 
@@ -48,8 +44,6 @@ def canonical_post_id(value) -> str:
     raw = str(value or "").strip()
     if not raw:
         return ""
-    # Do not invent ids from arbitrary text. Accept numeric ids and the
-    # documented id-like strings returned by Square, after URL cleanup.
     raw = raw.rstrip("/")
     if "/square/post/" in raw:
         raw = raw.split("/square/post/", 1)[1].split("?", 1)[0].split("#", 1)[0]
@@ -159,9 +153,6 @@ def build_verified_result(result: dict) -> dict:
 
 
 def main() -> int:
-    # The workflow historically exposed BINANCE_SQUARE_API_KEY while the
-    # adapter consumed BINANCE_SQUARE_OPENAPI_KEY. Support the existing secret
-    # name without weakening the fail-closed publication proof.
     key = (os.getenv("BINANCE_SQUARE_OPENAPI_KEY") or os.getenv("BINANCE_SQUARE_API_KEY") or "").strip()
     if not key:
         return fail("BINANCE_SQUARE_OPENAPI_KEY/BINANCE_SQUARE_API_KEY is not configured", "PUBLISHER_NOT_CONFIGURED")
@@ -183,8 +174,19 @@ def main() -> int:
             })
             return fail(f"Duplicate publication blocked: {duplicate}", "PUBLISH_BLOCKED_DUPLICATE")
 
-        use_image = VISUAL.exists() and VISUAL.stat().st_size > 10000 and (
-            category in IMAGE_LANES or bool(context.get("visual_requested"))
+        # If the visual pipeline produced and validated a chart, attach it by
+        # default for market/trading lanes. Do not depend on a brittle allowlist
+        # of category names: new creator lanes should inherit chart attachment.
+        visual_requested = bool(
+            context.get("visual_requested")
+            or context.get("visual_required")
+            or context.get("visual_verified")
+            or context.get("tradingview_verified")
+        )
+        use_image = (
+            VISUAL.exists()
+            and VISUAL.stat().st_size > 10000
+            and (visual_requested or category not in NO_IMAGE_LANES)
         )
 
         if use_image:
