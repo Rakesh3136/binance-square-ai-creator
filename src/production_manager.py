@@ -76,10 +76,15 @@ def evaluate(report):
     except:quality=float(interaction.get('score') or 0)
     human_score,human_failures=human_content_audit(post,expected,cat);quality=min(quality,human_score)
     intelligence=load(INTEL_PATH);elite=load(ELITE_PATH);intelligence_ok=(cat=='result_followup') or intelligence.get('publish_recommendation') is True;opportunity=opportunity_score(data);chart_ok=cat in NONCHART or visual_is_verified(expected);coherent=content_is_coherent(post,expected,cat);failures=list(elite.get('failures') or []) if isinstance(elite,dict) else [];failures.extend(human_failures)
-    hard={'malformed_statistics_phrase','repetitive_feed_template','template_phrase_density','repeats_recent_published_sentence','policy_language_failure','generic_template_language:follow-through matters','generic_template_language:the next reaction matters','no_mechanism_or_relationship','ticker_percent_hook','missing_primary_cashtag','empty_post','quality_gate_error'}
-    hard_block=bool(any(x in failures for x in hard) or any(x.startswith('quality_gate_error') for x in human_failures))
+    # Only irreversible integrity/policy failures are hard blocks. Human-style
+    # issues such as generic wording, ticker-percent hooks, number density,
+    # length and missing testable phrasing are repairable by the one bounded
+    # rescue pass. This prevents a fixable draft from being denied rescue.
+    hard_prefixes=('quality_gate_error','policy_language_failure','malformed_statistics_phrase','repetitive_feed_template','repeats_recent_published_sentence')
+    hard_exact={'empty_post','missing_primary_cashtag'}
+    hard_block=bool(any(any(x==p or x.startswith(p+':') for p in hard_prefixes) for x in failures) or any(x in hard_exact for x in failures))
     threshold=RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD;eligible=bool(post) and asset_ok and coherent and quality>=threshold and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok and (rescue or (intelligence_ok and (data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' or cat=='result_followup'))) and not hard_block
-    mode=choose_mode();audit={'version':'6.1-bounded-rescue-and-decision-artifact','draft':str(report),'publish':eligible,'mode':mode,'category':cat,'quality_score':quality,'human_content_score':human_score,'quality_threshold':threshold,'opportunity_score':opportunity,'interaction_gate':interaction,'human_content_failures':human_failures,'final_asset_lock':asset_ok,'tradingview_required':cat not in NONCHART,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'content_coherent':coherent,'rescue':rescue,'elite_failures':failures,'hard_block':hard_block,'rescue_allowed':not hard_block,'reason':'publish_eligible' if eligible else 'gate_rejected'};AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False));GATE_PATH.write_text(json.dumps(interaction,indent=2),encoding='utf-8');write_decision(audit);print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
+    mode=choose_mode();audit={'version':'6.2-bounded-rescue-repairable-human-content','draft':str(report),'publish':eligible,'mode':mode,'category':cat,'quality_score':quality,'human_content_score':human_score,'quality_threshold':threshold,'opportunity_score':opportunity,'interaction_gate':interaction,'human_content_failures':human_failures,'final_asset_lock':asset_ok,'tradingview_required':cat not in NONCHART,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'content_coherent':coherent,'rescue':rescue,'elite_failures':failures,'hard_block':hard_block,'rescue_allowed':not hard_block,'reason':'publish_eligible' if eligible else 'gate_rejected'};AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False));GATE_PATH.write_text(json.dumps(interaction,indent=2),encoding='utf-8');write_decision(audit);print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
 def rescue_status():STATUS_PATH.parent.mkdir(parents=True,exist_ok=True);STATUS_PATH.write_text(json.dumps({'status':'LOCAL_FALLBACK_SUCCESS','generation_mode':'LOCAL_FALLBACK','reason':'Bounded deterministic rescue'},indent=2),encoding='utf-8')
 def main():
     report=fresh_report()
@@ -87,11 +92,10 @@ def main():
     publish,mode=evaluate(report)
     if publish:output(True,mode);return 0
     audit=load(DECISION_PATH,{})
-    failures=audit.get('human_content_failures') or []
     hard_block=bool(audit.get('hard_block'))
     if category()=='result_followup' or hard_block:
-        output(False,mode);print('Production manager: rescue blocked by hard human-content failure.');return 0
-    print('Production manager: normal gate rejected; running one bounded rescue for repairable length/format failures.')
+        output(False,mode);print('Production manager: rescue blocked by hard integrity/policy failure.');return 0
+    print('Production manager: normal gate rejected; running one bounded rescue for repairable content/format failures.')
     rc=subprocess.run([sys.executable,str(ROOT/'src/publish_rescue.py')],cwd=ROOT,check=False).returncode
     if rc!=0:output(False,mode);return 0
     rescue_status();report=fresh_report()
