@@ -13,6 +13,8 @@ from pathlib import Path
 
 REPORT_DIR = Path("data/reports")
 PREFLIGHT = Path("data/live/editorial_preflight.json")
+CONTEXT = Path("data/live/publication_context.json")
+FROZEN = Path("data/live/authoritative_opportunity.json")
 MARKET = Path("data/live/market_snapshot.json")
 STATUS = Path("data/live/creator_status.json")
 VISUAL_META = Path("data/live/visual_metadata.json")
@@ -73,6 +75,28 @@ def fmt_volume(volume: float) -> str:
     return "fresh spot data"
 
 
+def clean_symbol(value: str) -> str:
+    return str(value or "").upper().replace("$", "").replace("USDT", "").strip()
+
+
+def authoritative_symbol(report: dict, preflight: dict) -> str:
+    context = load(CONTEXT, {})
+    frozen = load(FROZEN, {})
+    selected = preflight.get("selected_opportunity") or {}
+    draft = report.get("draft") or {}
+    for value in (
+        context.get("symbol"),
+        frozen.get("symbol"),
+        selected.get("symbol") if isinstance(selected, dict) else "",
+        report.get("symbol"),
+        draft.get("symbol") if isinstance(draft, dict) else "",
+    ):
+        symbol = clean_symbol(value)
+        if symbol:
+            return symbol
+    return ""
+
+
 def main():
     report_path = latest_report()
     report = load(report_path, {})
@@ -83,13 +107,7 @@ def main():
     if not isinstance(selected, dict):
         selected = {}
 
-    symbol = str(
-        selected.get("symbol")
-        or selected.get("topic")
-        or report.get("symbol")
-        or (report.get("draft") or {}).get("symbol")
-        or ""
-    ).upper().replace("USDT", "")
+    symbol = authoritative_symbol(report, preflight)
     if not symbol:
         raise SystemExit("No authoritative symbol available for rescue")
 
@@ -136,7 +154,7 @@ def main():
         ])
         style = "publish_rescue_newsroom"
     elif move >= 15:
-        hook = f"🔥 ${symbol} moved {move:+.1f}% — the next reaction matters more than the headline."
+        hook = f"🔥 ${symbol} moved {move:+.1f}% — confirmation now matters more than the headline."
         post = "\n\n".join([
             hook,
             f"Spot activity is {volume_text}, with a {intraday:.1f}% intraday range.",
@@ -154,7 +172,7 @@ def main():
         ])
         style = "publish_rescue_breakdown"
     else:
-        hook = f"📊 ${symbol}: the next 1H reaction matters."
+        hook = f"📊 ${symbol}: the next 1H move is the decision point."
         post = "\n\n".join([
             hook,
             f"Price is around ${fmt_price(last)} with {volume_text} and a {intraday:.1f}% intraday range.",
