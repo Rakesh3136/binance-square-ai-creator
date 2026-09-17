@@ -75,16 +75,21 @@ def choose(xs,rows):
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); rows=recent(); primary_candidates,market_candidates=candidates(brief,pre,cad)
     chosen,blocks=choose(primary_candidates,rows)
-    if chosen is None:chosen,more=choose(market_candidates,rows);blocks+=more
+    if chosen is None:
+        market_choice,more=choose(market_candidates,rows); blocks+=more
+        if market_choice is not None and not flow_complete(market_choice):
+            blocks.append({'symbol':market_choice.get('symbol'),'reason':'market_fallback_requires_prediction_contract'})
+            market_choice=None
+        chosen=market_choice
     current_allowed=bool(cad.get('publish')); is_primary_signal=False; decision='NO_PUBLISH'; reason='no_qualified_non_repetitive_signal'
     if chosen and (current_allowed or num(chosen.get('score'))>=MIN_SCORE):
         is_primary_signal=lane(chosen) in PRIMARY_LANES or chosen.get('type')=='flow'
-        if is_primary_signal and not flow_complete(chosen):chosen=None; is_primary_signal=False; reason='prediction_contract_missing_direction_trigger_tp_or_sl'
-        else:decision='PRIMARY_SIGNAL' if is_primary_signal else 'MARKET_SIGNAL';reason='qualified_non_repetitive_signal_selected'
+        if not flow_complete(chosen):chosen=None; is_primary_signal=False; reason='prediction_contract_missing_direction_trigger_tp_or_sl'
+        else:decision='PRIMARY_SIGNAL' if is_primary_signal else 'MARKET_SIGNAL';reason='qualified_prediction_signal_selected'
     publish=chosen is not None; selected=None
     if chosen:
-        selected=dict(chosen); _,p,side,tr,tp1,tp2,sl,conf=setup_parts(selected); selected['signal_first_primary']=is_primary_signal; selected['prediction_contract_complete']=flow_complete(selected) if is_primary_signal else False; selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"
+        selected=dict(chosen); _,p,side,tr,tp1,tp2,sl,conf=setup_parts(selected); selected['signal_first_primary']=is_primary_signal; selected['prediction_contract_complete']=flow_complete(selected); selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"
         pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':is_primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':selected['prediction_contract_complete'],'prediction':p}; PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'1.6-current-cycle-cadence-recovery-shadow-fix','publish':publish,'decision':decision,'reason':reason,'primary_signal':is_primary_signal,'secondary_meme':False,'selected':selected,'cadence_publish_on_disk':current_allowed,'current_cycle_cadence_recovery':True,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary_candidates),'market':len(market_candidates)},'policy':{'primary_lane':'capital_flow_and_measurable_market_outcomes','secondary_lane':'controlled_market_signals_and_memes','minimum_primary_score':MIN_SCORE,'minimum_flow_confidence':MIN_FLOW_CONF,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'anti_repetition_window':5,'text_similarity_block':SIM,'no_signal_means_no_signal_post':True,'cadence_current_cycle_is_authoritative':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'1.7-prediction-contract-fallback-gate','publish':publish,'decision':decision,'reason':reason,'primary_signal':is_primary_signal,'secondary_meme':False,'selected':selected,'cadence_publish_on_disk':current_allowed,'current_cycle_cadence_recovery':True,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary_candidates),'market':len(market_candidates)},'policy':{'primary_lane':'capital_flow_and_measurable_market_outcomes','secondary_lane':'controlled_market_signals_and_memes','minimum_primary_score':MIN_SCORE,'minimum_flow_confidence':MIN_FLOW_CONF,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'anti_repetition_window':5,'text_similarity_block':SIM,'no_signal_means_no_signal_post':True,'market_fallback_requires_prediction_contract':True,'cadence_current_cycle_is_authoritative':True}}
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
