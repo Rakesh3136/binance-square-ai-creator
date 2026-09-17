@@ -1,14 +1,14 @@
 {
-  "version": "1.2-authoritative-publication-asset",
-  "generated_at": "2026-09-17T05:59:19.470129+00:00",
-  "decision": "PROCEED_TO_EXISTING_GATES",
-  "publish_intent": true,
+  "version": "1.3-300-agent-mesh",
+  "generated_at": "2026-09-17T06:18:10.297932+00:00",
+  "decision": "WAIT",
+  "publish_intent": false,
   "authoritative_symbol": "SYN",
   "authoritative_category": "top_gainers",
   "blockers": [],
   "asset_alignment": {
     "publication_context": "SYN",
-    "selected_opportunity": "",
+    "selected_opportunity": "SYN",
     "aligned": true,
     "stale_selection_is_not_used_for_strategy": false
   },
@@ -23,8 +23,13 @@
       "role": "select one differentiated thesis",
       "authority": "publication_context"
     },
-    "editorial": {
+    "mesh": {
       "status": "READY",
+      "role": "aggregate 300 sparse specialist signals",
+      "authority": "evidence_only"
+    },
+    "editorial": {
+      "status": "WAIT",
       "role": "shape one human-style authoring pass",
       "authority": "editorial_gates"
     },
@@ -45,18 +50,21 @@
     }
   },
   "strategy_artifact": "data/live/agent_strategy.json",
+  "mesh_artifact": "data/live/agent_mesh_300.json",
   "performance_health": {
-    "feed_records": 597,
+    "feed_records": 594,
     "matched_post_ids": 0,
     "collector_version": "2.1-canonical-id-attribution",
     "blind": false
   },
   "policy": {
+    "logical_agent_count": 300,
+    "sparse_network": true,
     "single_authoritative_asset": true,
     "publication_context_wins": true,
     "one_authoring_pass": true,
     "agents_cannot_publish": true,
-    "agents_cannot_merge": true,
+    "agents_cannot_trade": true,
     "deterministic_gates_win": true,
     "wait_is_valid": true
   }
