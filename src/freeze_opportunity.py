@@ -8,6 +8,7 @@ PRE = ROOT / 'data/live/editorial_preflight.json'
 ENGAGEMENT = ROOT / 'data/live/engagement_strategy.json'
 MARKET = ROOT / 'data/live/market_snapshot.json'
 CADENCE = ROOT / 'data/live/autonomous_cadence_6.json'
+SIGNAL = ROOT / 'data/live/signal_first_routing.json'
 PORTFOLIO = ROOT / 'data/live/content_portfolio_guard.json'
 OUT = ROOT / 'data/live/authoritative_opportunity.json'
 BASES = ['https://data-api.binance.vision', 'https://api-gcp.binance.com', 'https://api1.binance.com', 'https://api2.binance.com']
@@ -94,21 +95,49 @@ def portfolio_candidates(portfolio):
     return out
 
 
-def candidate_pool(portfolio, pre, engagement, market, stale_portfolio=False):
+def signal_candidate(signal):
+    if not isinstance(signal, dict) or signal.get('publish') is not True:
+        return None
+    selected = signal.get('selected')
+    if not isinstance(selected, dict) or not symbol(selected):
+        return None
+    candidate = dict(selected)
+    prediction = candidate.get('prediction') if isinstance(candidate.get('prediction'), dict) else {}
+    setup = candidate.get('trade_setup') if isinstance(candidate.get('trade_setup'), dict) else {}
+    for key, value in {
+        'direction': prediction.get('direction') or setup.get('side'),
+        'entry_trigger': prediction.get('entry_trigger') or setup.get('trigger'),
+        'tp1': prediction.get('tp1') or setup.get('tp1'),
+        'tp2': prediction.get('tp2') or setup.get('tp2'),
+        'sl': prediction.get('sl') or setup.get('invalidation'),
+        'confidence': prediction.get('confidence') or candidate.get('flow_confidence'),
+    }.items():
+        if value is not None:
+            candidate[key] = value
+    candidate['signal_first_primary'] = bool(candidate.get('signal_first_primary'))
+    candidate['signal_router_version'] = signal.get('router_version', '')
+    candidate['signal_thesis_key'] = candidate.get('thesis_key', '')
+    return candidate
+
+
+def candidate_pool(portfolio, pre, engagement, market, signal, stale_portfolio=False):
     pool, seen = [], set()
+    selected_signal = signal_candidate(signal)
+    if selected_signal:
+        add_candidate(pool, seen, selected_signal, 'signal_first_router')
     for source, item in portfolio_candidates(portfolio):
         add_candidate(pool, seen, item, source)
-
     ranking = pre.get('opportunity_ranking_6') or {}
+    selected_ranking = ranking.get('selected')
+    if isinstance(selected_ranking, dict):
+        add_candidate(pool, seen, selected_ranking, 'opportunity_ranker_selected')
     for x in ranking.get('top_candidates') or []:
         add_candidate(pool, seen, x, 'opportunity_ranker')
-
     if stale_portfolio:
         for key in ('top_content_signals', 'top_gainers', 'top_losers', 'highest_volume', 'new_listing_market'):
             for x in market.get(key) or []:
                 add_candidate(pool, seen, x, f'market_candidate:{key}')
         return pool
-
     selected_pre = pre.get('selected_opportunity')
     if isinstance(selected_pre, dict):
         add_candidate(pool, seen, selected_pre, 'preflight_selected_opportunity')
@@ -125,6 +154,10 @@ def infer_category(candidate, source):
     allowed = {'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','technical_setup','comparison','education','watchlist','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','crypto_meme'}
     if existing in allowed:
         return existing
+    if existing == 'next_gainer_candidate':
+        return 'top_gainers'
+    if existing == 'next_loser_candidate':
+        return 'top_losers'
     if source.endswith(':top_gainers'):
         return 'top_gainers'
     if source.endswith(':top_losers'):
@@ -135,7 +168,7 @@ def infer_category(candidate, source):
         return 'new_listings'
     if source.endswith(':top_content_signals'):
         return 'technical_setup'
-    if source == 'opportunity_ranker':
+    if source in {'opportunity_ranker','opportunity_ranker_selected','signal_first_router'}:
         return 'technical_setup'
     if source.startswith('content_portfolio_guard'):
         return 'technical_setup'
@@ -147,7 +180,7 @@ def prepare_candidate(candidate, source):
     item['symbol'] = symbol(item)
     item['category'] = infer_category(item, source)
     item['lane'] = str(item.get('lane') or item['category'])
-    item['chart_symbols'] = [item['symbol']]
+    item['chart_symbols'] = [base_symbol(item)]
     if not str(item.get('reason') or '').strip():
         item['reason'] = f'Fresh {item["category"].replace("_", " ")} market opportunity for {base_symbol(item)}; validate the move before acting.'
     if not str(item.get('instruction') or '').strip():
@@ -160,40 +193,35 @@ def main():
     eng = load(ENGAGEMENT)
     market = load(MARKET)
     cadence = load(CADENCE)
+    signal = load(SIGNAL)
     portfolio = load(PORTFOLIO)
     valid = trading_symbols()
-
     portfolio_selected = portfolio.get('selected') if isinstance(portfolio.get('selected'), dict) else {}
     portfolio_symbol = symbol(portfolio_selected)
     portfolio_exists = bool(portfolio.get('publish') and portfolio_symbol)
     stale_portfolio = bool(portfolio_exists and portfolio_symbol not in valid)
     if stale_portfolio:
         print(f'Portfolio selected stale/delisted asset: {portfolio_symbol}; entering NON-BTC research recovery')
-
-    pool = candidate_pool(portfolio, pre, eng, market, stale_portfolio=stale_portfolio)
+    pool = candidate_pool(portfolio, pre, eng, market, signal, stale_portfolio=stale_portfolio)
     chosen = None
     source = ''
-
     for candidate in pool:
         s = symbol(candidate)
         if s not in valid:
             if s == portfolio_symbol:
                 print(f'Skipping stale portfolio candidate: {s}')
             continue
-        if stale_portfolio and base_symbol(candidate) in {'BTC', 'ETH'}:
+        if stale_portfolio and base_symbol(candidate) in {'BTC', 'ETH'} and str(candidate.get('_freeze_source')) != 'signal_first_router':
             print(f'Skipping reserve-asset recovery candidate: {base_symbol(candidate)}')
             continue
         chosen = prepare_candidate(candidate, str(candidate.get('_freeze_source') or 'validated_candidate'))
         source = str(candidate.get('_freeze_source') or 'validated_candidate')
         break
-
     if not chosen:
         raise SystemExit('WAIT_FOR_DIFFERENT_STORY: stale portfolio had no valid non-BTC researched recovery candidate')
-
     usdt = symbol(chosen)
     if usdt not in valid:
         raise SystemExit(f'Frozen opportunity is not a currently trading Binance symbol: {usdt}')
-
     sym = usdt[:-4]
     chosen.pop('_freeze_source', None)
     chosen['symbol'] = usdt
@@ -201,10 +229,6 @@ def main():
     if chosen_score > 0:
         chosen['selected_score'] = chosen_score
     pre['selected_opportunity'] = chosen
-
-    # Keep the authoritative content-director snapshot coherent with the frozen
-    # asset. This is essential for chart validation: a recovered market asset
-    # must not inherit the previous story's chart symbol/category.
     director = pre.get('content_director_4')
     if not isinstance(director, dict):
         director = {}
@@ -212,10 +236,10 @@ def main():
     primary.update({'symbol': sym, 'category': chosen.get('category'), 'lane': chosen.get('lane'), 'chart_symbols': [sym], 'reason': chosen.get('reason'), 'instruction': chosen.get('instruction')})
     director['primary_story'] = primary
     pre['content_director_4'] = director
-
     news_authoritative = bool(chosen.get('news_title') and (chosen.get('news_override') or chosen.get('type') == 'news' or chosen.get('category') in {'breaking_news', 'news_and_macro', 'news_market_impact'}))
+    prediction = chosen.get('prediction') if isinstance(chosen.get('prediction'), dict) else {}
     frozen = {
-        'version': 12,
+        'version': 13,
         'frozen_at': datetime.now(timezone.utc).isoformat(),
         'symbol': sym,
         'symbol_usdt': usdt,
@@ -233,6 +257,17 @@ def main():
         'run_ai': bool(pre.get('run_ai', False)),
         'selection_source': source,
         'portfolio_authoritative': source.startswith('content_portfolio_guard'),
+        'signal_first_authoritative': source == 'signal_first_router',
+        'signal_router_version': chosen.get('signal_router_version', signal.get('router_version', '')),
+        'signal_thesis_key': chosen.get('signal_thesis_key', ''),
+        'direction': chosen.get('direction') or prediction.get('direction') or '',
+        'entry_trigger': chosen.get('entry_trigger') or prediction.get('entry_trigger'),
+        'tp1': chosen.get('tp1') or prediction.get('tp1'),
+        'tp2': chosen.get('tp2') or prediction.get('tp2'),
+        'sl': chosen.get('sl') or prediction.get('sl'),
+        'confidence': chosen.get('confidence') or prediction.get('confidence'),
+        'conditional': bool(prediction.get('conditional', True)),
+        'not_a_guarantee': bool(prediction.get('not_a_guarantee', True)),
         'stale_portfolio_recovered': stale_portfolio,
         'stale_portfolio_original_symbol': portfolio_symbol if stale_portfolio else '',
         'news_authoritative': news_authoritative,
