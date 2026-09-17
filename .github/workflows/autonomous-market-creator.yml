@@ -190,7 +190,7 @@ jobs:
           python src/creator_intelligence_2.py || true
       - name: Score scripts and apply human editorial pass
         id: editorial
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
