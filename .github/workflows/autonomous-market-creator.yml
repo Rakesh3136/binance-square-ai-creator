@@ -27,7 +27,9 @@ env:
 
 concurrency:
   group: unified-binance-square-creator
-  cancel-in-progress: true
+  # Never kill an active market/publication cycle because a newer commit arrived.
+  # The next cycle will queue and run against the newest main instead.
+  cancel-in-progress: false
 
 jobs:
   creator:
@@ -305,6 +307,12 @@ jobs:
       - name: Persist run state and diagnostics
         if: ${{ always() }}
         run: |
+          # A cancelled run may be superseded by a newer main commit. Never
+          # persist its mixed working tree back to main.
+          if [ "${{ job.status }}" = "cancelled" ]; then
+            echo 'Run cancelled; skipping repository state persistence.'
+            exit 0
+          fi
           if [ -f src/creator_diagnostics.py ]; then
             python src/creator_diagnostics.py || true
           else
@@ -312,11 +320,16 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          # Re-anchor the working tree to the newest main before staging generated state.
-          # This avoids rebasing a large generated-data commit after another cycle advanced main.
           git fetch origin main
           git reset --mixed origin/main
           git add analytics data
+          bad_paths=$(git diff --cached --name-only | grep -vE '^(analytics|data)/' || true)
+          if [ -n "$bad_paths" ]; then
+            echo '::error::Refusing to persist non-generated paths:'
+            echo "$bad_paths"
+            git reset
+            exit 1
+          fi
           if git diff --cached --quiet; then
             echo 'No generated state changes to persist'
           else
