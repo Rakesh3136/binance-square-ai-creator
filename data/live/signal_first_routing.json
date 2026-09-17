@@ -1,28 +1,23 @@
 {
-  "generated_at": "2026-09-17T06:18:07.788618+00:00",
-  "router_version": "1.6-current-cycle-cadence-recovery-shadow-fix",
-  "publish": true,
-  "decision": "MARKET_SIGNAL",
-  "reason": "qualified_non_repetitive_signal_selected",
+  "generated_at": "2026-09-17T06:27:26.139634+00:00",
+  "router_version": "1.7-prediction-contract-fallback-gate",
+  "publish": false,
+  "decision": "NO_PUBLISH",
+  "reason": "no_qualified_non_repetitive_signal",
   "primary_signal": false,
   "secondary_meme": false,
-  "selected": {
-    "symbol": "NEAR",
-    "category": "next_gainer_candidate",
-    "score": 93.84,
-    "type": "market",
-    "lane": "market",
-    "reason": "current cadence selected opportunity",
-    "signal_first_primary": false,
-    "prediction_contract_complete": false,
-    "thesis_key": "NEAR||next_gainer_candidate|None|None"
-  },
+  "selected": null,
   "cadence_publish_on_disk": false,
   "current_cycle_cadence_recovery": true,
-  "blocked_candidates": [],
+  "blocked_candidates": [
+    {
+      "symbol": "NEAR",
+      "reason": "market_fallback_requires_prediction_contract"
+    }
+  ],
   "candidate_counts": {
     "primary": 0,
-    "market": 29
+    "market": 27
   },
   "policy": {
     "primary_lane": "capital_flow_and_measurable_market_outcomes",
@@ -40,6 +35,7 @@
     "anti_repetition_window": 5,
     "text_similarity_block": 0.72,
     "no_signal_means_no_signal_post": true,
+    "market_fallback_requires_prediction_contract": true,
     "cadence_current_cycle_is_authoritative": true
   }
 }
