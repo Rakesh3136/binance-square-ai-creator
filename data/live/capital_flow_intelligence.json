@@ -1,519 +1,617 @@
 {
-  "version": "1.3",
-  "generated_at": "2026-09-17T13:26:26.922329+00:00",
-  "source": "Binance Spot 24h ticker + 1h OHLCV",
-  "method": "relative strength + volume acceleration + volume-weighted directional pressure",
-  "assets_considered": 65,
-  "assets_scored": 65,
-  "rotation_state": "RISK_ON_ROTATION",
-  "leader_laggard_spread": 179.5347,
-  "leaders": [
-    {
-      "symbol": "AVAUSDT",
-      "last_price": 0.298,
-      "recent_6h_high": 0.332,
-      "recent_6h_low": 0.2355,
-      "return_6h_pct": 20.3554,
-      "return_12h_pct": 69.7039,
-      "volume_ratio_6h_vs_prior_12h": 1.4254,
-      "volume_pressure_pct": 8.7843,
-      "flow_score": 288.363,
-      "quote_volume_usdt": 17504743.54
-    },
-    {
-      "symbol": "GENIUSUSDT",
-      "last_price": 0.3874,
-      "recent_6h_high": 0.455,
-      "recent_6h_low": 0.3029,
-      "return_6h_pct": 26.3948,
-      "return_12h_pct": 26.3536,
-      "volume_ratio_6h_vs_prior_12h": 282.5994,
-      "volume_pressure_pct": 17.95329,
-      "flow_score": 219.6634,
-      "quote_volume_usdt": 9253449.61
-    },
-    {
-      "symbol": "ONEUSDT",
-      "last_price": 0.001412,
-      "recent_6h_high": 0.00155,
-      "recent_6h_low": 0.001235,
-      "return_6h_pct": 4.2836,
-      "return_12h_pct": 27.8986,
-      "volume_ratio_6h_vs_prior_12h": 0.6414,
-      "volume_pressure_pct": 8.97573,
-      "flow_score": 125.2973,
-      "quote_volume_usdt": 20229646.56
-    },
-    {
-      "symbol": "SYNUSDT",
-      "last_price": 0.19737,
-      "recent_6h_high": 0.23318,
-      "recent_6h_low": 0.17144,
-      "return_6h_pct": 10.7265,
-      "return_12h_pct": 21.6081,
-      "volume_ratio_6h_vs_prior_12h": 1.1638,
-      "volume_pressure_pct": 3.0688,
-      "flow_score": 99.8629,
-      "quote_volume_usdt": 36075570.84
-    },
-    {
-      "symbol": "MARSCOINUSDT",
-      "last_price": 0.1191,
-      "recent_6h_high": 0.1196,
-      "recent_6h_low": 0.1041,
-      "return_6h_pct": 5.1192,
-      "return_12h_pct": 12.6774,
-      "volume_ratio_6h_vs_prior_12h": 0.6753,
-      "volume_pressure_pct": 1.87304,
-      "flow_score": 53.1648,
-      "quote_volume_usdt": 28518506.22
-    }
+  "version": "23.0",
+  "generated_at": "2026-09-17T13:29:37.613176+00:00",
+  "status": "READY",
+  "method": "Binance spot multi-timeframe OHLCV + taker-buy proxy + Binance futures OI/funding/taker/long-short proxies + BTC-relative rotation",
+  "symbols_scanned": [
+    "BTC",
+    "ETH",
+    "BNB",
+    "USDC",
+    "ZEC",
+    "SOL",
+    "XRP",
+    "USD1",
+    "NEAR",
+    "RLUSD",
+    "LSK",
+    "MARSCOIN"
   ],
-  "laggards": [
-    {
-      "symbol": "SOLVUSDT",
-      "last_price": 0.00438,
-      "recent_6h_high": 0.00459,
-      "recent_6h_low": 0.00435,
-      "return_6h_pct": -2.0134,
-      "return_12h_pct": -13.4387,
-      "volume_ratio_6h_vs_prior_12h": 0.1497,
-      "volume_pressure_pct": -3.38548,
-      "flow_score": -64.6877,
-      "quote_volume_usdt": 6358720.37
-    },
-    {
-      "symbol": "LSKUSDT",
-      "last_price": 0.4891,
-      "recent_6h_high": 0.5162,
-      "recent_6h_low": 0.4731,
-      "return_6h_pct": -0.4883,
-      "return_12h_pct": -4.7146,
-      "volume_ratio_6h_vs_prior_12h": 0.371,
-      "volume_pressure_pct": -0.82588,
-      "flow_score": -23.456,
-      "quote_volume_usdt": 69093784.15
-    },
-    {
-      "symbol": "HEIUSDT",
-      "last_price": 0.1267,
-      "recent_6h_high": 0.133,
-      "recent_6h_low": 0.1235,
-      "return_6h_pct": -0.7831,
-      "return_12h_pct": -1.6304,
-      "volume_ratio_6h_vs_prior_12h": 0.4828,
-      "volume_pressure_pct": 0.1196,
-      "flow_score": -10.1169,
-      "quote_volume_usdt": 13946465.08
-    },
-    {
-      "symbol": "DASHUSDT",
-      "last_price": 57.54,
-      "recent_6h_high": 59.59,
-      "recent_6h_low": 56.51,
-      "return_6h_pct": -0.8615,
-      "return_12h_pct": -2.1096,
-      "volume_ratio_6h_vs_prior_12h": 0.6021,
-      "volume_pressure_pct": 0.89524,
-      "flow_score": -7.6541,
-      "quote_volume_usdt": 35991349.22
-    },
-    {
-      "symbol": "ZENUSDT",
-      "last_price": 6.879,
-      "recent_6h_high": 7.22,
-      "recent_6h_low": 6.835,
-      "return_6h_pct": -2.3286,
-      "return_12h_pct": -1.3622,
-      "volume_ratio_6h_vs_prior_12h": 1.027,
-      "volume_pressure_pct": 0.78009,
-      "flow_score": -5.4076,
-      "quote_volume_usdt": 9152452.69
-    }
+  "majors": [
+    "BTC",
+    "ETH",
+    "BNB"
   ],
-  "highest_conviction": {
-    "symbol": "AVAUSDT",
-    "last_price": 0.298,
-    "recent_6h_high": 0.332,
-    "recent_6h_low": 0.2355,
-    "return_6h_pct": 20.3554,
-    "return_12h_pct": 69.7039,
-    "volume_ratio_6h_vs_prior_12h": 1.4254,
-    "volume_pressure_pct": 8.7843,
-    "flow_score": 288.363,
-    "quote_volume_usdt": 17504743.54
-  },
-  "top_conditional_setups": [
-    {
-      "symbol": "GENIUSUSDT",
-      "flow_score": 219.6634,
-      "flow_confidence": 95.0,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 0.455455,
-        "tp1": 0.60801,
-        "tp2": 0.6842875,
-        "sl": 0.3029,
-        "invalidation": 0.3029,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 95.0,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 0.455455,
-        "target": 0.6842875,
-        "tp1": 0.60801,
-        "tp2": 0.6842875,
-        "invalidation": 0.3029,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "COTIUSDT",
-      "flow_score": 48.078,
-      "flow_confidence": 95.0,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 0.0196196,
-        "tp1": 0.0210392,
-        "tp2": 0.021749,
-        "sl": 0.0182,
-        "invalidation": 0.0182,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 95.0,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 0.0196196,
-        "target": 0.021749,
-        "tp1": 0.0210392,
-        "tp2": 0.021749,
-        "invalidation": 0.0182,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "NEARUSDT",
-      "flow_score": 47.6408,
-      "flow_confidence": 95.0,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 2.9029,
-        "tp1": 3.0958,
-        "tp2": 3.19225,
-        "sl": 2.71,
-        "invalidation": 2.71,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 95.0,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 2.9029,
-        "target": 3.19225,
-        "tp1": 3.0958,
-        "tp2": 3.19225,
-        "invalidation": 2.71,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "SOXLBUSDT",
-      "flow_score": 47.1329,
-      "flow_confidence": 95.0,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 114.85474,
-        "tp1": 121.84948,
-        "tp2": 125.34685,
-        "sl": 107.86,
-        "invalidation": 107.86,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 95.0,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 114.85474,
-        "target": 125.34685,
-        "tp1": 121.84948,
-        "tp2": 125.34685,
-        "invalidation": 107.86,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "REZUSDT",
-      "flow_score": 47.0342,
-      "flow_confidence": 95.0,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 0.004190186,
-        "tp1": 0.004674372,
-        "tp2": 0.004916465,
-        "sl": 0.003706,
-        "invalidation": 0.003706,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 95.0,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 0.004190186,
-        "target": 0.004916465,
-        "tp1": 0.004674372,
-        "tp2": 0.004916465,
-        "invalidation": 0.003706,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "0GUSDT",
-      "flow_score": 44.5114,
-      "flow_confidence": 95.0,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 0.2198196,
-        "tp1": 0.2429392,
-        "tp2": 0.254499,
-        "sl": 0.1967,
-        "invalidation": 0.1967,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 95.0,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 0.2198196,
-        "target": 0.254499,
-        "tp1": 0.2429392,
-        "tp2": 0.254499,
-        "invalidation": 0.1967,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "CAKEUSDT",
-      "flow_score": 35.9386,
-      "flow_confidence": 95.0,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 2.435433,
-        "tp1": 2.568866,
-        "tp2": 2.6355825,
-        "sl": 2.302,
-        "invalidation": 2.302,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 95.0,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 2.435433,
-        "target": 2.6355825,
-        "tp1": 2.568866,
-        "tp2": 2.6355825,
-        "invalidation": 2.302,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "ONDOUSDT",
-      "flow_score": 34.9386,
-      "flow_confidence": 95.0,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 0.3751748,
-        "tp1": 0.4027496,
-        "tp2": 0.416537,
-        "sl": 0.3476,
-        "invalidation": 0.3476,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 95.0,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 0.3751748,
-        "target": 0.416537,
-        "tp1": 0.4027496,
-        "tp2": 0.416537,
-        "invalidation": 0.3476,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "AVAUSDT",
-      "flow_score": 288.363,
-      "flow_confidence": 90.51,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 0.332332,
-        "tp1": 0.429164,
-        "tp2": 0.47758,
-        "sl": 0.2355,
-        "invalidation": 0.2355,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 90.51,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 0.332332,
-        "target": 0.47758,
-        "tp1": 0.429164,
-        "tp2": 0.47758,
-        "invalidation": 0.2355,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    },
-    {
-      "symbol": "UNIUSDT",
-      "flow_score": 29.214,
-      "flow_confidence": 89.29,
-      "prediction": {
-        "direction": "LONG",
-        "entry_trigger": 7.082075,
-        "tp1": 7.40715,
-        "tp2": 7.5696875,
-        "sl": 6.757,
-        "invalidation": 6.757,
-        "risk_reward_tp1": 1.0,
-        "risk_reward_tp2": 1.5
-      },
-      "multitimeframe": {
-        "confidence": 89.29,
-        "flow_proxy_score": 100
-      },
-      "flow_notes": [
-        "6H/12H relative strength",
-        "6H volume acceleration versus prior 12H",
-        "volume-weighted directional pressure",
-        "trigger, TP and invalidation are derived from fresh 1H candles"
-      ],
-      "trade_setup": {
-        "side": "LONG",
-        "trigger": 7.082075,
-        "target": 7.5696875,
-        "tp1": 7.40715,
-        "tp2": 7.5696875,
-        "invalidation": 6.757,
-        "risk_reward": 1.5,
-        "conditional": true
-      }
-    }
-  ],
-  "prediction_contract": {
-    "required": [
-      "direction",
-      "entry_trigger",
-      "tp1",
-      "tp2",
-      "sl",
-      "confidence"
+  "selected_story_symbol": "ONE",
+  "market_rotation": {
+    "market_regime": "MIXED",
+    "btc_trend_score": 50.0,
+    "btc_flow_proxy_score": 50.0,
+    "leaders": [
+      "ETH",
+      "BNB",
+      "USDC",
+      "ZEC",
+      "SOL"
     ],
-    "tp1_rr": 1.0,
-    "tp2_rr": 1.5,
-    "conditional_only": true
+    "laggards": [
+      "ETH",
+      "BNB",
+      "USDC",
+      "ZEC",
+      "SOL"
+    ],
+    "reader_model": "When BTC is weak, prefer relative-strength leaders for watchlists and relative underperformers for conditional downside analysis; do not state that a coin will pump solely because BTC falls."
   },
-  "constraints": [
-    "observational signal only",
-    "capital flow is a market-data proxy, not wallet-level fund-flow data",
-    "setups are conditional on trigger; they are not guaranteed calls",
-    "targets/invalidation are derived from fresh 1H market structure",
-    "no synthetic data",
-    "requires editorial and technical gates before publication"
-  ]
+  "assets": [
+    {
+      "symbol": "BTC",
+      "last_price": 76599.31,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.5
+      },
+      "market_context": {
+        "quote_volume_usdt": 1107267796.09,
+        "liquidity_score": 100.0,
+        "spot_move_pct": 1.053
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "ETH",
+      "last_price": 2453.5,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.5
+      },
+      "market_context": {
+        "quote_volume_usdt": 794374110.38,
+        "liquidity_score": 100.0,
+        "spot_move_pct": 2.119
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "BNB",
+      "last_price": 727.78,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.035
+      },
+      "market_context": {
+        "quote_volume_usdt": 97462066.11,
+        "liquidity_score": 96.9,
+        "spot_move_pct": 2.179
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "USDC",
+      "last_price": 1.00076,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.5
+      },
+      "market_context": {
+        "quote_volume_usdt": 3542275860.16,
+        "liquidity_score": 100.0,
+        "spot_move_pct": 0.001
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "ZEC",
+      "last_price": 1361.18,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.5
+      },
+      "market_context": {
+        "quote_volume_usdt": 755005321.62,
+        "liquidity_score": 100.0,
+        "spot_move_pct": 10.282
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "SOL",
+      "last_price": 100.44,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.5
+      },
+      "market_context": {
+        "quote_volume_usdt": 241433269.51,
+        "liquidity_score": 100.0,
+        "spot_move_pct": 3.164
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "XRP",
+      "last_price": 1.3029,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.5
+      },
+      "market_context": {
+        "quote_volume_usdt": 239694998.91,
+        "liquidity_score": 100.0,
+        "spot_move_pct": 1.916
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "USD1",
+      "last_price": 0.99999,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.278
+      },
+      "market_context": {
+        "quote_volume_usdt": 147609867.76,
+        "liquidity_score": 98.522,
+        "spot_move_pct": 0.001
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "NEAR",
+      "last_price": 2.858,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.21
+      },
+      "market_context": {
+        "quote_volume_usdt": 131401057.78,
+        "liquidity_score": 98.067,
+        "spot_move_pct": 15.943
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "RLUSD",
+      "last_price": 1.001,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.033
+      },
+      "market_context": {
+        "quote_volume_usdt": 97211876.13,
+        "liquidity_score": 96.889,
+        "spot_move_pct": 0.01
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "LSK",
+      "last_price": 0.4885,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 48.832
+      },
+      "market_context": {
+        "quote_volume_usdt": 68975366.81,
+        "liquidity_score": 95.548,
+        "spot_move_pct": -16.224
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "MARSCOIN",
+      "last_price": 0.1185,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 48.327
+      },
+      "market_context": {
+        "quote_volume_usdt": 29152222.63,
+        "liquidity_score": 92.182,
+        "spot_move_pct": 22.798
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    }
+  ],
+  "top_conditional_setups": [],
+  "research_policy": [
+    "Money flow is inferred from observable proxies, not wallet-level capital tracking.",
+    "Direction is conditional, never certain.",
+    "LONG/SHORT setups require multi-timeframe alignment, flow confirmation, liquidity and model confidence.",
+    "Trigger/invalidation/TP are ATR-derived model levels, not guarantees or instructions to execute.",
+    "WAIT is a first-class answer whenever evidence conflicts or data is incomplete.",
+    "Never claim a coin will pump just because BTC falls; require relative strength and flow evidence."
+  ],
+  "content_recipe": {
+    "headline": "Lead with the market-regime change or capital-rotation observation, not a generic price move.",
+    "body": "Explain BTC/ETH/BNB regime, then show the alt that is gaining/losing relative strength and the evidence stack.",
+    "setup": "Only publish a conditional setup when side is LONG/SHORT and confidence >= 65, liquidity >= 55, and data quality is acceptable.",
+    "risk": "Always show invalidation and explain what would make the thesis wrong.",
+    "monetization": "Use only natural, story-relevant cashtags and verified trading widgets. Never manufacture urgency or solicit trades just to generate clicks."
+  },
+  "news_snapshot_used": true
 }
