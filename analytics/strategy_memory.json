@@ -1349,6 +1349,11 @@
       "pattern": "Repeated zero-reply asset: XRP",
       "reason": "Repeated passive views with zero replies and zero follower conversion.",
       "rule": "Apply a strong repetition penalty until a materially different format proves otherwise."
+    },
+    {
+      "pattern": "Repeated zero-reply asset: XRP",
+      "reason": "Repeated passive views with zero replies and zero follower conversion.",
+      "rule": "Apply a strong repetition penalty until a materially different format proves otherwise."
     }
   ],
   "best_formats": [],
@@ -1374,7 +1379,7 @@
       "reliability",
       "repair"
     ],
-    "generated_at": "2026-09-17T02:26:59.124547+00:00",
+    "generated_at": "2026-09-17T02:36:29.351002+00:00",
     "next_action": "RESEARCH_AND_WAIT_FOR_STRONG_SIGNAL",
     "objective": "IMPROVE_OPPORTUNITY_SELECTION",
     "plan_id": "bb7787ac467225ba",
@@ -1392,7 +1397,7 @@
     "status": "WAITING",
     "execution": "WAIT_FOR_VALID_OPPORTUNITY",
     "reason": "The autonomous brain does not currently authorize a strong opportunity.",
-    "created_at": "2026-09-17T02:26:59.166724+00:00"
+    "created_at": "2026-09-17T02:36:29.384797+00:00"
   },
   "creator_13_0": {
     "decision_id": "self13_5f72d5f82136",
@@ -1410,7 +1415,7 @@
     "knowledge_gap_count": 0
   },
   "creator_17_0": {
-    "research_id": "research17_3ca18e010ca0",
+    "research_id": "research17_128b61eff205",
     "status": "PARTIAL_RESEARCH",
     "decision_impact": "BLOCK_UNTIL_VERIFIED",
     "evidence_count": 6,
@@ -1464,7 +1469,7 @@
     "asset_outcomes": [],
     "category_outcomes": [],
     "format_outcomes": [],
-    "generated_at": "2026-09-17T02:26:57.322499+00:00",
+    "generated_at": "2026-09-17T02:36:27.681342+00:00",
     "guardrails": {
       "minimum_asset_win_rate": 0.67,
       "minimum_repeated_sample": 3,
@@ -1514,7 +1519,7 @@
     ],
     "effects": [],
     "exploration_rate": 0.35,
-    "generated_at": "2026-09-17T02:26:57.416151+00:00",
+    "generated_at": "2026-09-17T02:36:27.762778+00:00",
     "hard_constraints": [
       "factual_accuracy",
       "originality",
@@ -1574,7 +1579,7 @@
       "treatment_value": "data_driven_breakdown"
     },
     "decision": "continue_active_experiment",
-    "generated_at": "2026-09-17T02:26:57.449447+00:00",
+    "generated_at": "2026-09-17T02:36:27.791250+00:00",
     "hard_constraints": [
       "factual_accuracy",
       "originality",
@@ -1690,7 +1695,7 @@
       "MEME_COMMUNITY": 0.03,
       "OUTCOME_ACCOUNTABILITY": 0.11
     },
-    "generated_at": "2026-09-17T02:26:57.481527+00:00",
+    "generated_at": "2026-09-17T02:36:27.818718+00:00",
     "next_action": "Prefer a DISCOVERY opportunity that passes all existing gates. If unavailable, choose the strongest qualified opportunity rather than manufacturing a portfolio slot.",
     "next_bucket_priority": [
       "DISCOVERY",
@@ -1742,15 +1747,26 @@
     "version": "7.5.1"
   },
   "creator_8_0": {
-    "version": "8.2",
-    "status": "LEARNING_NO_VERIFIED_REVENUE",
-    "updated_at": "2026-09-17T02:28:41.699422+00:00",
+    "funnel": {
+      "reach": 0,
+      "revenue_per_verified_conversion": null,
+      "verified_conversion": 0,
+      "verified_conversion_per_reach_percent": 0.0,
+      "verified_revenue": 0
+    },
+    "learning_policy": {
+      "causal_claims_allowed": false,
+      "minimum_repeated_records": 3,
+      "never_force_weak_story_for_monetization": true,
+      "never_optimize_for_clicks_without_quality_evidence": true,
+      "promotion_requires_independent_experiment": true,
+      "revenue_alone_cannot_override_editorial_quality": true,
+      "revenue_alone_cannot_override_safety": true,
+      "use_for_strategy": false
+    },
     "lineage": {
-      "attributed_record_count": 0,
-      "unallocated_verified_record_count": 0,
-      "verified_revenue": 0,
       "allocated_verified_revenue": 0,
-      "unallocated_verified_revenue": 0.0,
+      "attributed_record_count": 0,
       "attribution_coverage_percent": 0.0,
       "identifier_priority": [
         "canonical_post_id",
@@ -1758,26 +1774,10 @@
         "experiment_id",
         "campaign_id"
       ],
-      "missing_links_are_not_inferred": true
-    },
-    "funnel": {
-      "reach": 0,
-      "verified_conversion": 0,
-      "verified_revenue": 0,
-      "verified_conversion_per_reach_percent": 0.0,
-      "revenue_per_verified_conversion": null
-    },
-    "revenue_lineage": [],
-    "repeated_monetization_signals": [],
-    "learning_policy": {
-      "use_for_strategy": false,
-      "minimum_repeated_records": 3,
-      "causal_claims_allowed": false,
-      "promotion_requires_independent_experiment": true,
-      "revenue_alone_cannot_override_editorial_quality": true,
-      "revenue_alone_cannot_override_safety": true,
-      "never_optimize_for_clicks_without_quality_evidence": true,
-      "never_force_weak_story_for_monetization": true
+      "missing_links_are_not_inferred": true,
+      "unallocated_verified_record_count": 0,
+      "unallocated_verified_revenue": 0.0,
+      "verified_revenue": 0
     },
     "next_actions": [
       "Feed repeated attributable signals into Creator 7.4 experiment selection as hypotheses, not guarantees.",
@@ -1785,7 +1785,12 @@
       "Preserve exact post/experiment attribution so future outcomes can explain why revenue occurred.",
       "Keep unallocated verified revenue visible but excluded from attribution-based strategy learning."
     ],
-    "sample_size": 0
+    "repeated_monetization_signals": [],
+    "revenue_lineage": [],
+    "sample_size": 0,
+    "status": "LEARNING_NO_VERIFIED_REVENUE",
+    "updated_at": "2026-09-17T02:36:27.846256+00:00",
+    "version": "8.2"
   },
   "creator_9_0": {
     "action": "RESEARCH_OR_WAIT",
@@ -1811,7 +1816,7 @@
       "treatment_value": "data_driven_breakdown",
       "use_policy": "apply only when naturally supported by the selected story"
     },
-    "generated_at": "2026-09-17T02:26:57.730544+00:00",
+    "generated_at": "2026-09-17T02:36:28.036206+00:00",
     "guardrails": [
       "factual_accuracy",
       "originality",
@@ -1896,7 +1901,7 @@
     "publish_standard": "Publish only when a story is genuinely useful, timely, evidence-backed and differentiated. Skipping is better than filler.",
     "visual_quality": "Use a visual only when it adds truthful information. Market charts must use real supplied market data."
   },
-  "generated_at": "2026-09-17T02:26:57.384906+00:00",
+  "generated_at": "2026-09-17T02:36:27.735126+00:00",
   "learning_overlay": {
     "adaptive_experiment_controller": {
       "experiment_id": "74-exp-20260906051743",
@@ -1924,7 +1929,7 @@
       "market_regime": "unknown",
       "primary_asset": "ZEC",
       "story_lane": "technical_setup",
-      "updated_at": "2026-09-17T02:26:57.730544+00:00",
+      "updated_at": "2026-09-17T02:36:28.036206+00:00",
       "version": "9.1"
     },
     "continuous_improvement": {
@@ -1947,7 +1952,7 @@
         "reliability",
         "repair"
       ],
-      "generated_at": "2026-09-17T02:26:59.124547+00:00",
+      "generated_at": "2026-09-17T02:36:29.351002+00:00",
       "next_action": "RESEARCH_AND_WAIT_FOR_STRONG_SIGNAL",
       "objective": "IMPROVE_OPPORTUNITY_SELECTION",
       "plan_id": "bb7787ac467225ba",
@@ -1988,23 +1993,23 @@
       }
     },
     "revenue_engine": {
-      "version": "8.2",
-      "status": "LEARNING_NO_VERIFIED_REVENUE",
       "allocated_verified_revenue": 0,
       "attribution_coverage_percent": 0.0,
-      "repeated_signal_count": 0,
       "learning_policy": {
-        "use_for_strategy": false,
-        "minimum_repeated_records": 3,
         "causal_claims_allowed": false,
+        "minimum_repeated_records": 3,
+        "never_force_weak_story_for_monetization": true,
+        "never_optimize_for_clicks_without_quality_evidence": true,
         "promotion_requires_independent_experiment": true,
         "revenue_alone_cannot_override_editorial_quality": true,
         "revenue_alone_cannot_override_safety": true,
-        "never_optimize_for_clicks_without_quality_evidence": true,
-        "never_force_weak_story_for_monetization": true
+        "use_for_strategy": false
       },
-      "updated_at": "2026-09-17T02:28:41.699422+00:00",
-      "revenue_inference_disabled": true
+      "repeated_signal_count": 0,
+      "revenue_inference_disabled": true,
+      "status": "LEARNING_NO_VERIFIED_REVENUE",
+      "updated_at": "2026-09-17T02:36:27.846256+00:00",
+      "version": "8.2"
     },
     "autonomous_experiment_execution": {
       "status": "WAITING",
@@ -2015,7 +2020,7 @@
     "synthetic_self": {
       "mode": "SURVIVAL",
       "executive_action": "RESEARCH_AND_WAIT_FOR_STRONG_SIGNAL",
-      "reflection_cycle": 183
+      "reflection_cycle": 184
     },
     "world_model": {
       "world_model_id": "wm14_9083bf44c7e8",
@@ -2024,7 +2029,7 @@
       "knowledge_gap_count": 0
     },
     "active_research": {
-      "research_id": "research17_3ca18e010ca0",
+      "research_id": "research17_128b61eff205",
       "status": "PARTIAL_RESEARCH",
       "decision_impact": "BLOCK_UNTIL_VERIFIED",
       "evidence_count": 6,
@@ -2073,15 +2078,6 @@
       "top_severity": 0.88,
       "improvement_count": 4,
       "verified_revenue": 0.0
-    },
-    "monetization_decision_engine": {
-      "version": "8.3",
-      "decision": "PRESERVE_ACTIVE_EXPERIMENT",
-      "experiment_id": "74-exp-20260906051743",
-      "repeated_signal_count": 0,
-      "updated_at": "2026-09-17T02:28:57.162037+00:00",
-      "revenue_inference_disabled": true,
-      "story_forcing_disabled": true
     }
   },
   "recent_performance_observations": [
