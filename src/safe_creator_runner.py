@@ -68,8 +68,6 @@ def choose_fresh(options, recent):
     for option in options:
         if normalize_sentence(option) not in recent:
             return option
-    # Options are intentionally different, but if history contains all of them
-    # use a date/asset-specific line rather than repeating a stock sentence.
     return options[0]
 
 
@@ -90,7 +88,7 @@ def emergency_verified_draft(reason):
     def n(key,default=0.0):
         try:return float(item.get(key) or default)
         except Exception:return default
-    move=n('price_change_percent'); price=n('last_price'); volume=n('quote_volume_usdt') or n('quote_volume'); rng=n('intraday_range_percent'); signal=n('content_signal_score'); category=str(selected.get('category') or 'market_opportunity').replace('_',' ')
+    move=n('price_change_percent'); price=n('last_price'); volume=n('quote_volume_usdt') or n('quote_volume'); rng=n('intraday_range_percent'); category=str(selected.get('category') or 'market_opportunity').replace('_',' ')
     candles=item.get('candles_1h') or []; highs=[]; lows=[]
     for c in candles[-24:]:
         if isinstance(c,(list,tuple)) and len(c)>=4:
@@ -104,26 +102,11 @@ def emergency_verified_draft(reason):
     recent=recent_published_sentences()
     seed=int(hashlib.sha256((symbol+datetime.now(timezone.utc).isoformat()).encode()).hexdigest()[:8],16)%4
     if category=='crypto meme':
-        hook_options=[
-            f'${symbol} chose chaos for today’s market update.',
-            f'The ${symbol} chart has excellent timing and questionable manners.',
-            f'Nobody ordered a ${symbol} plot twist, but the market delivered one.',
-            f'${symbol} just volunteered for the trader patience test.'
-        ]
+        hook_options=[f'${symbol} chose chaos for today’s market update.',f'The ${symbol} chart has excellent timing and questionable manners.',f'Nobody ordered a ${symbol} plot twist, but the market delivered one.',f'${symbol} just volunteered for the trader patience test.']
         hook=choose_fresh(hook_options[seed:]+hook_options[:seed],recent)
-        mechanism_options=[
-            f'For ${symbol}, the punchline is also the test: the size of the move matters less because the next reaction shows whether traders are accepting it or giving it back.',
-            f'The funny part is the headline; the useful part is ${symbol} itself, because the next reaction can show whether this move is being absorbed or rejected.',
-            f'${symbol} is interesting here because a large move creates attention first, while the reaction afterward tells us whether that attention has substance.',
-            f'The market can make any candle look dramatic, but ${symbol} becomes more informative because the follow-through can separate a real change in behavior from a one-off move.'
-        ]
+        mechanism_options=[f'For ${symbol}, the punchline is also the test: the size of the move matters less because the next reaction shows whether traders are accepting it or giving it back.',f'The funny part is the headline; the useful part is ${symbol} itself, because the reaction afterward tells us whether this move is being absorbed or rejected.',f'${symbol} is interesting here because a large move creates attention first, while the reaction afterward tells us whether that attention has substance.',f'The market can make any candle look dramatic, but ${symbol} becomes more informative because the follow-through can separate a real change in behavior from a one-off move.']
         mechanism=choose_fresh(mechanism_options[seed:]+mechanism_options[:seed],recent)
-        close_options=[
-            f'No heroic prediction here — just a very crypto-looking moment, backed by the Binance market snapshot.',
-            f'This is entertainment with a real market data point underneath it: the Binance snapshot shows the move, not its future.',
-            f'The joke is mine; the move is from the Binance market snapshot. What happens next still has to be observed.',
-            f'One chart can create a lot of drama. The Binance snapshot gives us the fact; the reaction gives us the next clue.'
-        ]
+        close_options=[f'No heroic prediction here — just a very crypto-looking moment, backed by the Binance market snapshot.',f'This is entertainment with a real market data point underneath it: the Binance snapshot shows the move, not its future.',f'The joke is mine; the move is from the Binance market snapshot. What happens next still has to be observed.',f'One chart can create a lot of drama. The Binance snapshot gives us the fact; the reaction gives us the next clue.']
         close=choose_fresh(close_options[seed:]+close_options[:seed],recent)
         question=f'What would make you stop laughing and start taking ${symbol} seriously?'
         post=f'{hook}\n\n${symbol} is on the screen after a {move:+.1f}% move.\n\n{mechanism}\n\n{close}\n\n{question}'
@@ -141,12 +124,8 @@ def emergency_verified_draft(reason):
 
 
 def local_or_emergency(original_error):
-    try:
-        import importlib.util
-        if importlib.util.find_spec('google.genai') is not None:
-            run_creator(); return 'LOCAL_FALLBACK_SUCCESS'
-        print('google.genai unavailable; using dependency-free verified creator')
-    except Exception as fallback_exc: print(f'Local AI fallback failed: {fallback_exc}')
+    """Never retry Gemini after a quota/error. The fallback is genuinely local."""
+    print('Gemini unavailable or budget exhausted; using dependency-free verified creator')
     emergency_verified_draft(original_error); return 'EMERGENCY_SUCCESS'
 
 
