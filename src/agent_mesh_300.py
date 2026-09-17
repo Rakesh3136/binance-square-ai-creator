@@ -6,7 +6,7 @@ blackboard and weighted consensus that downstream strategy/editorial code can
 consume without allowing the mesh to publish or trade by itself.
 """
 from __future__ import annotations
-import hashlib, json, math
+import hashlib, json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -27,6 +27,7 @@ CLUSTERS = [
     ("outcome_monetization", 20),
     ("safety_governance", 15),
 ]
+TOTAL_AGENTS = sum(count for _, count in CLUSTERS)
 
 
 def load(name: str) -> dict:
@@ -77,11 +78,13 @@ def build_agents() -> list[dict]:
 
 def candidate_signals(market: dict, flow: dict, research: dict, news: dict) -> dict[str, dict]:
     out: dict[str, dict] = {}
+
     def add(s: str) -> dict:
         s = sym(s)
         if not s:
             return {}
         return out.setdefault(s, {"market": [], "flow": [], "research": [], "news": []})
+
     for x in market.get("top_content_signals", []) + market.get("top_gainers", []) + market.get("top_losers", []):
         if isinstance(x, dict) and x.get("symbol"):
             add(x["symbol"])["market"].append(x)
@@ -140,34 +143,69 @@ def main() -> dict:
     feedback = load("performance_feedback.json")
     agents = build_agents()
     candidates = candidate_signals(market, flow, research, news)
-    scores = sorted((score_symbol(s, d) for s, d in candidates.items()), key=lambda x: x["opportunity_score"], reverse=True)
+    scores = sorted(
+        (score_symbol(s, d) for s, d in candidates.items()),
+        key=lambda x: x["opportunity_score"],
+        reverse=True,
+    )
+
+    # Evidence availability is global to the current cycle. The previous
+    # implementation referenced an undefined per-agent `data` variable, which
+    # made the entire mesh fail before producing its blackboard.
+    has_market = any(bool(d.get("market")) for d in candidates.values())
+    has_flow = any(bool(d.get("flow")) for d in candidates.values())
+    has_research_or_news = any(bool(d.get("research") or d.get("news")) for d in candidates.values())
+    has_feedback = bool(feedback)
+
     active = []
     for agent in agents:
-        # Activation is deterministic and evidence-gated; no blind 300-agent fan-out.
         cluster = agent["cluster"]
-        relevant = any([
-            cluster in {"market_structure", "technical_setup"} and bool(data["market"]),
-            cluster == "capital_flow" and bool(data["flow"]),
-            cluster in {"research_news"} and bool(data["research"] or data["news"]),
-            cluster == "derivatives" and bool(data["flow"]),
-            cluster == "prediction_scenarios" and bool(data["flow"]),
-            cluster == "risk_invalidation" and bool(data["flow"] or data["research"]),
-            cluster == "content_editorial" and bool(scores),
-            cluster == "audience_growth" and bool(scores),
-            cluster == "outcome_monetization" and bool(feedback),
-            cluster == "safety_governance",
-        ])
+        relevant = (
+            (cluster in {"market_structure", "technical_setup"} and has_market)
+            or (cluster == "capital_flow" and has_flow)
+            or (cluster == "research_news" and has_research_or_news)
+            or (cluster == "derivatives" and has_flow)
+            or (cluster == "prediction_scenarios" and has_flow)
+            or (cluster == "risk_invalidation" and (has_flow or has_research_or_news))
+            or (cluster == "content_editorial" and bool(scores))
+            or (cluster == "audience_growth" and bool(scores))
+            or (cluster == "outcome_monetization" and has_feedback)
+            or cluster == "safety_governance"
+        )
         if relevant:
             active.append(agent["id"])
+
+    ids = [a["id"] for a in agents]
+    unique_ids = len(set(ids)) == len(ids)
+    cluster_total_ok = sum(CLUSTERS[i][1] for i in range(len(CLUSTERS))) == TOTAL_AGENTS
+    validation = {
+        "logical_agent_count": len(agents),
+        "expected_agent_count": TOTAL_AGENTS,
+        "exact_count": len(agents) == TOTAL_AGENTS,
+        "unique_ids": unique_ids,
+        "cluster_totals_valid": cluster_total_ok,
+        "sparse_max_neighbors": max((len(a["neighbors"]) for a in agents), default=0),
+        "status": "VALID" if len(agents) == TOTAL_AGENTS and unique_ids and cluster_total_ok else "INVALID",
+    }
+    if validation["status"] != "VALID":
+        raise RuntimeError(f"300-agent mesh validation failed: {validation}")
+
     top = scores[:10]
     state = {
-        "version": "MESH-300.1",
+        "version": "MESH-300.2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "architecture": "sparse_weighted_specialist_network",
-        "logical_agent_count": 300,
+        "logical_agent_count": TOTAL_AGENTS,
         "active_agent_count": len(active),
         "clusters": {k: v for k, v in CLUSTERS},
         "activation": "evidence_gated",
+        "validation": validation,
+        "evidence_state": {
+            "market_available": has_market,
+            "flow_available": has_flow,
+            "research_or_news_available": has_research_or_news,
+            "verified_feedback_available": has_feedback,
+        },
         "shared_blackboard": {
             "candidate_count": len(scores),
             "top_candidates": top,
@@ -176,7 +214,7 @@ def main() -> dict:
             "revenue_claims": "observed_only",
         },
         "learning": {
-            "feedback_available": bool(feedback),
+            "feedback_available": has_feedback,
             "weight_updates": "reserved_for_verified_outcomes",
             "no_guaranteed_returns": True,
         },
@@ -184,7 +222,14 @@ def main() -> dict:
     }
     LIVE.mkdir(parents=True, exist_ok=True)
     MESH_OUT.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({"status": "OK", "version": state["version"], "logical_agents": 300, "active_agents": len(active), "top": top[:3]}))
+    print(json.dumps({
+        "status": "OK",
+        "version": state["version"],
+        "logical_agents": TOTAL_AGENTS,
+        "active_agents": len(active),
+        "validation": validation,
+        "top": top[:3],
+    }))
     return state
 
 
