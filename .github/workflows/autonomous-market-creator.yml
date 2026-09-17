@@ -67,6 +67,7 @@ jobs:
       - name: Measure previous publications and resolve prediction outcomes
         run: |
           python src/square_performance_collector.py
+          python src/square_post_detail_collector.py
           python src/creator_24_1_prediction_outcomes.py
           python src/creator_24_0_unified_ledger.py
           python src/creator_7_2_learning.py
@@ -122,6 +123,7 @@ jobs:
         run: |
           python src/creator_agent_supervisor.py
           python -m json.tool data/live/creator_agent_supervisor.json >/dev/null
+          python -m json.tool data/live/agent_mesh_300.json >/dev/null
       - name: Optional guarded self-engineering
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_self_engineering == true }}
         env:
@@ -149,9 +151,12 @@ jobs:
           python src/creator_mission_7.py
           python src/audience_growth_director.py
           python src/autonomous_cadence_6.py
-          publish=$(python -c 'import json; print(str(json.load(open("data/live/autonomous_cadence_6.json")).get("publish", False)).lower())')
+          # Signal-first routing is the last decision layer before publication.
+          # It binds the current cycle back to the authoritative preflight asset.
+          python src/signal_first_router.py
+          publish=$(python -c 'import json; print(str(json.load(open("data/live/signal_first_routing.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "Human-like adaptive cadence decision: $publish"
+          echo "Signal-first adaptive cadence decision: $publish"
       - name: Freeze opportunity and run authoritative brain
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
@@ -292,6 +297,7 @@ jobs:
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
           python src/extract_publication.py
+          python src/write_to_earn_eligibility_gate.py
           python src/binance_square_publisher.py
           python src/creator_20_0_publication_verifier.py
           python src/call_tracker.py
