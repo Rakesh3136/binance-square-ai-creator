@@ -174,7 +174,7 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
         facts.append(f"flow score: {flow_score:+.2f}")
     if quote is not None and quote >= 1_000_000:
         facts.append(f"24H quote volume: ${quote/1_000_000:.1f}M")
-    facts = facts[:3]
+    facts = facts[:2]
 
     seed_material = f"{sym}|{s['direction']}|{s['entry']}|{s['sl']}"
     variant = int(hashlib.sha256(seed_material.encode()).hexdigest()[:8], 16) % 5
@@ -199,8 +199,8 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
         + (", ".join(facts) if facts else "the fresh 1H structure and flow proxy agree on the current direction.")
     )
     condition = (
-        f"Confirmation: price must reach/hold the {s['direction']} trigger at {fmt(s['entry'])}. "
-        f"If the market invalidates at {fmt(s['sl'])}, the thesis is wrong."
+        f"Confirmation: price must reach and hold the {s['direction']} trigger. "
+        "If the invalidation breaks, the thesis is wrong."
     )
     plan = (
         f"Trade map — {s['direction']}\n"
