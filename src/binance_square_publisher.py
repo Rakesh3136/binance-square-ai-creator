@@ -113,8 +113,17 @@ def recent_rows():
     return rows
 
 
-def duplicate_reason(text: str, symbol: str, category: str) -> str:
+def duplicate_reason(text: str, symbol: str, category: str, context: dict, frozen: dict) -> str:
     target = clean_symbol(symbol)
+    current_direction = str(
+        context.get("direction")
+        or (context.get("prediction") or {}).get("direction")
+        or frozen.get("direction")
+        or (frozen.get("prediction") or {}).get("direction")
+        or ""
+    ).upper()
+    current_trigger = context.get("entry_trigger") or frozen.get("entry_trigger") or frozen.get("trigger") or frozen.get("entry")
+    current_invalidation = context.get("sl") or frozen.get("sl") or frozen.get("invalidation")
     now_dt = datetime.now(timezone.utc)
     for row in reversed(recent_rows()):
         rs = clean_symbol(row.get("symbol") or row.get("selected_lane_symbol"))
@@ -129,13 +138,30 @@ def duplicate_reason(text: str, symbol: str, category: str) -> str:
         old = str(row.get("text") or row.get("post") or row.get("content") or "").strip()
         if old and old == text.strip():
             return f"exact_text_duplicate_within_{DUPLICATE_HOURS:g}h"
-        if (
-            target
-            and rs == target
-            and row_category == str(category or "").lower()
-            and not any(k in text.lower() for k in ("result", "outcome", "invalidated", "follow-up", "follow up"))
-        ):
+
+        same_asset_category = target and rs == target and row_category == str(category or "").lower()
+        if not same_asset_category:
+            continue
+
+        old_direction = str(row.get("direction") or row.get("side") or "").upper()
+        old_trigger = row.get("trigger") or row.get("entry_trigger")
+        old_invalidation = row.get("invalidation") or row.get("sl")
+
+        # Signal/setup posts may revisit the same asset when the decision map
+        # changed. Block only a genuinely repeated setup, not every same-asset
+        # post. Legacy rows without a stored direction/setup are not enough to
+        # classify a new conditional thesis as a duplicate.
+        if current_direction and old_direction:
+            same_direction = current_direction == old_direction
+            same_trigger = str(current_trigger) == str(old_trigger) if current_trigger is not None and old_trigger is not None else True
+            same_invalidation = str(current_invalidation) == str(old_invalidation) if current_invalidation is not None and old_invalidation is not None else True
+            if same_direction and same_trigger and same_invalidation:
+                return f"same_asset_category_and_setup_within_{DUPLICATE_HOURS:g}h"
+
+        # For non-signal posts, retain the conservative old cooldown.
+        if not current_direction and not old_direction and not any(k in text.lower() for k in ("result", "outcome", "invalidated", "follow-up", "follow up")):
             return f"same_asset_and_category_within_{DUPLICATE_HOURS:g}h"
+
     return ""
 
 
@@ -186,7 +212,7 @@ def main() -> int:
             })
             return skip(f"Publication skipped by W2E eligibility gate: {reason}", "PUBLISH_SKIPPED_WTE_INELIGIBLE", symbol, category)
 
-        dup = duplicate_reason(text, symbol, category)
+        dup = duplicate_reason(text, symbol, category, context, frozen)
         if dup:
             append({
                 "timestamp": now(),
@@ -300,6 +326,13 @@ def main() -> int:
         "text_length": len(text),
         "symbol": symbol,
         "category": category,
+        "direction": str(
+            context.get("direction")
+            or (context.get("prediction") or {}).get("direction")
+            or frozen.get("direction")
+            or (frozen.get("prediction") or {}).get("direction")
+            or ""
+        ).upper(),
         "experiment_id": str(context.get("experiment_id") or frozen.get("experiment_id") or ""),
         "reference_price": frozen.get("reference_price") or context.get("reference_price"),
         "trigger": frozen.get("trigger") or frozen.get("entry"),
