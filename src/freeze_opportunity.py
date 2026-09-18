@@ -114,7 +114,16 @@ def signal_candidate(signal):
     }.items():
         if value is not None:
             candidate[key] = value
-    candidate['signal_first_primary'] = bool(candidate.get('signal_first_primary'))
+    side=str(candidate.get('direction') or '').upper()
+    complete=side in {'LONG','SHORT'} and all(candidate.get(k) is not None for k in ('entry_trigger','tp1','tp2','sl')) and float(candidate.get('confidence') or 0)>=65
+    if not complete:
+        return None
+    # A complete signal is authoritative regardless of whether an upstream
+    # ranker called it "market" or "flow".
+    candidate['signal_first_primary'] = True
+    candidate['type'] = 'flow'
+    candidate['lane'] = 'capital_flow_long' if side=='LONG' else 'capital_flow_short'
+    candidate['category'] = 'capital_flow_long' if side=='LONG' else 'capital_flow_short'
     candidate['signal_router_version'] = signal.get('router_version', '')
     candidate['signal_thesis_key'] = candidate.get('thesis_key', '')
     return candidate
