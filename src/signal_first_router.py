@@ -114,6 +114,18 @@ def candidates(brief,pre,cad,market,flow_data,full_flow,ranking):
         candidate={**x,'category':cat,'lane':'capital_flow_long' if cat=='next_gainer_candidate' else 'capital_flow_short','type':'flow','flow_confidence':num(x.get('discovery_score'),0)}
         if num(candidate.get('discovery_score'))>=45: primary.append(candidate)
 
+    # Promote fresh chartable content signals into the Signal-First evidence
+    # pool.  These candidates are still subject to exchangeInfo validation and
+    # derive() will only create a setup when verified 1H OHLCV is available.
+    for x in (market.get('top_content_signals') or []):
+        if not isinstance(x,dict) or not x.get('symbol'): continue
+        move=num(x.get('price_change_6h_pct'),num(x.get('price_change_percent')))
+        if move == 0: continue
+        cat='next_gainer_candidate' if move > 0 else 'next_loser_candidate'
+        candidate={**x,'category':cat,'lane':'capital_flow_long' if move > 0 else 'capital_flow_short','type':'flow','flow_confidence':num(x.get('content_signal_score'),num(x.get('score'),72))}
+        if num(candidate.get('content_signal_score'),0) >= MIN_SCORE:
+            primary.append(candidate)
+
     ranking_items=[]
     if isinstance(ranking.get('selected'),dict):ranking_items.append(ranking['selected'])
     if isinstance(ranking.get('top_candidates'),list):ranking_items.extend(x for x in ranking['top_candidates'] if isinstance(x,dict))
@@ -138,15 +150,10 @@ def choose(xs,rows,market,live_symbols):
     return None,blocked_rows
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); rows=recent()
-    # The full-universe scanner can lag the exchangeInfo-backed market snapshot
-    # for recently listed/relisted symbols.  Use the fresh market snapshot as a
-    # second authoritative live-universe source instead of rejecting a symbol
-    # that Binance has just returned with current klines.
+    # ExchangeInfo is the authority for whether an asset is actually tradable.
+    # Market-snapshot symbols are evidence candidates only; they must never
+    # override the live-trading universe (prevents stale/delisted symbols).
     live_symbols={str(s).upper().replace('USDT','').strip() for s in (full_flow.get('all_live_symbols') or []) if str(s).strip()}
-    for key in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
-        for item in (market.get(key) or []):
-            if isinstance(item,dict) and item.get('symbol'):
-                live_symbols.add(str(item.get('symbol')).upper().replace('USDT','').strip())
     primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking)
     chosen,blocks=choose(primary,rows,market,live_symbols)
     if chosen is None:chosen,more=choose(markets,rows,market,live_symbols);blocks+=more
