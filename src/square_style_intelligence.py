@@ -40,6 +40,34 @@ OFFICIAL_SOURCES = [
     },
 ]
 
+PUBLIC_CREATOR_OBSERVATIONS = [
+    {
+        "creator": "612 Ceros",
+        "profile_url": "https://www.binance.com/en/square/profile/612Ceros",
+        "observed_post_url": "https://www.binance.com/en/square/post/367180121030743",
+        "evidence_level": "public_profile_and_post_observation",
+        "notes": [
+            "Public profile shows a high-frequency market-signal identity and a large archive of posts.",
+            "Observed setup anatomy: asset-specific hook, LONG/SHORT direction, confidence, entry zone, SL, TP1/TP2/TP3, why-now evidence, one debate question, chart context and risk disclaimer.",
+            "Observed outcome posts are separate from fresh calls; the account publicly follows up when a frozen target is reported as hit."
+        ],
+    },
+    {
+        "creator": "509 JonyDong",
+        "profile_url": "https://www.binance.com/en/square/profile/chainguru_global",
+        "observed_post_url": "https://www.binance.com/en/square/post/365162251988587",
+        "evidence_level": "public_profile_and_post_observation",
+        "notes": [
+            "Public profile emphasizes real-trading context and a large post archive.",
+            "Observed setup anatomy: entry zone, TP ladder, SL, explicit rationale, volume/context, a specific question and a clear educational-risk disclaimer.",
+            "Observed follow-up behavior emphasizes reporting the result of earlier calls rather than presenting a new result as if it were the original signal."
+        ],
+    },
+    {
+        "policy": "These are public content-pattern observations, not verified payout or earnings records. Never copy creator wording, identity or signature jokes.",
+    },
+]
+
 PUBLIC_BENCHMARK_SOURCES = [
     {
         "name": "Premium Analysis — public Write-to-Earn tips",
@@ -73,6 +101,7 @@ BENCHMARKS = {
         "visual_principle": "Use a relevant image, chart, screenshot or original visual when it materially improves the story.",
         "human_signal": "Specific personal-style reasoning, observable decisions and concrete market context beat generic summaries.",
     },
+    "public_creator_observations": PUBLIC_CREATOR_OBSERVATIONS,
     "observed_high_reach_patterns": [
         "Strong posts create tension before explaining it.",
         "The body adds a new fact or interpretation instead of repeating the headline.",
@@ -242,6 +271,8 @@ def main() -> None:
         "research_confidence": quality,
         "training_policy": [
             "Learn patterns, not sentences.",
+            "For signal lanes, prefer a complete decision map over a generic momentum recap: direction, trigger, TP ladder, invalidation, why-now evidence and one specific question.",
+            "Use outcome follow-ups only from the verified prediction ledger; never turn an open or ambiguous call into a win post.",
             "Use public creator examples as editorial benchmarks only; never clone identity, wording or signature jokes.",
             "Prefer first-party evidence and the creator system's own measured outcomes over generic internet advice.",
             "A post is monetization-ready only when it is independently publishable as useful content first.",
