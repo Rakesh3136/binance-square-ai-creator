@@ -74,7 +74,33 @@ def evaluate(report):
     except Exception as exc:interaction={'score':0,'publish':False,'reasons':[f'quality_gate_error:{type(exc).__name__}']}
     try:quality=float(draft.get('quality_score') or interaction.get('score') or 0)
     except:quality=float(interaction.get('score') or 0)
-    human_score,human_failures=human_content_audit(post,expected,cat);quality=min(quality,human_score)
+    human_score,human_failures=human_content_audit(post,expected,cat)
+    # Signal-first lanes must preserve the frozen prediction contract in the
+    # final text. Missing setup fields are repairable, so they trigger the
+    # bounded rescue instead of silently publishing a generic market post.
+    signal_lanes={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','technical_setup'}
+    frozen=load(FROZEN_PATH)
+    prediction=frozen.get('prediction') if isinstance(frozen.get('prediction'),dict) else {}
+    contract={
+        'direction': frozen.get('direction') or prediction.get('direction'),
+        'entry_trigger': frozen.get('entry_trigger') or prediction.get('entry_trigger'),
+        'tp1': frozen.get('tp1') or prediction.get('tp1'),
+        'tp2': frozen.get('tp2') or prediction.get('tp2'),
+        'sl': frozen.get('sl') or prediction.get('sl'),
+    }
+    if cat in signal_lanes and all(v is not None and str(v).strip() for v in contract.values()):
+        required_markers=(
+            str(contract['direction']).upper(),
+            'Entry trigger:',
+            'TP1:',
+            'TP2:',
+            'SL / invalidation:',
+        )
+        for marker in required_markers:
+            if marker.lower() not in post.lower():
+                human_failures.append('signal_contract_missing:'+marker)
+        human_score=min(human_score,90 if not any(x.startswith('signal_contract_missing:') for x in human_failures) else 68)
+    quality=min(quality,human_score)
     intelligence=load(INTEL_PATH);elite=load(ELITE_PATH);intelligence_ok=(cat=='result_followup') or intelligence.get('publish_recommendation') is True;opportunity=opportunity_score(data);chart_ok=cat in NONCHART or visual_is_verified(expected);coherent=content_is_coherent(post,expected,cat);failures=list(elite.get('failures') or []) if isinstance(elite,dict) else [];failures.extend(human_failures)
     # Only irreversible integrity/policy failures are hard blocks. Human-style
     # issues such as generic wording, ticker-percent hooks, number density,
