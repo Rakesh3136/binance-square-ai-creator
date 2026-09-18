@@ -214,6 +214,7 @@ def main():
     pool = candidate_pool(portfolio, pre, eng, market, signal, stale_portfolio=stale_portfolio)
     chosen = None
     source = ''
+    signal_mode = bool(signal.get('publish') is True and signal_candidate(signal))
     for candidate in pool:
         s = symbol(candidate)
         if s not in valid:
@@ -223,8 +224,20 @@ def main():
         if stale_portfolio and base_symbol(candidate) in {'BTC', 'ETH'} and str(candidate.get('_freeze_source')) != 'signal_first_router':
             print(f'Skipping reserve-asset recovery candidate: {base_symbol(candidate)}')
             continue
-        chosen = prepare_candidate(candidate, str(candidate.get('_freeze_source') or 'validated_candidate'))
-        source = str(candidate.get('_freeze_source') or 'validated_candidate')
+        source_name = str(candidate.get('_freeze_source') or 'validated_candidate')
+        prepared = prepare_candidate(candidate, source_name)
+        # Once Signal-First has produced a publishable prediction, never let a
+        # later generic ranker silently replace it with an unbounded market post.
+        # A fallback is allowed only if it carries the same complete prediction
+        # contract; otherwise fail closed and let the router find another
+        # evidence-backed candidate on the next cycle.
+        if signal_mode and source_name != 'signal_first_router':
+            direction = str(prepared.get('direction') or '').upper()
+            if direction not in {'LONG', 'SHORT'} or any(prepared.get(k) is None for k in ('entry_trigger','tp1','tp2','sl')):
+                print(f'Rejecting non-prediction fallback during Signal-First cycle: {s}')
+                continue
+        chosen = prepared
+        source = source_name
         break
     if not chosen:
         raise SystemExit('WAIT_FOR_DIFFERENT_STORY: stale portfolio had no valid non-BTC researched recovery candidate')
