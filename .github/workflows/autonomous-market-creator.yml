@@ -52,6 +52,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
+      - name: Early code integrity check
+        run: |
+          python -m compileall -q src
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, publish_rescue, production_manager"
+          echo 'Signal-first creator modules imported successfully'
+
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
       - name: Refresh full market universe, flow, news and core intelligence
