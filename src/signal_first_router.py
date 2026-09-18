@@ -124,24 +124,38 @@ def candidates(brief,pre,cad,market,flow_data,full_flow,ranking):
     story=brief.get('primary_story')
     if isinstance(story,dict):add(primary if lane(story) in PRIMARY_LANES or story.get('type')=='flow' else market_candidates,story,allow_complete_flow=True)
     return (sorted(primary,key=lambda x:(1 if flow_complete(x) else 0,num(x.get('flow_confidence'),0),num(x.get('score')),),reverse=True),sorted(market_candidates,key=lambda x:num(x.get('score')),reverse=True))
-def choose(xs,rows,market):
+def choose(xs,rows,market,live_symbols):
     blocked_rows=[]
     for x in xs:
+        raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
+        if live_symbols and raw_symbol not in live_symbols:
+            blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'})
+            continue
         e=derive(x,market); reason=blocked(e,rows)
         if reason:blocked_rows.append({'symbol':e.get('symbol'),'reason':reason});continue
         if flow_complete(e):return e,blocked_rows
         blocked_rows.append({'symbol':e.get('symbol'),'reason':'prediction_contract_missing_verified_ohlcv'})
     return None,blocked_rows
 def main():
-    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); rows=recent(); primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking)
-    chosen,blocks=choose(primary,rows,market)
-    if chosen is None:chosen,more=choose(markets,rows,market);blocks+=more
+    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); rows=recent()
+    live_symbols={str(s).upper().replace('USDT','').strip() for s in (full_flow.get('all_live_symbols') or []) if str(s).strip()}
+    primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking)
+    chosen,blocks=choose(primary,rows,market,live_symbols)
+    if chosen is None:chosen,more=choose(markets,rows,market,live_symbols);blocks+=more
     current_allowed=bool(cad.get('publish')); selected=None; decision='NO_PUBLISH'; reason='no_qualified_non_repetitive_signal'; primary_signal=False
     if chosen and (current_allowed or num(chosen.get('score'))>=MIN_SCORE):
-        primary_signal=lane(chosen) in PRIMARY_LANES or chosen.get('type')=='flow'; decision='PRIMARY_SIGNAL' if primary_signal else 'MARKET_SIGNAL'; reason='qualified_conditional_signal_selected'; selected=dict(chosen)
+        primary_signal=flow_complete(chosen) or lane(chosen) in PRIMARY_LANES or chosen.get('type')=='flow'
+        if primary_signal:
+            side=setup_parts(chosen)[2]
+            chosen['type']='flow'
+            chosen['lane']='capital_flow_long' if side=='LONG' else 'capital_flow_short'
+            chosen['category']=chosen.get('category') if chosen.get('category') in PRIMARY_LANES else ('capital_flow_long' if side=='LONG' else 'capital_flow_short')
+        decision='PRIMARY_SIGNAL' if primary_signal else 'MARKET_SIGNAL'
+        reason='qualified_conditional_signal_selected'
+        selected=dict(chosen)
     if selected:
         _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected); selected['signal_first_primary']=primary_signal; selected['prediction_contract_complete']=True; selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"
         pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':True,'prediction':pred}; PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.1-flow-first-with-full-universe-fallback','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'cadence_publish_on_disk':current_allowed,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets)},'policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_signal_post':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.2-live-symbol-validated-flow-primary','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'cadence_publish_on_disk':current_allowed,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets)},'policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_signal_post':True}}
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
