@@ -4,6 +4,7 @@ from pathlib import Path
 
 STATUS=Path('data/live/creator_status.json'); USAGE=Path('analytics/ai_usage.json'); REPORT_DIR=Path('data/reports'); DAILY_LIMIT=int(os.getenv('GEMINI_DAILY_BUDGET','20'))
 PUBLICATION_LOG=Path('analytics/publication_log.jsonl')
+SIGNAL_ROUTING=Path('data/live/signal_first_routing.json')
 
 
 def load(path,default):
@@ -36,6 +37,55 @@ def run_creator():
     multi_agent_creator.main()
     after=latest_report()
     if not after or after.stat().st_mtime <= before_mtime or not report_has_publishable_text(after): raise RuntimeError('Gemini creator completed without producing a fresh publishable draft')
+    return after
+
+
+def enforce_signal_first(report_path):
+    """Authoritative post-generation binding for Signal-First cycles.
+
+    Gemini is useful for prose, but it must not be allowed to silently replace
+    the frozen prediction contract with the old momentum template. When the
+    router selected a primary signal, the deterministic builder becomes the
+    final content source for the signal lane. This guarantees that the text
+    contains the same direction/trigger/targets/invalidation used by the chart
+    and outcome ledger.
+    """
+    routing=load(SIGNAL_ROUTING,{})
+    if routing.get('decision')!='PRIMARY_SIGNAL' or routing.get('primary_signal') is not True:
+        return {'applied':False,'reason':'not_primary_signal'}
+    selected=routing.get('selected') if isinstance(routing.get('selected'),dict) else {}
+    if not selected.get('symbol') or routing.get('prediction_contract_complete') is not True:
+        raise RuntimeError('Signal-First routing says PRIMARY_SIGNAL but prediction contract is incomplete')
+    from signal_post_builder import build_outcome_post, build_signal_post
+    special=build_outcome_post(selected) or build_signal_post(selected)
+    if not special:
+        raise RuntimeError('Signal-First selected a primary signal but no compliant post could be built')
+    try:
+        report=json.loads(report_path.read_text(encoding='utf-8'))
+    except Exception as exc:
+        raise RuntimeError(f'Cannot read generated draft for Signal-First enforcement: {exc}')
+    draft=report.get('draft') if isinstance(report.get('draft'),dict) else {}
+    post=special['post']
+    draft.update({
+        'post':post,
+        'text':post,
+        'body':post,
+        'hook':special.get('hook',''),
+        'discussion_question':special.get('question',''),
+        'editorial_style':special.get('style','signal_first'),
+        'symbol':special.get('symbol') or selected.get('symbol'),
+        'content_category':selected.get('category') or selected.get('lane') or 'capital_flow_signal',
+        'signal_first_enforced':True,
+        'signal_contract':special.get('signal_contract'),
+        'flow_evidence':special.get('flow_evidence'),
+    })
+    report['draft']=draft
+    report['signal_first_enforced']=True
+    report['signal_first_routing_version']=routing.get('router_version')
+    report['generation_mode']='SIGNAL_FIRST_BOUND'
+    report['status']='DRAFT_ONLY_NOT_PUBLISHED'
+    report_path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+    return {'applied':True,'symbol':special.get('symbol'),'style':special.get('style')}
 
 
 def normalize_sentence(text):
@@ -146,9 +196,12 @@ def main():
     if requests>=DAILY_LIMIT:
         fallback_status=local_or_emergency('Gemini daily budget exhausted'); save_status('AI_SUCCESS','Gemini budget exhausted; verified local creator used',requests=requests,daily_limit=DAILY_LIMIT,generation_mode='LOCAL_FALLBACK',fallback_status=fallback_status); return 0
     usage['requests']=requests+1; USAGE.parent.mkdir(parents=True,exist_ok=True); USAGE.write_text(json.dumps(usage,indent=2),encoding='utf-8')
-    try: run_creator()
+    try:
+        report_path=run_creator()
+        binding=enforce_signal_first(report_path)
+        print(json.dumps({'signal_first_binding':binding},indent=2))
     except Exception as exc:
         message=str(exc); print(f'Gemini creator failed; switching immediately to verified local creator. Original error: {message}'); fallback_status=local_or_emergency(message); save_status('AI_SUCCESS','Gemini creator failed; verified local creator preserved the cycle',error=message,requests=usage['requests'],daily_limit=DAILY_LIMIT,generation_mode='LOCAL_FALLBACK',fallback_status=fallback_status); return 0
-    save_status('AI_SUCCESS','Fresh Gemini draft generated',requests=usage['requests'],daily_limit=DAILY_LIMIT,generation_mode='GEMINI'); return 0
+    save_status('AI_SUCCESS','Fresh creator draft generated and Signal-First binding enforced when applicable',requests=usage['requests'],daily_limit=DAILY_LIMIT,generation_mode='SIGNAL_FIRST_BOUND' if binding.get('applied') else 'GEMINI',signal_first_binding=binding); return 0
 
 if __name__=='__main__':raise SystemExit(main())
