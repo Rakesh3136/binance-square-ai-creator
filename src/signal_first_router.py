@@ -138,7 +138,15 @@ def choose(xs,rows,market,live_symbols):
     return None,blocked_rows
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); rows=recent()
+    # The full-universe scanner can lag the exchangeInfo-backed market snapshot
+    # for recently listed/relisted symbols.  Use the fresh market snapshot as a
+    # second authoritative live-universe source instead of rejecting a symbol
+    # that Binance has just returned with current klines.
     live_symbols={str(s).upper().replace('USDT','').strip() for s in (full_flow.get('all_live_symbols') or []) if str(s).strip()}
+    for key in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
+        for item in (market.get(key) or []):
+            if isinstance(item,dict) and item.get('symbol'):
+                live_symbols.add(str(item.get('symbol')).upper().replace('USDT','').strip())
     primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking)
     chosen,blocks=choose(primary,rows,market,live_symbols)
     if chosen is None:chosen,more=choose(markets,rows,market,live_symbols);blocks+=more
