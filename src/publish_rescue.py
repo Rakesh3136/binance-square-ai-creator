@@ -139,10 +139,25 @@ def main():
     news_title = str(selected.get("news_title") or "").strip()
     news_source = str(selected.get("news_source") or "").strip()
 
+    special = None
+    try:
+        from signal_post_builder import build_outcome_post, build_signal_post
+        special = build_outcome_post(selected)
+        if special is None:
+            special = build_signal_post(selected)
+    except Exception as exc:
+        print(f'Signal-first rescue composer unavailable; using verified market rescue: {exc}')
+
+    # A rejected signal draft must not be downgraded into the old generic
+    # top-gainer template. Preserve the prediction contract whenever it exists.
+    if special:
+        post = special["post"]
+        hook = special["hook"]
+        style = special["style"]
     # Avoid template labels such as "Bull case:" / "Bear case:". Those read
     # like generated boilerplate and are explicitly penalized by the final
     # human-content firewall. Write the same conditional logic as a sentence.
-    if news_title:
+    elif news_title:
         source_line = f"Source: {news_source}" if news_source else "Source: verified news feed"
         hook = f"🚨 ${symbol}: {news_title}"
         post = "\n\n".join([
