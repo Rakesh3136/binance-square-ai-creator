@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
+PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
 PRIMARY_LANES={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up'}
 
@@ -71,20 +71,35 @@ def derive(candidate,market):
     if risk<=0:return candidate
     conf=max(MIN_FLOW_CONF,min(95.0,num(candidate.get('score'),num(candidate.get('ranker_score')))))
     e=dict(candidate); e['trade_setup']={'side':side,'trigger':trigger,'tp1':tp1,'tp2':tp2,'invalidation':sl,'risk_per_unit':risk,'setup_source':'verified_1h_ohlcv_conditional'}; e['prediction']={'direction':side,'entry_trigger':trigger,'tp1':tp1,'tp2':tp2,'sl':sl,'confidence':conf,'conditional':True,'not_a_guarantee':True}; e['flow_confidence']=conf; e['evidence']={'ohlcv_candles_used':len(candles),'last_price':last,'recent_high':rh,'recent_low':rl}; return e
-def add(target,x):
+def add(target,x,allow_complete_flow=False):
     if not isinstance(x,dict) or not x.get('symbol'):return
     score=num(x.get('score'),num(x.get('ranker_score')))
-    if score>=MIN_SCORE:target.append({**x,'score':score})
-def candidates(brief,pre,cad,market,ranking):
+    complete=flow_complete(x)
+    if score>=MIN_SCORE or (allow_complete_flow and complete):
+        target.append({**x,'score':score})
+def candidates(brief,pre,cad,market,flow_data,ranking):
     primary=[]; market_candidates=[]
     for source in (brief.get('ranked_stories'),pre.get('ranked_stories')):
         if isinstance(source,list):
             for x in source:
                 if not isinstance(x,dict) or not x.get('symbol'):continue
                 score=num(x.get('score'),num(x.get('ranker_score')))
-                if score>=MIN_SCORE:(primary if lane(x) in PRIMARY_LANES or x.get('type')=='flow' else market_candidates).append({**x,'score':score})
+                is_flow=lane(x) in PRIMARY_LANES or x.get('type')=='flow'
+                if is_flow and (score>=MIN_SCORE or flow_complete(x)):
+                    primary.append({**x,'score':score})
+                elif score>=MIN_SCORE:
+                    market_candidates.append({**x,'score':score})
     selected=pre.get('selected_opportunity')
-    if isinstance(selected,dict):add(primary if lane(selected) in PRIMARY_LANES or selected.get('type')=='flow' else market_candidates,selected)
+    if isinstance(selected,dict):
+        selected_is_flow=lane(selected) in PRIMARY_LANES or selected.get('type')=='flow' or flow_complete(selected)
+        add(primary if selected_is_flow else market_candidates,selected,allow_complete_flow=selected_is_flow)
+    # Directly bind the fresh capital-flow engine too. This keeps Signal-First
+    # independent of editorial score weighting and prevents a top-gainer fallback
+    # from replacing a complete conditional flow setup.
+    for x in (flow_data.get('top_conditional_setups') or []):
+        if isinstance(x,dict) and flow_complete(x):
+            primary.append({**x,'type':'flow','lane':x.get('lane') or ('capital_flow_long' if str((x.get('prediction') or {}).get('direction') or (x.get('trade_setup') or {}).get('side') or '').upper()=='LONG' else 'capital_flow_short'),'category':x.get('category') or ('capital_flow_long' if str((x.get('prediction') or {}).get('direction') or (x.get('trade_setup') or {}).get('side') or '').upper()=='LONG' else 'capital_flow_short'),'score':num(x.get('flow_score'),x.get('flow_confidence'))})
+
     # opportunity_ranking_6 stores the authoritative choice under `selected` and
     # the viable alternatives under `top_candidates`. The previous router looked
     # for selected_symbol at the root, so it silently ignored the entire ranking.
@@ -97,8 +112,9 @@ def candidates(brief,pre,cad,market,ranking):
     if cad.get('selected_symbol') and num(cad.get('ranker_score'),num(cad.get('effective_score')))>=MIN_SCORE:
         add(market_candidates,{'symbol':cad['selected_symbol'],'category':cad.get('selected_category','market'),'lane':'market','type':'market','score':num(cad.get('ranker_score'),num(cad.get('effective_score'))),'reason':'authoritative cadence selection'})
     story=brief.get('primary_story')
-    if isinstance(story,dict):add(primary if lane(story) in PRIMARY_LANES or story.get('type')=='flow' else market_candidates,story)
-    return sorted(primary,key=lambda x:num(x.get('score')),reverse=True),sorted(market_candidates,key=lambda x:num(x.get('score')),reverse=True)
+    if isinstance(story,dict):add(primary if lane(story) in PRIMARY_LANES or story.get('type')=='flow' else market_candidates,story,allow_complete_flow=True)
+    return (sorted(primary,key=lambda x:(1 if flow_complete(x) else 0,num(x.get('flow_confidence'),0),num(x.get('score')),),reverse=True),
+            sorted(market_candidates,key=lambda x:num(x.get('score')),reverse=True))
 def choose(xs,rows,market):
     blocked_rows=[]
     for x in xs:
@@ -108,7 +124,7 @@ def choose(xs,rows,market):
         blocked_rows.append({'symbol':e.get('symbol'),'reason':'prediction_contract_missing_verified_ohlcv'})
     return None,blocked_rows
 def main():
-    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); ranking=load(RANKING); rows=recent(); primary,markets=candidates(brief,pre,cad,market,ranking)
+    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); ranking=load(RANKING); rows=recent(); primary,markets=candidates(brief,pre,cad,market,flow,ranking)
     chosen,blocks=choose(primary,rows,market)
     if chosen is None:chosen,more=choose(markets,rows,market); blocks+=more
     current_allowed=bool(cad.get('publish')); selected=None; decision='NO_PUBLISH'; reason='no_qualified_non_repetitive_signal'; primary_signal=False
@@ -117,6 +133,6 @@ def main():
     if selected:
         _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected); selected['signal_first_primary']=primary_signal; selected['prediction_contract_complete']=True; selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"
         pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':True,'prediction':pred}; PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'1.9-ranking-selected-and-alternatives','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'cadence_publish_on_disk':current_allowed,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets)},'policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_signal_post':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.0-direct-flow-first-complete-signal-priority','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'cadence_publish_on_disk':current_allowed,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets)},'policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_signal_post':True}}
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
