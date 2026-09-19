@@ -260,6 +260,8 @@ def main():
     pre['content_director_4'] = director
     news_authoritative = bool(chosen.get('news_title') and (chosen.get('news_override') or chosen.get('type') == 'news' or chosen.get('category') in {'breaking_news', 'news_and_macro', 'news_market_impact'}))
     prediction = chosen.get('prediction') if isinstance(chosen.get('prediction'), dict) else {}
+    trade_setup = chosen.get('trade_setup') if isinstance(chosen.get('trade_setup'), dict) else {}
+    evidence = chosen.get('evidence') if isinstance(chosen.get('evidence'), dict) else {}
     frozen = {
         'version': 13,
         'frozen_at': datetime.now(timezone.utc).isoformat(),
@@ -290,6 +292,10 @@ def main():
         'confidence': chosen.get('confidence') or prediction.get('confidence'),
         'conditional': bool(prediction.get('conditional', True)),
         'not_a_guarantee': bool(prediction.get('not_a_guarantee', True)),
+        # Preserve the complete Signal-First provenance across the freeze boundary.
+        # Downstream evidence gates must validate the same OHLCV contract that the router selected.
+        'trade_setup': trade_setup,
+        'evidence': evidence,
         'stale_portfolio_recovered': stale_portfolio,
         'stale_portfolio_original_symbol': portfolio_symbol if stale_portfolio else '',
         'news_authoritative': news_authoritative,
