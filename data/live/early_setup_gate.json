@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "status": "WAIT_FOR_CONFIRMATION",
   "allowed": false,
   "symbol": "ONE",
@@ -8,15 +8,17 @@
   "discovery_score": 0.0,
   "evidence_fields": 0,
   "participation_evidence": false,
+  "signal_first_ohlcv_evidence": false,
   "reasons": [
     "no_qualified_early_state",
     "discovery_score_below_45",
     "insufficient_independent_participation_evidence",
-    "fewer_than_3_observed_flow_structure_fields"
+    "fewer_than_3_observed_flow_structure_fields",
+    "no_verified_signal_first_ohlcv_contract"
   ],
   "policy": [
     "No generic fallback is allowed when an early setup fails.",
-    "A confirmed setup still needs a concrete trigger and invalidation in the authoring contract.",
+    "A Signal-First conditional setup must carry >=20 fresh 1H OHLCV candles and concrete trigger/TP/invalidation levels.",
     "This gate does not guarantee a future move."
   ]
 }
