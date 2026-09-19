@@ -1,6 +1,6 @@
 """Final signal-first router: preserve strong candidates and derive evidence-backed conditional setups."""
 from __future__ import annotations
-import json, os, re
+import json, os, re, urllib.request
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -43,6 +43,19 @@ def blocked(x,rows):
         old=norm(text(r)); new=norm(text(x))
         if new and old and SequenceMatcher(None,new,old).ratio()>=SIM:return 'high_text_similarity_recent'
     return ''
+def trading_symbols():
+    """Return Binance's current TRADING spot symbols; never infer tradability from market snapshots."""
+    bases=('https://data-api.binance.vision','https://api-gcp.binance.com','https://api1.binance.com','https://api2.binance.com')
+    last=None
+    for api in bases:
+        try:
+            req=urllib.request.Request(api+'/api/v3/exchangeInfo?symbolStatus=TRADING',headers={'User-Agent':'binance-square-ai-creator/4.0','Accept':'application/json'})
+            with urllib.request.urlopen(req,timeout=15) as h:
+                data=json.loads(h.read().decode('utf-8'))
+            symbols={str(x.get('symbol','')).upper() for x in data.get('symbols',[]) if str(x.get('status','')).upper()=='TRADING'}
+            if symbols:return {s[:-4] if s.endswith('USDT') else s for s in symbols if s.endswith('USDT')}
+        except Exception as exc:last=exc
+    raise RuntimeError(f'Unable to verify Binance trading symbols before Signal-First selection: {last}')
 def candles_for(symbol,market):
     sym=str(symbol).upper().replace('USDT','')
     for key in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
@@ -94,17 +107,11 @@ def candidates(brief,pre,cad,market,flow_data,full_flow,ranking):
         selected_is_flow=lane(selected) in PRIMARY_LANES or selected.get('type')=='flow' or flow_complete(selected)
         add(primary if selected_is_flow else market_candidates,selected,allow_complete_flow=selected_is_flow)
 
-    # Primary source: the dedicated conditional-flow engine.
     for x in (flow_data.get('top_conditional_setups') or []):
         if isinstance(x,dict) and flow_complete(x):
             side=setup_parts(x)[2]
             primary.append({**x,'type':'flow','lane':x.get('lane') or ('capital_flow_long' if side=='LONG' else 'capital_flow_short'),'category':x.get('category') or ('capital_flow_long' if side=='LONG' else 'capital_flow_short'),'score':num(x.get('flow_score'),x.get('flow_confidence'))})
 
-    # Secondary evidence source: the full-universe participation scanner. It
-    # deliberately does not invent a direction; only positive/negative short-
-    # term price context can turn EARLY/DEVELOPING participation into a
-    # conditional LONG/SHORT candidate, and derive() then requires fresh 1H
-    # candles before it becomes publishable.
     for x in (full_flow.get('early_movers') or []):
         if not isinstance(x,dict) or str(x.get('flow_state','')).upper() not in {'EARLY','DEVELOPING'}:continue
         move=num(x.get('price_change_6h_pct'),num(x.get('price_change_percent')))
@@ -114,9 +121,6 @@ def candidates(brief,pre,cad,market,flow_data,full_flow,ranking):
         candidate={**x,'category':cat,'lane':'capital_flow_long' if cat=='next_gainer_candidate' else 'capital_flow_short','type':'flow','flow_confidence':num(x.get('discovery_score'),0)}
         if num(candidate.get('discovery_score'))>=45: primary.append(candidate)
 
-    # Promote fresh chartable content signals into the Signal-First evidence
-    # pool.  These candidates are still subject to exchangeInfo validation and
-    # derive() will only create a setup when verified 1H OHLCV is available.
     for x in (market.get('top_content_signals') or []):
         if not isinstance(x,dict) or not x.get('symbol'): continue
         move=num(x.get('price_change_6h_pct'),num(x.get('price_change_percent')))
@@ -140,7 +144,7 @@ def choose(xs,rows,market,live_symbols):
     blocked_rows=[]
     for x in xs:
         raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
-        if live_symbols and raw_symbol not in live_symbols:
+        if raw_symbol not in live_symbols:
             blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'})
             continue
         e=derive(x,market); reason=blocked(e,rows)
@@ -150,10 +154,8 @@ def choose(xs,rows,market,live_symbols):
     return None,blocked_rows
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); rows=recent()
-    # ExchangeInfo is the authority for whether an asset is actually tradable.
-    # Market-snapshot symbols are evidence candidates only; they must never
-    # override the live-trading universe (prevents stale/delisted symbols).
-    live_symbols={str(s).upper().replace('USDT','').strip() for s in (full_flow.get('all_live_symbols') or []) if str(s).strip()}
+    # ExchangeInfo is authoritative; scanner snapshots are evidence only.
+    live_symbols=trading_symbols()
     primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking)
     chosen,blocks=choose(primary,rows,market,live_symbols)
     if chosen is None:chosen,more=choose(markets,rows,market,live_symbols);blocks+=more
@@ -171,6 +173,6 @@ def main():
     if selected:
         _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected); selected['signal_first_primary']=primary_signal; selected['prediction_contract_complete']=True; selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"
         pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':True,'prediction':pred}; PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.2-live-symbol-validated-flow-primary','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'cadence_publish_on_disk':current_allowed,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets)},'policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_signal_post':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.3-exchangeinfo-authoritative-flow-primary','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'cadence_publish_on_disk':current_allowed,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols)},'live_symbol_source':'binance_exchangeInfo_TRADING','policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_signal_post':True}}
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
