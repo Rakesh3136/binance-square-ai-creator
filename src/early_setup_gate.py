@@ -27,7 +27,13 @@ def verified_prediction_evidence(frozen):
     pred=frozen.get('prediction') if isinstance(frozen.get('prediction'),dict) else {}
     ev=frozen.get('evidence') if isinstance(frozen.get('evidence'),dict) else {}
     direction=str(frozen.get('direction') or pred.get('direction') or '').upper()
-    levels=(pred.get('entry_trigger'),pred.get('tp1'),pred.get('tp2'),pred.get('sl'))
+    # The freeze contract may carry levels either inside prediction or at the frozen top level.
+    levels=(
+        pred.get('entry_trigger') if pred.get('entry_trigger') is not None else frozen.get('entry_trigger'),
+        pred.get('tp1') if pred.get('tp1') is not None else frozen.get('tp1'),
+        pred.get('tp2') if pred.get('tp2') is not None else frozen.get('tp2'),
+        pred.get('sl') if pred.get('sl') is not None else frozen.get('sl'),
+    )
     candles=num(ev.get('ohlcv_candles_used'))
     has_ohlcv=all(v is not None for v in levels) and direction in {'LONG','SHORT'} and candles>=20 and all(ev.get(k) not in (None,'') for k in ('last_price','recent_high','recent_low'))
     source=str((frozen.get('trade_setup') or {}).get('setup_source') or ev.get('source') or '').lower()
@@ -57,7 +63,7 @@ def main():
         if move>8:reasons.append('move_too_extended_for_early_lane')
         reasons.append('no_verified_signal_first_ohlcv_contract')
         allowed=False;status='WAIT_FOR_CONFIRMATION'
-    payload={'version':'1.1','status':status,'allowed':allowed,'symbol':symbol,'category':cat,'flow_state':state,'discovery_score':score,'evidence_fields':evidence,'participation_evidence':participation,'signal_first_ohlcv_evidence':prediction_evidence,'reasons':reasons,'policy':['No generic fallback is allowed when an early setup fails.','A Signal-First conditional setup must carry >=20 fresh 1H OHLCV candles and concrete trigger/TP/invalidation levels.','This gate does not guarantee a future move.']}
+    payload={'version':'1.2','status':status,'allowed':allowed,'symbol':symbol,'category':cat,'flow_state':state,'discovery_score':score,'evidence_fields':evidence,'participation_evidence':participation,'signal_first_ohlcv_evidence':prediction_evidence,'reasons':reasons,'policy':['No generic fallback is allowed when an early setup fails.','A Signal-First conditional setup must carry >=20 fresh 1H OHLCV candles and concrete trigger/TP/invalidation levels.','This gate does not guarantee a future move.']}
     OUT.write_text(json.dumps(payload,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(payload,indent=2))
     if not allowed:raise SystemExit('WAIT_FOR_CONFIRMATION: early-mover evidence gate failed')
 if __name__=='__main__':main()
