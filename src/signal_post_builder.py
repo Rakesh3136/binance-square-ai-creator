@@ -195,46 +195,51 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
     )
 
     why_now = (
-        f\"The current evidence supports a {s['direction']} scenario. \" +
-        (\", \".join(facts) + ".\" if facts else
-         f\"The fresh 1H structure and flow proxy are pointing in the same direction.\")
+        f"The current evidence supports a {s['direction']} scenario. "
+        + (", ".join(facts) + "." if facts else
+           "The fresh 1H structure and flow proxy are pointing in the same direction.")
+    )
+    condition = (
+        f"Confirmation: price needs to reach and hold {s['direction']} trigger {fmt(s['entry'])}. "
+        f"If {fmt(s['sl'])} breaks, the thesis is invalid."
     )
     plan = (
-        f\"Plan: {s['direction']} above {fmt(s['entry'])}; TP1 {fmt(s['tp1'])}; "
-        f\"TP2 {fmt(s['tp2'])}; invalidate below {fmt(s['sl'])}.\"
+        f"Plan: {s['direction']} above {fmt(s['entry'])}; "
+        f"TP1 {fmt(s['tp1'])}; TP2 {fmt(s['tp2'])}; "
+        f"invalidate below {fmt(s['sl'])}."
     )
     angle = [
-        \"The trigger matters more than the headline. A clean hold is confirmation; a fast wick is not.\",
-        \"The edge here is the predefined invalidation. If price loses it, the setup is discarded rather than averaged.\",
-        \"The setup is asymmetric by design: risk is defined before the market chooses the outcome.\",
-        \"Flow is a market-data proxy, so price structure still has the final say.\",
-        \"No chase: the trigger is the decision point, not the current candle.\",
+        "The trigger matters more than the headline. A clean hold is confirmation; a fast wick is not.",
+        "The edge here is the predefined invalidation. If price loses it, the setup is discarded rather than averaged.",
+        "The setup is asymmetric by design: risk is defined before the market chooses the outcome.",
+        "Flow is a market-data proxy, so price structure still has the final say.",
+        "No chase: the trigger is the decision point, not the current candle.",
     ][variant]
     question = {
-        \"LONG\": [
-            f\"Would you take a clean 1H hold above {fmt(s['entry'])}, or wait for the retest?\",
-            f\"What would make you reject the LONG thesis around {fmt(s['entry'])}?\",
-            f\"Do you want the breakout or the retest around {fmt(s['entry'])}?\",
-            f\"Which matters more here: volume confirmation or the 1H close above {fmt(s['entry'])}?\",
-            f\"Would you wait for the trigger, or is the current move already too extended?\",
+        "LONG": [
+            f"Would you take a clean 1H hold above {fmt(s['entry'])}, or wait for the retest?",
+            f"What would make you reject the LONG thesis around {fmt(s['entry'])}?",
+            f"Do you want the breakout or the retest around {fmt(s['entry'])}?",
+            f"Which matters more here: volume confirmation or the 1H close above {fmt(s['entry'])}?",
+            f"Would you wait for the trigger, or is the current move already too extended?",
         ],
-        \"SHORT\": [
-            f\"Would you take a clean 1H break below {fmt(s['entry'])}, or wait for the retest?\",
-            f\"What would make you reject the SHORT thesis around {fmt(s['entry'])}?\",
-            f\"Do you want the breakdown or the retest around {fmt(s['entry'])}?\",
-            f\"Which matters more here: volume confirmation or the 1H close below {fmt(s['entry'])}?\",
-            f\"Would you wait for the trigger, or is the move already too extended?\",
+        "SHORT": [
+            f"Would you take a clean 1H break below {fmt(s['entry'])}, or wait for the retest?",
+            f"What would make you reject the SHORT thesis around {fmt(s['entry'])}?",
+            f"Do you want the breakdown or the retest around {fmt(s['entry'])}?",
+            f"Which matters more here: volume confirmation or the 1H close below {fmt(s['entry'])}?",
+            f"Would you wait for the trigger, or is the move already too extended?",
         ],
-    }[s[\"direction\"]][variant]
-    disclaimer = \"Conditional setup only; invalidation wins.\"
+    }[s["direction"]][variant]
+    disclaimer = "Conditional setup only; invalidation wins."
     return_payload = {
-        \"post\": \"\\n\\n\".join([hook, why_now, condition, plan, angle, question, disclaimer]),
-        \"hook\": hook,
-        \"question\": question,
-        \"style\": f\"signal_map_variant_{variant + 1}_human\",
-        \"symbol\": sym,
-        \"signal_contract\": s,
-        \"flow_evidence\": facts,
+        "post": "\n\n".join([hook, why_now, condition, plan, angle, question, disclaimer]),
+        "hook": hook,
+        "question": question,
+        "style": f"signal_map_variant_{variant + 1}_human",
+        "symbol": sym,
+        "signal_contract": s,
+        "flow_evidence": facts,
     }
 
     return return_payload
