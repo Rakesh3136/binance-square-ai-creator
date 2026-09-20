@@ -1,4 +1,4 @@
-import json, re, urllib.parse, urllib.request
+import json, re, urllib.parse, urllib.request, subprocess, sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -53,6 +53,16 @@ def main():
     category=str(selected.get('category') or '').lower()
     if category not in TECH_LANES or not symbol:
         print(json.dumps({'status':'SKIP','reason':'non-chart editorial lane'})); return
+
+    # Freeze the Signal-First market state before any chart rendering. The snapshot
+    # is immutable and becomes the only historical source for the setup visual.
+    if category in TECH_LANES and symbol:
+        snap = ROOT/'data/live/historical_setup_snapshot.json'
+        if not snap.exists():
+            result = subprocess.run([sys.executable, str(ROOT/'src/historical_setup_snapshot.py')], cwd=ROOT, text=True, capture_output=True)
+            if result.returncode != 0:
+                raise SystemExit(f'historical setup snapshot failed: {result.stderr.strip() or result.stdout.strip()}')
+            print(result.stdout.strip())
 
     market=load(MARKET,{})
     item=find_item(market,symbol)
