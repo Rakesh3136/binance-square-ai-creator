@@ -6,7 +6,7 @@ PREFLIGHT=ROOT/'data/live/editorial_preflight.json'
 AUTHORITATIVE=ROOT/'data/live/authoritative_opportunity.json'
 MARKET=ROOT/'data/live/market_snapshot.json'
 REPORTS=ROOT/'data/reports'
-TECH_LANES={'technical_setup','high_volatility','top_gainers','top_losers','creator_signal_outcome'}
+TECH_LANES={'technical_setup','high_volatility','top_gainers','top_losers','creator_signal_outcome','capital_flow_long','capital_flow_short','flow','follow_up'}
 BINANCE_BASES=['https://data-api.binance.vision','https://api-gcp.binance.com','https://api1.binance.com']
 
 
