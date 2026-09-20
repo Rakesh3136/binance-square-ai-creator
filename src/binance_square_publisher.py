@@ -19,6 +19,7 @@ RESULT_PATH = LIVE / "publication_result.json"
 CONTEXT_PATH = LIVE / "publication_context.json"
 FROZEN_PATH = LIVE / "authoritative_opportunity.json"
 WTE_PATH = LIVE / "write_to_earn_eligibility.json"
+ATTRIBUTION_LOG_PATH = ANALYTICS / "publication_attribution.jsonl"
 VISUAL = LIVE / "visual.png"
 ENDPOINT = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
 NO_IMAGE_LANES = {"education", "commentary", "community", "text_only"}
@@ -168,6 +169,17 @@ def duplicate_reason(text: str, symbol: str, category: str, context: dict, froze
 def append(row: dict) -> None:
     ANALYTICS.mkdir(parents=True, exist_ok=True)
     with LOG_PATH.open("a", encoding="utf-8") as h:
+        h.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def append_attribution(row: dict) -> None:
+    """Persist a durable post-to-monetization lineage event.
+
+    This records what was actually published and what attribution mechanism was
+    present. It deliberately does not manufacture reader trades or revenue.
+    """
+    ANALYTICS.mkdir(parents=True, exist_ok=True)
+    with ATTRIBUTION_LOG_PATH.open("a", encoding="utf-8") as h:
         h.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
@@ -344,8 +356,44 @@ def main() -> int:
         "editorial_style": str(context.get("editorial_style") or ""),
         "publication_id_verified": bool(post_id),
         "publication_proof": proof,
+        "monetization": {
+            "wte_eligible": bool(wte.get("eligible")) if isinstance(wte, dict) else None,
+            "required_attribution": bool(wte.get("required_attribution")) if isinstance(wte, dict) else None,
+            "cashtag": str(wte.get("cashtag") or f"${symbol}") if isinstance(wte, dict) else f"${symbol}",
+            "has_primary_cashtag": bool(wte.get("has_primary_cashtag")) if isinstance(wte, dict) else None,
+            "verified_widget": wte.get("verified_widget") if isinstance(wte, dict) else False,
+            "revenue_verified": False,
+            "qualified_trade_count": None,
+            "reward_amount_usdc": None,
+            "status": "AWAITING_VERIFIED_READER_ACTIVITY",
+        },
     }
     append(row)
+    append_attribution({
+        "recorded_at": row["published_at"],
+        "post_id": post_id or None,
+        "canonical_post_id": post_id or None,
+        "published_at": row["published_at"],
+        "symbol": symbol,
+        "category": category,
+        "direction": row["direction"],
+        "experiment_id": row["experiment_id"],
+        "reference_price": row["reference_price"],
+        "trigger": row["trigger"],
+        "invalidation": row["invalidation"],
+        "targets": row["targets"],
+        "cashtag": row["monetization"]["cashtag"],
+        "has_primary_cashtag": row["monetization"]["has_primary_cashtag"],
+        "verified_widget": row["monetization"]["verified_widget"],
+        "visual_attached": use_image,
+        "visual_url": api_result.get("image_url"),
+        "publication_proof": proof,
+        "revenue_verified": False,
+        "qualified_trade_count": None,
+        "reward_amount_usdc": None,
+        "status": "AWAITING_VERIFIED_READER_ACTIVITY",
+        "lineage_policy": "exact_post_id_first; revenue_only_from_explicit_verified_fields",
+    })
     result = {
         "status": status,
         "checked_at": now(),
@@ -358,6 +406,8 @@ def main() -> int:
         "visual_url": api_result.get("image_url"),
         "id_verification": "verified" if post_id else "unavailable",
         "publication_proof": proof,
+        "experiment_id": row["experiment_id"],
+        "cashtag": row["monetization"]["cashtag"],
     }
     LIVE.mkdir(parents=True, exist_ok=True)
     RESULT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
