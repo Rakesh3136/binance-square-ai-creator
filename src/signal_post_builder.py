@@ -200,13 +200,14 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
            "The fresh 1H structure and flow proxy are pointing in the same direction.")
     )
     condition = (
-        f"Confirmation: price needs to reach and hold {s['direction']} trigger {fmt(s['entry'])}. "
-        f"If {fmt(s['sl'])} breaks, the thesis is invalid."
+        "Confirmation: price needs to reach and hold the trigger. "
+        "If the invalidation level breaks, the thesis is invalid."
     )
     plan = (
-        f"Plan: {s['direction']} above {fmt(s['entry'])}; "
-        f"TP1 {fmt(s['tp1'])}; TP2 {fmt(s['tp2'])}; "
-        f"invalidate below {fmt(s['sl'])}."
+        f"Entry trigger: {fmt(s['entry'])}. "
+        f"TP1: {fmt(s['tp1'])}. "
+        f"TP2: {fmt(s['tp2'])}. "
+        f"SL / invalidation: {fmt(s['sl'])}."
     )
     angle = [
         "The trigger matters more than the headline. A clean hold is confirmation; a fast wick is not.",
