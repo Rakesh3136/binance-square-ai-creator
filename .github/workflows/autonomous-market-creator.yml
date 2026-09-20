@@ -278,13 +278,16 @@ jobs:
           if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then
             python src/meme_renderer.py
           else
+            # Signal-First technical lanes use the frozen historical snapshot renderer;
+            # other technical lanes retain the TradingView renderer.
             npm install --no-save playwright
             npx playwright install --with-deps chromium
-            node src/tradingview_renderer.mjs
+            python src/visual_renderer.py
           fi
           test -s data/live/visual.png
           python src/validate_visual.py
-          if [ "${{ steps.visual_mode.outputs.mode }}" = "tradingview" ]; then python src/validate_tradingview_visual.py data/live/visual.png; fi
+          provider=$(python -c 'import json; p=json.load(open("data/live/visual_metadata.json")); print(p.get("provider",""))')
+          if [ "$provider" = "TradingView" ]; then python src/validate_tradingview_visual.py data/live/visual.png; fi
           python src/pipeline_stage.py visual success 'Professional visual package rendered and validated'
       - name: Final production gate
         id: production
