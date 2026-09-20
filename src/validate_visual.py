@@ -33,6 +33,26 @@ def main() -> None:
         raise SystemExit("TradingView visual metadata/image missing")
 
     meta = json.loads(META.read_text(encoding="utf-8"))
+    provider = str(meta.get("provider") or "")
+    status = str(meta.get("status") or "")
+    if provider == "Local historical OHLCV renderer" and status == "HISTORICAL_SNAPSHOT_CREATED":
+        snapshot_path = Path("data/live/historical_setup_snapshot.json")
+        if not snapshot_path.exists(): raise SystemExit("Historical setup snapshot missing")
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        if snapshot.get("status") != "FROZEN" or snapshot.get("lookahead_protection") is not True: raise SystemExit("Historical setup snapshot is not frozen/lookahead protected")
+        if str(meta.get("signal_created_at")) != str(snapshot.get("signal_created_at")): raise SystemExit("Visual signal timestamp does not match frozen snapshot")
+        if str(meta.get("data_cutoff")) != str(snapshot.get("data_cutoff")): raise SystemExit("Visual data cutoff does not match frozen snapshot")
+        pred = snapshot.get("prediction") or {}; marks = meta.get("prediction_markings") or {}
+        for key in ("direction", "entry_trigger", "tp1", "tp2", "sl"):
+            if marks.get(key) != pred.get(key): raise SystemExit(f"Historical visual prediction marking mismatch: {key}")
+        if int(meta.get("candle_count") or 0) != len(snapshot.get("candles_1h") or []): raise SystemExit("Historical visual candle count mismatch")
+        cutoff_ms = int(snapshot.get("signal_created_at_ms"))
+        for candle in snapshot.get("candles_1h") or []:
+            if int(candle["open_time"]) + 3600000 > cutoff_ms: raise SystemExit("Historical visual contains an incomplete/post-signal 1H candle")
+        print(json.dumps({"status":"VISUAL_MATCH_CONFIRMED","provider":provider,"symbol":snapshot.get("symbol_usdt"),"signal_created_at":snapshot.get("signal_created_at"),"data_cutoff":snapshot.get("data_cutoff"),"candles":len(snapshot.get("candles_1h") or []),"lookahead_protection":True,"image_bytes":VISUAL.stat().st_size}, indent=2))
+        return
+    if provider != "TradingView" or status != "TRADINGVIEW_CREATED": raise SystemExit("Visual is neither a verified historical snapshot nor a TradingView visual")
+
     if meta.get("provider") != "TradingView" or meta.get("status") != "TRADINGVIEW_CREATED":
         raise SystemExit("Visual is not a verified TradingView snapshot")
 
