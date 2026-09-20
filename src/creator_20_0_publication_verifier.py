@@ -99,7 +99,7 @@ def main():
     # Recovery path for the observed failure mode: the durable publication log
     # itself was written by the publisher immediately after a verified Binance
     # API response, while publication_result.json was empty/missing later.
-    elif latest_verified:
+    elif not result_id and latest_verified:
         durable_id = canonical_post_id(
             latest_verified.get("canonical_post_id") or latest_verified.get("post_id")
         )
