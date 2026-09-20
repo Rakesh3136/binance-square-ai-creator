@@ -194,15 +194,43 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
         ordered[0],
     )
 
-    why_now = (
-        f"The current evidence supports a {s['direction']} scenario. "
-        + (", ".join(facts) + "." if facts else
-           "The fresh 1H structure and flow proxy are pointing in the same direction.")
-    )
-    condition = (
-        "Confirmation: price needs to reach and hold the trigger. "
-        "If the invalidation level breaks, the thesis is invalid."
-    )
+    why_now_variants = [
+        (
+            f"The current evidence supports a {s['direction']} scenario. "
+            + (", ".join(facts) + "." if facts else
+               "The fresh 1H structure and flow proxy are pointing in the same direction.")
+        ),
+        (
+            f"${sym} has a conditional {s["direction"]} map rather than a chase signal. "
+            + (", ".join(facts) + "." if facts else
+               "Participation and the 1H structure are aligned enough to test the trigger.")
+        ),
+        (
+            f"The decision on ${sym} is straightforward: let the {s["direction"]} trigger confirm the idea. "
+            + (", ".join(facts) + "." if facts else
+               "The current flow proxy and 1H structure keep the setup conditional.")
+        ),
+        (
+            f"For ${sym}, the {s["direction"]} thesis only becomes actionable after confirmation. "
+            + (", ".join(facts) + "." if facts else
+               "Price structure still has to validate the flow read.")
+        ),
+        (
+            f"The useful read on ${sym} is the alignment between flow and the 1H decision level. "
+            + (", ".join(facts) + "." if facts else
+               f"That alignment leaves a conditional {s["direction"]} scenario to test.")
+        ),
+    ]
+    why_now = why_now_variants[variant]
+
+    condition_variants = [
+        "Confirmation comes from price reaching the trigger and holding it; a break of invalidation ends the thesis.",
+        "The setup stays conditional until the trigger is reached and defended; invalidation overrides the idea.",
+        "Treat the trigger as the confirmation point. Once invalidation breaks, the scenario is no longer valid.",
+        "Price has to prove the setup at the trigger; a clean invalidation break cancels the thesis.",
+        "The market decides at the trigger: acceptance supports the map, while invalidation closes it.",
+    ]
+    condition = condition_variants[variant]
     plan = (
         f"Entry trigger: {fmt(s['entry'])}. "
         f"TP1: {fmt(s['tp1'])}. "
