@@ -65,9 +65,11 @@ def main():
             print(result.stdout.strip())
 
     market=load(MARKET,{})
+    historical = load(ROOT/'data/live/historical_setup_snapshot.json', {})
+    use_historical = bool(historical.get('status') == 'FROZEN' and historical.get('symbol') == symbol)
     item=find_item(market,symbol)
-    candles=(item or {}).get('candles_1h') or []
-    if len(candles)<12:
+    candles=(historical.get('candles_1h') if use_historical else (item or {}).get('candles_1h') or []) or []
+    if len(candles)<12 and not use_historical:
         candles=fetch_fresh_candles(symbol+'USDT')
         if item is None:item={'symbol':symbol+'USDT'}
         item['candles_1h']=candles
@@ -82,7 +84,7 @@ def main():
     highs=[float(c['high']) for c in window]
     lows=[float(c['low']) for c in window]
     closes=[float(c['close']) for c in window]
-    last=float((item or {}).get('last_price') or closes[-1] or 0)
+    last=float((historical.get('signal_price') if use_historical else (item or {}).get('last_price')) or closes[-1] or 0)
     support=min(lows)
     resistance=max(highs)
     span=max(resistance-support,0.0)
@@ -96,7 +98,15 @@ def main():
     window_move=((closes[-1]/closes[0])-1)*100 if closes[0] else market_move
     direction='LONG_BIAS' if (window_move if abs(window_move)>0.01 else market_move) >= 0 else 'SHORT_BIAS'
 
-    if direction=='LONG_BIAS':
+    if use_historical:
+        hp=historical.get('prediction') or {}
+        frozen_direction=str(hp.get('direction') or direction).upper()
+        direction='LONG_BIAS' if frozen_direction == 'LONG' else 'SHORT_BIAS'
+        tp1=float(hp.get('tp1')) if hp.get('tp1') is not None else (resistance + span*0.25 if direction=='LONG_BIAS' else max(0.0, support-span*0.25))
+        target=float(hp.get('tp2')) if hp.get('tp2') is not None else (resistance + span*0.50 if direction=='LONG_BIAS' else max(0.0, support-span*0.50))
+        invalidation=float(hp.get('sl')) if hp.get('sl') is not None else (support if direction=='LONG_BIAS' else resistance)
+        sl_label='SL / invalidation'
+    elif direction=='LONG_BIAS':
         tp1=resistance + span*0.25
         target=resistance + span*0.50
         invalidation=support
@@ -132,13 +142,13 @@ def main():
     draft['technical_levels']={
         'current_price':last,'support':support,'resistance':resistance,
         'tp1':tp1,'target':target,'invalidation':invalidation,'direction':direction,
-        'timeframe':'1H','method':'fresh_24_1h_candles'
+        'timeframe':'1H','method':'historical_frozen_snapshot' if use_historical else 'fresh_24_1h_candles'
     }
     data['draft']=draft
     data.setdefault('research',{})['chart_levels']={
         'current_price':last,'support':support,'resistance':resistance,
         'tp1':tp1,'target':target,'invalidation':invalidation,'direction':direction,
-        'method':'fresh_24_1h_candles'
+        'method':'historical_frozen_snapshot' if use_historical else 'fresh_24_1h_candles'
     }
     data.setdefault('visual_plan',{}).update({
         'use_visual':True,'type':'tradingview_chart',
