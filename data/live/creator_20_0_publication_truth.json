@@ -1,8 +1,9 @@
 {
-  "version": "20.4-skip-aware-live-proof",
-  "checked_at": "2026-09-20T15:31:53.454283+00:00",
-  "truth_state": "ATTEMPTED_NOT_VERIFIED",
-  "proof": "publication attempt exists but canonical Binance post-id proof is missing or inconsistent",
+  "version": "20.5-durable-log-recovery",
+  "checked_at": "2026-09-20T15:39:08.228635+00:00",
+  "truth_state": "VERIFIED_PUBLISHED",
+  "proof": "durable publication-log record contains a canonical post_id and verified API-response proof; publisher result file is missing or empty",
+  "proof_source": "publication_log_durable_proof",
   "latest_publication": {
     "timestamp": "2026-09-20T12:16:13.928582+00:00",
     "published_at": "2026-09-20T12:16:13.928602+00:00",
@@ -28,12 +29,16 @@
     "publication_proof": "binance_openapi_response_post_id"
   },
   "publisher_result": {},
+  "publisher_result_present": false,
+  "publisher_result_post_id": null,
   "canonical_post_id": "368702971218506",
   "post_id_match": false,
+  "durable_log_verified": true,
   "publication_count_observed": 159,
   "rules": {
     "post_id_required_for_verified_state": true,
-    "publisher_and_log_ids_must_match": true,
+    "publisher_and_log_ids_should_match_when_result_exists": true,
+    "durable_verified_log_can_recover_empty_result_file": true,
     "submission_unknown_is_not_verified": true,
     "intentional_skips_are_not_failures": true,
     "revenue_inferred": false,
