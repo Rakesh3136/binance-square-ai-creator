@@ -38,9 +38,25 @@ def authoritative_symbol(data):
         if x:return x
     return ''
 def visual_is_verified(expected=''):
-    meta=load(VISUAL_META);mode=str(meta.get('visual_mode') or '')
+    meta=load(VISUAL_META)
+    provider=str(meta.get('provider') or '')
+    status=str(meta.get('status') or '')
+    if not VISUAL.exists() or VISUAL.stat().st_size < 1000:
+        return False
+    if provider=='Local historical OHLCV renderer' and status=='HISTORICAL_SNAPSHOT_CREATED':
+        snap=load(ROOT/'data/live/historical_setup_snapshot.json')
+        if snap.get('status')!='FROZEN' or snap.get('lookahead_protection') is not True:
+            return False
+        if str(meta.get('base_symbol') or '').upper()!=str(snap.get('symbol') or '').upper():
+            return False
+        if str(meta.get('signal_created_at') or '')!=str(snap.get('signal_created_at') or ''):
+            return False
+        if str(meta.get('data_cutoff') or '')!=str(snap.get('data_cutoff') or ''):
+            return False
+        return True
+    mode=str(meta.get('visual_mode') or '')
     valid_modes={'TRADINGVIEW_CHART_ONLY','TRADINGVIEW_CHART_PAIR','TRADINGVIEW_CHART_ANNOTATED','TRADINGVIEW_CHART_WITH_SETUP_LEVELS'}
-    ok=meta.get('provider')=='TradingView' and meta.get('status')=='TRADINGVIEW_CREATED' and mode in valid_modes and VISUAL.exists() and VISUAL.stat().st_size>=1000
+    ok=provider=='TradingView' and status=='TRADINGVIEW_CREATED' and mode in valid_modes
     if not ok:return False
     actuals=[str(x).upper() for x in (meta.get('tradingview_symbols') or [])]
     return not expected or not actuals or f'BINANCE:{expected.upper()}USDT' in actuals or f'BINANCE:{expected.upper()}USDT.P' in actuals
