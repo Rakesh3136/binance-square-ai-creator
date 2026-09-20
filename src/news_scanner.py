@@ -72,6 +72,49 @@ def fetch(url: str) -> bytes:
         return response.read()
 
 
+def fetch_bls_cpi_fallback() -> list[dict]:
+    """Fallback when BLS blocks RSS requests from hosted runners."""
+    url = "https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0?latest=true"
+    payload = json.loads(fetch(url).decode("utf-8", errors="replace"))
+    series = ((payload.get("Results") or {}).get("series") or [])
+    data = series[0].get("data") if series and isinstance(series[0], dict) else []
+    if not data:
+        raise RuntimeError("BLS API returned no CPI-U observation")
+    item = data[0]
+    value = str(item.get("value") or "").strip()
+    year = str(item.get("year") or "").strip()
+    period = str(item.get("period") or "").strip()
+    period_name = str(item.get("periodName") or "").strip()
+    if not value or not year or not period:
+        raise RuntimeError("BLS API returned incomplete CPI-U observation")
+    footnotes = []
+    for footnote in item.get("footnotes") or []:
+        if isinstance(footnote, dict) and footnote.get("text"):
+            footnotes.append(str(footnote["text"]))
+    title = f"BLS CPI-U latest index: {value} ({period_name or period} {year})"
+    summary = (
+        f"Official BLS Public Data API observation for CUSR0000SA0: index {value} "
+        f"for {period_name or period} {year}."
+    )
+    if footnotes:
+        summary += " " + " ".join(footnotes)
+    return [{
+        "source": "BLS CPI",
+        "category": "macro_official",
+        "title": title,
+        "url": url,
+        "summary": summary[:1200],
+        "published_at": None,
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "symbols": [],
+        "news_score": score_article(title, summary, "macro_official", None),
+        "source_mode": "BLS_PUBLIC_API_FALLBACK",
+        "series_id": "CUSR0000SA0",
+        "period": period,
+        "year": year,
+    }]
+
+
 def text(node) -> str:
     return " ".join((node.text or "").split()) if node is not None else ""
 
@@ -127,6 +170,18 @@ def main() -> None:
         try:
             articles.extend(parse_feed(source, category, fetch(url)))
         except Exception as exc:
+            if source == "BLS CPI":
+                try:
+                    articles.extend(fetch_bls_cpi_fallback())
+                    continue
+                except Exception as fallback_exc:
+                    failures.append({
+                        "source": source,
+                        "category": category,
+                        "error": str(exc),
+                        "fallback_error": str(fallback_exc),
+                    })
+                    continue
             failures.append({"source": source, "category": category, "error": str(exc)})
 
     seen = set()
