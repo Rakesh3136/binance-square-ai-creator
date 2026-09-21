@@ -27,9 +27,10 @@ def save(d): OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.d
 
 
 def reset_run(reason="New autonomous production cycle"):
-    # Remove only ephemeral publication-proof artifacts from the previous run.
-    # Historical publication_log.jsonl is deliberately preserved.
-    for name in ("publication_result.json", "creator_20_0_publication_truth.json"):
+    # Remove only ephemeral artifacts from the previous run. Durable publication logs
+    # and analytics are deliberately preserved, but the current visual/snapshot package
+    # must never leak into the next production cycle.
+    for name in ("publication_result.json", "creator_20_0_publication_truth.json", "historical_setup_snapshot.json", "visual_metadata.json", "visual.png", "tradingview_capture.html"):
         path=LIVE/name
         try: path.unlink()
         except FileNotFoundError: pass
