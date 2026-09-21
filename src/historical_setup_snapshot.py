@@ -38,6 +38,20 @@ def normal_symbol(value) -> str:
     return str(value or "").upper().replace("BINANCE:", "").replace("$", "").replace("USDT", "").strip()
 
 
+def levels_valid(direction, entry, tp1, tp2, sl):
+    try:
+        e, a, b, stop = map(float, (entry, tp1, tp2, sl))
+    except (TypeError, ValueError):
+        return False
+    if min(e, a, b, stop) <= 0:
+        return False
+    if direction == "LONG":
+        return stop < e < a <= b
+    if direction == "SHORT":
+        return 0 < b <= a < e < stop
+    return False
+
+
 def candle_row(row):
     if isinstance(row, dict):
         return {
@@ -63,6 +77,7 @@ def candle_row(row):
 def main():
     routing = load(ROUTING, {})
     auth = load(AUTH, {})
+    context = load(CONTEXT, {})
     selected = routing.get("selected") if isinstance(routing.get("selected"), dict) else {}
     if not selected:
         selected = auth
@@ -75,6 +90,9 @@ def main():
     signal_ms = parse_ms(created_at)
 
     symbol = normal_symbol(selected.get("symbol") or auth.get("symbol"))
+    context_symbol = normal_symbol(context.get("symbol"))
+    if context_symbol and context_symbol != symbol:
+        raise SystemExit(f"Historical snapshot asset drift: router={symbol}, publication_context={context_symbol}")
     if not symbol:
         raise SystemExit("Signal symbol missing")
 
@@ -107,6 +125,15 @@ def main():
     # signal saw at creation time; it is not retroactively reconstructed.
     if signal_price is None:
         signal_price = candles[-1]["close"]
+    if direction not in {"LONG", "SHORT"}:
+        raise SystemExit(f"Historical snapshot direction is invalid: {direction or '<missing>'}")
+    if not levels_valid(direction, entry, tp1, tp2, sl):
+        raise SystemExit(
+            f"Historical snapshot setup levels are inconsistent for {direction}: "
+            f"entry={entry}, tp1={tp1}, tp2={tp2}, sl={sl}"
+        )
+
+    cycle_id = f"{symbol}|{direction}|{created_at}|{context.get('experiment_id','') or selected.get('thesis_key','')}"
 
     snapshot = {
         "schema_version": 1,
@@ -121,6 +148,8 @@ def main():
         "candle_policy": "completed_candles_only",
         "lookahead_protection": True,
         "source": "Signal-First router market snapshot",
+        "cycle_id": cycle_id,
+        "experiment_id": str(context.get("experiment_id") or ""),
         "signal_price": float(signal_price),
         "prediction": {
             "direction": direction,
@@ -138,10 +167,16 @@ def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     if OUT.exists():
         old = load(OUT, {})
-        if old.get("status") == "FROZEN" and old.get("signal_created_at") == snapshot["signal_created_at"] and old.get("symbol") == symbol:
-            print(json.dumps({"status": "ALREADY_FROZEN", "path": str(OUT), "signal_created_at": old.get("signal_created_at")}, indent=2))
+        if old.get("status") == "FROZEN" and old.get("cycle_id") == cycle_id:
+            print(json.dumps({"status": "ALREADY_FROZEN", "path": str(OUT), "cycle_id": cycle_id}, indent=2))
             return
-        raise SystemExit("Refusing to overwrite an existing historical setup snapshot")
+        print(json.dumps({
+            "status": "REFRESHING_STALE_SNAPSHOT",
+            "old_symbol": old.get("symbol"),
+            "new_symbol": symbol,
+            "old_cycle_id": old.get("cycle_id"),
+            "new_cycle_id": cycle_id,
+        }, indent=2))
 
     OUT.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({
