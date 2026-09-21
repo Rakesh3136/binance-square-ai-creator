@@ -7,6 +7,8 @@ from pathlib import Path
 REPORT_DIR = Path("data/reports")
 META = Path("data/live/visual_metadata.json")
 VISUAL = Path("data/live/visual.png")
+CONTEXT = Path("data/live/publication_context.json")
+FROZEN = Path("data/live/authoritative_opportunity.json")
 
 
 def latest_report() -> Path:
@@ -28,6 +30,28 @@ def tickers(text: str) -> list[str]:
     return list(dict.fromkeys(found))
 
 
+def clean_symbol(value: str) -> str:
+    raw = str(value or "").upper().replace("BINANCE:", "").replace("$", "").strip()
+    return raw[:-4] if raw.endswith("USDT") else raw
+
+
+def parse_float(value: str):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def post_setup(post: str) -> dict:
+    patterns = {
+        "entry": r"Entry trigger:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)",
+        "tp1": r"TP1:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)",
+        "tp2": r"TP2:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)",
+        "sl": r"SL\s*/\s*invalidation:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)",
+    }
+    return {k: parse_float(re.search(v, post, re.I).group(1)) if re.search(v, post, re.I) else None for k, v in patterns.items()}
+
+
 def main() -> None:
     if not META.exists() or not VISUAL.exists():
         raise SystemExit("TradingView visual metadata/image missing")
@@ -39,16 +63,72 @@ def main() -> None:
         snapshot_path = Path("data/live/historical_setup_snapshot.json")
         if not snapshot_path.exists(): raise SystemExit("Historical setup snapshot missing")
         snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
-        if snapshot.get("status") != "FROZEN" or snapshot.get("lookahead_protection") is not True: raise SystemExit("Historical setup snapshot is not frozen/lookahead protected")
-        if str(meta.get("signal_created_at")) != str(snapshot.get("signal_created_at")): raise SystemExit("Visual signal timestamp does not match frozen snapshot")
-        if str(meta.get("data_cutoff")) != str(snapshot.get("data_cutoff")): raise SystemExit("Visual data cutoff does not match frozen snapshot")
-        pred = snapshot.get("prediction") or {}; marks = meta.get("prediction_markings") or {}
+        if snapshot.get("status") != "FROZEN" or snapshot.get("lookahead_protection") is not True:
+            raise SystemExit("Historical setup snapshot is not frozen/lookahead protected")
+
+        context = json.loads(CONTEXT.read_text(encoding="utf-8")) if CONTEXT.exists() else {}
+        frozen = json.loads(FROZEN.read_text(encoding="utf-8")) if FROZEN.exists() else {}
+        expected = clean_symbol(context.get("symbol") or frozen.get("symbol"))
+        actual = clean_symbol(snapshot.get("symbol"))
+        if not expected:
+            raise SystemExit("Historical visual has no authoritative current symbol")
+        if actual != expected:
+            raise SystemExit(f"Historical visual symbol mismatch: snapshot={actual or '<missing>'} current={expected}")
+
+        report_path = latest_report()
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        post = str((report.get("draft") or {}).get("post") or (report.get("draft") or {}).get("text") or "")
+        post_tickers = tickers(post)
+        if expected not in post_tickers:
+            raise SystemExit(f"Historical visual symbol {expected} does not match current post tickers {post_tickers}")
+
+        if str(meta.get("base_symbol") or "").upper() != expected:
+            raise SystemExit(f"Historical visual metadata symbol mismatch: {meta.get('base_symbol')} != {expected}")
+
+        if str(meta.get("signal_created_at")) != str(snapshot.get("signal_created_at")):
+            raise SystemExit("Visual signal timestamp does not match frozen snapshot")
+        if str(meta.get("data_cutoff")) != str(snapshot.get("data_cutoff")):
+            raise SystemExit("Visual data cutoff does not match frozen snapshot")
+
+        pred = snapshot.get("prediction") or {}
+        marks = meta.get("prediction_markings") or {}
         for key in ("direction", "entry_trigger", "tp1", "tp2", "sl"):
-            if marks.get(key) != pred.get(key): raise SystemExit(f"Historical visual prediction marking mismatch: {key}")
-        if int(meta.get("candle_count") or 0) != len(snapshot.get("candles_1h") or []): raise SystemExit("Historical visual candle count mismatch")
+            if marks.get(key) != pred.get(key):
+                raise SystemExit(f"Historical visual prediction marking mismatch: {key}")
+
+        frozen_pred = frozen.get("prediction") if isinstance(frozen.get("prediction"), dict) else {}
+        authoritative = {
+            "direction": frozen.get("direction") or frozen_pred.get("direction"),
+            "entry_trigger": frozen.get("entry_trigger") if frozen.get("entry_trigger") is not None else frozen_pred.get("entry_trigger"),
+            "tp1": frozen.get("tp1") if frozen.get("tp1") is not None else frozen_pred.get("tp1"),
+            "tp2": frozen.get("tp2") if frozen.get("tp2") is not None else frozen_pred.get("tp2"),
+            "sl": frozen.get("sl") if frozen.get("sl") is not None else frozen_pred.get("sl"),
+        }
+        for key, expected_value in authoritative.items():
+            if expected_value is not None and pred.get(key) != expected_value:
+                raise SystemExit(f"Historical visual does not match authoritative setup: {key}")
+
+        setup = post_setup(post)
+        numeric_pairs = {"entry": "entry_trigger", "tp1": "tp1", "tp2": "tp2", "sl": "sl"}
+        for post_key, snap_key in numeric_pairs.items():
+            if setup.get(post_key) is not None and pred.get(snap_key) is not None:
+                delta = abs(setup[post_key] - float(pred[snap_key]))
+                if delta > max(1e-12, abs(float(pred[snap_key])) * 1e-9):
+                    raise SystemExit(f"Current post setup does not match frozen visual: {post_key}")
+
+        direction = str(pred.get("direction") or "").upper()
+        if direction not in {"LONG", "SHORT"} or re.search(rf"\b{direction}\b", post, re.I) is None:
+            raise SystemExit(f"Current post direction does not match frozen visual: {direction or '<missing>'}")
+
+        if VISUAL.stat().st_mtime + 1 < snapshot_path.stat().st_mtime:
+            raise SystemExit("Historical visual file predates the current frozen snapshot")
+
+        if int(meta.get("candle_count") or 0) != len(snapshot.get("candles_1h") or []):
+            raise SystemExit("Historical visual candle count mismatch")
         cutoff_ms = int(snapshot.get("signal_created_at_ms"))
         for candle in snapshot.get("candles_1h") or []:
-            if int(candle["open_time"]) + 3600000 > cutoff_ms: raise SystemExit("Historical visual contains an incomplete/post-signal 1H candle")
+            if int(candle["open_time"]) + 3600000 > cutoff_ms:
+                raise SystemExit("Historical visual contains an incomplete/post-signal 1H candle")
         print(json.dumps({"status":"VISUAL_MATCH_CONFIRMED","provider":provider,"symbol":snapshot.get("symbol_usdt"),"signal_created_at":snapshot.get("signal_created_at"),"data_cutoff":snapshot.get("data_cutoff"),"candles":len(snapshot.get("candles_1h") or []),"lookahead_protection":True,"image_bytes":VISUAL.stat().st_size}, indent=2))
         return
     if provider != "TradingView" or status != "TRADINGVIEW_CREATED": raise SystemExit("Visual is neither a verified historical snapshot nor a TradingView visual")
