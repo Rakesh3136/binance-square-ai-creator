@@ -20,30 +20,59 @@ jobs:
     steps:
       - name: Ensure autonomous creator keeps waking
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+
           workflow='autonomous-market-creator.yml'
-          runs=$(gh run list --repo "$GH_REPO" --workflow "$workflow" --branch main --limit 1 --json status,createdAt,databaseId --jq '.[0] // empty')
           now=$(date -u +%s)
-          if [ -z "$runs" ]; then
-            echo 'No creator run found; dispatching one.'
+
+          # Inspect several recent runs so a stale queued run cannot hide a stalled creator.
+          runs=$(gh run list \
+            --repo "$GH_REPO" \
+            --workflow "$workflow" \
+            --branch main \
+            --limit 10 \
+            --json status,createdAt,updatedAt,databaseId,event)
+
+          if [ "$(printf '%s' "$runs" | jq 'length')" -eq 0 ]; then
+            echo 'No creator run exists; dispatching the initial recovery run.'
             gh workflow run "$workflow" --repo "$GH_REPO" --ref main
             exit 0
           fi
-          status=$(printf '%s' "$runs" | jq -r '.status')
-          created=$(printf '%s' "$runs" | jq -r '.createdAt')
-          created_epoch=$(date -d "$created" +%s)
-          age=$((now-created_epoch))
-          echo "Latest creator run: $created (status=$status, age=${age}s)"
-          if [ "$status" = 'queued' ] || [ "$status" = 'in_progress' ]; then
-            echo 'Creator is already running; no dispatch needed.'
+
+          active_count=$(printf '%s' "$runs" | jq '[.[] | select(.status == "in_progress")] | length')
+          if [ "$active_count" -gt 0 ]; then
+            echo "Creator is already in progress ($active_count active run); no recovery dispatch needed."
             exit 0
           fi
-          if [ "$age" -ge 1800 ]; then
-            echo 'Creator has not run for 30 minutes; dispatching a recovery run.'
+
+          latest=$(printf '%s' "$runs" | jq '.[0]')
+          latest_id=$(printf '%s' "$latest" | jq -r '.databaseId')
+          latest_status=$(printf '%s' "$latest" | jq -r '.status')
+          latest_created=$(printf '%s' "$latest" | jq -r '.createdAt')
+          latest_created_epoch=$(date -d "$latest_created" +%s)
+          latest_age=$((now-latest_created_epoch))
+
+          echo "Latest creator run: id=$latest_id status=$latest_status created=$latest_created age=${latest_age}s"
+
+          if [ "$latest_status" = 'queued' ] && [ "$latest_age" -lt 1800 ]; then
+            echo 'Creator has a recent queued run; no recovery dispatch needed.'
+            exit 0
+          fi
+
+          if [ "$latest_status" = 'queued' ] && [ "$latest_age" -ge 1800 ]; then
+            echo 'Creator queue entry is stale (>30m) with no active run; cancelling it.'
+            gh run cancel "$latest_id" --repo "$GH_REPO" || true
+            echo 'Dispatching recovery run after stale queue cleanup.'
+            gh workflow run "$workflow" --repo "$GH_REPO" --ref main
+            exit 0
+          fi
+
+          if [ "$latest_age" -ge 1800 ]; then
+            echo 'Creator has not started a fresh run for 30 minutes; dispatching recovery run.'
             gh workflow run "$workflow" --repo "$GH_REPO" --ref main
           else
-            echo 'Recent creator run exists; no dispatch needed.'
+            echo 'Recent creator run exists; no recovery dispatch needed.'
           fi
