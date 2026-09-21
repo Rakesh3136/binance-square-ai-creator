@@ -1,10 +1,9 @@
 name: Binance Square Creator — Heartbeat Watchdog
 
 on:
-  # Backup wake-up path. The main creator also has its own 20-minute schedule.
-  - schedule:
-      - cron: '*/10 * * * *'
-  - workflow_dispatch:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 permissions:
   actions: write
@@ -42,9 +41,6 @@ jobs:
             echo 'Creator is already running; no dispatch needed.'
             exit 0
           fi
-          # If the primary 20-minute schedule is delayed/missed, dispatch a
-          # recovery run after 30 minutes. The workflow's cadence/publish gate
-          # still decides whether a post is actually published.
           if [ "$age" -ge 1800 ]; then
             echo 'Creator has not run for 30 minutes; dispatching a recovery run.'
             gh workflow run "$workflow" --repo "$GH_REPO" --ref main
