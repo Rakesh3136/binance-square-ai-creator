@@ -27,8 +27,6 @@ env:
 
 concurrency:
   group: unified-binance-square-creator
-  # Never kill an active market/publication cycle because a newer commit arrived.
-  # The next cycle will queue and run against the newest main instead.
   cancel-in-progress: false
 
 jobs:
@@ -55,8 +53,8 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, publish_rescue, production_manager"
-          echo 'Signal-first creator modules imported successfully'
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, publish_rescue, production_manager, creator_8_4_monetization_feedback"
+          echo 'Signal-first and monetization feedback modules imported successfully'
 
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
@@ -85,6 +83,8 @@ jobs:
           python src/creator_7_4_adaptive_experiment_controller.py
           python src/creator_7_5_growth_portfolio.py
           python src/creator_8_0_revenue_engine.py
+          python src/creator_8_4_monetization_feedback.py
+          python -m json.tool data/live/creator_8_4_monetization_feedback.json >/dev/null
       - name: Publication truth and audience intelligence
         run: |
           python src/creator_20_0_publication_verifier.py
@@ -159,8 +159,6 @@ jobs:
           python src/creator_mission_7.py
           python src/audience_growth_director.py
           python src/autonomous_cadence_6.py
-          # Signal-first routing is the last decision layer before publication.
-          # It binds the current cycle back to the authoritative preflight asset.
           python src/signal_first_router.py
           publish=$(python -c 'import json; print(str(json.load(open("data/live/signal_first_routing.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
@@ -183,9 +181,6 @@ jobs:
           TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           python src/script_director_4.py
-          # Lock the current frozen opportunity BEFORE candidate generation.
-          # Candidate generation and the agent supervisor must consume the same
-          # publication identity that was selected by this cycle, not stale context.
           python src/publication_context.py
           python src/candidate_generation_4.py
           python src/self_repair_agent.py
@@ -207,8 +202,6 @@ jobs:
           test -n "$DRAFT_PATH"
           test -f "$DRAFT_PATH"
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
-          echo "path=$DRAFT_PATH"
-          echo "Pinned editorial draft: $DRAFT_PATH"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           python -m json.tool "$DRAFT_PATH" >/dev/null
           blocked=$(python -c 'import json; print(str(json.load(open("data/live/editorial_polish.json")).get("status", "")).upper()=="BLOCKED")')
@@ -278,8 +271,6 @@ jobs:
           if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then
             python src/meme_renderer.py
           else
-            # Signal-First technical lanes use the frozen historical snapshot renderer;
-            # other technical lanes retain the TradingView renderer.
             npm install --no-save playwright
             npx playwright install --with-deps chromium
             python src/visual_renderer.py
@@ -303,7 +294,6 @@ jobs:
         if: ${{ steps.production.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-          # Support both historical and current Binance Square OpenAPI secret names.
           BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
         run: |
@@ -316,8 +306,6 @@ jobs:
       - name: Persist run state and diagnostics
         if: ${{ always() }}
         run: |
-          # A cancelled run may be superseded by a newer main commit. Never
-          # persist its mixed working tree back to main.
           if [ "${{ job.status }}" = "cancelled" ]; then
             echo 'Run cancelled; skipping repository state persistence.'
             exit 0
