@@ -6,6 +6,7 @@ bridge using facts already present in the draft, but never calls an LLM.
 from __future__ import annotations
 import json,re
 from pathlib import Path
+from safe_creator_runner import deduplicate_signal_post
 ROOT=Path(__file__).resolve().parents[1];REPORT_DIR=ROOT/'data/reports';OUT=ROOT/'data/live/mechanism_value_repair.json';PUBLICATION_LOG=ROOT/'analytics/publication_log.jsonl'
 MECHANISM_TERMS=('because','driven by','explains why','the reason','which means','leads to','causes','due to','means that','translates into','shows up in','flows into','results in','comes from','depends on','hinges on','works through','is linked to','matters because','suggests that','implies that','in turn','which can make','which can leave','the mechanism','pathway','transmission')
 GENERIC_BRIDGES=('the mechanism to watch','the link between','the conclusion in this draft','the reported fact matters because','the effect described here')
@@ -55,7 +56,11 @@ def main():
     for candidate in deterministic_bridges(body_without_question):
         if not recent_repetitions(candidate) and not generic_bridge(candidate):bridge=candidate;break
     if not bridge:bridge=deterministic_bridges(body_without_question)[-1]
-    candidate=f'{body_without_question}\n\n{bridge}\n\n{original_question}'.strip();reasons=[]
+    candidate=f'{body_without_question}\n\n{bridge}\n\n{original_question}'.strip()
+    # Final sentence-level diversity repair runs after all upstream editorial passes.
+    asset_symbol=(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b', candidate) or ['$THIS-ASSET'])[0].replace('$','')
+    candidate=deduplicate_signal_post(candidate, asset_symbol)
+    reasons=[]
     if not mechanism_present(bridge):reasons.append('MECHANISM_STILL_MISSING')
     if generic_bridge(bridge):reasons.append('GENERIC_BRIDGE')
     if len(questions(candidate))!=1:reasons.append('QUESTION_COUNT_CHANGED')
