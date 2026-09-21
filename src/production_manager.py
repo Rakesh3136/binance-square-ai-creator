@@ -45,21 +45,33 @@ def visual_is_verified(expected=''):
         return False
     if provider=='Local historical OHLCV renderer' and status=='HISTORICAL_SNAPSHOT_CREATED':
         snap=load(ROOT/'data/live/historical_setup_snapshot.json')
+        ctx=load(CONTEXT_PATH)
+        current=clean_symbol(ctx.get('symbol') or expected)
         if snap.get('status')!='FROZEN' or snap.get('lookahead_protection') is not True:
             return False
-        if str(meta.get('base_symbol') or '').upper()!=str(snap.get('symbol') or '').upper():
+        snap_symbol=clean_symbol(snap.get('symbol'))
+        if current and snap_symbol != current:
+            return False
+        if expected and snap_symbol != clean_symbol(expected):
+            return False
+        if clean_symbol(meta.get('base_symbol')) != snap_symbol:
             return False
         if str(meta.get('signal_created_at') or '')!=str(snap.get('signal_created_at') or ''):
             return False
         if str(meta.get('data_cutoff') or '')!=str(snap.get('data_cutoff') or ''):
             return False
+        pred=snap.get('prediction') if isinstance(snap.get('prediction'),dict) else {}
+        marks=meta.get('prediction_markings') if isinstance(meta.get('prediction_markings'),dict) else {}
+        for key in ('direction','entry_trigger','tp1','tp2','sl'):
+            if marks.get(key) != pred.get(key):
+                return False
         return True
     mode=str(meta.get('visual_mode') or '')
     valid_modes={'TRADINGVIEW_CHART_ONLY','TRADINGVIEW_CHART_PAIR','TRADINGVIEW_CHART_ANNOTATED','TRADINGVIEW_CHART_WITH_SETUP_LEVELS'}
     ok=provider=='TradingView' and status=='TRADINGVIEW_CREATED' and mode in valid_modes
     if not ok:return False
     actuals=[str(x).upper() for x in (meta.get('tradingview_symbols') or [])]
-    return not expected or not actuals or f'BINANCE:{expected.upper()}USDT' in actuals or f'BINANCE:{expected.upper()}USDT.P' in actuals
+    return not expected or not actuals or f'BINANCE:{clean_symbol(expected)}USDT' in actuals or f'BINANCE:{clean_symbol(expected)}USDT.P' in actuals
 def human_content_audit(post,expected,cat):
     text=re.sub(r'\s+',' ',str(post or '').strip());low=text.lower();fails=[];score=100
     if not text:fails.append('empty_post');return score,fails
