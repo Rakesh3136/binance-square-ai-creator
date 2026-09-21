@@ -189,10 +189,14 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
     ]
 
     ordered = hooks[variant:] + hooks[:variant]
-    hook = next(
-        (x for x in ordered if re.sub(r"[^a-z0-9 ]", "", x.lower()).strip() not in recent),
-        ordered[0],
-    )
+    def has_recent_sentence(text: str) -> bool:
+        for sentence in re.split(r"[.!?]+", text):
+            normalized = re.sub(r"[^a-z0-9 ]", "", sentence.lower()).strip()
+            if len(normalized.split()) >= 6 and normalized in recent:
+                return True
+        return False
+
+    hook = next((x for x in ordered if not has_recent_sentence(x)), ordered[0])
 
     why_now_variants = [
         (
