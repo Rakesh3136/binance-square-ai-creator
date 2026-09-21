@@ -31,8 +31,23 @@ def setup_parts(x):
     s=x.get('trade_setup') if isinstance(x.get('trade_setup'),dict) else {}; p=x.get('prediction') if isinstance(x.get('prediction'),dict) else {}
     side=str(s.get('side') or p.get('direction') or x.get('flow_side') or '').upper(); tr=s.get('trigger',p.get('entry_trigger')); tp1=s.get('tp1',p.get('tp1')); tp2=s.get('tp2',p.get('tp2')); sl=s.get('invalidation',p.get('sl')); conf=num(x.get('flow_confidence'),num((x.get('multitimeframe') or {}).get('confidence'),num(p.get('confidence'),num(x.get('score')))))
     return s,p,side,tr,tp1,tp2,sl,conf
+def level_contract_valid(side,tr,tp1,tp2,sl):
+    try:
+        e,a,b,stop=[float(v) for v in (tr,tp1,tp2,sl)]
+    except (TypeError,ValueError):
+        return False
+    if min(e,a,b,stop) <= 0:
+        return False
+    if side == 'LONG':
+        return stop < e < a <= b
+    if side == 'SHORT':
+        return 0 < b <= a < e < stop
+    return False
+
+
 def flow_complete(x):
-    _,_,side,tr,tp1,tp2,sl,conf=setup_parts(x); return side in {'LONG','SHORT'} and all(v is not None for v in (tr,tp1,tp2,sl)) and conf>=MIN_FLOW_CONF
+    _,_,side,tr,tp1,tp2,sl,conf=setup_parts(x)
+    return side in {'LONG','SHORT'} and level_contract_valid(side,tr,tp1,tp2,sl) and conf>=MIN_FLOW_CONF
 def norm(v):
     v=re.sub(r'\$?[0-9]+(?:\.[0-9]+)?',' ',str(v or '').lower()); return re.sub(r'\s+',' ',re.sub(r'[^a-z0-9 ]+',' ',v)).strip()
 def blocked(x,rows):
@@ -77,11 +92,20 @@ def derive(candidate,market):
         except Exception:continue
     if len(highs)<6:return candidate
     last=closes[-1]; rh=max(highs[:-1]); rl=min(lows[:-1]); span=max(rh-rl,last*0.002)
+    if last <= 0:return candidate
     if category=='next_gainer_candidate':
-        side='LONG'; trigger=rh*1.002; sl=max(rl,last-span*.75); risk=trigger-sl; tp1=trigger+risk; tp2=trigger+2*risk
+        side='LONG'; trigger=rh*1.002; sl=max(rl,last-span*.75); risk=trigger-sl
+        if risk<=0:return candidate
+        tp1=trigger+risk; tp2=trigger+2*risk
     else:
-        side='SHORT'; trigger=rl*.998; sl=min(rh,last+span*.75); risk=sl-trigger; tp1=trigger-risk; tp2=trigger-2*risk
-    if risk<=0:return candidate
+        side='SHORT'; trigger=rl*.998; sl=min(rh,last+span*.75); risk=sl-trigger
+        # Keep both downside targets strictly positive. If the natural 2R target
+        # would cross zero, cap the risk distance rather than inventing a negative price.
+        risk=min(risk, trigger*0.45)
+        if risk<=0:return candidate
+        tp1=trigger-risk; tp2=trigger-2*risk
+    if not level_contract_valid(side,trigger,tp1,tp2,sl):
+        return candidate
     conf=max(MIN_FLOW_CONF,min(95.0,num(candidate.get('flow_confidence'),num(candidate.get('score'),num(candidate.get('discovery_score'),72)))))
     e=dict(candidate); e['trade_setup']={'side':side,'trigger':trigger,'tp1':tp1,'tp2':tp2,'invalidation':sl,'risk_per_unit':risk,'setup_source':'verified_1h_ohlcv_conditional'}; e['prediction']={'direction':side,'entry_trigger':trigger,'tp1':tp1,'tp2':tp2,'sl':sl,'confidence':conf,'conditional':True,'not_a_guarantee':True}; e['flow_confidence']=conf; e['evidence']={'ohlcv_candles_used':len(candles),'last_price':last,'recent_high':rh,'recent_low':rl}; return e
 def add(target,x,allow_complete_flow=False):
