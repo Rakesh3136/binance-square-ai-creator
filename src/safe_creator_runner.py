@@ -65,7 +65,7 @@ def enforce_signal_first(report_path):
     except Exception as exc:
         raise RuntimeError(f'Cannot read generated draft for Signal-First enforcement: {exc}')
     draft=report.get('draft') if isinstance(report.get('draft'),dict) else {}
-    post=special['post']
+    post=deduplicate_signal_post(special['post'], special.get('symbol') or selected.get('symbol') or '')
     draft.update({
         'post':post,
         'text':post,
@@ -119,6 +119,35 @@ def choose_fresh(options, recent):
         if normalize_sentence(option) not in recent:
             return option
     return options[0]
+
+
+def deduplicate_signal_post(post, symbol):
+    """Replace exact reused paragraphs without weakening the originality gate."""
+    recent = recent_published_sentences()
+    replacements = [
+        f"The fixed risk boundary gives ${symbol} a clear condition for keeping or dropping this thesis.",
+        f"${symbol} only becomes actionable when the market validates the trigger rather than the narrative around it.",
+        "The important test is acceptance at the decision level; a failed level ends the setup cleanly.",
+        "Risk is defined before confirmation, so the scenario remains testable in either direction.",
+        "The setup stays conditional until price proves the level instead of merely touching it.",
+        f"For ${symbol}, the next reaction is more informative than another prediction about the headline.",
+        "The chart is a decision map: confirmation activates the idea, while invalidation closes it.",
+        f"What would you watch first around ${symbol}: acceptance of the level or a cleaner retest?",
+        f"Would you wait for ${symbol} to confirm the level, or treat the first break as unreliable?",
+    ]
+    paragraphs = post.split("\n\n")
+    used = set()
+    for i, paragraph in enumerate(paragraphs):
+        normalized = normalize_sentence(paragraph)
+        if len(normalized.split()) < 6 or normalized not in recent:
+            continue
+        for candidate in replacements:
+            candidate_norm = normalize_sentence(candidate)
+            if candidate_norm not in recent and candidate_norm not in used:
+                paragraphs[i] = candidate
+                used.add(candidate_norm)
+                break
+    return "\n\n".join(paragraphs)
 
 
 def emergency_verified_draft(reason):
