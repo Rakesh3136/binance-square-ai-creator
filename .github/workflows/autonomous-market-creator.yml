@@ -2,7 +2,10 @@ name: Binance Square AI Creator — Single Autonomous Orchestrator
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    # Primary autonomous cadence: every 20 minutes. The content director still
+    # decides whether a cycle should actually publish, so this is a wake-up
+    # cadence rather than a promise to post every 20 minutes.
+    - cron: '*/20 * * * *'
   push:
     branches:
       - main
