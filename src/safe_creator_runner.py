@@ -122,9 +122,9 @@ def choose_fresh(options, recent):
 
 
 def deduplicate_signal_post(post, symbol):
-    """Replace exact reused paragraphs without weakening the originality gate."""
+    """Replace repeated sentences while preserving the surrounding structure."""
     recent = recent_published_sentences()
-    replacements = [
+    statement_replacements = [
         f"The fixed risk boundary gives ${symbol} a clear condition for keeping or dropping this thesis.",
         f"${symbol} only becomes actionable when the market validates the trigger rather than the narrative around it.",
         "The important test is acceptance at the decision level; a failed level ends the setup cleanly.",
@@ -132,22 +132,34 @@ def deduplicate_signal_post(post, symbol):
         "The setup stays conditional until price proves the level instead of merely touching it.",
         f"For ${symbol}, the next reaction is more informative than another prediction about the headline.",
         "The chart is a decision map: confirmation activates the idea, while invalidation closes it.",
+    ]
+    question_replacements = [
         f"What would you watch first around ${symbol}: acceptance of the level or a cleaner retest?",
         f"Would you wait for ${symbol} to confirm the level, or treat the first break as unreliable?",
     ]
-    paragraphs = post.split("\n\n")
     used = set()
-    for i, paragraph in enumerate(paragraphs):
-        normalized = normalize_sentence(paragraph)
-        if len(normalized.split()) < 6 or normalized not in recent:
-            continue
-        for candidate in replacements:
-            candidate_norm = normalize_sentence(candidate)
-            if candidate_norm not in recent and candidate_norm not in used:
-                paragraphs[i] = candidate
-                used.add(candidate_norm)
-                break
-    return "\n\n".join(paragraphs)
+
+    def replacement_for(sentence):
+        pool = question_replacements if "?" in sentence else statement_replacements
+        for candidate in pool:
+            normalized = normalize_sentence(candidate)
+            if normalized not in recent and normalized not in used:
+                used.add(normalized)
+                return candidate
+        return sentence
+
+    def repair_paragraph(paragraph):
+        pieces = re.split(r"(?<=[.!?])\s+", paragraph.strip())
+        repaired = []
+        for sentence in pieces:
+            normalized = normalize_sentence(sentence)
+            if len(normalized.split()) >= 6 and normalized in recent:
+                repaired.append(replacement_for(sentence))
+            else:
+                repaired.append(sentence)
+        return " ".join(x for x in repaired if x).strip()
+
+    return "\n\n".join(repair_paragraph(p) for p in post.split("\n\n"))
 
 
 def emergency_verified_draft(reason):
