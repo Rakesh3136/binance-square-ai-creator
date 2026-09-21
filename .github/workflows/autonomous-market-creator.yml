@@ -232,12 +232,45 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/mechanism_value_rewriter.py
       - name: Elite pre-publication judge
+        id: elite_judge
+        continue-on-error: true
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/elite_prepublication_judge.py
+
+      - name: Apply elite pre-publication gate
+        id: elite_gate
+        if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('data/live/elite_prepublication_judge.json')
+          blocked = True
+          reason = 'elite_judge_output_missing'
+
+          if path.exists():
+              try:
+                  result = json.loads(path.read_text(encoding='utf-8'))
+              except Exception:
+                  result = {}
+                  reason = 'elite_judge_output_invalid_json'
+              else:
+                  failures = result.get('failures') or []
+                  blocked = result.get('publish') is not True or bool(failures)
+                  reason = ','.join(str(x) for x in failures) or 'publish'
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f"blocked={'true' if blocked else 'false'}\n")
+              f.write(f"reason={reason}\n")
+
+          print({'blocked': blocked, 'reason': reason})
+          PY
       - name: Integrity and final content gates
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_gate.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -245,7 +278,7 @@ jobs:
           python -m compileall -q src
       - name: Decide whether this lane needs a visual
         id: visual_mode
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_gate.outputs.blocked != 'true' }}
         run: |
           python - <<'PY'
           import json, os
@@ -262,12 +295,12 @@ jobs:
           print({'category':cat,'visual_required':required,'mode':mode})
           PY
       - name: Setup Node and Chromium
-        if: ${{ steps.visual_mode.outputs.required == 'true' && steps.visual_mode.outputs.mode == 'tradingview' }}
+        if: ${{ steps.visual_mode.outputs.required == 'true' && steps.visual_mode.outputs.mode == 'tradingview' && steps.elite_gate.outputs.blocked != 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Render visual package
-        if: ${{ steps.visual_mode.outputs.required == 'true' }}
+        if: ${{ steps.visual_mode.outputs.required == 'true' && steps.elite_gate.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -285,7 +318,7 @@ jobs:
           python src/pipeline_stage.py visual success 'Professional visual package rendered and validated'
       - name: Final production gate
         id: production
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_gate.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -294,7 +327,7 @@ jobs:
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "Final production decision: $publish"
       - name: Extract publication and submit to Binance Square
-        if: ${{ steps.production.outputs.publish == 'true' }}
+        if: ${{ steps.production.outputs.publish == 'true' && steps.elite_gate.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY }}
