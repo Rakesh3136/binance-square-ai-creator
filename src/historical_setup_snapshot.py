@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ROUTING = ROOT / "data/live/signal_first_routing.json"
 AUTH = ROOT / "data/live/authoritative_opportunity.json"
 OUT = ROOT / "data/live/historical_setup_snapshot.json"
+CONTEXT = ROOT / "data/live/publication_context.json"
 HOUR_MS = 60 * 60 * 1000
 
 
