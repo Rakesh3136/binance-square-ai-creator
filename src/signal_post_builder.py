@@ -71,13 +71,18 @@ def setup_from(selected: dict) -> dict:
 
 def complete(selected: dict) -> bool:
     s = setup_from(selected)
-    return (
-        s["direction"] in {"LONG", "SHORT"}
-        and all(s[k] is not None for k in ("entry", "tp1", "tp2", "sl"))
-        and (s["confidence"] or 0) >= 65
+    try:
+        e, a, b, stop = [float(s[k]) for k in ('entry', 'tp1', 'tp2', 'sl')]
+    except (TypeError, ValueError):
+        return False
+    level_ok = (
+        stop < e < a <= b
+        if s['direction'] == 'LONG'
+        else 0 < b <= a < e < stop
+        if s['direction'] == 'SHORT'
+        else False
     )
-
-
+    return s['direction'] in {'LONG', 'SHORT'} and level_ok and (s['confidence'] or 0) >= 65
 def flow_record(sym: str) -> dict:
     data = load(FLOW, {})
     for row in data.get("top_conditional_setups") or []:
@@ -181,13 +186,12 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
     recent = recent_hooks()
 
     hooks = [
-        f"The useful signal on ${sym} is not the headline move; it is whether participation confirms the next break.",
-        f"${sym} now has a defined decision map: trigger first, targets second, invalidation always.",
-        f"For ${sym}, the invalidation level is just as important as the upside/downside target.",
-        f"Capital rotation is showing up around ${sym}; the next confirmation should decide whether the move is real.",
-        f"${sym} is not a chase setup here. It is a conditional test with a clear line in the sand.",
+        f'${sym} is at a level where the next 1H close matters more than the headline.',
+        f"I'm watching ${sym} for one thing: can sellers actually keep price below the trigger?" if s['direction'] == 'SHORT' else f"I'm watching ${sym} for one thing: can buyers actually keep price above the trigger?",
+        f'${sym} looks interesting here, but the short only makes sense after the level gives way.' if s['direction'] == 'SHORT' else f'${sym} looks interesting here, but the long only makes sense after the level holds.',
+        f'The ${sym} setup is pretty simple: trigger, retest, or invalidate.',
+        f'This is a ${sym} test, not a chase; the trigger decides whether the thesis has legs.',
     ]
-
     ordered = hooks[variant:] + hooks[:variant]
     def has_recent_sentence(text: str) -> bool:
         for sentence in re.split(r"[.!?]+", text):
@@ -199,40 +203,20 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
     hook = next((x for x in ordered if not has_recent_sentence(x)), ordered[0])
 
     why_now_variants = [
-        (
-            f"The current evidence supports a {s['direction']} scenario. "
-            + (", ".join(facts) + "." if facts else
-               "The fresh 1H structure and flow proxy are pointing in the same direction.")
-        ),
-        (
-            f"${sym} has a conditional {s['direction']} map rather than a chase signal. "
-            + (", ".join(facts) + "." if facts else
-               "Participation and the 1H structure are aligned enough to test the trigger.")
-        ),
-        (
-            f"The decision on ${sym} is straightforward: let the {s['direction']} trigger confirm the idea. "
-            + (", ".join(facts) + "." if facts else
-               "The current flow proxy and 1H structure keep the setup conditional.")
-        ),
-        (
-            f"For ${sym}, the {s['direction']} thesis only becomes actionable after confirmation. "
-            + (", ".join(facts) + "." if facts else
-               "Price structure still has to validate the flow read.")
-        ),
-        (
-            f"The useful read on ${sym} is the alignment between flow and the 1H decision level. "
-            + (", ".join(facts) + "." if facts else
-               f"That alignment leaves a conditional {s['direction']} scenario to test.")
-        ),
+        f"The flow read and 1H structure are leaning {s['direction']}. " + (', '.join(facts) + '.' if facts else 'That is enough evidence to test the trigger, not enough to call it confirmed.'),
+        f'The evidence is aligned enough to test ${sym}, but the level still has to break or hold before the setup is valid.' + ((' ' + ', '.join(facts) + '.') if facts else ''),
+        f'For ${sym}, the useful question is whether the move gets follow-through after the trigger.' + ((' ' + ', '.join(facts) + '.') if facts else ''),
+        f"I'm not treating the current candle as confirmation on ${sym}. The next 1H reaction around the trigger is the real test." + ((' ' + ', '.join(facts) + '.') if facts else ''),
+        f'The current structure gives ${sym} a conditional {s["direction"]} map; the market still has to prove it.' + ((' ' + ', '.join(facts) + '.') if facts else ''),
     ]
     why_now = why_now_variants[variant]
 
     condition_variants = [
-        "Confirmation comes from price reaching the trigger and holding it; a break of invalidation ends the thesis.",
-        "The setup stays conditional until the trigger is reached and defended; invalidation overrides the idea.",
-        "Treat the trigger as the confirmation point. Once invalidation breaks, the scenario is no longer valid.",
-        "Price has to prove the setup at the trigger; a clean invalidation break cancels the thesis.",
-        "The market decides at the trigger: acceptance supports the map, while invalidation closes it.",
+        "I'd treat the first break as a trigger, not proof; the hold or retest is what makes the idea interesting.",
+        "No confirmation, no thesis. If price reclaims the invalidation level, I'm done with the setup.",
+        "Let price prove it at the trigger. A clean rejection back through invalidation kills the idea.",
+        "The trigger starts the test; acceptance keeps it alive, while invalidation shuts it down.",
+        "The market gets the final say here: trigger first, then confirmation, then targets.",
     ]
     condition = condition_variants[variant]
     plan = (
@@ -242,11 +226,11 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
         f"SL / invalidation: {fmt(s['sl'])}."
     )
     angle = [
-        "The trigger matters more than the headline. A clean hold is confirmation; a fast wick is not.",
-        "The edge here is the predefined invalidation. If price loses it, the setup is discarded rather than averaged.",
-        "The setup is asymmetric by design: risk is defined before the market chooses the outcome.",
-        "Flow is a market-data proxy, so price structure still has the final say.",
-        "No chase: the trigger is the decision point, not the current candle.",
+        "I care more about what price does after the break than whether it tags the level for a second.",
+        "There is no need to force it; a clean invalidation keeps the call honest.",
+        "The useful part is the risk boundary: if that level fails, the idea is finished.",
+        "Flow is still a proxy, so the 1H price action gets the final vote.",
+        "No need to chase the candle. The trigger is the decision point.",
     ][variant]
     question = {
         "LONG": [
@@ -264,7 +248,14 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
             f"Would you wait for the trigger, or is the move already too extended?",
         ],
     }[s["direction"]][variant]
-    disclaimer = "Conditional setup only; invalidation wins."
+    disclaimers = [
+        'Conditional setup only; no guarantee.',
+        'Scenario to test, not certainty.',
+        'Conditional map; let price prove it.',
+        'This is a setup to test, not a promised outcome.',
+        'Risk boundary first; outcome unknown.',
+    ]
+    disclaimer = disclaimers[variant]
     return_payload = {
         "post": "\n\n".join([hook, why_now, condition, plan, angle, question, disclaimer]),
         "hook": hook,

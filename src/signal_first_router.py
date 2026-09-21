@@ -45,6 +45,20 @@ def level_contract_valid(side,tr,tp1,tp2,sl):
     return False
 
 
+def level_contract_valid(side,tr,tp1,tp2,sl):
+    try:
+        e,a,b,stop=[float(v) for v in (tr,tp1,tp2,sl)]
+    except (TypeError,ValueError):
+        return False
+    if min(e,a,b,stop) <= 0:
+        return False
+    if side == 'LONG':
+        return stop < e < a <= b
+    if side == 'SHORT':
+        return 0 < b <= a < e < stop
+    return False
+
+
 def flow_complete(x):
     _,_,side,tr,tp1,tp2,sl,conf=setup_parts(x)
     return side in {'LONG','SHORT'} and level_contract_valid(side,tr,tp1,tp2,sl) and conf>=MIN_FLOW_CONF
@@ -99,8 +113,6 @@ def derive(candidate,market):
         tp1=trigger+risk; tp2=trigger+2*risk
     else:
         side='SHORT'; trigger=rl*.998; sl=min(rh,last+span*.75); risk=sl-trigger
-        # Keep both downside targets strictly positive. If the natural 2R target
-        # would cross zero, cap the risk distance rather than inventing a negative price.
         risk=min(risk, trigger*0.45)
         if risk<=0:return candidate
         tp1=trigger-risk; tp2=trigger-2*risk
