@@ -187,7 +187,7 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
 
     hooks = [
         f'${sym} is at a level where the next 1H close matters more than the headline.',
-        f"I'm watching ${sym} for one thing: can sellers actually keep price below the trigger?" if s['direction'] == 'SHORT' else f"I'm watching ${sym} for one thing: can buyers actually keep price above the trigger?",
+        f"I'm watching ${sym} for one thing: whether sellers can actually keep price below the trigger." if s['direction'] == 'SHORT' else f"I'm watching ${sym} for one thing: whether buyers can actually keep price above the trigger.",
         f'${sym} looks interesting here, but the short only makes sense after the level gives way.' if s['direction'] == 'SHORT' else f'${sym} looks interesting here, but the long only makes sense after the level holds.',
         f'The ${sym} setup is pretty simple: trigger, retest, or invalidate.',
         f'This is a ${sym} test, not a chase; the trigger decides whether the thesis has legs.',
