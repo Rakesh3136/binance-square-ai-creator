@@ -1,4 +1,4 @@
-"""Creator 9.1 — Autonomous Strategy Orchestrator.
+"""Creator 9.2 — Autonomous Strategy Orchestrator + Reward Evidence Reconciliation.
 
 Creator 9.0 was previously a thin decision helper. This version becomes the
 strategy layer above the existing 7.x learning/experiment portfolio and 8.x
@@ -25,9 +25,47 @@ AUTHORITATIVE = ROOT / "data/live/authoritative_opportunity.json"
 EXPERIMENT = ROOT / "analytics/creator_7_4_experiment_plan.json"
 GROWTH = ROOT / "analytics/creator_7_5_growth_portfolio.json"
 MONETIZATION = ROOT / "analytics/creator_8_3_monetization_decision.json"
+EXTERNAL_REWARDS = ROOT / "analytics/external_reward_events.jsonl"
 OUT = ROOT / "data/live/creator_9_0_brain_state.json"
 BRIEF = ROOT / "data/live/creator_9_0_strategy_brief.json"
 REPORT = ROOT / "data/intelligence/creator_9_0_report.json"
+
+
+def load_jsonl(path: Path):
+    rows = []
+    if not path.exists():
+        return rows
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                value = json.loads(line)
+                if isinstance(value, dict):
+                    rows.append(value)
+    except Exception:
+        return []
+    return rows
+
+
+def external_reward_summary(rows):
+    """Expose external reward evidence without guessing post attribution."""
+    valid = []
+    seen = set()
+    for row in rows:
+        try:
+            amount = float(row.get("reward_amount_usdc") or 0)
+        except Exception:
+            amount = 0.0
+        key = (row.get("reward_date"), amount, row.get("source"), row.get("post_id"))
+        if amount > 0 and key not in seen:
+            seen.add(key)
+            valid.append(row)
+    return {
+        "event_count": len(valid),
+        "total_usdc": round(sum(float(x.get("reward_amount_usdc") or 0) for x in valid), 8),
+        "unallocated_count": sum(1 for x in valid if not x.get("post_id")),
+        "attribution_policy": "never_infer_post_from_date_views_engagement_or_asset",
+        "events": valid[-20:],
+    }
 
 
 def load(path: Path, default):
@@ -146,6 +184,7 @@ def main():
     experiment = load(EXPERIMENT, {})
     growth = load(GROWTH, {})
     monetization = load(MONETIZATION, {})
+    external_rewards = external_reward_summary(load_jsonl(EXTERNAL_REWARDS))
 
     symbol = clean_symbol(auth.get("symbol") or brain.get("symbol"))
     sample = int(num(perf.get("observation_count")))
@@ -213,6 +252,7 @@ def main():
         "strategy_preferences": preferences,
         "experiment": exp,
         "monetization_feedback": monetization_signal,
+        "external_reward_evidence": external_rewards,
         "decision_order": [
             "hard_validity_and_safety",
             "authoritative_fresh_opportunity",
@@ -275,6 +315,7 @@ def main():
         "market_regime": regime,
         "experiment": exp,
         "monetization_feedback": monetization_signal,
+        "external_reward_evidence": external_rewards,
         "directive": strategy["publisher_directive"],
     }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     REPORT.write_text(json.dumps(strategy, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -308,6 +349,8 @@ def main():
         "market_regime": regime,
         "experiment_id": exp["experiment_id"],
         "monetization_decision": monetization.get("decision"),
+        "external_reward_usdc": external_rewards["total_usdc"],
+        "unallocated_external_reward_count": external_rewards["unallocated_count"],
         "observation_sample": sample,
         "promotion_allowed": promotion,
     }, ensure_ascii=False, indent=2))
