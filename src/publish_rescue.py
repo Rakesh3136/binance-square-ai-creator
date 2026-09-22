@@ -1,9 +1,8 @@
 """Deterministic publish-rescue draft for a fresh but gate-rejected cycle.
 
-Rescue never changes the authoritative asset or removes the required
-TradingView visual. It only rewrites the already-researched evidence into a
-short, natural, testable Square post that is compatible with the final
-production and engagement gates.
+Rescue never changes the authoritative asset or removes the required visual. It
+rewrites already-researched evidence into a concise, natural, mobile-friendly
+Square post. The frozen prediction contract remains authoritative.
 """
 from __future__ import annotations
 
@@ -85,11 +84,9 @@ def authoritative_symbol(report: dict, preflight: dict) -> str:
     selected = preflight.get("selected_opportunity") or {}
     draft = report.get("draft") or {}
     for value in (
-        context.get("symbol"),
-        frozen.get("symbol"),
+        context.get("symbol"), frozen.get("symbol"),
         selected.get("symbol") if isinstance(selected, dict) else "",
-        report.get("symbol"),
-        draft.get("symbol") if isinstance(draft, dict) else "",
+        report.get("symbol"), draft.get("symbol") if isinstance(draft, dict) else "",
     ):
         symbol = clean_symbol(value)
         if symbol:
@@ -127,7 +124,6 @@ def main():
     symbol = authoritative_symbol(report, preflight)
     if not symbol:
         raise SystemExit("No authoritative symbol available for rescue")
-
     match = market_match(market, symbol)
     if not match:
         raise SystemExit(f"No fresh market evidence found for authoritative asset {symbol}")
@@ -165,179 +161,89 @@ def main():
     )
     try:
         from signal_post_builder import build_outcome_post, build_signal_post
-        # Current signal lanes must preserve the frozen prediction contract.
-        # Never let a historical outcome post replace a live LONG/SHORT setup.
         if signal_lane:
-            special = build_signal_post(selected)
+            # Feed the immutable contract into the human composer even when an
+            # upstream draft omitted normalized fields.
+            signal_selected = dict(selected)
+            signal_selected["symbol"] = symbol
+            signal_selected["direction"] = frozen_contract.get("direction")
+            signal_selected["prediction"] = {
+                "direction": frozen_contract.get("direction"),
+                "entry_trigger": frozen_contract.get("entry"),
+                "tp1": frozen_contract.get("tp1"),
+                "tp2": frozen_contract.get("tp2"),
+                "sl": frozen_contract.get("sl"),
+                "confidence": frozen_contract.get("confidence") or 65,
+            }
+            signal_selected["trade_setup"] = {
+                "side": frozen_contract.get("direction"),
+                "trigger": frozen_contract.get("entry"),
+                "tp1": frozen_contract.get("tp1"),
+                "tp2": frozen_contract.get("tp2"),
+                "invalidation": frozen_contract.get("sl"),
+            }
+            special = build_signal_post(signal_selected)
         elif category in {"creator_signal_outcome", "follow_up"}:
             special = build_outcome_post(selected)
-        if special is None:
-            special = build_signal_post(selected) if signal_lane else build_outcome_post(selected)
     except Exception as exc:
-        print(f'Signal-first rescue composer unavailable; using verified market rescue: {exc}')
+        print(f"Signal-first rescue composer unavailable; using compact contract fallback: {exc}")
 
-    # A rejected signal draft must not be downgraded into the old generic
-    # top-gainer template. Preserve the prediction contract whenever it exists.
     if special:
         post = special["post"]
         hook = special["hook"]
         style = special["style"]
-        if signal_lane:
-            contract = special.get("signal_contract") or {}
-            direction = str(contract.get("direction") or frozen_contract.get("direction") or "").upper()
-            required = (
-                direction,
-                "Entry trigger:",
-                "TP1:",
-                "TP2:",
-                "SL / invalidation:",
-            )
-            if not all(token and token.lower() in post.lower() for token in required):
-                retry_selected = dict(selected)
-                retry_selected["direction"] = frozen_contract.get("direction")
-                retry_selected["prediction"] = {
-                    "direction": frozen_contract.get("direction"),
-                    "entry_trigger": frozen_contract.get("entry"),
-                    "tp1": frozen_contract.get("tp1"),
-                    "tp2": frozen_contract.get("tp2"),
-                    "sl": frozen_contract.get("sl"),
-                    "confidence": frozen_contract.get("confidence") or 65,
-                }
-                retry_selected["trade_setup"] = {
-                    "side": frozen_contract.get("direction"),
-                    "trigger": frozen_contract.get("entry"),
-                    "tp1": frozen_contract.get("tp1"),
-                    "tp2": frozen_contract.get("tp2"),
-                    "invalidation": frozen_contract.get("sl"),
-                }
-                retry = build_signal_post(retry_selected)
-                if retry:
-                    special = retry
-                    post = retry["post"]
-                    hook = retry["hook"]
-                    style = retry["style"]
-    # Avoid template labels such as "Bull case:" / "Bear case:". Those read
-    # like generated boilerplate and are explicitly penalized by the final
-    # human-content firewall. Write the same conditional logic as a sentence.
+    elif signal_lane:
+        direction = str(frozen_contract.get("direction") or "").upper()
+        e, tp1, tp2, sl = (frozen_contract.get("entry"), frozen_contract.get("tp1"), frozen_contract.get("tp2"), frozen_contract.get("sl"))
+        contract_ok = direction in {"LONG", "SHORT"} and all(v is not None for v in (e, tp1, tp2, sl))
+        if not contract_ok:
+            raise SystemExit("Frozen signal contract incomplete; refusing generic downgrade")
+        hook = f"${symbol}: the {direction} idea is at its decision level."
+        why = f"I'm watching the next 1H reaction around {fmt_price(e)}. The setup needs confirmation; it is not a call to chase the current candle."
+        plan = f"{direction} trigger: {fmt_price(e)}  |  TP1 {fmt_price(tp1)}  |  TP2 {fmt_price(tp2)}  |  SL {fmt_price(sl)}"
+        condition = "A clean trigger plus follow-through keeps the thesis alive; the invalidation level ends it."
+        question = f"Would you wait for the retest around {fmt_price(e)}, or require a fresh 1H close first?"
+        disclaimer = "Conditional setup only; no guarantee."
+        post = "\n\n".join([hook, why, plan, condition, question, disclaimer])
+        style = "publish_rescue_mobile_contract_v2"
     elif news_title:
         source_line = f"Source: {news_source}" if news_source else "Source: verified news feed"
         hook = f"🚨 ${symbol}: {news_title}"
-        post = "\n\n".join([
-            hook,
-            source_line,
-            f"The headline matters only if price confirms it. ${symbol} is {move:+.1f}% with {volume_text}.",
-            f"Watch ${fmt_price(resistance)} as the decision area; a failed reaction puts ${fmt_price(support)} back in focus.",
-            "Does price confirm the catalyst, or fade it?",
-        ])
+        post = "\n\n".join([hook, source_line, f"The headline matters only if price confirms it. ${symbol} is {move:+.1f}% with {volume_text}.", f"Watch {fmt_price(resistance)} as the decision area; a failed reaction puts {fmt_price(support)} back in focus.", "Does price confirm the catalyst, or fade it?"])
         style = "publish_rescue_newsroom"
     elif move >= 15:
         hook = f"🔥 ${symbol} moved {move:+.1f}% — confirmation now matters more than the headline."
-        post = "\n\n".join([
-            hook,
-            f"Spot activity is {volume_text}, with a {intraday:.1f}% intraday range.",
-            f"A hold above ${fmt_price(resistance)} would keep continuation in play; rejection there puts ${fmt_price(support)} back on watch.",
-            "Would you wait for a clean hold, or expect a pullback first?",
-        ])
+        post = "\n\n".join([hook, f"Spot activity is {volume_text}, with a {intraday:.1f}% intraday range.", f"A hold above {fmt_price(resistance)} keeps continuation in play; rejection puts {fmt_price(support)} back on watch.", "Would you wait for a clean hold, or expect a pullback first?"])
         style = "publish_rescue_momentum"
     elif move <= -15:
         hook = f"⚠️ ${symbol} fell {abs(move):.1f}% — the reaction now matters more than the drop itself."
-        post = "\n\n".join([
-            hook,
-            f"Spot activity is {volume_text}, with a {intraday:.1f}% intraday range.",
-            f"A reclaim of ${fmt_price(resistance)} would improve the read; losing ${fmt_price(support)} keeps sellers in control.",
-            "Would you wait for a reclaim, or another lower high?",
-        ])
+        post = "\n\n".join([hook, f"Spot activity is {volume_text}, with a {intraday:.1f}% intraday range.", f"A reclaim of {fmt_price(resistance)} improves the read; losing {fmt_price(support)} keeps sellers in control.", "Would you wait for a reclaim, or another lower high?"])
         style = "publish_rescue_breakdown"
     else:
         hook = f"📊 ${symbol}: the next 1H move is the decision point."
-        post = "\n\n".join([
-            hook,
-            f"Price is around ${fmt_price(last)} with {volume_text} and a {intraday:.1f}% intraday range.",
-            f"A clean move through ${fmt_price(resistance)} would strengthen the upside read; rejection keeps ${fmt_price(support)} in focus.",
-            "Which level would you require before treating the setup as confirmed?",
-        ])
+        post = "\n\n".join([hook, f"Price is around {fmt_price(last)} with {volume_text} and a {intraday:.1f}% intraday range.", f"A clean move through {fmt_price(resistance)} strengthens the upside read; rejection keeps {fmt_price(support)} in focus.", "Which level would you require before treating the setup as confirmed?"])
         style = "publish_rescue_chart"
 
-    if signal_lane:
-        direction = str(frozen_contract.get("direction") or "").upper()
-        e, tp1, tp2, sl = (
-            frozen_contract.get("entry"),
-            frozen_contract.get("tp1"),
-            frozen_contract.get("tp2"),
-            frozen_contract.get("sl"),
-        )
-        contract_ok = direction in {"LONG", "SHORT"} and all(v is not None for v in (e, tp1, tp2, sl))
-        visible = all(token.lower() in post.lower() for token in (
-            direction,
-            "Entry trigger:",
-            "TP1:",
-            "TP2:",
-            "SL / invalidation:",
-        )) if direction else False
-        if contract_ok and not visible:
-            hook = f"${symbol}: the {direction} setup only activates if price confirms the trigger."
-            condition = (
-                f"Direction: {direction}. Entry trigger: {e:.8g}. TP1: {tp1:.8g}. "
-                f"TP2: {tp2:.8g}. SL / invalidation: {sl:.8g}."
-            )
-            body = (
-                "The setup is conditional: the trigger starts the test, while a move through "
-                "the invalidation level cancels the thesis."
-            )
-            question = f"Would you wait for the {direction} trigger or the retest before acting?"
-            disclaimer = "Conditional setup only; no guarantee."
-            post = "\n\n".join([hook, condition, body, question, disclaimer])
-            style = "publish_rescue_frozen_signal_contract"
-
-    # Keep the rescue inside the post-mode engagement limit. Never truncate
-    # a verified signal contract in the middle of its required fields.
+    # Keep mobile posts compact, but never truncate a signal contract.
     if signal_lane and len(post) > 740:
-        lines = post.split("\n\n")
-        essential = [hook]
-        for block in lines[1:]:
-            if block in essential:
-                continue
-            essential.append(block)
-            candidate = "\n\n".join(essential)
-            if len(candidate) > 740:
-                essential.pop()
-                break
-        post = "\n\n".join(essential)
-        required_tokens = ["Entry trigger:", "TP1:", "TP2:", "SL / invalidation:"]
-        if not all(t.lower() in post.lower() for t in required_tokens):
-            rebuilt = build_signal_post(selected) if signal_lane else None
-            if rebuilt:
-                post = rebuilt["post"]
-                hook = rebuilt["hook"]
-                style = rebuilt["style"]
-    else:
-        post = post[:740]
+        raise SystemExit("Human signal post exceeded mobile limit; refusing unsafe truncation")
+    post = post[:740] if not signal_lane else post
+
     draft = report.get("draft") or {}
     if not isinstance(draft, dict):
         draft = {}
     draft.update({
-        "post": post,
-        "text": post,
-        "hook": hook,
+        "post": post, "text": post, "hook": hook,
         "discussion_question": post.splitlines()[-1],
-        "quality_score": 90,
-        "editorial_style": style,
-        "generation_mode": "LOCAL_FALLBACK",
-        "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
-        "symbol": symbol,
-        "content_category": selected.get("category") or selected.get("reason") or "market_opportunity",
+        "quality_score": 90, "editorial_style": style,
+        "generation_mode": "LOCAL_FALLBACK", "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
+        "symbol": symbol, "content_category": selected.get("category") or selected.get("reason") or "market_opportunity",
     })
 
     visual = report.get("visual_plan") or {}
     if not isinstance(visual, dict):
         visual = {}
-    visual.update({
-        "use_visual": True,
-        "type": "candlestick_chart",
-        "provider": "TradingView",
-        "timeframe": "1H",
-        "rescue_text_fallback": False,
-    })
+    visual.update({"use_visual": True, "type": "candlestick_chart", "provider": "TradingView", "timeframe": "1H", "rescue_text_fallback": False})
 
     meta = load(VISUAL_META, {})
     chart_symbols = [str(x).upper() for x in (meta.get("tradingview_symbols") or [])]
@@ -355,12 +261,7 @@ def main():
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
     STATUS.parent.mkdir(parents=True, exist_ok=True)
-    STATUS.write_text(json.dumps({
-        "status": "LOCAL_FALLBACK_SUCCESS",
-        "generation_mode": "LOCAL_FALLBACK",
-        "reason": "Rescue rewrote the fresh evidence without template labels, asset drift, or visual downgrade",
-        "rescue": True,
-    }, indent=2), encoding="utf-8")
+    STATUS.write_text(json.dumps({"status": "LOCAL_FALLBACK_SUCCESS", "generation_mode": "LOCAL_FALLBACK", "reason": "Human mobile rescue with frozen contract and visual asset binding", "rescue": True}, indent=2), encoding="utf-8")
     print(json.dumps({"status": "PUBLISH_RESCUE_READY", "report": str(report_path), "symbol": symbol}, indent=2))
 
 
