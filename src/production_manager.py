@@ -38,36 +38,22 @@ def authoritative_symbol(data):
         if x:return x
     return ''
 def visual_is_verified(expected=''):
-    meta=load(VISUAL_META)
-    provider=str(meta.get('provider') or '')
-    status=str(meta.get('status') or '')
-    if not VISUAL.exists() or VISUAL.stat().st_size < 1000:
-        return False
+    meta=load(VISUAL_META);provider=str(meta.get('provider') or '');status=str(meta.get('status') or '')
+    if not VISUAL.exists() or VISUAL.stat().st_size < 1000:return False
     if provider=='Local historical OHLCV renderer' and status=='HISTORICAL_SNAPSHOT_CREATED':
-        snap=load(ROOT/'data/live/historical_setup_snapshot.json')
-        ctx=load(CONTEXT_PATH)
-        current=clean_symbol(ctx.get('symbol') or expected)
-        if snap.get('status')!='FROZEN' or snap.get('lookahead_protection') is not True:
-            return False
+        snap=load(ROOT/'data/live/historical_setup_snapshot.json');ctx=load(CONTEXT_PATH);current=clean_symbol(ctx.get('symbol') or expected)
+        if snap.get('status')!='FROZEN' or snap.get('lookahead_protection') is not True:return False
         snap_symbol=clean_symbol(snap.get('symbol'))
-        if current and snap_symbol != current:
-            return False
-        if expected and snap_symbol != clean_symbol(expected):
-            return False
-        if clean_symbol(meta.get('base_symbol')) != snap_symbol:
-            return False
-        if str(meta.get('signal_created_at') or '')!=str(snap.get('signal_created_at') or ''):
-            return False
-        if str(meta.get('data_cutoff') or '')!=str(snap.get('data_cutoff') or ''):
-            return False
-        pred=snap.get('prediction') if isinstance(snap.get('prediction'),dict) else {}
-        marks=meta.get('prediction_markings') if isinstance(meta.get('prediction_markings'),dict) else {}
+        if current and snap_symbol != current:return False
+        if expected and snap_symbol != clean_symbol(expected):return False
+        if clean_symbol(meta.get('base_symbol')) != snap_symbol:return False
+        if str(meta.get('signal_created_at') or '')!=str(snap.get('signal_created_at') or ''):return False
+        if str(meta.get('data_cutoff') or '')!=str(snap.get('data_cutoff') or ''):return False
+        pred=snap.get('prediction') if isinstance(snap.get('prediction'),dict) else {};marks=meta.get('prediction_markings') if isinstance(meta.get('prediction_markings'),dict) else {}
         for key in ('direction','entry_trigger','tp1','tp2','sl'):
-            if marks.get(key) != pred.get(key):
-                return False
+            if marks.get(key) != pred.get(key):return False
         return True
-    mode=str(meta.get('visual_mode') or '')
-    valid_modes={'TRADINGVIEW_CHART_ONLY','TRADINGVIEW_CHART_PAIR','TRADINGVIEW_CHART_ANNOTATED','TRADINGVIEW_CHART_WITH_SETUP_LEVELS'}
+    mode=str(meta.get('visual_mode') or '');valid_modes={'TRADINGVIEW_CHART_ONLY','TRADINGVIEW_CHART_PAIR','TRADINGVIEW_CHART_ANNOTATED','TRADINGVIEW_CHART_WITH_SETUP_LEVELS'}
     ok=provider=='TradingView' and status=='TRADINGVIEW_CREATED' and mode in valid_modes
     if not ok:return False
     actuals=[str(x).upper() for x in (meta.get('tradingview_symbols') or [])]
@@ -97,6 +83,12 @@ def final_asset_ok(report):
     env=dict(os.environ);env['DRAFT_PATH']=str(report);return subprocess.run([sys.executable,str(ASSET_LOCK)],cwd=ROOT,env=env,check=False).returncode==0
 def write_decision(audit):
     DECISION_PATH.parent.mkdir(parents=True,exist_ok=True);DECISION_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False),encoding='utf-8')
+def jev_gate(data,post,cat,expected,contract,quality,opportunity,deterministic_ok):
+    try:
+        from jev_decision_gate import evaluate
+        return evaluate(symbol=expected,category=cat,post=post,direction=str(contract.get('direction') or ''),entry=contract.get('entry_trigger'),tp1=contract.get('tp1'),tp2=contract.get('tp2'),sl=contract.get('sl'),opportunity_score=opportunity,quality_score=quality,evidence=[f'deterministic_gate:{deterministic_ok}',f'opportunity_score:{opportunity}',f'quality_score:{quality}',f'category:{cat}'],deterministic_ok=deterministic_ok)
+    except Exception as exc:
+        return {'enabled':False,'status':f'error:{type(exc).__name__}','publish':deterministic_ok,'confidence':0.0}
 def evaluate(report):
     data=load(report);draft=data.get('draft') or {};post=str(draft.get('post') or draft.get('text') or '').strip();rescue=data.get('publish_rescue') is True;ctx=load(CONTEXT_PATH);cat=category();expected=authoritative_symbol(data);asset_ok=final_asset_ok(report)
     try:
@@ -104,13 +96,13 @@ def evaluate(report):
     except Exception as exc:interaction={'score':0,'publish':False,'reasons':[f'quality_gate_error:{type(exc).__name__}']}
     try:quality=float(draft.get('quality_score') or interaction.get('score') or 0)
     except:quality=float(interaction.get('score') or 0)
-    human_score,human_failures=human_content_audit(post,expected,cat)
-    signal_lanes={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','technical_setup'};frozen=load(FROZEN_PATH);prediction=frozen.get('prediction') if isinstance(frozen.get('prediction'),dict) else {};contract={'direction':frozen.get('direction') or prediction.get('direction'),'entry_trigger':frozen.get('entry_trigger') or prediction.get('entry_trigger'),'tp1':frozen.get('tp1') or prediction.get('tp1'),'tp2':frozen.get('tp2') or prediction.get('tp2'),'sl':frozen.get('sl') or prediction.get('sl')}
+    human_score,human_failures=human_content_audit(post,expected,cat);signal_lanes={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','technical_setup'};frozen=load(FROZEN_PATH);prediction=frozen.get('prediction') if isinstance(frozen.get('prediction'),dict) else {};contract={'direction':frozen.get('direction') or prediction.get('direction'),'entry_trigger':frozen.get('entry_trigger') or prediction.get('entry_trigger'),'tp1':frozen.get('tp1') or prediction.get('tp1'),'tp2':frozen.get('tp2') or prediction.get('tp2'),'sl':frozen.get('sl') or prediction.get('sl')}
     if cat in signal_lanes and all(v is not None and str(v).strip() for v in contract.values()):
         for marker in (str(contract['direction']).upper(),'Entry trigger:','TP1:','TP2:','SL / invalidation:'):
             if marker.lower() not in post.lower():human_failures.append('signal_contract_missing:'+marker)
         human_score=min(human_score,90 if not any(x.startswith('signal_contract_missing:') for x in human_failures) else 68)
-    quality=min(quality,human_score);intelligence=load(INTEL_PATH);elite=load(ELITE_PATH);intelligence_ok=(cat=='result_followup') or intelligence.get('publish_recommendation') is True;opportunity=opportunity_score(data);chart_ok=cat in NONCHART or visual_is_verified(expected);coherent=content_is_coherent(post,expected,cat);failures=list(elite.get('failures') or []) if isinstance(elite,dict) else [];failures.extend(human_failures);hard_prefixes=('quality_gate_error','policy_language_failure','malformed_statistics_phrase','repetitive_feed_template','repeats_recent_published_sentence');hard_exact={'empty_post','missing_primary_cashtag'};hard_block=bool(any(any(x==p or x.startswith(p+':') for p in hard_prefixes) for x in failures) or any(x in hard_exact for x in failures));threshold=RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD;eligible=bool(post) and asset_ok and coherent and quality>=threshold and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok and (rescue or (intelligence_ok and (data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' or cat=='result_followup'))) and not hard_block;mode=choose_mode();audit={'version':'6.3-overlay-aware-visual-verification','draft':str(report),'publish':eligible,'mode':mode,'category':cat,'quality_score':quality,'human_content_score':human_score,'quality_threshold':threshold,'opportunity_score':opportunity,'interaction_gate':interaction,'human_content_failures':human_failures,'final_asset_lock':asset_ok,'tradingview_required':cat not in NONCHART,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'content_coherent':coherent,'rescue':rescue,'elite_failures':failures,'hard_block':hard_block,'rescue_allowed':not hard_block,'reason':'publish_eligible' if eligible else 'gate_rejected'};AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False));GATE_PATH.write_text(json.dumps(interaction,indent=2),encoding='utf-8');write_decision(audit);print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
+    quality=min(quality,human_score);intelligence=load(INTEL_PATH);elite=load(ELITE_PATH);intelligence_ok=(cat=='result_followup') or intelligence.get('publish_recommendation') is True;opportunity=opportunity_score(data);chart_ok=cat in NONCHART or visual_is_verified(expected);coherent=content_is_coherent(post,expected,cat);failures=list(elite.get('failures') or []) if isinstance(elite,dict) else [];failures.extend(human_failures);hard_prefixes=('quality_gate_error','policy_language_failure','malformed_statistics_phrase','repetitive_feed_template','repeats_recent_published_sentence');hard_exact={'empty_post','missing_primary_cashtag'};hard_block=bool(any(any(x==p or x.startswith(p+':') for p in hard_prefixes) for x in failures) or any(x in hard_exact for x in failures));threshold=RESCUE_QUALITY_THRESHOLD if rescue else QUALITY_THRESHOLD;deterministic_ok=bool(post) and asset_ok and coherent and quality>=threshold and opportunity>=OPPORTUNITY_THRESHOLD and interaction.get('publish') is True and chart_ok and (rescue or (intelligence_ok and (data.get('status')=='DRAFT_ONLY_NOT_PUBLISHED' or cat=='result_followup'))) and not hard_block
+    mode=choose_mode();jev=jev_gate(data,post,cat,expected,contract,quality,opportunity,deterministic_ok);jev_enabled=bool(jev.get('enabled'));eligible=bool(deterministic_ok and (not jev_enabled or jev.get('publish') is True));audit={'version':'6.4-jev-decision-layer','draft':str(report),'publish':eligible,'mode':mode,'category':cat,'quality_score':quality,'human_content_score':human_score,'quality_threshold':threshold,'opportunity_score':opportunity,'interaction_gate':interaction,'human_content_failures':human_failures,'final_asset_lock':asset_ok,'tradingview_required':cat not in NONCHART,'tradingview_verified':chart_ok,'chart_expected_symbol':expected,'publication_context_symbol':ctx.get('symbol',''),'content_coherent':coherent,'rescue':rescue,'elite_failures':failures,'hard_block':hard_block,'rescue_allowed':not hard_block,'deterministic_publish':deterministic_ok,'jev':{k:v for k,v in jev.items() if k!='raw'},'reason':'publish_eligible' if eligible else ('jev_review_or_block' if deterministic_ok and jev_enabled else 'gate_rejected')};AUDIT_PATH.write_text(json.dumps(audit,indent=2,ensure_ascii=False));GATE_PATH.write_text(json.dumps(interaction,indent=2),encoding='utf-8');write_decision(audit);print(json.dumps(audit,indent=2,ensure_ascii=False));return eligible,mode
 def rescue_status():STATUS_PATH.parent.mkdir(parents=True,exist_ok=True);STATUS_PATH.write_text(json.dumps({'status':'LOCAL_FALLBACK_SUCCESS','generation_mode':'LOCAL_FALLBACK','reason':'Bounded deterministic rescue'},indent=2),encoding='utf-8')
 def main():
     report=fresh_report()
