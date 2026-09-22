@@ -34,7 +34,8 @@ def main():
     if entry is None or tp1 is None or sl is None: failures.append("incomplete_trade_contract")
     elif side=="LONG" and not sl<entry<tp1: failures.append("invalid_long_level_order")
     elif side=="SHORT" and not tp1<entry<sl: failures.append("invalid_short_level_order")
-    if routing.get("prediction_contract_complete") is not True: failures.append("router_contract_not_complete")
+    router_contract_ok = routing.get("prediction_contract_complete") is True or selected.get("prediction_contract_complete") is True
+    if not router_contract_ok: failures.append("router_contract_not_complete")
     if selected and selected.get("signal_first_ohlcv_verified") is not True and not (selected.get("evidence") or {}).get("ohlcv_candles_used"):
         challenges.append("Signal is not carrying explicit fresh completed-candle provenance.")
     if regime.get("regime")=="HIGH_DISPERSION": challenges.append("High cross-asset dispersion: avoid treating one asset move as broad market confirmation.")
