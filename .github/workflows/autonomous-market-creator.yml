@@ -69,8 +69,8 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback"
-          echo 'Signal-first, recovery and monetization modules imported successfully'
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, jev_decision_gate"
+          echo 'Signal-first, recovery, monetization and Jev modules imported successfully'
 
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
@@ -273,29 +273,21 @@ jobs:
           import json
           import os
           from pathlib import Path
-
           path = Path('data/live/elite_prepublication_judge.json')
           blocked = True
           reason = 'elite_judge_output_missing'
-
           if path.exists():
-              try:
-                  result = json.loads(path.read_text(encoding='utf-8'))
-              except Exception:
-                  result = {}
-                  reason = 'elite_judge_output_invalid_json'
+              try: result = json.loads(path.read_text(encoding='utf-8'))
+              except Exception: result = {}; reason = 'elite_judge_output_invalid_json'
               else:
                   failures = result.get('failures') or []
                   blocked = result.get('publish') is not True or bool(failures)
                   reason = ','.join(str(x) for x in failures) or 'publish'
-
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
               f.write(f"blocked={'true' if blocked else 'false'}\n")
               f.write(f"reason={reason}\n")
-
           print({'blocked': blocked, 'reason': reason})
-          if blocked:
-              print('No publication: authoritative quality gate remains blocked after bounded recovery.')
+          if blocked: print('No publication: authoritative quality gate remains blocked after bounded recovery.')
           PY
       - name: Integrity and final content gates
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_gate.outputs.blocked != 'true' }}
@@ -332,13 +324,8 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then
-            python src/meme_renderer.py
-          else
-            npm install --no-save playwright
-            npx playwright install --with-deps chromium
-            python src/visual_renderer.py
-          fi
+          if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then python src/meme_renderer.py
+          else npm install --no-save playwright; npx playwright install --with-deps chromium; python src/visual_renderer.py; fi
           test -s data/live/visual.png
           python src/validate_visual.py
           provider=$(python -c 'import json; p=json.load(open("data/live/visual_metadata.json")); print(p.get("provider",""))')
@@ -349,6 +336,7 @@ jobs:
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_gate.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+          JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
         run: |
           python src/production_manager.py
           publish=$(python -c 'import json; print(str(json.load(open("data/live/production_decision.json")).get("publish", False)).lower())')
@@ -370,30 +358,13 @@ jobs:
       - name: Persist run state and diagnostics
         if: ${{ always() }}
         run: |
-          if [ "${{ job.status }}" = "cancelled" ]; then
-            echo 'Run cancelled; skipping repository state persistence.'
-            exit 0
-          fi
-          if [ -f src/creator_diagnostics.py ]; then
-            python src/creator_diagnostics.py || true
-          else
-            echo 'creator_diagnostics.py not present; skipping legacy diagnostics hook'
-          fi
+          if [ "${{ job.status }}" = "cancelled" ]; then echo 'Run cancelled; skipping repository state persistence.'; exit 0; fi
+          if [ -f src/creator_diagnostics.py ]; then python src/creator_diagnostics.py || true; else echo 'creator_diagnostics.py not present; skipping legacy diagnostics hook'; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
           git reset --mixed origin/main
           git add analytics data
           bad_paths=$(git diff --cached --name-only | grep -vE '^(analytics|data)/' || true)
-          if [ -n "$bad_paths" ]; then
-            echo '::error::Refusing to persist non-generated paths:'
-            echo "$bad_paths"
-            git reset
-            exit 1
-          fi
-          if git diff --cached --quiet; then
-            echo 'No generated state changes to persist'
-          else
-            git commit -m 'Record Creator 7.x cycle'
-            git push origin HEAD:main
-          fi
+          if [ -n "$bad_paths" ]; then echo '::error::Refusing to persist non-generated paths:'; echo "$bad_paths"; git reset; exit 1; fi
+          if git diff --cached --quiet; then echo 'No generated state changes to persist'; else git commit -m 'Record Creator 7.x cycle'; git push origin HEAD:main; fi
