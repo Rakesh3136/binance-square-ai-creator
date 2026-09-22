@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -123,10 +124,55 @@ def evaluate(*, symbol: str, category: str, post: str, direction: str,
             "setup_quality": quality_a.get("score") or quality_a.get("value"),
             "raw": resp,
         })
+    except urllib.error.HTTPError as exc:
+        # Jev is an optional second-opinion integration. An invalid/expired key
+        # (401/403) means Jev is unavailable, not that the market setup itself
+        # failed. Keep deterministic/ensemble authority intact and make the
+        # failure auditable so the key can be repaired without deadlocking the
+        # creator. A valid Jev response with review/block still fails closed.
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:1000]
+        except Exception:
+            detail = ""
+        if exc.code in {401, 403}:
+            result.update({
+                "status": "unavailable_auth",
+                "error": f"HTTPError: {exc.code} {exc.reason}",
+                "error_detail": detail,
+                "publish": bool(deterministic_ok),
+                "action": "local_gates_only",
+                "confidence": 0.0,
+                "jev_authoritative": False,
+            })
+        else:
+            result.update({
+                "status": "unavailable_http",
+                "error": f"HTTPError: {exc.code} {exc.reason}",
+                "error_detail": detail,
+                "publish": bool(deterministic_ok),
+                "action": "local_gates_only",
+                "confidence": 0.0,
+                "jev_authoritative": False,
+            })
+    except (urllib.error.URLError, TimeoutError) as exc:
+        # Temporary connectivity/DNS/timeout failures are integration
+        # availability failures. Never turn them into a false Jev approval.
+        result.update({
+            "status": "unavailable_transport",
+            "error": f"{type(exc).__name__}: {exc}",
+            "publish": bool(deterministic_ok),
+            "action": "local_gates_only",
+            "confidence": 0.0,
+            "jev_authoritative": False,
+        })
     except Exception as exc:
-        # Fail closed for the optional Jev layer: do not claim Jev approval.
-        # The existing deterministic pipeline remains authoritative.
-        result.update({"status": "error", "error": f"{type(exc).__name__}: {exc}", "publish": False})
+        # Unexpected Jev failures remain fail-closed: do not claim Jev approval.
+        result.update({
+            "status": "error",
+            "error": f"{type(exc).__name__}: {exc}",
+            "publish": False,
+            "jev_authoritative": False,
+        })
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
