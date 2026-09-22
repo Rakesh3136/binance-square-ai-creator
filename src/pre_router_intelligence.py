@@ -3,7 +3,7 @@ This layer ranks/filters candidate symbols using already-produced evidence. It n
 creates a trade contract, never publishes, and never overrides Signal-First gates.
 """
 from __future__ import annotations
-import json, math
+import json, math, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,6 +29,30 @@ def num(v):
         return x if math.isfinite(x) else 0.0
     except Exception:
         return 0.0
+
+BINANCE_BASES=(
+    "https://data-api.binance.vision",
+    "https://api-gcp.binance.com",
+    "https://api1.binance.com",
+    "https://api2.binance.com",
+)
+
+def live_usdt_bases():
+    # Best-effort current Binance Spot TRADING universe for discovery filtering.
+    # The final router remains authoritative and re-verifies independently.
+    for base in BINANCE_BASES:
+        try:
+            req=urllib.request.Request(
+                base+"/api/v3/exchangeInfo?symbolStatus=TRADING",
+                headers={"User-Agent":"binance-square-ai-creator/pre-router","Accept":"application/json"},
+            )
+            with urllib.request.urlopen(req,timeout=15) as h:
+                data=json.loads(h.read().decode("utf-8"))
+            return {str(x.get("symbol","")).upper()[:-4] for x in data.get("symbols",[])
+                    if str(x.get("status","")).upper()=="TRADING" and str(x.get("symbol","")).upper().endswith("USDT")}
+        except Exception:
+            continue
+    return set()
 
 def add(pool,x,source):
     if not isinstance(x,dict): return
@@ -65,8 +89,13 @@ def main():
     for x in mesh_top or []: add(pool,x,"agent_mesh_300")
 
     regime_name=str(regime.get("regime") or "UNKNOWN").upper()
+    live_symbols=live_usdt_bases()
     ranked=[]
     for row in pool.values():
+        # Filter stale symbols when a live Binance universe is available.
+        # Final router verification remains authoritative.
+        if live_symbols and row["symbol"] not in live_symbols:
+            continue
         sources=len(row["sources"])
         # This is discovery prioritization only. No direction or trade levels are invented.
         support=min(25.0,sources*5.0)
@@ -80,6 +109,8 @@ def main():
         "generated_at":datetime.now(timezone.utc).isoformat(),
         "status":"READY",
         "candidate_count":len(ranked),
+        "source_candidate_count":len(pool),
+        "live_symbol_filter_active":bool(live_symbols),
         "shortlist":ranked[:40],
         "regime":regime_name,
         "mesh_version":mesh.get("version") if isinstance(mesh,dict) else None,
@@ -93,6 +124,6 @@ def main():
     }
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    print(json.dumps({"status":"READY","candidate_count":len(ranked),"shortlist":[x["symbol"] for x in ranked[:10]],"regime":regime_name},ensure_ascii=False))
+    print(json.dumps({"status":"READY","candidate_count":len(ranked),"source_candidate_count":len(pool),"live_symbol_filter_active":bool(live_symbols),"shortlist":[x["symbol"] for x in ranked[:10]],"regime":regime_name},ensure_ascii=False))
 if __name__=="__main__":
     main()
