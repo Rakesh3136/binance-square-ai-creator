@@ -59,6 +59,39 @@ def main() -> None:
     meta = json.loads(META.read_text(encoding="utf-8"))
     provider = str(meta.get("provider") or "")
     status = str(meta.get("status") or "")
+    if provider == "Wikimedia Commons" and status == "MEME_CREATED":
+        context = json.loads(CONTEXT.read_text(encoding="utf-8")) if CONTEXT.exists() else {}
+        frozen = json.loads(FROZEN.read_text(encoding="utf-8")) if FROZEN.exists() else {}
+        category = str(context.get("category") or frozen.get("category") or "").lower()
+        if category != "crypto_meme":
+            raise SystemExit(f"Meme visual is bound to non-meme category: {category or '<missing>'}")
+        expected = clean_symbol(context.get("symbol") or frozen.get("symbol"))
+        actual = clean_symbol(meta.get("base_symbol"))
+        if not expected or actual != expected:
+            raise SystemExit(f"Meme visual symbol mismatch: visual={actual or '<missing>'} current={expected or '<missing>'}")
+        license_name = str(meta.get("license") or "")
+        if not license_name or not any(x.lower() in license_name.lower() for x in ("cc0", "public domain")):
+            raise SystemExit(f"Meme visual license is not explicitly compatible: {license_name or '<missing>'}")
+        if not str(meta.get("source_title") or "").strip() or not str(meta.get("source_url") or "").strip():
+            raise SystemExit("Meme visual source metadata is incomplete")
+        if VISUAL.stat().st_size < 20_000:
+            raise SystemExit("Meme visual image is suspiciously small")
+        report_path = latest_report()
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        post = str((report.get("draft") or {}).get("post") or (report.get("draft") or {}).get("text") or "")
+        post_tickers = tickers(post)
+        if expected and post_tickers and expected not in post_tickers:
+            raise SystemExit(f"Meme visual symbol {expected} does not match current post tickers {post_tickers}")
+        print(json.dumps({
+            "status":"VISUAL_MATCH_CONFIRMED",
+            "provider":provider,
+            "visual_type":"real_world_photo_meme",
+            "symbol":actual,
+            "license":license_name,
+            "source_title":meta.get("source_title"),
+            "image_bytes":VISUAL.stat().st_size,
+        }, indent=2))
+        return
     if provider == "Local historical OHLCV renderer" and status == "HISTORICAL_SNAPSHOT_CREATED":
         snapshot_path = Path("data/live/historical_setup_snapshot.json")
         if not snapshot_path.exists(): raise SystemExit("Historical setup snapshot missing")
