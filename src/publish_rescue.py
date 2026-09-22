@@ -102,10 +102,27 @@ def main():
     report = load(report_path, {})
     preflight = load(PREFLIGHT, {})
     market = load(MARKET, {})
+    frozen = load(FROZEN, {})
 
     selected = preflight.get("selected_opportunity") or report.get("selected_editorial_lane") or {}
     if not isinstance(selected, dict):
         selected = {}
+
+    frozen_prediction = frozen.get("prediction") if isinstance(frozen.get("prediction"), dict) else {}
+    frozen_setup = frozen.get("trade_setup") if isinstance(frozen.get("trade_setup"), dict) else {}
+    frozen_contract = {
+        "direction": frozen.get("direction") or frozen_prediction.get("direction") or frozen_setup.get("side"),
+        "entry": frozen.get("entry_trigger") or frozen_prediction.get("entry_trigger") or frozen_setup.get("trigger"),
+        "tp1": frozen.get("tp1") or frozen_prediction.get("tp1") or frozen_setup.get("tp1"),
+        "tp2": frozen.get("tp2") or frozen_prediction.get("tp2") or frozen_setup.get("tp2"),
+        "sl": frozen.get("sl") or frozen_prediction.get("sl") or frozen_setup.get("invalidation"),
+        "confidence": frozen.get("confidence") or frozen_prediction.get("confidence") or frozen.get("flow_confidence"),
+    }
+    contract_direction = str(frozen_contract.get("direction") or "").upper()
+    if contract_direction == "SHORT_BIAS":
+        frozen_contract["direction"] = "SHORT"
+    elif contract_direction == "LONG_BIAS":
+        frozen_contract["direction"] = "LONG"
 
     symbol = authoritative_symbol(report, preflight)
     if not symbol:
@@ -140,8 +157,12 @@ def main():
     news_source = str(selected.get("news_source") or "").strip()
 
     special = None
-    category = str(selected.get("category") or selected.get("lane") or "").lower()
-    signal_lane = category in {"capital_flow_long", "capital_flow_short", "technical_setup", "flow"}
+    category = str(selected.get("category") or selected.get("lane") or frozen.get("category") or frozen.get("lane") or "").lower()
+    signal_lane = (
+        category in {"capital_flow_long", "capital_flow_short", "technical_setup", "flow"}
+        or str(frozen_contract.get("direction") or "").upper() in {"LONG", "SHORT"}
+        or all(frozen_contract.get(k) is not None for k in ("entry", "tp1", "tp2", "sl"))
+    )
     try:
         from signal_post_builder import build_outcome_post, build_signal_post
         # Current signal lanes must preserve the frozen prediction contract.
@@ -163,17 +184,33 @@ def main():
         style = special["style"]
         if signal_lane:
             contract = special.get("signal_contract") or {}
+            direction = str(contract.get("direction") or frozen_contract.get("direction") or "").upper()
             required = (
-                str(contract.get("direction") or "").upper(),
+                direction,
                 "Entry trigger:",
                 "TP1:",
                 "TP2:",
                 "SL / invalidation:",
             )
             if not all(token and token.lower() in post.lower() for token in required):
-                # Rebuild once from the frozen contract rather than publishing
-                # a rescue that has silently lost its direction/levels.
-                retry = build_signal_post(selected)
+                retry_selected = dict(selected)
+                retry_selected["direction"] = frozen_contract.get("direction")
+                retry_selected["prediction"] = {
+                    "direction": frozen_contract.get("direction"),
+                    "entry_trigger": frozen_contract.get("entry"),
+                    "tp1": frozen_contract.get("tp1"),
+                    "tp2": frozen_contract.get("tp2"),
+                    "sl": frozen_contract.get("sl"),
+                    "confidence": frozen_contract.get("confidence") or 65,
+                }
+                retry_selected["trade_setup"] = {
+                    "side": frozen_contract.get("direction"),
+                    "trigger": frozen_contract.get("entry"),
+                    "tp1": frozen_contract.get("tp1"),
+                    "tp2": frozen_contract.get("tp2"),
+                    "invalidation": frozen_contract.get("sl"),
+                }
+                retry = build_signal_post(retry_selected)
                 if retry:
                     special = retry
                     post = retry["post"]
@@ -220,6 +257,37 @@ def main():
             "Which level would you require before treating the setup as confirmed?",
         ])
         style = "publish_rescue_chart"
+
+    if signal_lane:
+        direction = str(frozen_contract.get("direction") or "").upper()
+        e, tp1, tp2, sl = (
+            frozen_contract.get("entry"),
+            frozen_contract.get("tp1"),
+            frozen_contract.get("tp2"),
+            frozen_contract.get("sl"),
+        )
+        contract_ok = direction in {"LONG", "SHORT"} and all(v is not None for v in (e, tp1, tp2, sl))
+        visible = all(token.lower() in post.lower() for token in (
+            direction,
+            "Entry trigger:",
+            "TP1:",
+            "TP2:",
+            "SL / invalidation:",
+        )) if direction else False
+        if contract_ok and not visible:
+            hook = f"${symbol}: the {direction} setup only activates if price confirms the trigger."
+            condition = (
+                f"Direction: {direction}. Entry trigger: {e:.8g}. TP1: {tp1:.8g}. "
+                f"TP2: {tp2:.8g}. SL / invalidation: {sl:.8g}."
+            )
+            body = (
+                "The setup is conditional: the trigger starts the test, while a move through "
+                "the invalidation level cancels the thesis."
+            )
+            question = f"Would you wait for the {direction} trigger or the retest before acting?"
+            disclaimer = "Conditional setup only; no guarantee."
+            post = "\n\n".join([hook, condition, body, question, disclaimer])
+            style = "publish_rescue_frozen_signal_contract"
 
     # Keep the rescue inside the post-mode engagement limit. Never truncate
     # a verified signal contract in the middle of its required fields.
