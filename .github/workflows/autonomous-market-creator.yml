@@ -3,12 +3,8 @@ name: Binance Square AI Creator — Single Autonomous Orchestrator
 on:
   schedule:
     - cron: '*/20 * * * *'
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'analytics/**'
-      - 'data/**'
+  # Autonomous execution is owned by schedule + heartbeat watchdog.
+  # Code pushes must not launch duplicate creator cycles.
   workflow_dispatch:
     inputs:
       topic:
