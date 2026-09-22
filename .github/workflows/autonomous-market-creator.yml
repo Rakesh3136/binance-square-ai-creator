@@ -64,7 +64,7 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate"
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate"
           echo 'Core, Jev and ensemble modules imported successfully'
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
@@ -94,7 +94,9 @@ jobs:
           python src/creator_7_5_growth_portfolio.py
           python src/creator_8_0_revenue_engine.py
           python src/creator_8_4_monetization_feedback.py
+          python src/revenue_content_director.py
           python -m json.tool data/live/creator_8_4_monetization_feedback.json >/dev/null
+          python -m json.tool data/live/revenue_content_director.json >/dev/null
       - name: Publication truth and audience intelligence
         run: |
           python src/creator_20_0_publication_verifier.py
@@ -163,6 +165,7 @@ jobs:
       - name: Creator 7.x content director and adaptive cadence
         id: cadence
         run: |
+          python src/revenue_content_director.py
           python src/content_director_4.py
           python src/opportunity_ranker_6.py
           python src/creator_identity_6.py
