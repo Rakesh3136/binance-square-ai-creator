@@ -1,6 +1,6 @@
 """Final signal-first router: preserve strong candidates and derive evidence-backed conditional setups."""
 from __future__ import annotations
-import json, os, re, urllib.request
+import json, os, re, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -85,41 +85,173 @@ def trading_symbols():
             if symbols:return {s[:-4] if s.endswith('USDT') else s for s in symbols if s.endswith('USDT')}
         except Exception as exc:last=exc
     raise RuntimeError(f'Unable to verify Binance trading symbols before Signal-First selection: {last}')
+BINANCE_BASES=(
+    'https://data-api.binance.vision',
+    'https://api-gcp.binance.com',
+    'https://api1.binance.com',
+    'https://api2.binance.com',
+)
+
 def candles_for(symbol,market):
     sym=str(symbol).upper().replace('USDT','')
     for key in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
         for item in market.get(key) or []:
-            if str(item.get('symbol','')).upper().replace('USDT','')==sym:return item.get('candles_1h') or [],item
+            if str(item.get('symbol','')).upper().replace('USDT','')==sym:
+                return item.get('candles_1h') or [],item
     return [],None
+
+def fetch_verified_1h_candles(symbol, limit=48):
+    """Fetch fresh completed Binance Spot 1H candles for the selected live symbol."""
+    clean=str(symbol or '').upper().replace('BINANCE:','').replace('USDT','').strip()
+    if not clean:
+        return []
+    request_symbol=f'{clean}USDT'
+    now_ms=int(datetime.now(timezone.utc).timestamp()*1000)
+    last=None
+    for base in BINANCE_BASES:
+        try:
+            url=base+'/api/v3/klines?'+urllib.parse.urlencode({
+                'symbol':request_symbol,
+                'interval':'1h',
+                'limit':str(limit),
+            })
+            req=urllib.request.Request(
+                url,
+                headers={'User-Agent':'binance-square-ai-creator/4.0','Accept':'application/json'},
+            )
+            with urllib.request.urlopen(req,timeout=20) as h:
+                raw=json.loads(h.read().decode('utf-8'))
+            candles=[]
+            for row in raw:
+                try:
+                    close_time=int(row[6])
+                    if close_time>=now_ms:
+                        continue
+                    candles.append({
+                        'open_time':int(row[0]),
+                        'open':float(row[1]),
+                        'high':float(row[2]),
+                        'low':float(row[3]),
+                        'close':float(row[4]),
+                        'volume':float(row[5]),
+                        'close_time':close_time,
+                    })
+                except (TypeError,ValueError,IndexError):
+                    continue
+            if len(candles)>=20:
+                return candles
+            last=RuntimeError(f'only {len(candles)} completed 1H candles returned for {clean}')
+        except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError,ValueError) as exc:
+            last=exc
+    raise RuntimeError(f'Unable to fetch verified completed 1H OHLCV for {clean}: {last}')
+
 def derive(candidate,market):
-    if flow_complete(candidate):return candidate
-    category=str(candidate.get('category') or lane(candidate)).lower()
-    if category not in {'next_gainer_candidate','next_loser_candidate'}:return candidate
+    if flow_complete(candidate):
+        evidence=candidate.get('evidence') if isinstance(candidate.get('evidence'),dict) else {}
+        if num(evidence.get('ohlcv_candles_used'))>=20 and str(evidence.get('provenance','')).startswith('binance_spot_'):
+            return candidate
+
     candles,item=candles_for(candidate.get('symbol'),market)
-    if len(candles)<6:return candidate
+    if len(candles)<20:
+        candles=fetch_verified_1h_candles(candidate.get('symbol'),limit=48)
+    else:
+        # The scanner snapshot may contain an open candle; use only completed
+        # candles and refresh when fewer than 20 completed candles remain.
+        now_ms=int(datetime.now(timezone.utc).timestamp()*1000)
+        completed=[]
+        for c in candles:
+            try:
+                close_time=int(c.get('close_time',0)) if isinstance(c,dict) else 0
+                if close_time<=0 or close_time<now_ms:
+                    completed.append(c)
+            except Exception:
+                continue
+        candles=completed
+        if len(candles)<20:
+            candles=fetch_verified_1h_candles(candidate.get('symbol'),limit=48)
+
+    if len(candles)<20:
+        return candidate
+
     highs=[]; lows=[]; closes=[]
     for c in candles[-24:]:
         try:
-            if isinstance(c,dict):h=float(c['high']);l=float(c['low']);cl=float(c['close'])
-            else:h=float(c[2]);l=float(c[3]);cl=float(c[4])
+            if isinstance(c,dict):
+                h=float(c['high']); l=float(c['low']); cl=float(c['close'])
+            else:
+                h=float(c[2]); l=float(c[3]); cl=float(c[4])
             highs.append(h); lows.append(l); closes.append(cl)
-        except Exception:continue
-    if len(highs)<6:return candidate
-    last=closes[-1]; rh=max(highs[:-1]); rl=min(lows[:-1]); span=max(rh-rl,last*0.002)
-    if last <= 0:return candidate
-    if category=='next_gainer_candidate':
-        side='LONG'; trigger=rh*1.002; sl=max(rl,last-span*.75); risk=trigger-sl
+        except Exception:
+            continue
+    if len(highs)<20:
+        return candidate
+
+    # Preserve the upstream direction when present; otherwise infer only from
+    # the candidate's observed signed move. Never fabricate a directional signal.
+    _,existing_prediction,existing_side,_,_,_,_,existing_conf=setup_parts(candidate)
+    category=str(candidate.get('category') or lane(candidate)).lower()
+    side=existing_side if existing_side in {'LONG','SHORT'} else (
+        'LONG' if num(candidate.get('price_change_6h_pct'),num(candidate.get('price_change_percent')))>=0
+        else 'SHORT'
+    )
+    last=closes[-1]
+    rh=max(highs[:-1]); rl=min(lows[:-1]); span=max(rh-rl,last*0.002)
+    if last<=0 or rh<=0 or rl<=0:
+        return candidate
+    if side=='LONG':
+        trigger=max(last,rh)*1.002
+        sl=min(rl,last-span*0.75)
+        risk=trigger-sl
         if risk<=0:return candidate
         tp1=trigger+risk; tp2=trigger+2*risk
     else:
-        side='SHORT'; trigger=rl*.998; sl=min(rh,last+span*.75); risk=sl-trigger
-        risk=min(risk, trigger*0.45)
+        trigger=min(last,rl)*0.998
+        sl=max(rh,last+span*0.75)
+        risk=sl-trigger
+        risk=min(risk,trigger*0.45)
         if risk<=0:return candidate
         tp1=trigger-risk; tp2=trigger-2*risk
+
     if not level_contract_valid(side,trigger,tp1,tp2,sl):
         return candidate
-    conf=max(MIN_FLOW_CONF,min(95.0,num(candidate.get('flow_confidence'),num(candidate.get('score'),num(candidate.get('discovery_score'),72)))))
-    e=dict(candidate); e['trade_setup']={'side':side,'trigger':trigger,'tp1':tp1,'tp2':tp2,'invalidation':sl,'risk_per_unit':risk,'setup_source':'verified_1h_ohlcv_conditional'}; e['prediction']={'direction':side,'entry_trigger':trigger,'tp1':tp1,'tp2':tp2,'sl':sl,'confidence':conf,'conditional':True,'not_a_guarantee':True}; e['flow_confidence']=conf; e['evidence']={'ohlcv_candles_used':len(candles),'last_price':last,'recent_high':rh,'recent_low':rl}; return e
+
+    conf=max(
+        MIN_FLOW_CONF,
+        min(95.0,num(candidate.get('flow_confidence'),num(candidate.get('score'),num(candidate.get('discovery_score'),existing_conf or 72))))
+    )
+    e=dict(candidate)
+    e['trade_setup']={
+        'side':side,
+        'trigger':trigger,
+        'tp1':tp1,
+        'tp2':tp2,
+        'invalidation':sl,
+        'risk_per_unit':risk,
+        'setup_source':'verified_completed_binance_1h_ohlcv_conditional',
+    }
+    e['prediction']={
+        'direction':side,
+        'entry_trigger':trigger,
+        'tp1':tp1,
+        'tp2':tp2,
+        'sl':sl,
+        'confidence':conf,
+        'conditional':True,
+        'not_a_guarantee':True,
+    }
+    e['flow_confidence']=max(num(candidate.get('flow_confidence')),conf)
+    e['evidence']={
+        'provenance':'binance_spot_1h_klines_completed_candles',
+        'ohlcv_candles_used':len(candles),
+        'last_price':last,
+        'recent_high':rh,
+        'recent_low':rl,
+        'data_cutoff':candles[-1].get('close_time') if isinstance(candles[-1],dict) else None,
+        'candles_1h':candles[-24:],
+    }
+    e['signal_first_ohlcv_verified']=True
+    e['prediction_contract_complete']=True
+    return e
 def add(target,x,allow_complete_flow=False):
     if not isinstance(x,dict) or not x.get('symbol'):return
     score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('discovery_score'))))
@@ -183,9 +315,17 @@ def choose(xs,rows,market,live_symbols):
         if raw_symbol not in live_symbols:
             blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'})
             continue
-        e=derive(x,market); reason=blocked(e,rows)
-        if reason:blocked_rows.append({'symbol':e.get('symbol'),'reason':reason});continue
-        if flow_complete(e):return e,blocked_rows
+        try:
+            e=derive(x,market)
+        except Exception as exc:
+            blocked_rows.append({'symbol':raw_symbol,'reason':f'verified_ohlcv_fetch_failed:{type(exc).__name__}'})
+            continue
+        reason=blocked(e,rows)
+        if reason:
+            blocked_rows.append({'symbol':e.get('symbol'),'reason':reason})
+            continue
+        if flow_complete(e):
+            return e,blocked_rows
         blocked_rows.append({'symbol':e.get('symbol'),'reason':'prediction_contract_missing_verified_ohlcv'})
     return None,blocked_rows
 def main():
@@ -209,6 +349,6 @@ def main():
     if selected:
         _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected); selected['signal_first_primary']=primary_signal; selected['prediction_contract_complete']=True; selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"
         pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':True,'prediction':pred}; PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.3-exchangeinfo-authoritative-flow-primary','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'cadence_publish_on_disk':current_allowed,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols)},'live_symbol_source':'binance_exchangeInfo_TRADING','policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_signal_post':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.3-exchangeinfo-authoritative-flow-primary','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'cadence_publish_on_disk':current_allowed,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols)},'verified_ohlcv_policy':{'minimum_completed_1h_candles':20,'refresh_limit':48,'source':'Binance Spot /api/v3/klines','reject_open_candle':True},'live_symbol_source':'binance_exchangeInfo_TRADING','policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_signal_post':True}}
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
