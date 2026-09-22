@@ -328,8 +328,13 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then python src/meme_renderer.py
-          else npm install --no-save playwright; npx playwright install --with-deps chromium; python src/visual_renderer.py; fi
+          if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then
+            python src/visual_renderer.py
+          else
+            npm install --no-save playwright
+            npx playwright install --with-deps chromium
+            python src/visual_renderer.py
+          fi
           test -s data/live/visual.png
           python src/validate_visual.py
           provider=$(python -c 'import json; p=json.load(open("data/live/visual_metadata.json")); print(p.get("provider",""))')
