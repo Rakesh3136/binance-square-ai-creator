@@ -339,6 +339,10 @@ def main():
     # ExchangeInfo is authoritative; scanner snapshots are evidence only.
     live_symbols=trading_symbols()
     primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
+    # Remove stale snapshot/ranker symbols before they reach authoritative selection.
+    # choose() still performs the final live-universe check as a defense in depth.
+    primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
+    markets=[x for x in markets if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
     chosen,blocks=choose(primary,rows,market,live_symbols)
     if chosen is None:chosen,more=choose(markets,rows,market,live_symbols);blocks+=more
     current_allowed=bool(cad.get('publish')); selected=None; decision='NO_PUBLISH'; reason='no_qualified_non_repetitive_signal'; primary_signal=False
