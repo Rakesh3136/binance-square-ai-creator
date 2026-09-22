@@ -7,9 +7,6 @@ on:
       - '.github/creator-recovery.trigger'
   schedule:
     - cron: '*/20 * * * *'
-  # Normal code pushes do not launch creator cycles. A single, explicit recovery
-  # trigger file is used when a repaired pipeline must be exercised immediately.
-  # Autonomous execution remains owned by schedule + heartbeat watchdog.
   workflow_dispatch:
     inputs:
       topic:
@@ -47,7 +44,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Reject stale queued creator run
         env:
           GH_TOKEN: ${{ github.token }}
@@ -57,7 +53,6 @@ jobs:
           current_main=$(git rev-parse origin/main)
           if [ "$GITHUB_SHA" != "$current_main" ]; then
             echo "Stale creator run detected: event=$GITHUB_SHA current_main=$current_main"
-            echo 'Cancelling this obsolete run before any market scan or publication.'
             gh run cancel "$GITHUB_RUN_ID" --repo "${{ github.repository }}" || true
             exit 0
           fi
@@ -69,9 +64,8 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, jev_decision_gate"
-          echo 'Signal-first, recovery, monetization and Jev modules imported successfully'
-
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate"
+          echo 'Core, Jev and ensemble modules imported successfully'
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
       - name: Refresh full market universe, flow, news and core intelligence
@@ -189,6 +183,7 @@ jobs:
           python src/early_setup_gate.py
           python src/opportunity_contract_gate.py
           python src/adversarial_brain.py
+          python src/decision_ensemble_gate.py
           python src/creator_brain.py
           python src/creator_brain_gate.py
           python src/pipeline_stage.py creator_brain success 'Authoritative creator brain completed'
@@ -248,18 +243,25 @@ jobs:
           GEMINI_DAILY_BUDGET: '20'
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/mechanism_value_rewriter.py
-      - name: Elite pre-publication judge
-        id: elite_judge
+      - name: Activate Jev second-opinion gate
+        id: jev
         continue-on-error: true
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+          JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
+        run: python src/jev_runtime_gate.py
+      - name: Elite pre-publication judge
+        id: elite_judge
+        continue-on-error: true
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/elite_prepublication_judge.py
-
       - name: Recover rejected draft in the SAME creator cycle
         id: elite_recovery
         continue-on-error: true
-        if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_judge.outcome == 'failure' }}
+        if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_judge.outcome == 'failure' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -268,18 +270,15 @@ jobs:
         run: |
           python src/autonomous_publish_recovery.py
           echo 'Bounded recovery finished; the authoritative judge remains the final publication authority.'
-
       - name: Apply authoritative elite pre-publication gate
         id: elite_gate
-        if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' }}
         run: |
           python - <<'PY'
-          import json
-          import os
+          import json, os
           from pathlib import Path
           path = Path('data/live/elite_prepublication_judge.json')
-          blocked = True
-          reason = 'elite_judge_output_missing'
+          blocked = True; reason = 'elite_judge_output_missing'
           if path.exists():
               try: result = json.loads(path.read_text(encoding='utf-8'))
               except Exception: result = {}; reason = 'elite_judge_output_invalid_json'
@@ -294,7 +293,7 @@ jobs:
           if blocked: print('No publication: authoritative quality gate remains blocked after bounded recovery.')
           PY
       - name: Integrity and final content gates
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_gate.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_gate.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -302,20 +301,15 @@ jobs:
           python -m compileall -q src
       - name: Decide whether this lane needs a visual
         id: visual_mode
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_gate.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_gate.outputs.blocked != 'true' }}
         run: |
           python - <<'PY'
           import json, os
           from pathlib import Path
-          p=Path('data/live/publication_context.json')
-          ctx=json.loads(p.read_text()) if p.exists() else {}
-          cat=str(ctx.get('category','')).lower()
-          meme=cat == 'crypto_meme'
-          required = meme or cat not in {'education','commentary','community'}
-          mode = 'meme' if meme else 'tradingview'
+          p=Path('data/live/publication_context.json'); ctx=json.loads(p.read_text()) if p.exists() else {}
+          cat=str(ctx.get('category','')).lower(); meme=cat == 'crypto_meme'; required=meme or cat not in {'education','commentary','community'}; mode='meme' if meme else 'tradingview'
           with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
-              f.write(f"required={'true' if required else 'false'}\n")
-              f.write(f"mode={mode}\n")
+              f.write(f"required={'true' if required else 'false'}\n"); f.write(f"mode={mode}\n")
           print({'category':cat,'visual_required':required,'mode':mode})
           PY
       - name: Setup Node and Chromium
@@ -328,13 +322,7 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then
-            python src/visual_renderer.py
-          else
-            npm install --no-save playwright
-            npx playwright install --with-deps chromium
-            python src/visual_renderer.py
-          fi
+          if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then python src/visual_renderer.py; else npm install --no-save playwright; npx playwright install --with-deps chromium; python src/visual_renderer.py; fi
           test -s data/live/visual.png
           python src/validate_visual.py
           provider=$(python -c 'import json; p=json.load(open("data/live/visual_metadata.json")); print(p.get("provider",""))')
@@ -342,7 +330,7 @@ jobs:
           python src/pipeline_stage.py visual success 'Professional visual package rendered and validated'
       - name: Final production gate
         id: production
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_gate.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_gate.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
@@ -352,7 +340,7 @@ jobs:
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "Final production decision: $publish"
       - name: Extract publication and submit to Binance Square
-        if: ${{ steps.production.outputs.publish == 'true' && steps.elite_gate.outputs.blocked != 'true' }}
+        if: ${{ steps.production.outputs.publish == 'true' && steps.elite_gate.outputs.blocked != 'true' && steps.jev.outcome == 'success' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY }}
