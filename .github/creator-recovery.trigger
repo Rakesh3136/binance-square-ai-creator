@@ -11,3 +11,4 @@ Decision ensemble + active Jev gate validation: 2026-09-22T16:56Z
 Multi-model local critic + calibration integration validation: 2026-09-22T17:00Z
 Revenue Content Director integration validation: 2026-09-22T18:00Z
 Cadence non-blocking verified-signal repair validation: 2026-09-22T18:20Z
+Contract-surface + research-vote repair validation: 2026-09-22T18:35Z
