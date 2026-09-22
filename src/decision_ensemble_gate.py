@@ -1,7 +1,7 @@
 """Independent decision ensemble for the frozen opportunity.
 
-Provider-neutral review/calibration layer. It combines independent signals
-already produced by the creator; it is never a market-data authority.
+Provider-neutral review/calibration layer. It combines deterministic signals and
+independent critics; it is never a market-data authority.
 """
 from __future__ import annotations
 import json
@@ -16,7 +16,7 @@ def load(name):
 
 def main():
     frozen=load('authoritative_opportunity.json'); signal=load('signal_first_routing.json')
-    specialists=[('adversarial','adversarial_decision.json'),('counterfactual','counterfactual_analysis.json'),('research','research_intelligence.json')]
+    specialists=[('adversarial','adversarial_decision.json'),('counterfactual','counterfactual_analysis.json'),('research','research_intelligence.json'),('local_models','local_model_critic.json')]
     direction=str(frozen.get('direction') or '').upper()
     contract=all(frozen.get(k) is not None for k in ('entry_trigger','tp1','tp2','sl'))
     signal_ok=signal.get('publish') is True and bool(signal.get('selected'))
@@ -27,13 +27,13 @@ def main():
         data=load(path)
         if not data: continue
         decision=str(data.get('decision') or data.get('status') or '').upper()
+        if decision == 'UNAVAILABLE': continue
         blocked=data.get('blocked') is True or decision in {'BLOCK','BLOCKED','FAIL','FAILED'}
-        approved=data.get('approved') is True or data.get('publish') is True or decision in {'PASS','APPROVE','APPROVED'}
+        approved=data.get('approved') is True or data.get('publish') is True or data.get('publish_authorized') is True or decision in {'PASS','PASSING','APPROVE','APPROVED'}
         votes.append({'agent':name,'decision':'BLOCK' if blocked else ('PASS' if approved else 'REVIEW'),'reason':str(data.get('reason') or data.get('message') or 'specialist output')[:500]})
     passes=sum(v['decision']=='PASS' for v in votes); blocks=sum(v['decision']=='BLOCK' for v in votes); reviews=sum(v['decision']=='REVIEW' for v in votes)
     decision='BLOCK' if not frozen_ok or not signal_ok else ('REVIEW' if blocks or reviews else 'PASS')
-    result={'version':'1.1','generated_at':datetime.now(timezone.utc).isoformat(),'symbol':frozen.get('symbol'),'direction':direction,'decision':decision,'publish_authorized':decision=='PASS','vote_count':len(votes),'passes':passes,'blocks':blocks,'reviews':reviews,'disagreement':bool(blocks or reviews),'votes':votes,'policy':'Independent reviewers may require review, but cannot override deterministic market/evidence failures.'}
+    result={'version':'1.2','generated_at':datetime.now(timezone.utc).isoformat(),'symbol':frozen.get('symbol'),'direction':direction,'decision':decision,'publish_authorized':decision=='PASS','vote_count':len(votes),'passes':passes,'blocks':blocks,'reviews':reviews,'disagreement':bool(blocks or reviews),'votes':votes,'policy':'Independent reviewers may require review, but cannot override deterministic market/evidence failures.'}
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
-    # REVIEW is a hard publication stop for this cycle; the next autonomous cycle may re-evaluate fresh evidence.
     return 0 if decision=='PASS' else 1
 if __name__=='__main__': raise SystemExit(main())
