@@ -140,11 +140,18 @@ def main():
     news_source = str(selected.get("news_source") or "").strip()
 
     special = None
+    category = str(selected.get("category") or selected.get("lane") or "").lower()
+    signal_lane = category in {"capital_flow_long", "capital_flow_short", "technical_setup", "flow"}
     try:
         from signal_post_builder import build_outcome_post, build_signal_post
-        special = build_outcome_post(selected)
-        if special is None:
+        # Current signal lanes must preserve the frozen prediction contract.
+        # Never let a historical outcome post replace a live LONG/SHORT setup.
+        if signal_lane:
             special = build_signal_post(selected)
+        elif category in {"creator_signal_outcome", "follow_up"}:
+            special = build_outcome_post(selected)
+        if special is None:
+            special = build_signal_post(selected) if signal_lane else build_outcome_post(selected)
     except Exception as exc:
         print(f'Signal-first rescue composer unavailable; using verified market rescue: {exc}')
 
@@ -154,6 +161,24 @@ def main():
         post = special["post"]
         hook = special["hook"]
         style = special["style"]
+        if signal_lane:
+            contract = special.get("signal_contract") or {}
+            required = (
+                str(contract.get("direction") or "").upper(),
+                "Entry trigger:",
+                "TP1:",
+                "TP2:",
+                "SL / invalidation:",
+            )
+            if not all(token and token.lower() in post.lower() for token in required):
+                # Rebuild once from the frozen contract rather than publishing
+                # a rescue that has silently lost its direction/levels.
+                retry = build_signal_post(selected)
+                if retry:
+                    special = retry
+                    post = retry["post"]
+                    hook = retry["hook"]
+                    style = retry["style"]
     # Avoid template labels such as "Bull case:" / "Bear case:". Those read
     # like generated boilerplate and are explicitly penalized by the final
     # human-content firewall. Write the same conditional logic as a sentence.
@@ -196,9 +221,29 @@ def main():
         ])
         style = "publish_rescue_chart"
 
-    # Keep the rescue comfortably inside the post-mode engagement limit and
-    # make one question the only conversation trigger.
-    post = post[:740]
+    # Keep the rescue inside the post-mode engagement limit. Never truncate
+    # a verified signal contract in the middle of its required fields.
+    if signal_lane and len(post) > 740:
+        lines = post.split("\n\n")
+        essential = [hook]
+        for block in lines[1:]:
+            if block in essential:
+                continue
+            essential.append(block)
+            candidate = "\n\n".join(essential)
+            if len(candidate) > 740:
+                essential.pop()
+                break
+        post = "\n\n".join(essential)
+        required_tokens = ["Entry trigger:", "TP1:", "TP2:", "SL / invalidation:"]
+        if not all(t.lower() in post.lower() for t in required_tokens):
+            rebuilt = build_signal_post(selected) if signal_lane else None
+            if rebuilt:
+                post = rebuilt["post"]
+                hook = rebuilt["hook"]
+                style = rebuilt["style"]
+    else:
+        post = post[:740]
     draft = report.get("draft") or {}
     if not isinstance(draft, dict):
         draft = {}
