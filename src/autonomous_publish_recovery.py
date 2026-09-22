@@ -1,8 +1,9 @@
 """Bounded recovery loop for autonomous publication.
 
-A hard editorial rejection should trigger one fresh regeneration/repair attempt,
-not terminate the creator cycle. This module intentionally keeps the final elite
-judge and production gates authoritative; it never bypasses them.
+A hard editorial rejection triggers a fresh regeneration/repair attempt. The
+recovery may perform one additional deterministic repetition repair if the first
+repair still leaves a recent-sentence collision. The final elite judge and
+production gates remain authoritative; recovery never bypasses them.
 """
 from __future__ import annotations
 
@@ -30,16 +31,18 @@ def latest_report() -> Path | None:
     return xs[0] if xs else None
 
 
+def read_judge() -> dict:
+    try:
+        return json.loads(JUDGE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
 def main() -> int:
     if not JUDGE.exists():
         print("[recovery] no elite judge result; refusing recovery")
         return 2
-    try:
-        judge = json.loads(JUDGE.read_text(encoding="utf-8"))
-    except Exception as exc:
-        print(f"[recovery] invalid judge JSON: {exc}")
-        return 2
-
+    judge = read_judge()
     failures = judge.get("failures") or []
     if not failures:
         print("[recovery] elite judge already passed; nothing to recover")
@@ -51,8 +54,6 @@ def main() -> int:
         return 2
 
     env = os.environ.copy()
-    # Force a fresh generation path. safe_creator_runner itself handles Gemini
-    # quota/error fallback and never invents unverified market facts.
     env["AUTONOMOUS_RECOVERY"] = "1"
 
     try:
@@ -66,8 +67,6 @@ def main() -> int:
             print("[recovery] no fresh report was produced")
             return 2
 
-        # Local fallback may regenerate directly into the same report path.
-        # Do not copy a file onto itself.
         fresh_resolved = fresh.resolve()
         original_resolved = original.resolve()
         if fresh_resolved != original_resolved:
@@ -77,31 +76,34 @@ def main() -> int:
             print(f"[recovery] fresh report already is the authoritative draft: {original_resolved}")
 
         env["DRAFT_PATH"] = str(original_resolved)
-
-        # Re-run the same deterministic editorial repair chain used by the main
-        # pipeline, then run the authoritative elite judge again.
         run("candidate_script_scorer_4.py", env)
         run("human_editor.py", env)
         run("news_headline_integrity_repair.py", env)
         run("hook_diversity_rewriter.py", env)
         run("mechanism_value_rewriter.py", env)
         run("elite_prepublication_judge.py", env)
+
+        # One bounded deterministic cleanup is allowed when the only remaining
+        # hard blocker is recent-sentence repetition. This specifically handles
+        # posts containing multiple repeated sentences in the same paragraph.
+        final = read_judge()
+        remaining = final.get("failures") or []
+        if "repeats_recent_published_sentence" in remaining:
+            print("[recovery] repetition remains; running one final deterministic sentence repair")
+            run("hook_diversity_rewriter.py", env)
+            run("elite_prepublication_judge.py", env)
     except SystemExit as exc:
         print(f"[recovery] recovery command failed with code {exc.code}")
         return int(exc.code or 1)
 
-    try:
-        final = json.loads(JUDGE.read_text(encoding="utf-8"))
-    except Exception as exc:
-        print(f"[recovery] final judge JSON invalid: {exc}")
-        return 2
-
+    final = read_judge()
     remaining = final.get("failures") or []
+    publish = final.get("publish") is True and not remaining
     print(json.dumps({
         "recovery": "completed",
         "original_failures": failures,
         "remaining_failures": remaining,
-        "publish": final.get("publish") is True and not remaining,
+        "publish": publish,
         "draft_path": str(original),
     }, indent=2))
     return 0
