@@ -238,6 +238,7 @@ jobs:
 
       - name: Recover rejected draft in the SAME creator cycle
         id: elite_recovery
+        continue-on-error: true
         if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_judge.outcome == 'failure' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
@@ -246,7 +247,7 @@ jobs:
           GEMINI_DAILY_BUDGET: '20'
         run: |
           python src/autonomous_publish_recovery.py
-          echo 'Bounded recovery completed; the authoritative judge will be checked again.'
+          echo 'Bounded recovery finished; the authoritative judge remains the final publication authority.'
 
       - name: Apply authoritative elite pre-publication gate
         id: elite_gate
