@@ -29,6 +29,8 @@ EXTERNAL_REWARDS = ROOT / "analytics/external_reward_events.jsonl"
 OUT = ROOT / "data/live/creator_9_0_brain_state.json"
 BRIEF = ROOT / "data/live/creator_9_0_strategy_brief.json"
 REPORT = ROOT / "data/intelligence/creator_9_0_report.json"
+REGIME = ROOT / "data/live/market_regime_intelligence.json"
+ADVERSARIAL = ROOT / "data/live/adversarial_brain_review.json"
 
 
 def load_jsonl(path: Path):
@@ -185,11 +187,13 @@ def main():
     growth = load(GROWTH, {})
     monetization = load(MONETIZATION, {})
     external_rewards = external_reward_summary(load_jsonl(EXTERNAL_REWARDS))
+    regime_intel = load(REGIME, {})
+    adversarial = load(ADVERSARIAL, {})
 
     symbol = clean_symbol(auth.get("symbol") or brain.get("symbol"))
     sample = int(num(perf.get("observation_count")))
     promotion = bool(perf.get("promotion_allowed", False))
-    regime = infer_regime(auth, perf, memory)
+    regime = first_text(regime_intel.get("regime"), infer_regime(auth, perf, memory))
     assets = recent_assets(memory)
     counts = Counter(assets)
     pressure_asset, pressure_count = counts.most_common(1)[0] if counts else ("", 0)
@@ -202,6 +206,8 @@ def main():
 
     # Hard hierarchy: validity/editorial gates first; then fresh opportunity;
     # then portfolio diversity and learning; monetization remains secondary.
+    adversarial_ok = adversarial.get("publish_review") is not False
+
     if not symbol:
         action = "WAIT_FOR_VALID_OPPORTUNITY"
         confidence = "LOW"
@@ -210,6 +216,10 @@ def main():
         action = "PIVOT_IF_ALTERNATIVE_IS_STRONGER"
         confidence = "MEDIUM"
         reason = "Recent asset concentration is high and no material authoritative update is present."
+    elif not adversarial_ok:
+        action = "WAIT_FOR_ADVERSARIAL_REVIEW"
+        confidence = "LOW"
+        reason = "The adversarial evidence layer found a contract or evidence failure."
     elif mission_decision == "PUBLISH" and auth.get("binance_verified") is not False:
         action = "PUBLISH_STRONG_OPPORTUNITY"
         confidence = "HIGH" if sample >= 10 and promotion else "MEDIUM"
@@ -252,6 +262,8 @@ def main():
         "strategy_preferences": preferences,
         "experiment": exp,
         "monetization_feedback": monetization_signal,
+        "regime_intelligence": regime_intel,
+        "adversarial_review": adversarial,
         "external_reward_evidence": external_rewards,
         "decision_order": [
             "hard_validity_and_safety",
@@ -275,6 +287,8 @@ def main():
             "experiment_instruction": experiment_instruction,
             "optimize_for_substantive_reader_value": True,
             "verified_conversion_and_revenue_are_secondary": True,
+            "adversarial_review_required": True,
+            "market_regime_is_descriptive_only": True,
             "never_force_story_for_experiment_or_monetization": True,
             "never_infer_revenue_from_views_or_engagement": True,
             "never_claim_causality_without_qualified_evidence": True,
@@ -331,6 +345,7 @@ def main():
         "primary_asset": symbol,
         "story_lane": lane,
         "market_regime": regime,
+        "adversarial_status": adversarial.get("status"),
         "instruction": strategy["next_cycle"]["instruction"],
         "updated_at": now,
         "hard_constraints": strategy["guardrails"],
