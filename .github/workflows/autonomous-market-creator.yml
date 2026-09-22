@@ -1,10 +1,15 @@
 name: Binance Square AI Creator — Single Autonomous Orchestrator
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/creator-recovery.trigger'
   schedule:
     - cron: '*/20 * * * *'
-  # Autonomous execution is owned by schedule + heartbeat watchdog.
-  # Code pushes must not launch duplicate creator cycles.
+  # Normal code pushes do not launch creator cycles. A single, explicit recovery
+  # trigger file is used when a repaired pipeline must be exercised immediately.
+  # Autonomous execution remains owned by schedule + heartbeat watchdog.
   workflow_dispatch:
     inputs:
       topic:
