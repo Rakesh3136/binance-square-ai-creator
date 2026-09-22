@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
-ROOT=Path(__file__).resolve().parents[1]; OUT=ROOT/'data/live/visual.png'; CTX=ROOT/'data/live/publication_context.json'; PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; HISTORY=ROOT/'data/intelligence/meme_visual_history.json'
+ROOT=Path(__file__).resolve().parents[1]; OUT=ROOT/'data/live/visual.png'; META=ROOT/'data/live/visual_metadata.json'; CTX=ROOT/'data/live/publication_context.json'; PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; HISTORY=ROOT/'data/intelligence/meme_visual_history.json'
 W,H=1600,900; UA='BinanceSquareAICreator/2.2 (Wikimedia Commons public-domain visual research)'; LICENSES=('CC0','Public domain')
 def load(path):
     try:
@@ -81,5 +81,20 @@ def main():
     OUT.parent.mkdir(parents=True,exist_ok=True); render(photo,treatment).save(OUT,'PNG',optimize=True)
     sources=(history.get('sources') or [])[-8:]+[str(source.get('title') or source.get('url') or 'photo')]; treatments_hist=(recent_treatments[-8:]+[treatment])[-8:]
     save(HISTORY,{'version':'2.2','updated_at':datetime.now(timezone.utc).isoformat(),'sources':sources[-8:],'treatments':treatments_hist,'policy':'Only public-domain or CC0 real-world photos; original captions; no famous meme copying; fail closed if no real photo is available.'})
+    metadata={
+        'provider':'Wikimedia Commons',
+        'status':'MEME_CREATED',
+        'visual_type':'real_world_photo_meme',
+        'visual_mode':'MEME_PHOTO',
+        'base_symbol':symbol(),
+        'post_tickers':[symbol()],
+        'source_title':str(source.get('title') or ''),
+        'source_url':str(source.get('url') or ''),
+        'license':str(source.get('license') or ''),
+        'created_at':datetime.now(timezone.utc).isoformat(),
+        'treatment':treatment,
+        'image_bytes':OUT.stat().st_size,
+    }
+    META.parent.mkdir(parents=True,exist_ok=True); META.write_text(json.dumps(metadata,indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps({'status':'VISUAL_RENDERED','path':str(OUT),'symbol':symbol(),'type':'real_world_photo_meme','source':source,'treatment':treatment},separators=(',',':')))
 if __name__=='__main__':main()
