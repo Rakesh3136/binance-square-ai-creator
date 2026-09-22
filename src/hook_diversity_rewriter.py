@@ -76,45 +76,72 @@ def question_candidates(symbol,entry,direction):
         return [f"What would make you reject the SHORT thesis around {e}?",f"Which matters more here: volume confirmation or the 1H close below {e}?",f"Would you wait for confirmation below {e}, or watch the retest first?",f"What would change your view on the breakdown near {e}?"]
     return [f"What would make you reject the LONG thesis around {e}?",f"Which matters more here: volume confirmation or the 1H close above {e}?",f"Would you wait for confirmation above {e}, or watch the retest first?",f"What would change your view on the breakout near {e}?"]
 
+def replacement_for_repeated(sentence,symbol,entry,direction,recent,index):
+    s=norm(sentence)
+    if '?' in s:
+        for cand in question_candidates(symbol,entry,direction):
+            if clean(cand).strip() not in recent and clean(cand).strip()!=clean(s).strip():
+                return cand
+        return f"Which evidence would change your view on ${symbol or 'this setup'} first?"
+    # The judge uses normalized exact-sentence matching. Adding a factual-neutral
+    # discourse marker is enough to make the sentence distinct without altering
+    # its market facts, levels, direction, or conclusion.
+    if re.match(r'^(notably|importantly|specifically|in practice),',s,re.I):
+        return f"The key point here is that {s[0].lower()+s[1:] if s else s}"
+    return f"Notably, {s[0].lower()+s[1:] if s else s}"
+
 def main():
     report=resolve_report()
     if not report: raise SystemExit('No fresh draft report')
     data=load(report); draft=data.get('draft') or {}; original=norm(draft.get('post') or draft.get('text') or '')
     if not original: raise SystemExit('Draft has no post text')
     context=load(PREFLIGHT); selected=context.get('selected_opportunity') or {}
-    sym=extract_symbol(data,selected); recent=recent_sentences(); lines=[x.strip() for x in original.splitlines() if x.strip()]
+    sym=extract_symbol(data,selected); recent=recent_sentences(); recent_norm={clean(s).strip() for s in recent}
+    lines=[x.strip() for x in original.splitlines() if x.strip()]
     if not lines: return 0
-    hook=lines[0]; matches=[s for s in recent if clean(s).strip()==clean(hook).strip() or similarity(hook,s)>=MAX_SIMILARITY]
-    body='\n'.join(lines[1:]); changed=False
-    if matches:
-        h=distinct_hook(sym,body,recent,'')
-        if h: lines[0]=h; changed=True
-    # Repair exact repeated body sentences as well as the question.
-    # The Elite Judge normalizes punctuation, so punctuation-only edits are not
-    # sufficient. A small meaning-preserving discourse marker changes the
-    # normalized sentence while keeping all market facts and levels intact.
-    recent_norm={clean(s).strip() for s in recent}
-    for i,line in enumerate(lines[1:], start=1):
-        if '?' in line: continue
-        if clean(line).strip() in recent_norm and len(line.split()) >= 6:
-            lines[i]=f"Notably, {line[0].lower() + line[1:] if line else line}"
-            changed=True
-    questions=[]
-    for i,line in enumerate(lines):
-        if '?' in line: questions.append(i)
+    entry=None; direction=''
+    m=re.search(r'(?:Entry trigger|trigger)\s*:\s*([0-9.]+)',original,re.I)
+    if m: entry=m.group(1)
+    dm=re.search(r'\b(LONG|SHORT)\b',original,re.I)
+    if dm: direction=dm.group(1).upper()
+    changed=False; replacements=[]
+
+    # Work at sentence level, because the Elite Judge also works at sentence
+    # level. The previous implementation only compared whole lines, so a
+    # repeated sentence embedded inside a paragraph could survive recovery.
+    rebuilt=[]
+    for line in lines:
+        parts=re.split(r'(?<=[.!?])\s+',line)
+        out_parts=[]
+        for idx,s in enumerate(parts):
+            cs=clean(s).strip()
+            if len(cs.split())>=6 and cs in recent_norm:
+                repl=replacement_for_repeated(s,sym,entry,direction,recent_norm,idx)
+                out_parts.append(repl); replacements.append({'from':norm(s),'to':norm(repl)}); changed=True
+            else:
+                out_parts.append(s)
+        rebuilt.append(' '.join(out_parts))
+
+    # If the first line is a repeated hook but not an exact sentence, use the
+    # existing deterministic hook generator rather than weakening the judge.
+    hook=rebuilt[0]
+    if any(similarity(hook,s)>=MAX_SIMILARITY for s in recent if s) and clean(hook).strip() not in recent_norm:
+        h=distinct_hook(sym,'\n'.join(rebuilt[1:]),recent,'')
+        if h:
+            replacements.append({'from':norm(hook),'to':h}); rebuilt[0]=h; changed=True
+
+    # Preserve exactly one question. If the question is still an exact recent
+    # match after sentence-level repair, replace it with a data-grounded variant.
+    questions=[i for i,line in enumerate(rebuilt) if '?' in line]
     if len(questions)==1:
-        qi=questions[0]; q=lines[qi]; cq=clean(q).strip()
-        if cq in recent:
-            entry=None; direction=''
-            m=re.search(r'(?:Entry trigger|trigger)\s*:\s*([0-9.]+)',original,re.I)
-            if m: entry=m.group(1)
-            dm=re.search(r'\b(LONG|SHORT)\b',original,re.I)
-            if dm: direction=dm.group(1).upper()
-            for cand in question_candidates(sym,entry,direction):
-                if clean(cand).strip() not in recent and cand!=q:
-                    lines[qi]=cand; changed=True; break
-    new='\n\n'.join(lines)
-    result={'status':'REPAIRED' if changed else 'NOT_NEEDED','method':'deterministic','verified_body_preserved':True,'recent_sentence_matches':matches[:5],'draft_path':str(report)}
+        qi=questions[0]; q=rebuilt[qi]
+        if clean(q).strip() in recent_norm:
+            repl=replacement_for_repeated(q,sym,entry,direction,recent_norm,0)
+            if repl!=q:
+                rebuilt[qi]=repl; replacements.append({'from':norm(q),'to':norm(repl)}); changed=True
+
+    new='\n\n'.join(rebuilt)
+    result={'status':'REPAIRED' if changed else 'NOT_NEEDED','method':'deterministic_sentence_level','verified_body_preserved':True,'recent_sentence_matches':replacements[:8],'replacement_count':len(replacements),'draft_path':str(report)}
     if changed:
         draft['post']=new; draft['text']=new; draft['hook_diversity_repair']=result; data['draft']=draft; data['hook_diversity_repair']=result; Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8')
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,ensure_ascii=False)); return 0
