@@ -65,8 +65,18 @@ def main() -> int:
         if fresh is None:
             print("[recovery] no fresh report was produced")
             return 2
-        shutil.copy2(fresh, original)
-        env["DRAFT_PATH"] = str(original)
+
+        # Local fallback may regenerate directly into the same report path.
+        # Do not copy a file onto itself.
+        fresh_resolved = fresh.resolve()
+        original_resolved = original.resolve()
+        if fresh_resolved != original_resolved:
+            shutil.copy2(fresh_resolved, original_resolved)
+            print(f"[recovery] promoted fresh report {fresh_resolved} -> {original_resolved}")
+        else:
+            print(f"[recovery] fresh report already is the authoritative draft: {original_resolved}")
+
+        env["DRAFT_PATH"] = str(original_resolved)
 
         # Re-run the same deterministic editorial repair chain used by the main
         # pipeline, then run the authoritative elite judge again.
