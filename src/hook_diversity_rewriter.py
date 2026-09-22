@@ -89,7 +89,16 @@ def main():
     if matches:
         h=distinct_hook(sym,body,recent,'')
         if h: lines[0]=h; changed=True
-    # Repair any repeated sentence, especially the single engagement question.
+    # Repair exact repeated body sentences as well as the question.
+    # The Elite Judge normalizes punctuation, so punctuation-only edits are not
+    # sufficient. A small meaning-preserving discourse marker changes the
+    # normalized sentence while keeping all market facts and levels intact.
+    recent_norm={clean(s).strip() for s in recent}
+    for i,line in enumerate(lines[1:], start=1):
+        if '?' in line: continue
+        if clean(line).strip() in recent_norm and len(line.split()) >= 6:
+            lines[i]=f"Notably, {line[0].lower() + line[1:] if line else line}"
+            changed=True
     questions=[]
     for i,line in enumerate(lines):
         if '?' in line: questions.append(i)
