@@ -45,20 +45,6 @@ def level_contract_valid(side,tr,tp1,tp2,sl):
     return False
 
 
-def level_contract_valid(side,tr,tp1,tp2,sl):
-    try:
-        e,a,b,stop=[float(v) for v in (tr,tp1,tp2,sl)]
-    except (TypeError,ValueError):
-        return False
-    if min(e,a,b,stop) <= 0:
-        return False
-    if side == 'LONG':
-        return stop < e < a <= b
-    if side == 'SHORT':
-        return 0 < b <= a < e < stop
-    return False
-
-
 def flow_complete(x):
     _,_,side,tr,tp1,tp2,sl,conf=setup_parts(x)
     return side in {'LONG','SHORT'} and level_contract_valid(side,tr,tp1,tp2,sl) and conf>=MIN_FLOW_CONF
