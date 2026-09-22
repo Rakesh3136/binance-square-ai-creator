@@ -98,6 +98,26 @@ def evaluate_call(call, candles):
     return {"status": "OPEN", "target_hits": sorted(hit)}
 
 
+def load_ledger():
+    records = []
+    if not LEDGER.exists():
+        return records
+    for line in LEDGER.read_text(encoding="utf-8").splitlines():
+        try:
+            value = json.loads(line)
+            if isinstance(value, dict):
+                records.append(value)
+        except Exception:
+            continue
+    return records
+
+
+def write_ledger(records):
+    LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    body = "\n".join(json.dumps(r, ensure_ascii=False) for r in records)
+    LEDGER.write_text((body + "\n") if body else "", encoding="utf-8")
+
+
 def refresh_open_outcomes(existing):
     now = datetime.now(timezone.utc)
     changed = False
@@ -158,6 +178,13 @@ def main():
     # A prediction call is only an experiment when an actual publication exists.
     # This prevents blocked/duplicate drafts from entering the outcome ledger as
     # if readers had received a live call.
+    # Refresh previously verified OPEN calls on every autonomous cycle.
+    # This happens before lane/publication early-returns, so outcome learning
+    # never stalls just because the current cycle did not publish.
+    existing = load_ledger()
+    refresh_open_outcomes(existing)
+    write_ledger(existing)
+
     if category not in trading_lanes or not symbol:
         record = {
             "recorded_at": now_iso(),
@@ -166,12 +193,9 @@ def main():
             "category": category,
             "symbol": symbol,
             "publication_status": status,
+            "refreshed_open_outcomes": True,
         }
-        if existing:
-        LEDGER.parent.mkdir(parents=True, exist_ok=True)
-        LEDGER.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in existing) + "\n", encoding="utf-8")
-
-    SUMMARY.parent.mkdir(parents=True, exist_ok=True)
+        SUMMARY.parent.mkdir(parents=True, exist_ok=True)
         SUMMARY.write_text(json.dumps(record, indent=2), encoding="utf-8")
         print(json.dumps(record))
         return 0
@@ -244,16 +268,6 @@ def main():
     ).upper() or "LONG_BIAS"
     explicit = bool(price and (targets or invalidation))
 
-    existing = []
-    if LEDGER.exists():
-        for line in LEDGER.read_text(encoding="utf-8").splitlines():
-            try:
-                r = json.loads(line)
-                if isinstance(r, dict):
-                    existing.append(r)
-            except Exception:
-                pass
-
     linked = None
     now = datetime.now(timezone.utc)
     for r in existing:
@@ -299,7 +313,7 @@ def main():
         with LEDGER.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-    refresh_open_outcomes(existing)
+    write_ledger(existing)
     open_calls = [r for r in existing if r.get("status") == "OPEN"]
     if explicit and verified_publication and not linked:
         open_calls.append(record)
