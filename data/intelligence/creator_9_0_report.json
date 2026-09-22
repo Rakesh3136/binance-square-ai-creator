@@ -1,12 +1,12 @@
 {
   "version": "9.1",
-  "generated_at": "2026-09-22T12:13:46.502438+00:00",
+  "generated_at": "2026-09-22T14:43:48.853882+00:00",
   "action": "PIVOT_IF_ALTERNATIVE_IS_STRONGER",
   "confidence": "MEDIUM",
   "reason": "Recent asset concentration is high and no material authoritative update is present.",
   "primary_asset": "CELR",
   "story_lane": "capital_flow_short",
-  "market_regime": "unknown",
+  "market_regime": "BROAD_RISK_OFF",
   "observation_sample": 4,
   "promotion_allowed": false,
   "recent_asset_pressure": {
@@ -32,6 +32,50 @@
     "verified_only": true,
     "can_override_editorial": false
   },
+  "regime_intelligence": {
+    "version": "1.0",
+    "generated_at": "2026-09-22T14:43:48.820674+00:00",
+    "regime": "BROAD_RISK_OFF",
+    "confidence": "MEDIUM",
+    "reason": "Negative breadth and negative average move dominate the available universe.",
+    "evidence": {
+      "observations": 71,
+      "average_6h_change_pct": -15.2004,
+      "dispersion_pct": 29.4965,
+      "positive_movers": 19,
+      "negative_movers": 47,
+      "large_movers": 65,
+      "conditional_flow_setups": 0,
+      "volume_observations": 71
+    },
+    "policy": {
+      "descriptive_only": true,
+      "never_overrides_frozen_contract": true,
+      "never_invents_signal": true
+    }
+  },
+  "adversarial_review": {},
+  "external_reward_evidence": {
+    "event_count": 1,
+    "total_usdc": 0.035,
+    "unallocated_count": 1,
+    "attribution_policy": "never_infer_post_from_date_views_engagement_or_asset",
+    "events": [
+      {
+        "recorded_at": "2026-09-22T00:00:00Z",
+        "reward_date": "2026-09-21",
+        "reward_amount_usdc": 0.035,
+        "currency": "USDC",
+        "source": "binance_square_notification",
+        "evidence_type": "user_reported_notification",
+        "attribution_status": "UNALLOCATED_EXTERNAL_REWARD",
+        "post_id": null,
+        "canonical_post_id": null,
+        "distribution_due_date": "2026-10-01",
+        "notes": "Binance Square notification reported 0.035 USDC commission rewards for yesterday. Originating post was not exposed in the notification and must not be inferred."
+      }
+    ]
+  },
   "decision_order": [
     "hard_validity_and_safety",
     "authoritative_fresh_opportunity",
@@ -54,6 +98,8 @@
     "experiment_instruction": "Preserve the active experiment and apply it only when the naturally selected story supports the treatment.",
     "optimize_for_substantive_reader_value": true,
     "verified_conversion_and_revenue_are_secondary": true,
+    "adversarial_review_required": true,
+    "market_regime_is_descriptive_only": true,
     "never_force_story_for_experiment_or_monetization": true,
     "never_infer_revenue_from_views_or_engagement": true,
     "never_claim_causality_without_qualified_evidence": true,
