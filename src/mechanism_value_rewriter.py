@@ -57,9 +57,26 @@ def main():
         if not recent_repetitions(candidate) and not generic_bridge(candidate):bridge=candidate;break
     if not bridge:bridge=deterministic_bridges(body_without_question)[-1]
     candidate=f'{body_without_question}\n\n{bridge}\n\n{original_question}'.strip()
-    # Final sentence-level diversity repair runs after all upstream editorial passes.
-    asset_symbol=(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b', candidate) or ['$THIS-ASSET'])[0].replace('$','')
+    # Final sentence-level diversity repair must never delete the causal bridge
+    # that this stage just added. Some deduplication rules can rewrite/remove
+    # short mechanism sentences, so restore the deterministic bridge if needed.
+    asset_symbol=(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b', candidate) or ['$THIS-ASSET'])[0].replace('    if not mechanism_present(bridge):reasons.append('MECHANISM_STILL_MISSING')
+    if generic_bridge(bridge):reasons.append('GENERIC_BRIDGE')
+    if len(questions(candidate))!=1:reasons.append('QUESTION_COUNT_CHANGED')
+    if original_question not in candidate:reasons.append('ORIGINAL_QUESTION_NOT_PRESERVED')
+    if explicit_facts(original)-explicit_facts(candidate):reasons.append('EXPLICIT_FACT_LOSS')
+    if recent_repetitions(bridge):reasons.append('REPAIR_SENTENCE_REPEATS_RECENT_PUBLICATION')
+    if reasons:
+        result={'status':'REPAIR_FAILED','draft_unchanged':True,'draft_path':str(report),'reasons':reasons};OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(result,indent=2,ensure_ascii=False));return 1
+    repair={'status':'REPAIRED','method':'deterministic','verified_facts_preserved':True,'exactly_one_question':True,'mechanism_present':True,'reader_value_floor_enabled':True};draft['post']=candidate;draft['text']=candidate;draft['mechanism_value_repair']=repair;data['draft']=draft;data['mechanism_value_repair']=repair;Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8');result={'status':'REPAIRED','method':'deterministic','verified_facts_preserved':True,'exactly_one_question':True,'mechanism_present':True,'reader_value_floor_enabled':True,'draft_path':str(report)};OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(result,indent=2,ensure_ascii=False));return 0
+if __name__=='__main__':raise SystemExit(main())
+,'')
     candidate=deduplicate_signal_post(candidate, asset_symbol)
+    if not mechanism_present(candidate):
+        candidate=f'{body_without_question}\n\n{bridge}\n\n{original_question}'.strip()
+        candidate=deduplicate_signal_post(candidate, asset_symbol)
+        if not mechanism_present(candidate):
+            candidate=f'{body_without_question}\n\n{bridge}\n\n{original_question}'.strip()
     reasons=[]
     if not mechanism_present(bridge):reasons.append('MECHANISM_STILL_MISSING')
     if generic_bridge(bridge):reasons.append('GENERIC_BRIDGE')
