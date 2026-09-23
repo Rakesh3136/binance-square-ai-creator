@@ -2,6 +2,7 @@ import json
 import os
 import re
 from google import genai
+from nic_model_router import generate as nic_generate
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -157,9 +158,9 @@ def local_news_fallback(news):
     return {'research':{'summary':'Fresh verified headline selected from news snapshot.','source_mode':'local_news_fallback','strongest_signal':symbol or 'macro','opportunity_score':90},'critique':{'summary':'News fallback preserves supplied event and source without adding claims.'},'draft':{'post':post[:880],'text':post[:880],'hook':hook,'discussion_question':q,'quality_score':86,'editorial_style':'fallback_newsroom','generation_mode':'LOCAL_FALLBACK','symbol':symbol},'visual_plan':{'type':'news_timeline','use_visual':True,'provider':'verified_news'}}
 
 def call_creator(client,prompt,system_instruction=SYSTEM):
-    response=client.interactions.create(model=MODEL,input=prompt,system_instruction=system_instruction)
-    text=(response.output_text or '').strip()
-    if not text: raise RuntimeError('Gemini returned an empty response')
+    """NIC chooses an available hosted specialist; Gemini is no longer mandatory."""
+    text, meta = nic_generate(prompt, system_instruction)
+    print(json.dumps({"nic_provider": meta.get("provider"), "nic_model": meta.get("model"), "nic_attempts": meta.get("attempts", [])}))
     return text
 
 def main():
@@ -169,9 +170,9 @@ def main():
         if not result: raise RuntimeError('Local fallback found neither a usable market opportunity nor a news article')
         generation_mode='LOCAL_FALLBACK'; scout={}
     else:
-        key=os.getenv('GEMINI_API_KEY')
-        if not key: raise RuntimeError('GEMINI_API_KEY is missing')
-        client=genai.Client(api_key=key)
+        # NIC owns provider selection. The legacy Gemini client is retained only
+        # for compatibility with the installed SDK; it is not a required path.
+        client=None
         engagement=preflight.get('engagement_strategy') or {}; instruction=TOPIC or selected.get('instruction') or 'Choose the strongest evidence-based opportunity across all supplied market and news lanes.'
         research_bundle=json.dumps({'creator_brain':creator_brain,'publication_context':publication_context,'preflight':preflight,'live_market':live,'news':news,'strategy_memory':memory,'creator_patterns':creator_patterns},ensure_ascii=False,indent=2)
         scout_prompt=('RESEARCH SCOUT BRIEF\n'+instruction+'\n\n'+research_bundle+'\n\nGenerate 5 materially different theses from the evidence. Rank them by information advantage, evidence strength, reader utility, non-obviousness, and visual information value. One thesis should challenge the obvious narrative; one should expose a mechanism; one should offer a reusable mental model. Return only JSON.')
@@ -191,7 +192,7 @@ def main():
             'STRATEGY MEMORY:\n'+json.dumps(memory,ensure_ascii=False,indent=2)+'\n\n'
             'Write ONE finished Binance Square post. Preserve verified asset/headline/chart constraints. Do not copy the verified headline verbatim as the hook unless the event itself is the unique insight. Use no more than two emojis and only when natural.'
         )
-        result=parse_json(call_creator(client,final_prompt,SYSTEM)); generation_mode='GEMINI_2PASS'
+        result=parse_json(call_creator(client,final_prompt,SYSTEM)); generation_mode='NIC_2PASS'
     research=normalize_object(result.get('research'),'summary'); critique=normalize_object(result.get('critique'),'summary'); draft=normalize_draft(result.get('draft')); visual=normalize_visual(result.get('visual_plan'))
     draft['experiment_id']=(preflight.get('engagement_strategy') or {}).get('experiment_id') or preflight.get('recommended_experiment') or 'A'
     draft['experiment_format']=((preflight.get('engagement_strategy') or {}).get('experiment') or {}).get('format')
@@ -200,8 +201,8 @@ def main():
     if not draft.get('post') and draft.get('text'): draft['post']=str(draft['text']).strip()
     allowed={'candlestick_chart','market_bar_chart','market_comparison','market_range_chart','news_timeline','text_card','none'}
     if visual.get('type') not in allowed: visual={'type':'none','use_visual':False}
-    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':MODEL,'topic_instruction':TOPIC or selected.get('instruction',''),'selected_editorial_lane':selected,'engagement_strategy':preflight.get('engagement_strategy') or {},'creator_intelligence':creator_patterns,'live_market_snapshot':live,'news_discovery_snapshot':news,'strategy_memory':memory,'research':research,'critique':critique,'draft':draft,'visual_plan':visual,'status':'DRAFT_ONLY_NOT_PUBLISHED','creator_brain':creator_brain,'publication_context':publication_context,'generation_mode':generation_mode,'gemini_requests_used':2 if generation_mode=='GEMINI_2PASS' else 0,'research_scout':scout}
+    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':os.getenv('NIC_PROVIDER_ORDER','claude,gemini,openai'),'topic_instruction':TOPIC or selected.get('instruction',''),'selected_editorial_lane':selected,'engagement_strategy':preflight.get('engagement_strategy') or {},'creator_intelligence':creator_patterns,'live_market_snapshot':live,'news_discovery_snapshot':news,'strategy_memory':memory,'research':research,'critique':critique,'draft':draft,'visual_plan':visual,'status':'DRAFT_ONLY_NOT_PUBLISHED','creator_brain':creator_brain,'publication_context':publication_context,'generation_mode':generation_mode,'gemini_requests_used':0,'research_scout':scout}
     slug_source=TOPIC or safe_slug_value(research.get('strongest_signal')) or safe_slug_value(selected.get('category')) or 'market-opportunity'; slug=''.join(c.lower() if c.isalnum() else '-' for c in slug_source).strip('-')[:80] or 'market-opportunity'
     output=OUTPUT_DIR/f'{slug}-multi-agent.json'; output.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
-    print(json.dumps({'status':'DRAFT_ONLY_NOT_PUBLISHED','report':str(output),'quality_score':draft.get('quality_score',0),'editorial_style':draft.get('editorial_style',''),'generation_mode':generation_mode,'visual_requested':visual.get('use_visual',False),'visual_type':visual.get('type','none'),'gemini_requests_used':2 if generation_mode=='GEMINI_2PASS' else 0},indent=2))
+    print(json.dumps({'status':'DRAFT_ONLY_NOT_PUBLISHED','report':str(output),'quality_score':draft.get('quality_score',0),'editorial_style':draft.get('editorial_style',''),'generation_mode':generation_mode,'visual_requested':visual.get('use_visual',False),'visual_type':visual.get('type','none'),'gemini_requests_used':0},indent=2))
 if __name__=='__main__':main()
