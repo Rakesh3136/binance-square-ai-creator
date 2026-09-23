@@ -10,8 +10,6 @@ import json
 import re
 from pathlib import Path
 
-from safe_creator_runner import deduplicate_signal_post
-
 ROOT = Path(__file__).resolve().parents[1]
 REPORT_DIR = ROOT / "data/reports"
 OUT = ROOT / "data/live/mechanism_value_repair.json"
@@ -137,13 +135,10 @@ def main():
         bridge = deterministic_bridges(body_without_question)[-1]
 
     candidate = f"{body_without_question}\n\n{bridge}\n\n{original_question}".strip()
-    asset_symbol = (re.findall(r"\$[A-Z][A-Z0-9]{1,14}\b", candidate) or ["$THIS-ASSET"])[0]
-
-    # Deduplicate first. If it removes the bridge, restore the exact deterministic
-    # bridge without a second deduplication pass. This makes the final invariant
-    # test operate on the actual final candidate.
-    deduped = deduplicate_signal_post(candidate, asset_symbol)
-    candidate = deduped if mechanism_present(deduped) else f"{body_without_question}\n\n{bridge}\n\n{original_question}".strip()
+    # Keep this repair narrow. Upstream stages own deduplication; running the
+    # broad deduplicator here can remove the causal bridge this stage is required
+    # to add. The final invariant is checked on the exact candidate we persist.
+    candidate = body_without_question + "\n\n" + bridge + "\n\n" + original_question
 
     reasons = []
     if not mechanism_present(candidate):
@@ -163,7 +158,7 @@ def main():
         write_result({"status":"REPAIR_FAILED","draft_unchanged":True,"draft_path":str(report),"reasons":reasons})
         return 1
 
-    repair = {"status":"REPAIRED","method":"deterministic","verified_facts_preserved":True,"exactly_one_question":True,"mechanism_present":True,"reader_value_floor_enabled":True}
+    repair = {"status":"REPAIRED","method":"deterministic_causal_bridge","upstream_dedup_only":true,"verified_facts_preserved":True,"exactly_one_question":True,"mechanism_present":True,"reader_value_floor_enabled":True}
     draft["post"] = candidate
     draft["text"] = candidate
     draft["mechanism_value_repair"] = repair
