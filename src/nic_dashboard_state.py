@@ -1,5 +1,13 @@
-"""Build a real, single-file telemetry snapshot for the NIC Command Center."""
+"""Build the NIC Command Center telemetry snapshot from committed pipeline truth.
+
+This is deliberately read-only with respect to market/publishing decisions: it
+summarizes artifacts produced by the authoritative pipeline and never invents
+agent state. A separate workflow refreshes this snapshot after creator commits
+so the cockpit reflects the final production/publication state, not an early
+mid-cycle snapshot.
+"""
 from __future__ import annotations
+
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,10 +28,12 @@ SOURCES = {
     "local_critic": "local_model_critic.json",
     "production": "production_decision.json",
     "publication": "publication_verification.json",
+    "publication_result": "publication_result.json",
     "outcomes": "creator_24_1_prediction_outcomes.json",
     "learning": "creator_7_2_learning.json",
     "revenue": "creator_8_4_monetization_feedback.json",
 }
+
 
 def load(name: str) -> dict:
     p = LIVE / name
@@ -33,11 +43,13 @@ def load(name: str) -> dict:
     except Exception:
         return {}
 
+
 def first(d: dict, *keys, default=None):
     for k in keys:
         if k in d and d[k] not in (None, ""):
             return d[k]
     return default
+
 
 def decision(d: dict) -> str:
     value = first(d, "decision", "action", "status", default="UNAVAILABLE")
@@ -45,10 +57,12 @@ def decision(d: dict) -> str:
         return "PASS" if value else "BLOCK"
     return str(value).upper()
 
-def main():
-    docs = {k: load(v) for k, v in SOURCES.items()}
+
+def main() -> None:
+    docs = {key: load(filename) for key, filename in SOURCES.items()}
     nic = docs["nic_core"]
     mesh = docs["mesh"]
+
     agents = []
     for key in ("adversarial", "counterfactual", "research", "creator_brain", "ensemble", "jev", "local_critic"):
         d = docs[key]
@@ -57,13 +71,25 @@ def main():
             "available": bool(d),
             "decision": decision(d) if d else "UNAVAILABLE",
             "confidence": first(d, "confidence", "score", "evidence_score"),
-            "reason": first(d, "reason", "rationale", "summary", default=""),
+            "reason": first(d, "reason", "rationale", "summary", default="artifact_not_available"),
         })
 
+    publication = docs["publication"] or docs["publication_result"]
+    publication_status = first(
+        publication,
+        "status",
+        "verification_status",
+        default="UNAVAILABLE",
+    )
+
+    production = docs["production"]
+    production_status = decision(production) if production else "UNAVAILABLE"
+
     state = {
-        "schema_version": "NIC-DASH-1.0",
+        "schema_version": "NIC-DASH-1.1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": "committed_repository_artifacts",
+        "refresh_mode": "post_cycle_truth_snapshot",
         "nic": {
             "version": nic.get("nic_version"),
             "symbol": nic.get("symbol"),
@@ -83,8 +109,11 @@ def main():
         "agents": agents,
         "pipeline": {
             "ensemble": decision(docs["ensemble"]) if docs["ensemble"] else "UNAVAILABLE",
-            "production": decision(docs["production"]) if docs["production"] else "UNAVAILABLE",
-            "publication": first(docs["publication"], "status", "verification_status", default="UNAVAILABLE"),
+            "production": production_status,
+            "publication": publication_status,
+            "publication_message": first(publication, "message", "reason", default=""),
+            "publication_proof": first(publication, "publication_proof", "proof", default="none"),
+            "post_id": first(publication, "post_id", default=None),
             "jev": {
                 "available": bool(docs["jev"]),
                 "authoritative": docs["jev"].get("jev_authoritative"),
@@ -98,15 +127,32 @@ def main():
             "revenue_feedback_available": bool(docs["revenue"]),
             "revenue_policy": "verified_observations_only",
         },
+        "artifact_health": {
+            key: {
+                "file": filename,
+                "available": bool(docs[key]),
+            }
+            for key, filename in SOURCES.items()
+        },
         "integrity": {
             "no_simulated_agent_status": True,
             "external_models_required": False,
             "publication_authority": "downstream deterministic gates",
         },
     }
+
     LIVE.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({"status":"OK","output":str(OUT),"agents":len(agents),"mesh_agents":state["mesh"]["logical_agents"]}))
+    print(json.dumps({
+        "status": "OK",
+        "output": str(OUT),
+        "schema_version": state["schema_version"],
+        "agents": len(agents),
+        "mesh_agents": state["mesh"]["logical_agents"],
+        "production": production_status,
+        "publication": publication_status,
+    }))
+
 
 if __name__ == "__main__":
     main()
