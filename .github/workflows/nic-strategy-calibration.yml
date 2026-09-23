@@ -1,0 +1,33 @@
+name: NIC Strategy Calibration
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'data/live/nic_outcome_ledger.jsonl'
+      - 'src/nic_strategy_calibrator.py'
+permissions:
+  contents: write
+concurrency:
+  group: nic-strategy-calibration
+  cancel-in-progress: true
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Calibrate advisory weights
+        run: python src/nic_strategy_calibrator.py
+      - name: Persist calibration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/live/nic_strategy_weights.json
+          git diff --cached --quiet || git commit -m 'Update NIC strategy calibration state'
+          git pull --rebase --autostash origin main
+          git push origin main
