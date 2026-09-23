@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NIC • Neural Intelligence Core</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif}body{margin:0;background:#070a0f;color:#eef2f7}main{max-width:1200px;margin:auto;padding:28px}.top{display:flex;justify-content:space-between;gap:20px;align-items:center}.brand h1{margin:0;font-size:30px}.muted{color:#8994a3}.pill{border:1px solid #26303d;border-radius:999px;padding:8px 12px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0}.card{background:#0d121a;border:1px solid #1c2633;border-radius:16px;padding:18px}.big{font-size:26px;font-weight:700;margin-top:8px}.wide{grid-column:span 2}.activity{max-height:430px;overflow:auto}.event{padding:12px 0;border-bottom:1px solid #1a222d}.stage{font-size:12px;text-transform:uppercase;color:#7dd3fc}.ok{color:#67e8a5}.warn{color:#fbbf24}.bar{height:8px;background:#1b2430;border-radius:9px;overflow:hidden}.fill{height:100%;background:#67e8a5;width:0}.mono{font-family:ui-monospace,monospace;font-size:12px}.footer{margin-top:24px;color:#657181;font-size:12px}@media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.wide{grid-column:span 2}}@media(max-width:520px){.grid{grid-template-columns:1fr}.wide{grid-column:span 1}}
+</style></head>
+<body><main>
+<div class="top"><div class="brand"><div class="muted">AUTONOMOUS CRYPTO INTELLIGENCE</div><h1>NIC Command Center</h1></div><div id="status" class="pill">Connecting…</div></div>
+<div class="grid">
+<div class="card"><div class="muted">NIC VERSION</div><div id="version" class="big">—</div></div>
+<div class="card"><div class="muted">SYMBOL</div><div id="symbol" class="big">—</div></div>
+<div class="card"><div class="muted">DIRECTION</div><div id="direction" class="big">—</div></div>
+<div class="card"><div class="muted">EVIDENCE</div><div id="evidence" class="big">—</div><div class="bar"><div id="fill" class="fill"></div></div></div>
+<div class="card wide"><div class="muted">CURRENT THESIS</div><p id="thesis">Waiting for NIC state…</p><div class="mono" id="meta">—</div></div>
+<div class="card wide"><div class="muted">LIVE ACTIVITY</div><div id="activity" class="activity">Waiting for events…</div></div>
+</div>
+<div class="footer">Auto-refreshes every 20 seconds • Displays repository telemetry • External models are optional advisors</div>
+</main>
+<script>
+const base='https://raw.githubusercontent.com/Rakesh3136/binance-square-ai-creator/main/';
+async function get(path){const r=await fetch(base+path+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error(r.status);return r.json()}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function refresh(){
+ try{
+  const s=await get('data/live/nic_core_state.json');
+  version.textContent=s.nic_version||'—';symbol.textContent=s.symbol?'$'+s.symbol:'—';direction.textContent=s.direction||'—';
+  const e=Number(s.evidence_score||0);evidence.textContent=e+'%';fill.style.width=Math.max(0,Math.min(100,e))+'%';
+  thesis.textContent=s.editorial_thesis||'—';meta.textContent='thesis '+(s.thesis_id||'—')+' • hook '+(s.hook_family||'—')+' • '+(s.generated_at||'—');
+  status.textContent='● NIC ONLINE';status.className='pill ok';
+  const r=await fetch(base+'data/live/nic_activity.jsonl?t='+Date.now(),{cache:'no-store'});const txt=await r.text();
+  const rows=txt.trim().split('\n').filter(Boolean).slice(-40).reverse().map(x=>JSON.parse(x));
+  activity.innerHTML=rows.map(x=>'<div class="event"><span class="stage">'+esc(x.stage)+'</span> <b>'+esc(x.event)+'</b><br><span class="muted">'+esc(x.timestamp)+'</span></div>').join('')||'No activity yet';
+ }catch(e){status.textContent='● WAITING FOR TELEMETRY';status.className='pill warn';}
+}
+refresh();setInterval(refresh,20000);
+</script></body></html>
