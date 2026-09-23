@@ -25,3 +25,4 @@ NIC cockpit Pages repair + unified Agent Mesh telemetry validation: 2026-09-23T1
 Mechanism repair dedup-removal fix validation: 2026-09-23T18:20+05:30
 Mechanism deterministic bridge invariant hardening validation: 2026-09-23T18:40+05:30
 Analyst-style Square chart renderer v5 validation: 2026-09-23T19:20+05:30
+NIC specialist artifact mapping + analyst chart validation: 2026-09-23T19:30+05:30
