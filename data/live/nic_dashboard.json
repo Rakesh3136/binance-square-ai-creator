@@ -1,6 +1,6 @@
 {
-  "schema_version": "NIC-DASH-1.1",
-  "generated_at": "2026-09-23T13:53:11.366068+00:00",
+  "schema_version": "NIC-DASH-1.3",
+  "generated_at": "2026-09-23T13:55:31.786760+00:00",
   "source": "committed_repository_artifacts",
   "refresh_mode": "post_cycle_truth_snapshot",
   "nic": {
@@ -35,45 +35,45 @@
   "agents": [
     {
       "module": "adversarial",
-      "available": false,
-      "decision": "UNAVAILABLE",
+      "available": true,
+      "decision": "PASS",
       "confidence": null,
-      "reason": "artifact_not_available"
+      "reason": "artifact_available"
     },
     {
       "module": "counterfactual",
-      "available": false,
-      "decision": "UNAVAILABLE",
+      "available": true,
+      "decision": "WAIT_FOR_MORE_EVIDENCE",
       "confidence": null,
-      "reason": "artifact_not_available"
+      "reason": "artifact_available"
     },
     {
       "module": "research",
-      "available": false,
-      "decision": "UNAVAILABLE",
+      "available": true,
+      "decision": "RESEARCH_COMPLETE",
       "confidence": null,
-      "reason": "artifact_not_available"
+      "reason": "artifact_available"
     },
     {
       "module": "creator_brain",
       "available": true,
       "decision": "CREATE_STORY_FIRST",
       "confidence": null,
-      "reason": "Honor cross-lane selected opportunity capital_flow_long for $BCH; build story from its evidence rather than allowing unrelated news to override it."
+      "reason": "Honor cross-lane selected opportunity capital_flow_short for $ONE; build story from its evidence rather than allowing unrelated news to override it."
     },
     {
       "module": "ensemble",
       "available": true,
       "decision": "PASS",
       "confidence": null,
-      "reason": "artifact_not_available"
+      "reason": "artifact_available"
     },
     {
       "module": "jev",
       "available": true,
       "decision": "LOCAL_GATES_ONLY",
       "confidence": 0.0,
-      "reason": "artifact_not_available"
+      "reason": "artifact_available"
     },
     {
       "module": "local_critic",
@@ -81,6 +81,49 @@
       "decision": "UNAVAILABLE",
       "confidence": null,
       "reason": "Local Ollama runtime is not installed or not reachable; deterministic and Jev layers remain authoritative."
+    }
+  ],
+  "decision_trace": [
+    {
+      "stage": "signal",
+      "status": "UNAVAILABLE",
+      "evidence": 25.0
+    },
+    {
+      "stage": "adversarial",
+      "status": "PASS",
+      "reason": null
+    },
+    {
+      "stage": "counterfactual",
+      "status": "WAIT_FOR_MORE_EVIDENCE",
+      "reason": null
+    },
+    {
+      "stage": "research",
+      "status": "RESEARCH_COMPLETE",
+      "reason": null
+    },
+    {
+      "stage": "ensemble",
+      "status": "PASS",
+      "reason": null
+    },
+    {
+      "stage": "jev",
+      "status": "LOCAL_GATES_ONLY",
+      "authoritative": false,
+      "action": "local_gates_only"
+    },
+    {
+      "stage": "production",
+      "status": "PUBLISH_ELIGIBLE",
+      "quality_score": 82
+    },
+    {
+      "stage": "publication",
+      "status": "UNAVAILABLE",
+      "post_id": null
     }
   ],
   "pipeline": {
@@ -100,75 +143,118 @@
   },
   "learning": {
     "outcomes_available": false,
-    "learning_available": false,
+    "learning_available": true,
     "revenue_feedback_available": true,
+    "outcome_summary": null,
+    "learning_summary": null,
+    "revenue_summary": "OK",
     "revenue_policy": "verified_observations_only"
+  },
+  "evidence_ledger": {
+    "signal_evidence": 25.0,
+    "mesh_validation": {
+      "logical_agent_count": 300,
+      "expected_agent_count": 300,
+      "exact_count": true,
+      "unique_ids": true,
+      "cluster_totals_valid": true,
+      "sparse_max_neighbors": 5,
+      "status": "VALID"
+    },
+    "specialists_available": 7,
+    "specialists_total": 7,
+    "publication_proof": "none"
   },
   "artifact_health": {
     "nic_core": {
       "file": "nic_core_state.json",
-      "available": true
+      "available": true,
+      "generated_at": "2026-09-23T13:53:11.318966+00:00",
+      "status": "UNAVAILABLE"
     },
     "mesh": {
       "file": "agent_mesh_300.json",
-      "available": true
+      "available": true,
+      "generated_at": "2026-09-23T13:53:27.290002+00:00",
+      "status": "UNAVAILABLE"
     },
     "adversarial": {
-      "file": "adversarial_decision.json",
-      "available": false
+      "file": "adversarial_brain_review.json",
+      "available": true,
+      "generated_at": "2026-09-23T13:53:24.146055+00:00",
+      "status": "PASS"
     },
     "counterfactual": {
-      "file": "counterfactual_decision.json",
-      "available": false
+      "file": "creator_16_0_decision_board.json",
+      "available": true,
+      "generated_at": "2026-09-23T13:53:10.840753+00:00",
+      "status": "WAIT_FOR_MORE_EVIDENCE"
     },
     "research": {
-      "file": "research_decision.json",
-      "available": false
+      "file": "creator_17_0_research_state.json",
+      "available": true,
+      "generated_at": null,
+      "status": "RESEARCH_COMPLETE"
     },
     "creator_brain": {
       "file": "creator_brain_decision.json",
-      "available": true
+      "available": true,
+      "generated_at": "2026-09-23T13:53:24.365047+00:00",
+      "status": "CREATE_STORY_FIRST"
     },
     "ensemble": {
       "file": "decision_ensemble.json",
-      "available": true
+      "available": true,
+      "generated_at": "2026-09-23T13:53:24.293502+00:00",
+      "status": "PASS"
     },
     "jev": {
       "file": "jev_decision.json",
-      "available": true
+      "available": true,
+      "generated_at": null,
+      "status": "LOCAL_GATES_ONLY"
     },
     "local_critic": {
       "file": "local_model_critic.json",
-      "available": true
+      "available": true,
+      "generated_at": "2026-09-23T13:53:24.249450+00:00",
+      "status": "UNAVAILABLE"
     },
     "production": {
       "file": "production_decision.json",
-      "available": true
+      "available": true,
+      "generated_at": null,
+      "status": "UNAVAILABLE"
     },
     "publication": {
-      "file": "publication_verification.json",
-      "available": false
-    },
-    "publication_result": {
       "file": "publication_result.json",
-      "available": false
+      "available": false,
+      "generated_at": null,
+      "status": "UNAVAILABLE"
     },
     "outcomes": {
-      "file": "creator_24_1_prediction_outcomes.json",
-      "available": false
+      "file": "prediction_outcomes.json",
+      "available": false,
+      "generated_at": null,
+      "status": "UNAVAILABLE"
     },
     "learning": {
-      "file": "creator_7_2_learning.json",
-      "available": false
+      "file": "learning_report.json",
+      "available": true,
+      "generated_at": "2026-09-23T13:53:08.456972+00:00",
+      "status": "UNAVAILABLE"
     },
     "revenue": {
       "file": "creator_8_4_monetization_feedback.json",
-      "available": true
+      "available": true,
+      "generated_at": "2026-09-23T13:53:08.765764+00:00",
+      "status": "OK"
     }
   },
   "integrity": {
     "no_simulated_agent_status": true,
     "external_models_required": false,
-    "publication_authority": "downstream deterministic gates"
+    "publication_authority": "downstream deterministic gates",
+    "decision_trace_is_observational": true
   }
 }
