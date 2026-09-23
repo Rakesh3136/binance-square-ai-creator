@@ -1,9 +1,8 @@
-"""Build the NIC Command Center telemetry snapshot from committed pipeline truth.
+"""Build NIC Command Center telemetry from the repository's real pipeline artifacts.
 
-This is read-only with respect to market/publishing decisions: it summarizes
-artifacts produced by the authoritative pipeline and never invents agent state.
-A separate workflow refreshes this snapshot after creator commits so the cockpit
-reflects final production/publication state rather than an early snapshot.
+This module is read-only with respect to market/publishing decisions. It maps the
+cockpit to the actual artifact names emitted by the current creator pipeline so
+available specialist results are not incorrectly shown as unavailable.
 """
 from __future__ import annotations
 
@@ -18,18 +17,17 @@ OUT = LIVE / "nic_dashboard.json"
 SOURCES = {
     "nic_core": "nic_core_state.json",
     "mesh": "agent_mesh_300.json",
-    "adversarial": "adversarial_decision.json",
-    "counterfactual": "counterfactual_decision.json",
-    "research": "research_decision.json",
+    "adversarial": "adversarial_brain_review.json",
+    "counterfactual": "creator_16_0_decision_board.json",
+    "research": "creator_17_0_research_state.json",
     "creator_brain": "creator_brain_decision.json",
     "ensemble": "decision_ensemble.json",
     "jev": "jev_decision.json",
     "local_critic": "local_model_critic.json",
     "production": "production_decision.json",
-    "publication": "publication_verification.json",
-    "publication_result": "publication_result.json",
-    "outcomes": "creator_24_1_prediction_outcomes.json",
-    "learning": "creator_7_2_learning.json",
+    "publication": "publication_result.json",
+    "outcomes": "prediction_outcomes.json",
+    "learning": "learning_report.json",
     "revenue": "creator_8_4_monetization_feedback.json",
 }
 
@@ -51,7 +49,7 @@ def first(d: dict, *keys, default=None):
 
 
 def decision(d: dict) -> str:
-    value = first(d, "decision", "action", "status", default="UNAVAILABLE")
+    value = first(d, "decision", "action", "status", "state", default="UNAVAILABLE")
     if isinstance(value, bool):
         return "PASS" if value else "BLOCK"
     return str(value).upper()
@@ -65,29 +63,45 @@ def production_decision(d: dict) -> str:
     return decision(d)
 
 
+def specialist(key: str, d: dict) -> dict:
+    if not d:
+        return {
+            "module": key,
+            "available": False,
+            "decision": "UNAVAILABLE",
+            "confidence": None,
+            "reason": "artifact_not_available",
+        }
+    return {
+        "module": key,
+        "available": True,
+        "decision": decision(d),
+        "confidence": first(d, "confidence", "score", "evidence_score", "research_score"),
+        "reason": first(d, "reason", "rationale", "summary", "thesis", "recommendation", default="artifact_available"),
+    }
+
+
 def main() -> None:
     docs = {key: load(filename) for key, filename in SOURCES.items()}
     nic = docs["nic_core"]
     mesh = docs["mesh"]
 
-    agents = []
-    for key in ("adversarial", "counterfactual", "research", "creator_brain", "ensemble", "jev", "local_critic"):
-        d = docs[key]
-        agents.append({
-            "module": key,
-            "available": bool(d),
-            "decision": decision(d) if d else "UNAVAILABLE",
-            "confidence": first(d, "confidence", "score", "evidence_score"),
-            "reason": first(d, "reason", "rationale", "summary", default="artifact_not_available"),
-        })
+    agents = [specialist(key, docs[key]) for key in (
+        "adversarial", "counterfactual", "research", "creator_brain",
+        "ensemble", "jev", "local_critic"
+    )]
 
-    publication = docs["publication"] or docs["publication_result"]
-    publication_status = first(publication, "status", "verification_status", default="UNAVAILABLE")
+    publication = docs["publication"]
+    publication_status = first(
+        publication,
+        "status", "publication_status", "verification_status",
+        default="UNAVAILABLE",
+    )
     production = docs["production"]
     production_status = production_decision(production)
 
     state = {
-        "schema_version": "NIC-DASH-1.1",
+        "schema_version": "NIC-DASH-1.2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": "committed_repository_artifacts",
         "refresh_mode": "post_cycle_truth_snapshot",
@@ -113,7 +127,7 @@ def main() -> None:
             "production": production_status,
             "production_quality_score": first(production, "quality_score", default=None),
             "publication": publication_status,
-            "publication_message": first(publication, "message", "reason", default=""),
+            "publication_message": first(publication, "message", "reason", "details", default=""),
             "publication_proof": first(publication, "publication_proof", "proof", default="none"),
             "post_id": first(publication, "post_id", default=None),
             "jev": {
@@ -150,6 +164,7 @@ def main() -> None:
         "mesh_agents": state["mesh"]["logical_agents"],
         "production": production_status,
         "publication": publication_status,
+        "available_specialists": sum(1 for x in agents if x["available"]),
     }))
 
 
