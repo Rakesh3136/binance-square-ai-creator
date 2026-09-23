@@ -20,7 +20,7 @@ import urllib.error
 import urllib.request
 from typing import Callable
 
-DEFAULT_ORDER = ("claude", "gemini", "openai")
+DEFAULT_ORDER = ()
 
 
 def provider_order() -> list[str]:
@@ -117,8 +117,14 @@ CALLERS: dict[str, Callable[[str, str], str]] = {
 }
 
 
+def external_models_enabled() -> bool:
+    return os.getenv("NIC_EXTERNAL_MODELS", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def generate(prompt: str, system: str) -> tuple[str, dict]:
-    """Try configured model specialists, then fail so caller can use local logic."""
+    """Optional hosted-model bridge. NIC Core remains the default path."""
+    if not external_models_enabled():
+        raise RuntimeError(json.dumps({"nic": "external_models_disabled", "attempts": []}))
     attempts = []
     for provider in provider_order():
         fn = CALLERS.get(provider)
@@ -150,6 +156,7 @@ def generate(prompt: str, system: str) -> tuple[str, dict]:
 def status() -> dict:
     return {
         "nic_version": "1.0-provider-independent",
+        "external_models_enabled": external_models_enabled(),
         "provider_order": provider_order(),
         "configured": {
             "claude": bool(os.getenv("ANTHROPIC_API_KEY")),
