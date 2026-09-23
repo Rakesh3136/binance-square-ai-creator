@@ -176,23 +176,33 @@ def main():
         engagement=preflight.get('engagement_strategy') or {}; instruction=TOPIC or selected.get('instruction') or 'Choose the strongest evidence-based opportunity across all supplied market and news lanes.'
         research_bundle=json.dumps({'creator_brain':creator_brain,'publication_context':publication_context,'preflight':preflight,'live_market':live,'news':news,'strategy_memory':memory,'creator_patterns':creator_patterns},ensure_ascii=False,indent=2)
         scout_prompt=('RESEARCH SCOUT BRIEF\n'+instruction+'\n\n'+research_bundle+'\n\nGenerate 5 materially different theses from the evidence. Rank them by information advantage, evidence strength, reader utility, non-obviousness, and visual information value. One thesis should challenge the obvious narrative; one should expose a mechanism; one should offer a reusable mental model. Return only JSON.')
-        scout=parse_json(call_creator(client,scout_prompt,SCOUT_SYSTEM))
-        theses=scout.get('theses') or []
-        final_prompt=(
-            'FINAL AUTHORING BRIEF — use the research scout below as internal editorial intelligence. Do not mention the scout or its process in the post.\n\n'
-            'AUTHENTICITY REQUIREMENT: the final copy must sound like a specific human creator who has actually looked at the evidence, not like an AI summary.\n'
-            'DECIDE FIRST: which thesis has the largest reader information gain? Write that one. If none has enough evidence, return a structured WAIT draft rather than generic market filler.\n'
-            'QUALITY TEST BEFORE RETURNING: Can a reader point to the exact fact that supports the insight? Is there a clear why-now? Is there a non-obvious interpretation? Is the mechanism understandable? Is there a counterpoint or invalidation? Does the final question arise naturally from the story? Would the post still be meaningful if the ticker were changed? If any answer is no, rewrite.\n\n'
-            'RESEARCH SCOUT:\n'+json.dumps(scout,ensure_ascii=False,indent=2)+'\n\n'
-            'AUTHORITATIVE STORY DECISION:\n'+json.dumps(creator_brain,ensure_ascii=False,indent=2)+'\n\n'
-            'PUBLICATION CONTRACT:\n'+json.dumps(publication_context,ensure_ascii=False,indent=2)+'\n\n'
-            'EDITORIAL LANE:\n'+instruction+'\n\n'
-            'ENGAGEMENT STRATEGY:\n'+json.dumps(engagement,ensure_ascii=False,indent=2)+'\n\n'
-            'LIVE MARKET:\n'+json.dumps(live,ensure_ascii=False,indent=2)+'\n\nNEWS:\n'+json.dumps(news,ensure_ascii=False,indent=2)+'\n\n'
-            'STRATEGY MEMORY:\n'+json.dumps(memory,ensure_ascii=False,indent=2)+'\n\n'
-            'Write ONE finished Binance Square post. Preserve verified asset/headline/chart constraints. Do not copy the verified headline verbatim as the hook unless the event itself is the unique insight. Use no more than two emojis and only when natural.'
-        )
-        result=parse_json(call_creator(client,final_prompt,SYSTEM)); generation_mode='NIC_2PASS'
+        try:
+            scout=parse_json(call_creator(client,scout_prompt,SCOUT_SYSTEM))
+            theses=scout.get('theses') or []
+            final_prompt=(
+                'FINAL AUTHORING BRIEF — use the research scout below as internal editorial intelligence. Do not mention the scout or its process in the post.\n\n'
+                'AUTHENTICITY REQUIREMENT: the final copy must sound like a specific human creator who has actually looked at the evidence, not like an AI summary.\n'
+                'DECIDE FIRST: which thesis has the largest reader information gain? Write that one. If none has enough evidence, return a structured WAIT draft rather than generic market filler.\n'
+                'QUALITY TEST BEFORE RETURNING: Can a reader point to the exact fact that supports the insight? Is there a clear why-now? Is there a non-obvious interpretation? Is the mechanism understandable? Is there a counterpoint or invalidation? Does the final question arise naturally from the story? Would the post still be meaningful if the ticker were changed? If any answer is no, rewrite.\n\n'
+                'RESEARCH SCOUT:\n'+json.dumps(scout,ensure_ascii=False,indent=2)+'\n\n'
+                'AUTHORITATIVE STORY DECISION:\n'+json.dumps(creator_brain,ensure_ascii=False,indent=2)+'\n\n'
+                'PUBLICATION CONTRACT:\n'+json.dumps(publication_context,ensure_ascii=False,indent=2)+'\n\n'
+                'EDITORIAL LANE:\n'+instruction+'\n\n'
+                'ENGAGEMENT STRATEGY:\n'+json.dumps(engagement,ensure_ascii=False,indent=2)+'\n\n'
+                'LIVE MARKET:\n'+json.dumps(live,ensure_ascii=False,indent=2)+'\n\nNEWS:\n'+json.dumps(news,ensure_ascii=False,indent=2)+'\n\n'
+                'STRATEGY MEMORY:\n'+json.dumps(memory,ensure_ascii=False,indent=2)+'\n\n'
+                'Write ONE finished Binance Square post. Preserve verified asset/headline/chart constraints. Do not copy the verified headline verbatim as the hook unless the event itself is the unique insight. Use no more than two emojis and only when natural.'
+            )
+            result=parse_json(call_creator(client,final_prompt,SYSTEM)); generation_mode='NIC_2PASS'
+        except Exception as exc:
+            fallback = local_market_fallback(live,preflight,memory) or local_news_fallback(news)
+            if not fallback:
+                raise
+            result = fallback
+            result.setdefault('critique', {})['nic_fallback_error'] = type(exc).__name__
+            result.setdefault('critique', {})['nic_provider_independent'] = True
+            generation_mode = 'NIC_LOCAL_FALLBACK'
+            scout = {}
     research=normalize_object(result.get('research'),'summary'); critique=normalize_object(result.get('critique'),'summary'); draft=normalize_draft(result.get('draft')); visual=normalize_visual(result.get('visual_plan'))
     draft['experiment_id']=(preflight.get('engagement_strategy') or {}).get('experiment_id') or preflight.get('recommended_experiment') or 'A'
     draft['experiment_format']=((preflight.get('engagement_strategy') or {}).get('experiment') or {}).get('format')
