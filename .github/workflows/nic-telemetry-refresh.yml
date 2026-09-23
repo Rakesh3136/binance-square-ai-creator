@@ -1,0 +1,65 @@
+name: NIC Command Center — Post-Cycle Telemetry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/live/nic_core_state.json'
+      - 'data/live/agent_mesh_300.json'
+      - 'data/live/adversarial_decision.json'
+      - 'data/live/counterfactual_decision.json'
+      - 'data/live/research_decision.json'
+      - 'data/live/creator_brain_decision.json'
+      - 'data/live/decision_ensemble.json'
+      - 'data/live/jev_decision.json'
+      - 'data/live/local_model_critic.json'
+      - 'data/live/production_decision.json'
+      - 'data/live/publication_result.json'
+      - 'data/live/publication_verification.json'
+      - 'data/live/creator_24_1_prediction_outcomes.json'
+      - 'data/live/creator_7_2_learning.json'
+      - 'data/live/creator_8_4_monetization_feedback.json'
+      - 'src/nic_dashboard_state.py'
+      - '.github/workflows/nic-telemetry-refresh.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nic-post-cycle-telemetry
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build final NIC truth snapshot
+        run: |
+          python -m compileall -q src/nic_dashboard_state.py
+          python src/nic_dashboard_state.py
+          python -m json.tool data/live/nic_dashboard.json >/dev/null
+
+      - name: Commit refreshed cockpit telemetry
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/live/nic_dashboard.json
+          if git diff --cached --quiet; then
+            echo 'NIC dashboard already current'
+            exit 0
+          fi
+          git commit -m 'Refresh NIC cockpit with post-cycle truth'
+          git pull --rebase --autostash origin main
+          git push origin main
