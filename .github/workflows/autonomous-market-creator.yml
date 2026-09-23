@@ -64,7 +64,7 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router"
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core"
           python src/nic_model_router.py
           echo 'Core, Jev, ensemble and NIC modules imported successfully'
       - name: Reset creator cycle
@@ -127,7 +127,9 @@ jobs:
           python src/creator_18_0_value_allocator.py
           python src/creator_19_0_self_improvement_v2.py
       - name: Superhuman Creator Core
-        run: python src/superhuman_creator_core.py
+        run: |
+          python src/superhuman_creator_core.py
+          python src/nic_core.py
       - name: Human-level editorial intelligence
         run: python src/creator_21_0_human_level_editor.py
       - name: Unified control-plane snapshot
@@ -200,7 +202,8 @@ jobs:
           GEMINI_MODEL: gemini-3.6-flash
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-6-astra
-          NIC_PROVIDER_ORDER: claude,gemini,openai
+          NIC_EXTERNAL_MODELS: 'false'
+          NIC_PROVIDER_ORDER: ''
           TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           python src/script_director_4.py
