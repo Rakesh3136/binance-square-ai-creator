@@ -74,11 +74,11 @@ def build_state() -> dict:
     hook_family = hook_families[family_index]
 
     plans = {
-        "contradiction": f"\${symbol} has a decision point where the obvious narrative can be tested against the verified market structure.",
-        "mechanism": f"The useful story for \${symbol} is the measurable link between the observed move and the level that would confirm or reject it.",
-        "decision": f"\${symbol} becomes actionable only under the frozen condition; the point is the test, not a certainty about the outcome.",
-        "anomaly": f"\${symbol} is worth examining for the gap between what the headline suggests and what the supplied market evidence actually confirms.",
-        "accountability": f"\${symbol} should be evaluated against the same frozen setup after the market resolves it, so the Creator can learn from the result.",
+        "contradiction": f"${symbol} has a decision point where the obvious narrative can be tested against the verified market structure.",
+        "mechanism": f"The useful story for ${symbol} is the measurable link between the observed move and the level that would confirm or reject it.",
+        "decision": f"${symbol} becomes actionable only under the frozen condition; the point is the test, not a certainty about the outcome.",
+        "anomaly": f"${symbol} is worth examining for the gap between what the headline suggests and what the supplied market evidence actually confirms.",
+        "accountability": f"${symbol} should be evaluated against the same frozen setup after the market resolves it, so the Creator can learn from the result.",
     }
     return {
         "nic_version": "1.0-keyless-domain-core",
