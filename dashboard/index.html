@@ -5,13 +5,14 @@
 </style></head>
 <body><main>
 <div class="top"><div class="brand"><div class="muted">AUTONOMOUS CRYPTO INTELLIGENCE</div><h1>NIC Command Center</h1></div><div id="status" class="pill">Connecting…</div></div>
-<nav style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0"><a class="pill" href="#overview">Overview</a><a class="pill" href="#activity">Activity</a><a class="pill" href="#reasoning">Reasoning</a><a class="pill" href="#learning">Learning</a></nav><div id="overview" class="grid">
+<nav style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0"><a class="pill" href="#overview">Overview</a><a class="pill" href="#activity">Activity</a><a class="pill" href="#reasoning">Reasoning</a><a class="pill" href="#learning">Learning</a><a class="pill" href="#brain">Brain Map</a></nav><div id="overview" class="grid">
 <div class="card"><div class="muted">NIC VERSION</div><div id="version" class="big">—</div></div>
 <div class="card"><div class="muted">SYMBOL</div><div id="symbol" class="big">—</div></div>
 <div class="card"><div class="muted">DIRECTION</div><div id="direction" class="big">—</div></div>
 <div class="card"><div class="muted">EVIDENCE</div><div id="evidence" class="big">—</div><div class="bar"><div id="fill" class="fill"></div></div></div>
 <div id="reasoning" class="card wide"><div class="muted">CURRENT THESIS</div><p id="thesis">Waiting for NIC state…</p><div class="mono" id="meta">—</div></div>
-<div id="learning" class="card wide"><div class="muted">NIC LEARNING STATE</div><p id="learningText">Reading outcome memory…</p><div class="mono" id="learningMeta">—</div></div>
+<div id="brain" class="card wide"><div class="muted">NIC BRAIN MAP</div><div id="brainMap" style="display:grid;gap:8px;margin-top:10px"><div>Market Scan → Signal Router → Evidence → Adversarial → Decision → Publish → Outcome → Learning</div></div><div class="mono" id="brainMeta">Loading pipeline state…</div></div>
+<div class="card wide"><div class="muted">SYSTEM SIGNALS</div><div id="signals" style="display:grid;gap:6px;margin-top:10px"></div></div><div id="learning" class="card wide"><div class="muted">NIC LEARNING STATE</div><p id="learningText">Reading outcome memory…</p><div class="mono" id="learningMeta">—</div></div>
 <div class="card wide"><div class="muted">LIVE ACTIVITY</div><div id="activity" class="activity">Waiting for events…</div></div>
 </div>
 <div class="footer">Auto-refreshes every 20 seconds • Real repository telemetry only • NIC Core is primary • External models are optional advisors</div>
@@ -27,6 +28,9 @@ async function refresh(){
   const e=Number(s.evidence_score||0);evidence.textContent=e+'%';fill.style.width=Math.max(0,Math.min(100,e))+'%';
   thesis.textContent=s.editorial_thesis||'—';meta.textContent='thesis '+(s.thesis_id||'—')+' • hook '+(s.hook_family||'—')+' • '+(s.generated_at||'—');
   try{const l=await get('data/live/creator_7_2_learning.json');learningText.textContent=JSON.stringify(l.strategy_recommendations||l.recommendations||l.summary||'Learning state available');learningMeta.textContent='learning artifact loaded • '+new Date().toISOString()}catch(_){learningText.textContent='No learning artifact available yet';learningMeta.textContent='NIC continues operating without it'}
+  const checks=[['NIC state','data/live/nic_core_state.json'],['Activity stream','data/live/nic_activity.jsonl'],['Signal router','data/live/signal_first_routing.json'],['Market regime','data/live/market_regime.json'],['Creator decision','data/live/creator_brain_decision.json'],['Prediction outcomes','data/live/creator_24_1_prediction_outcomes.json']];
+  signals.innerHTML=''; for(const [label,path] of checks){try{await get(path);signals.insertAdjacentHTML('beforeend','<div>● '+label+' <span class="muted">AVAILABLE</span></div>')}catch(_){signals.insertAdjacentHTML('beforeend','<div>○ '+label+' <span class="muted">NOT AVAILABLE</span></div>')}}
+  brainMeta.textContent='Pipeline telemetry is read from committed artifacts; no simulated agent status.';
   status.textContent='● NIC ONLINE';status.className='pill ok';
   const r=await fetch(base+'data/live/nic_activity.jsonl?t='+Date.now(),{cache:'no-store'});const txt=await r.text();
   const rows=txt.trim().split('\n').filter(Boolean).slice(-40).reverse().map(x=>JSON.parse(x));
