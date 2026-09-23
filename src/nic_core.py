@@ -19,6 +19,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data/live/nic_core_state.json"
 REPORT = ROOT / "data/intelligence/nic_core_report.json"
+ACTIVITY = ROOT / "data/live/nic_activity.jsonl"
+
+def emit(event: str, stage: str, **details) -> None:
+    record = {"timestamp": datetime.now(timezone.utc).isoformat(), "status": "ACTIVE", "stage": stage, "event": event, **details}
+    ACTIVITY.parent.mkdir(parents=True, exist_ok=True)
+    with ACTIVITY.open("a", encoding="utf-8") as f: f.write(json.dumps(record, ensure_ascii=False) + "\\n")
+    print(json.dumps(record, ensure_ascii=False))
 
 def load(path: Path) -> dict:
     try:
@@ -32,6 +39,7 @@ def symbol_of(d: dict) -> str:
     return re.sub(r"[^A-Z0-9]", "", value.replace("USDT", ""))
 
 def build_state() -> dict:
+    emit("NIC reading intelligence state", "observe")
     pre = load(ROOT / "data/live/editorial_preflight.json")
     routing = load(ROOT / "data/live/signal_first_routing.json")
     regime = load(ROOT / "data/live/market_regime.json")
@@ -80,6 +88,7 @@ def build_state() -> dict:
         "anomaly": f"${symbol} is worth examining for the gap between what the headline suggests and what the supplied market evidence actually confirms.",
         "accountability": f"${symbol} should be evaluated against the same frozen setup after the market resolves it, so the Creator can learn from the result.",
     }
+    emit("NIC completed evidence synthesis", "reason", symbol=symbol, evidence_score=evidence_score, hook_family=hook_family)
     return {
         "nic_version": "1.0-keyless-domain-core",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -103,6 +112,7 @@ def build_state() -> dict:
     }
 
 def main() -> None:
+    emit("NIC cycle started", "boot")
     state = build_state()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.parent.mkdir(parents=True, exist_ok=True)
@@ -115,6 +125,7 @@ def main() -> None:
         "hook_family": state["hook_family"],
         "external_models": "optional",
     }, indent=2, ensure_ascii=False), encoding="utf-8")
+    emit("NIC state persisted", "learn", thesis_id=state["thesis_id"], evidence_score=state["evidence_score"])
     print(json.dumps(state, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":
