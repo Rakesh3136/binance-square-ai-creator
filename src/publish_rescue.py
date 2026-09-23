@@ -200,8 +200,8 @@ def main():
             raise SystemExit("Frozen signal contract incomplete; refusing generic downgrade")
         hook = f"${symbol}: the {direction} idea is at its decision level."
         why = f"I'm watching the next 1H reaction around {fmt_price(e)}. The setup needs confirmation; it is not a call to chase the current candle."
-        plan = f"{direction} trigger: {fmt_price(e)}  |  TP1 {fmt_price(tp1)}  |  TP2 {fmt_price(tp2)}  |  SL {fmt_price(sl)}"
-        condition = "A clean trigger plus follow-through keeps the thesis alive; the invalidation level ends it."
+        plan = f"Entry trigger: {fmt_price(e)}  |  TP1: {fmt_price(tp1)}  |  TP2: {fmt_price(tp2)}  |  SL / invalidation: {fmt_price(sl)}"
+        condition = "Because the trigger starts the test, follow-through keeps the thesis alive; the invalidation level ends it."
         question = f"Would you wait for the retest around {fmt_price(e)}, or require a fresh 1H close first?"
         disclaimer = "Conditional setup only; no guarantee."
         post = "\n\n".join([hook, why, plan, condition, question, disclaimer])
