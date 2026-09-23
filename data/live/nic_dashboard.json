@@ -1,7 +1,8 @@
 {
-  "schema_version": "NIC-DASH-1.0",
-  "generated_at": "2026-09-23T06:53:18.193176+00:00",
+  "schema_version": "NIC-DASH-1.1",
+  "generated_at": "2026-09-23T08:42:20.709492+00:00",
   "source": "committed_repository_artifacts",
+  "refresh_mode": "post_cycle_truth_snapshot",
   "nic": {
     "version": "1.0-keyless-domain-core",
     "symbol": "ONE",
@@ -37,21 +38,21 @@
       "available": false,
       "decision": "UNAVAILABLE",
       "confidence": null,
-      "reason": ""
+      "reason": "artifact_not_available"
     },
     {
       "module": "counterfactual",
       "available": false,
       "decision": "UNAVAILABLE",
       "confidence": null,
-      "reason": ""
+      "reason": "artifact_not_available"
     },
     {
       "module": "research",
       "available": false,
       "decision": "UNAVAILABLE",
       "confidence": null,
-      "reason": ""
+      "reason": "artifact_not_available"
     },
     {
       "module": "creator_brain",
@@ -65,14 +66,14 @@
       "available": true,
       "decision": "PASS",
       "confidence": null,
-      "reason": ""
+      "reason": "artifact_not_available"
     },
     {
       "module": "jev",
       "available": true,
       "decision": "LOCAL_GATES_ONLY",
       "confidence": 0.0,
-      "reason": ""
+      "reason": "artifact_not_available"
     },
     {
       "module": "local_critic",
@@ -85,7 +86,10 @@
   "pipeline": {
     "ensemble": "PASS",
     "production": "UNAVAILABLE",
-    "publication": "UNAVAILABLE",
+    "publication": "PUBLISH_BLOCKED_DUPLICATE",
+    "publication_message": "Duplicate publication blocked: same_asset_category_and_setup_within_6h",
+    "publication_proof": "none",
+    "post_id": null,
     "jev": {
       "available": true,
       "authoritative": false,
@@ -98,6 +102,68 @@
     "learning_available": false,
     "revenue_feedback_available": true,
     "revenue_policy": "verified_observations_only"
+  },
+  "artifact_health": {
+    "nic_core": {
+      "file": "nic_core_state.json",
+      "available": true
+    },
+    "mesh": {
+      "file": "agent_mesh_300.json",
+      "available": true
+    },
+    "adversarial": {
+      "file": "adversarial_decision.json",
+      "available": false
+    },
+    "counterfactual": {
+      "file": "counterfactual_decision.json",
+      "available": false
+    },
+    "research": {
+      "file": "research_decision.json",
+      "available": false
+    },
+    "creator_brain": {
+      "file": "creator_brain_decision.json",
+      "available": true
+    },
+    "ensemble": {
+      "file": "decision_ensemble.json",
+      "available": true
+    },
+    "jev": {
+      "file": "jev_decision.json",
+      "available": true
+    },
+    "local_critic": {
+      "file": "local_model_critic.json",
+      "available": true
+    },
+    "production": {
+      "file": "production_decision.json",
+      "available": true
+    },
+    "publication": {
+      "file": "publication_verification.json",
+      "available": false
+    },
+    "publication_result": {
+      "file": "publication_result.json",
+      "available": true
+    },
+    "outcomes": {
+      "file": "creator_24_1_prediction_outcomes.json",
+      "available": false
+    },
+    "learning": {
+      "file": "creator_7_2_learning.json",
+      "available": false
+    },
+    "revenue": {
+      "file": "creator_8_4_monetization_feedback.json",
+      "available": true
+    }
   },
   "integrity": {
     "no_simulated_agent_status": true,
