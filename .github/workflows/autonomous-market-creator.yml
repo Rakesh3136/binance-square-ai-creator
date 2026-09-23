@@ -126,6 +126,26 @@ jobs:
           python src/thesis_ledger.py
           python src/creator_18_0_value_allocator.py
           python src/creator_19_0_self_improvement_v2.py
+      - name: NIC Live Activity Snapshot
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          root=Path('.')
+          state={
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "run_id": os.getenv("GITHUB_RUN_ID",""),
+            "run_number": os.getenv("GITHUB_RUN_NUMBER",""),
+            "status": "ACTIVE",
+            "stage": "nic_core",
+            "event": "NIC autonomous cycle started",
+          }
+          p=root/"data/live/nic_activity.jsonl"
+          p.parent.mkdir(parents=True,exist_ok=True)
+          with p.open("a",encoding="utf-8") as f: f.write(json.dumps(state,ensure_ascii=False)+"\\n")
+          print(json.dumps(state,indent=2))
+          PY
       - name: Superhuman Creator Core
         run: |
           python src/superhuman_creator_core.py
