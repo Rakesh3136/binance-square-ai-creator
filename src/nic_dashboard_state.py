@@ -1,10 +1,9 @@
 """Build the NIC Command Center telemetry snapshot from committed pipeline truth.
 
-This is deliberately read-only with respect to market/publishing decisions: it
-summarizes artifacts produced by the authoritative pipeline and never invents
-agent state. A separate workflow refreshes this snapshot after creator commits
-so the cockpit reflects the final production/publication state, not an early
-mid-cycle snapshot.
+This is read-only with respect to market/publishing decisions: it summarizes
+artifacts produced by the authoritative pipeline and never invents agent state.
+A separate workflow refreshes this snapshot after creator commits so the cockpit
+reflects final production/publication state rather than an early snapshot.
 """
 from __future__ import annotations
 
@@ -58,6 +57,14 @@ def decision(d: dict) -> str:
     return str(value).upper()
 
 
+def production_decision(d: dict) -> str:
+    if not d:
+        return "UNAVAILABLE"
+    if isinstance(d.get("publish"), bool):
+        return "PUBLISH_ELIGIBLE" if d["publish"] else "PUBLISH_BLOCKED"
+    return decision(d)
+
+
 def main() -> None:
     docs = {key: load(filename) for key, filename in SOURCES.items()}
     nic = docs["nic_core"]
@@ -75,15 +82,9 @@ def main() -> None:
         })
 
     publication = docs["publication"] or docs["publication_result"]
-    publication_status = first(
-        publication,
-        "status",
-        "verification_status",
-        default="UNAVAILABLE",
-    )
-
+    publication_status = first(publication, "status", "verification_status", default="UNAVAILABLE")
     production = docs["production"]
-    production_status = decision(production) if production else "UNAVAILABLE"
+    production_status = production_decision(production)
 
     state = {
         "schema_version": "NIC-DASH-1.1",
@@ -110,6 +111,7 @@ def main() -> None:
         "pipeline": {
             "ensemble": decision(docs["ensemble"]) if docs["ensemble"] else "UNAVAILABLE",
             "production": production_status,
+            "production_quality_score": first(production, "quality_score", default=None),
             "publication": publication_status,
             "publication_message": first(publication, "message", "reason", default=""),
             "publication_proof": first(publication, "publication_proof", "proof", default="none"),
@@ -128,10 +130,7 @@ def main() -> None:
             "revenue_policy": "verified_observations_only",
         },
         "artifact_health": {
-            key: {
-                "file": filename,
-                "available": bool(docs[key]),
-            }
+            key: {"file": filename, "available": bool(docs[key])}
             for key, filename in SOURCES.items()
         },
         "integrity": {
