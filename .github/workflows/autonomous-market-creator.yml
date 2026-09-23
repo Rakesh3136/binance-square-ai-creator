@@ -64,8 +64,9 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate"
-          echo 'Core, Jev and ensemble modules imported successfully'
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router"
+          python src/nic_model_router.py
+          echo 'Core, Jev, ensemble and NIC modules imported successfully'
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
       - name: Refresh full market universe, flow, news and core intelligence
@@ -193,9 +194,13 @@ jobs:
       - name: Build and refine publishable content
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: claude-sonnet-5
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
-          GEMINI_DAILY_BUDGET: '20'
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-6-astra
+          NIC_PROVIDER_ORDER: claude,gemini,openai
           TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           python src/script_director_4.py
@@ -233,17 +238,11 @@ jobs:
       - name: Automatic hook diversity repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-3.6-flash
-          GEMINI_DAILY_BUDGET: '20'
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/hook_diversity_rewriter.py
       - name: Automatic mechanism and reader-value repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-3.6-flash
-          GEMINI_DAILY_BUDGET: '20'
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/mechanism_value_rewriter.py
       - name: Activate Jev second-opinion gate
