@@ -5,15 +5,16 @@
 </style></head>
 <body><main>
 <div class="top"><div class="brand"><div class="muted">AUTONOMOUS CRYPTO INTELLIGENCE</div><h1>NIC Command Center</h1></div><div id="status" class="pill">Connecting…</div></div>
-<div class="grid">
+<nav style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0"><a class="pill" href="#overview">Overview</a><a class="pill" href="#activity">Activity</a><a class="pill" href="#reasoning">Reasoning</a><a class="pill" href="#learning">Learning</a></nav><div id="overview" class="grid">
 <div class="card"><div class="muted">NIC VERSION</div><div id="version" class="big">—</div></div>
 <div class="card"><div class="muted">SYMBOL</div><div id="symbol" class="big">—</div></div>
 <div class="card"><div class="muted">DIRECTION</div><div id="direction" class="big">—</div></div>
 <div class="card"><div class="muted">EVIDENCE</div><div id="evidence" class="big">—</div><div class="bar"><div id="fill" class="fill"></div></div></div>
-<div class="card wide"><div class="muted">CURRENT THESIS</div><p id="thesis">Waiting for NIC state…</p><div class="mono" id="meta">—</div></div>
+<div id="reasoning" class="card wide"><div class="muted">CURRENT THESIS</div><p id="thesis">Waiting for NIC state…</p><div class="mono" id="meta">—</div></div>
+<div id="learning" class="card wide"><div class="muted">NIC LEARNING STATE</div><p id="learningText">Reading outcome memory…</p><div class="mono" id="learningMeta">—</div></div>
 <div class="card wide"><div class="muted">LIVE ACTIVITY</div><div id="activity" class="activity">Waiting for events…</div></div>
 </div>
-<div class="footer">Auto-refreshes every 20 seconds • Displays repository telemetry • External models are optional advisors</div>
+<div class="footer">Auto-refreshes every 20 seconds • Real repository telemetry only • NIC Core is primary • External models are optional advisors</div>
 </main>
 <script>
 const base='https://raw.githubusercontent.com/Rakesh3136/binance-square-ai-creator/main/';
@@ -25,6 +26,7 @@ async function refresh(){
   version.textContent=s.nic_version||'—';symbol.textContent=s.symbol?'$'+s.symbol:'—';direction.textContent=s.direction||'—';
   const e=Number(s.evidence_score||0);evidence.textContent=e+'%';fill.style.width=Math.max(0,Math.min(100,e))+'%';
   thesis.textContent=s.editorial_thesis||'—';meta.textContent='thesis '+(s.thesis_id||'—')+' • hook '+(s.hook_family||'—')+' • '+(s.generated_at||'—');
+  try{const l=await get('data/live/creator_7_2_learning.json');learningText.textContent=JSON.stringify(l.strategy_recommendations||l.recommendations||l.summary||'Learning state available');learningMeta.textContent='learning artifact loaded • '+new Date().toISOString()}catch(_){learningText.textContent='No learning artifact available yet';learningMeta.textContent='NIC continues operating without it'}
   status.textContent='● NIC ONLINE';status.className='pill ok';
   const r=await fetch(base+'data/live/nic_activity.jsonl?t='+Date.now(),{cache:'no-store'});const txt=await r.text();
   const rows=txt.trim().split('\n').filter(Boolean).slice(-40).reverse().map(x=>JSON.parse(x));
