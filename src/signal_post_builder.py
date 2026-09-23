@@ -184,13 +184,13 @@ def build_signal_post(selected: dict | None = None) -> dict | None:
         f"This is a reaction trade, not a prediction of certainty. {evidence_line}",
     ]
     why_now = why_variants[variant]
-    plan = f"{s['direction']} trigger: {fmt(s['entry'])}  |  TP1 {fmt(s['tp1'])}  |  TP2 {fmt(s['tp2'])}  |  SL {fmt(s['sl'])}"
+    plan = f"Entry trigger: {fmt(s['entry'])}  |  TP1: {fmt(s['tp1'])}  |  TP2: {fmt(s['tp2'])}  |  SL / invalidation: {fmt(s['sl'])}"
     condition = [
         "I want the trigger first; a clean retest is confirmation, not permission to chase.",
         "If price reclaims the invalidation level, I drop the idea — no forcing it.",
-        "The trigger starts the test. Follow-through keeps it alive; invalidation ends it.",
+        "Because the trigger starts the test, follow-through keeps the thesis alive; invalidation ends it.",
         "No confirmation, no thesis. The market gets the final vote at the level.",
-        "The risk boundary matters as much as the target; once it fails, the setup is finished.",
+        "Because the risk boundary matters as much as the target, once it fails the setup is finished.",
         "I'd rather miss the move than turn an unconfirmed candle into a certainty.",
     ][variant]
     questions = {
