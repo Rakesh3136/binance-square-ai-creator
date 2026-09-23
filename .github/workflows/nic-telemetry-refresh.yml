@@ -6,18 +6,17 @@ on:
     paths:
       - 'data/live/nic_core_state.json'
       - 'data/live/agent_mesh_300.json'
-      - 'data/live/adversarial_decision.json'
-      - 'data/live/counterfactual_decision.json'
-      - 'data/live/research_decision.json'
+      - 'data/live/adversarial_brain_review.json'
+      - 'data/live/creator_16_0_decision_board.json'
+      - 'data/live/creator_17_0_research_state.json'
       - 'data/live/creator_brain_decision.json'
       - 'data/live/decision_ensemble.json'
       - 'data/live/jev_decision.json'
       - 'data/live/local_model_critic.json'
       - 'data/live/production_decision.json'
       - 'data/live/publication_result.json'
-      - 'data/live/publication_verification.json'
-      - 'data/live/creator_24_1_prediction_outcomes.json'
-      - 'data/live/creator_7_2_learning.json'
+      - 'data/live/prediction_outcomes.json'
+      - 'data/live/learning_report.json'
       - 'data/live/creator_8_4_monetization_feedback.json'
       - 'src/nic_dashboard_state.py'
       - '.github/workflows/nic-telemetry-refresh.yml'
@@ -46,6 +45,7 @@ jobs:
 
       - name: Build final NIC truth snapshot
         run: |
+          set -euo pipefail
           python -m compileall -q src/nic_dashboard_state.py
           python src/nic_dashboard_state.py
           python -m json.tool data/live/nic_dashboard.json >/dev/null
