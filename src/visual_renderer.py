@@ -1,7 +1,8 @@
 """Visual dispatcher for Binance Square.
 
 Signal-First technical lanes use the immutable historical snapshot and the
-professional setup renderer. Other technical/news lanes retain TradingView.
+human analyst-style Square renderer. Other technical/news lanes retain
+TradingView; meme lanes retain the meme renderer.
 """
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = Path(__file__).resolve().parent
 TRADINGVIEW = SRC / "tradingview_renderer.mjs"
 MEME = SRC / "meme_visual_renderer.py"
-PRO = SRC / "professional_setup_renderer.py"
+ANALYST = SRC / "analyst_square_chart_renderer.py"
 SNAPSHOT = ROOT / "data/live/historical_setup_snapshot.json"
 CONTEXT = ROOT / "data/live/publication_context.json"
 FROZEN = ROOT / "data/live/authoritative_opportunity.json"
@@ -36,12 +37,8 @@ def main() -> int:
     frozen = load(FROZEN)
     cat = str(ctx.get("category") or "").lower()
     signal_lanes = {
-        "capital_flow_long",
-        "capital_flow_short",
-        "flow",
-        "technical_setup",
-        "creator_signal_outcome",
-        "follow_up",
+        "capital_flow_long", "capital_flow_short", "flow", "technical_setup",
+        "creator_signal_outcome", "follow_up",
     }
 
     if cat in signal_lanes:
@@ -53,29 +50,20 @@ def main() -> int:
         if not snap or snap.get("status") != "FROZEN":
             raise SystemExit("historical chart snapshot missing for Signal-First technical lane")
         if actual != expected:
-            raise SystemExit(
-                f"historical chart asset mismatch: snapshot={actual or '<missing>'} current={expected}"
-            )
+            raise SystemExit(f"historical chart asset mismatch: snapshot={actual or '<missing>'} current={expected}")
 
         pred = snap.get("prediction") or {}
         frozen_pred = frozen.get("prediction") if isinstance(frozen.get("prediction"), dict) else {}
         checks = {
-            "direction": str(pred.get("direction") or "").upper()
-            == str(frozen.get("direction") or frozen_pred.get("direction") or pred.get("direction") or "").upper(),
-            "entry": pred.get("entry_trigger")
-            == (frozen.get("entry_trigger") if frozen.get("entry_trigger") is not None else frozen_pred.get("entry_trigger", pred.get("entry_trigger"))),
-            "tp1": pred.get("tp1")
-            == (frozen.get("tp1") if frozen.get("tp1") is not None else frozen_pred.get("tp1", pred.get("tp1"))),
-            "tp2": pred.get("tp2")
-            == (frozen.get("tp2") if frozen.get("tp2") is not None else frozen_pred.get("tp2", pred.get("tp2"))),
-            "sl": pred.get("sl")
-            == (frozen.get("sl") if frozen.get("sl") is not None else frozen_pred.get("sl", pred.get("sl"))),
+            "direction": str(pred.get("direction") or "").upper() == str(frozen.get("direction") or frozen_pred.get("direction") or pred.get("direction") or "").upper(),
+            "entry": pred.get("entry_trigger") == (frozen.get("entry_trigger") if frozen.get("entry_trigger") is not None else frozen_pred.get("entry_trigger", pred.get("entry_trigger"))),
+            "tp1": pred.get("tp1") == (frozen.get("tp1") if frozen.get("tp1") is not None else frozen_pred.get("tp1", pred.get("tp1"))),
+            "tp2": pred.get("tp2") == (frozen.get("tp2") if frozen.get("tp2") is not None else frozen_pred.get("tp2", pred.get("tp2"))),
+            "sl": pred.get("sl") == (frozen.get("sl") if frozen.get("sl") is not None else frozen_pred.get("sl", pred.get("sl"))),
         }
         if not all(checks.values()):
-            raise SystemExit(
-                f"historical chart setup mismatch with authoritative prediction: {checks}"
-            )
-        return subprocess.run(["python", str(PRO)], cwd=ROOT, check=False).returncode
+            raise SystemExit(f"historical chart setup mismatch with authoritative prediction: {checks}")
+        return subprocess.run(["python", str(ANALYST)], cwd=ROOT, check=False).returncode
 
     if cat == "crypto_meme":
         return subprocess.run(["python", str(MEME)], cwd=ROOT, check=False).returncode
