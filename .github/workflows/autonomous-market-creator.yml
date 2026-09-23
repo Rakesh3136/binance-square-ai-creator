@@ -126,6 +126,19 @@ jobs:
           python src/thesis_ledger.py
           python src/creator_18_0_value_allocator.py
           python src/creator_19_0_self_improvement_v2.py
+      - name: NIC Dashboard Telemetry Summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          files = ["data/live/nic_core_state.json","data/live/nic_activity.jsonl"]
+          for name in files:
+              p=Path(name)
+              print("NIC_TELEMETRY", name, "present=", p.exists(), "bytes=", p.stat().st_size if p.exists() else 0)
+          if Path(files[0]).exists():
+              s=json.loads(Path(files[0]).read_text())
+              print("NIC_TELEMETRY_STATE", json.dumps({"symbol":s.get("symbol"),"direction":s.get("direction"),"evidence_score":s.get("evidence_score"),"hook_family":s.get("hook_family")}))
+          PY
       - name: NIC Live Activity Snapshot
         run: |
           python - <<'PY'
