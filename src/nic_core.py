@@ -20,6 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data/live/nic_core_state.json"
 REPORT = ROOT / "data/intelligence/nic_core_report.json"
 ACTIVITY = ROOT / "data/live/nic_activity.jsonl"
+MACRO = ROOT / "data/live/global_macro_intelligence.json"
+IMPACT = ROOT / "data/live/cross_asset_impact.json"
+SELF_TRAINING = ROOT / "data/live/creator_self_training.json"
+SELF_DEV = ROOT / "data/live/autonomous_self_development_gate.json"
 
 def emit(event: str, stage: str, **details) -> None:
     record = {"timestamp": datetime.now(timezone.utc).isoformat(), "status": "ACTIVE", "stage": stage, "event": event, **details}
@@ -46,6 +50,10 @@ def build_state() -> dict:
     brain = load(ROOT / "data/live/creator_brain_decision.json")
     learning = load(ROOT / "data/live/creator_7_2_learning.json")
     audience = load(ROOT / "data/live/creator_22_0_audience_intelligence.json")
+    macro = load(MACRO)
+    impact = load(IMPACT)
+    self_training = load(SELF_TRAINING)
+    self_dev = load(SELF_DEV)
     selected = pre.get("selected_opportunity") if isinstance(pre.get("selected_opportunity"), dict) else {}
     selected_signal = routing.get("selected") if isinstance(routing.get("selected"), dict) else {}
 
@@ -63,6 +71,9 @@ def build_state() -> dict:
         "regime_available": bool(regime),
         "learning_available": bool(learning),
         "audience_available": bool(audience),
+        "macro_available": bool(macro),
+        "cross_asset_available": bool(impact),
+        "self_training_available": bool(self_training),
     }
     evidence_score = round(100 * sum(evidence_components.values()) / max(1, len(evidence_components)), 1)
 
@@ -77,9 +88,20 @@ def build_state() -> dict:
     thesis_id = hashlib.sha256(thesis_seed.encode()).hexdigest()[:16]
 
     hook_families = ["contradiction", "mechanism", "decision", "anomaly", "accountability"]
-    day_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    family_index = int(hashlib.sha256((thesis_id + day_key).encode()).hexdigest()[:8], 16) % len(hook_families)
-    hook_family = hook_families[family_index]
+    learned_patterns = self_training.get("policy", {}).get("observed_patterns", []) if isinstance(self_training.get("policy"), dict) else []
+    hook_candidates = [p for p in learned_patterns if isinstance(p, dict) and p.get("dimension") == "hook_type" and int(p.get("samples", 0) or 0) >= 3]
+    learned_hook = str(sorted(
+        hook_candidates,
+        key=lambda p: (float(p.get("avg_engagement_rate", 0) or 0), float(p.get("avg_views", 0) or 0)),
+        reverse=True
+    )[0].get("value") or "").lower() if hook_candidates else ""
+    mapped = {"question": "decision", "breaking": "anomaly", "contrarian": "contradiction", "explanation": "mechanism", "fact_led": "anomaly"}
+    if learned_hook in mapped:
+        hook_family = mapped[learned_hook]
+    else:
+        day_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        family_index = int(hashlib.sha256((thesis_id + day_key).encode()).hexdigest()[:8], 16) % len(hook_families)
+        hook_family = hook_families[family_index]
 
     plans = {
         "contradiction": f"${symbol} has a decision point where the obvious narrative can be tested against the verified market structure.",
@@ -108,6 +130,22 @@ def build_state() -> dict:
             "do not infer revenue from engagement",
         ],
         "editorial_thesis": plans[hook_family],
+        "macro_context": {
+            "primary_theme": macro.get("primary_theme"),
+            "event_count": macro.get("event_count", 0),
+            "cross_asset_watchlist": macro.get("cross_asset_watchlist", []),
+            "impact_status": impact.get("status"),
+        },
+        "self_training": {
+            "plan_id": self_training.get("plan_id"),
+            "primary_variable": ((self_training.get("policy") or {}).get("next_experiment") or {}).get("primary_variable"),
+            "underrepresented_lanes": (self_training.get("policy") or {}).get("underrepresented_lanes", []),
+            "verified_revenue_observed": ((self_training.get("policy") or {}).get("verified_monetization") or {}).get("verified_revenue_observed", 0),
+        },
+        "self_development": {
+            "run_self_engineer": bool(self_dev.get("run_self_engineer")),
+            "reason": self_dev.get("reason"),
+        },
         "external_models": "optional_advisors_only",
     }
 
@@ -123,7 +161,12 @@ def main() -> None:
         "thesis_id": state["thesis_id"],
         "evidence_score": state["evidence_score"],
         "hook_family": state["hook_family"],
+        "self_training_plan_id": state["self_training"]["plan_id"],
+        "macro_theme": state["macro_context"]["primary_theme"],
         "external_models": "optional",
+        "self_training": state["self_training"],
+        "macro_context": state["macro_context"],
+        "self_development": state["self_development"],
     }, indent=2, ensure_ascii=False), encoding="utf-8")
     emit("NIC state persisted", "learn", thesis_id=state["thesis_id"], evidence_score=state["evidence_score"])
     print(json.dumps(state, indent=2, ensure_ascii=False))
