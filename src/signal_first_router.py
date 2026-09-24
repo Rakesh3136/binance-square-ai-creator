@@ -362,7 +362,7 @@ def main():
         themes=event.get('themes') if isinstance(event.get('themes'),list) else []
         score=min(100,64 + len(themes)*5 + (4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
         for raw in (event.get('asset_symbols') or [])[:2]:
-            s=str(raw).upper().replace('    # Remove stale snapshot/ranker symbols before they reach authoritative selection.
+            s=str(raw).upper().replace('USDT','').strip()
     # choose() still performs the final live-universe check as a defense in depth.
     primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
     markets=[x for x in markets if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
