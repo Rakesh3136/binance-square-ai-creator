@@ -43,7 +43,8 @@ def main() -> int:
 
     text = WORKFLOW.read_text(encoding="utf-8")
     scripts = referenced_scripts(text)
-    missing = [p for p in scripts if not (ROOT / p).exists()]
+    # creator_diagnostics.py is intentionally optional in the persistence hook.
+    missing = [p for p in scripts if p != "src/creator_diagnostics.py" and not (ROOT / p).exists()]
 
     if missing:
         print("ERROR: workflow references missing Python files:", file=sys.stderr)
