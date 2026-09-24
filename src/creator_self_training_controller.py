@@ -162,12 +162,9 @@ def main():
 
     result={"status":"READY","plan_id":plan_id,"policy":policy,"memory_path":str(MEMORY.relative_to(ROOT))}
     LIVE.mkdir(parents=True,exist_ok=True); INTEL.mkdir(parents=True,exist_ok=True); AN.mkdir(parents=True,exist_ok=True)
-    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"
-",encoding="utf-8")
-    REPORT.write_text(json.dumps({"version":"1.0","generated_at":iso(t),"plan_id":plan_id,"status":"READY","primary_variable":next_variable,"underrepresented_lanes":underrepresented,"observed_patterns":len(repeated),"resolved_outcomes":len(outcome_scores)},indent=2)+"
-",encoding="utf-8")
-    MEMORY.write_text(json.dumps(memory,indent=2,ensure_ascii=False)+"
-",encoding="utf-8")
+    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+    REPORT.write_text(json.dumps({"version":"1.0","generated_at":iso(t),"plan_id":plan_id,"status":"READY","primary_variable":next_variable,"underrepresented_lanes":underrepresented,"observed_patterns":len(repeated),"resolved_outcomes":len(outcome_scores)},indent=2)+"\\n",encoding="utf-8")
+    MEMORY.write_text(json.dumps(memory,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
     print(json.dumps({"status":"READY","plan_id":plan_id,"primary_variable":next_variable,"underrepresented_lanes":underrepresented,"observed_patterns":len(repeated),"resolved_outcomes":len(outcome_scores)},indent=2))
     return 0
 
