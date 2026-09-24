@@ -31,7 +31,7 @@ def title_assets(title):
     return found
 
 def write_block(report,path,reason,count):
-    result={'status':'BLOCKED','version':'human-editor-v19','hook_preserved':False,'question_count':count,'reason':reason,'draft_path':str(path),'fail_closed':True,'edited_at':datetime.now(timezone.utc).isoformat()}
+    result={'status':'BLOCKED','version':'human-editor-v20','hook_preserved':False,'question_count':count,'reason':reason,'draft_path':str(path),'fail_closed':True,'edited_at':datetime.now(timezone.utc).isoformat()}
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
     report.setdefault('draft',{})['human_editor']=result; path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,ensure_ascii=False))
 
@@ -63,12 +63,15 @@ def deterministic_question(symbol,category):
 
 def main():
     raw_path=os.getenv('DRAFT_PATH','').strip(); path=Path(raw_path)
-    if not path.exists(): raise SystemExit('DRAFT_PATH is missing')
+    if not path.exists():
+        OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps({'status':'BLOCKED','version':'human-editor-v20','reason':'DRAFT_PATH is missing','fail_closed':True},indent=2),encoding='utf-8'); print(json.dumps({'status':'BLOCKED','reason':'DRAFT_PATH is missing'})); return 0
     report=load(path,{}); draft=report.setdefault('draft',{}); original=norm(draft.get('post') or draft.get('text') or '')
-    if not original: raise SystemExit('Draft has no post text')
+    if not original:
+        write_block(report,path,'draft_has_no_post_text',0); return 0
     context=load(CONTEXT,{}); selected=report.get('selected_editorial_lane') or report.get('selected_opportunity') or {}
     primary=normalize_symbol(context.get('symbol') or selected.get('symbol') or draft.get('symbol'))
-    if not primary: raise SystemExit('Editorial layer: primary symbol missing')
+    if not primary:
+        write_block(report,path,'primary_symbol_missing',0); return 0
     news_title=norm(context.get('news_title') or selected.get('news_title') or draft.get('news_title')); allowed={primary}|set(title_assets(news_title)) if news_title else {primary}
     edited=surgical_cleanup(strip_unsupported_cashtags(original,allowed)); lines=[norm(x) for x in edited.splitlines() if norm(x)]
     questions=re.findall(r'[^\n.!?]*\?',edited)
