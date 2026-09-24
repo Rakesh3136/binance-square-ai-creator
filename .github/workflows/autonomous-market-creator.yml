@@ -401,9 +401,37 @@ jobs:
           if [ -f src/creator_diagnostics.py ]; then python src/creator_diagnostics.py || true; else echo 'creator_diagnostics.py not present; skipping legacy diagnostics hook'; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin main
-          git reset --mixed origin/main
-          git add analytics data
-          bad_paths=$(git diff --cached --name-only | grep -vE '^(analytics|data)/' || true)
-          if [ -n "$bad_paths" ]; then echo '::error::Refusing to persist non-generated paths:'; echo "$bad_paths"; git reset; exit 1; fi
-          if git diff --cached --quiet; then echo 'No generated state changes to persist'; else git commit -m 'Record Creator 7.x cycle'; git push origin HEAD:main; fi
+          # Another workflow (NIC learning/calibration/feedback) can legitimately push
+          # main while this long creator cycle is still running. Preserve this cycle's
+          # generated state, rebase it onto the newest main, then retry the push instead
+          # of turning a harmless branch race into a red creator run.
+          for attempt in 1 2 3; do
+            echo "Persistence attempt $attempt/3"
+            git fetch origin main
+            git reset --mixed origin/main
+            git add analytics data
+            bad_paths=$(git diff --cached --name-only | grep -vE '^(analytics|data)/' || true)
+            if [ -n "$bad_paths" ]; then
+              echo '::error::Refusing to persist non-generated paths:'
+              echo "$bad_paths"
+              git reset
+              exit 1
+            fi
+            if git diff --cached --quiet; then
+              echo 'No generated state changes to persist'
+              exit 0
+            fi
+            git commit -m 'Record Creator 7.x cycle'
+            if git pull --rebase --autostash origin main; then
+              if git push origin HEAD:main; then
+                echo "Generated state persisted successfully on attempt $attempt"
+                exit 0
+              fi
+            else
+              echo "Rebase failed on attempt $attempt; aborting rebase and retrying from latest main"
+              git rebase --abort || true
+            fi
+            echo "Main moved during persistence; retrying with latest origin/main"
+          done
+          echo '::error::Unable to persist generated creator state after 3 synchronized attempts'
+          exit 1
