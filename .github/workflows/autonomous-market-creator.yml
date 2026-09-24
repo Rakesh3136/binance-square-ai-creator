@@ -360,7 +360,7 @@ jobs:
         run: |
           python src/content_integrity_gate_4.py
           python -m json.tool data/live/content_integrity_gate.json >/dev/null
-          python src/pipeline_stage.py draft validated 'Draft passed content integrity gate'
+          python src/pipeline_stage.py quality_gate success 'Draft passed content integrity gate'
       - name: Decide whether this lane needs a visual
         id: visual_decision
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
