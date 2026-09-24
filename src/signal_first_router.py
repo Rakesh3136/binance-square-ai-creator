@@ -334,7 +334,7 @@ def choose(xs,rows,market,live_symbols,allow_editorial=False):
                 e['news_title']=e.get('news_title') or e.get('title') or ''
                 e['news_source']=e.get('news_source') or e.get('source') or ''
                 e['news_published_at']=e.get('news_published_at') or e.get('published_at') or ''
-                s=str(e.get('symbol') or '').upper().replace('USDT','').replace('
+                s=str(e.get('symbol') or '').upper().replace('USDT','').replace('$','').strip()
         try: e=derive(x,market)
         except Exception as exc:
             blocked_rows.append({'symbol':raw_symbol,'reason':f'verified_ohlcv_fetch_failed:{type(exc).__name__}'}); continue
