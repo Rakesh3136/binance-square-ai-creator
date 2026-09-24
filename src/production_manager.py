@@ -58,6 +58,37 @@ def visual_is_verified(expected=''):
     if not ok:return False
     actuals=[str(x).upper() for x in (meta.get('tradingview_symbols') or [])]
     return not expected or not actuals or f'BINANCE:{clean_symbol(expected)}USDT' in actuals or f'BINANCE:{clean_symbol(expected)}USDT.P' in actuals
+def ensure_signal_contract_text(post, cat, contract):
+    """Bind the immutable frozen setup into the final draft when labels were
+    lost by a prose/normalization stage. Values come only from the frozen
+    contract; this never creates new levels or changes the setup."""
+    if cat not in {'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','technical_setup'}:
+        return str(post or '')
+    required=('direction','entry_trigger','tp1','tp2','sl')
+    if not all(contract.get(k) is not None and str(contract.get(k)).strip() for k in required):
+        return str(post or '')
+    text=str(post or '').strip()
+    low=text.lower()
+    direction=str(contract['direction']).upper().replace('_BIAS','')
+    missing=[]
+    if direction not in low and direction not in {'LONG','SHORT'}:
+        missing.append(f"Direction: {direction}")
+    elif direction not in low:
+        missing.append(f"Direction: {direction}")
+    labels=(
+        ('entry_trigger','Entry trigger'),
+        ('tp1','TP1'),
+        ('tp2','TP2'),
+        ('sl','SL / invalidation'),
+    )
+    for key,label in labels:
+        if label.lower() not in low:
+            missing.append(f"{label}: {contract[key]}")
+    if not missing:
+        return text
+    block=' | '.join(missing)
+    return (text.rstrip() + '\\n\\n' + block).strip()
+
 def human_content_audit(post,expected,cat):
     text=re.sub(r'\s+',' ',str(post or '').strip());low=text.lower();fails=[];score=100
     if not text:fails.append('empty_post');return score,fails
@@ -97,6 +128,11 @@ def evaluate(report):
     try:quality=float(draft.get('quality_score') or interaction.get('score') or 0)
     except:quality=float(interaction.get('score') or 0)
     human_score,human_failures=human_content_audit(post,expected,cat);signal_lanes={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','technical_setup'};frozen=load(FROZEN_PATH);prediction=frozen.get('prediction') if isinstance(frozen.get('prediction'),dict) else {};contract={'direction':frozen.get('direction') or prediction.get('direction'),'entry_trigger':frozen.get('entry_trigger') or prediction.get('entry_trigger'),'tp1':frozen.get('tp1') or prediction.get('tp1'),'tp2':frozen.get('tp2') or prediction.get('tp2'),'sl':frozen.get('sl') or prediction.get('sl')}
+    repaired_post=ensure_signal_contract_text(post,cat,contract)
+    if repaired_post != post:
+        draft['post']=repaired_post; draft['text']=repaired_post; post=repaired_post
+        Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8')
+        print('Production manager: restored frozen signal contract labels from authoritative snapshot')
     if cat in signal_lanes and all(v is not None and str(v).strip() for v in contract.values()):
         for marker in (str(contract['direction']).upper(),'Entry trigger:','TP1:','TP2:','SL / invalidation:'):
             if marker.lower() not in post.lower():human_failures.append('signal_contract_missing:'+marker)
