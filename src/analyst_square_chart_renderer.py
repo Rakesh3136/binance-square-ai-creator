@@ -114,7 +114,11 @@ def main():
 
     OUT.parent.mkdir(parents=True,exist_ok=True); im.save(OUT,"PNG",optimize=True)
     rr=abs(tp2-entry)/abs(sl-entry) if sl!=entry else None
-    meta={"status":"HISTORICAL_SNAPSHOT_CREATED","renderer":"analyst_square_chart_renderer_v6","provider":"Local historical OHLCV renderer","base_symbol":symbol,"timeframe":"1H","candle_count":len(rows),"candle_policy":"completed_candles_only","lookahead_protection":True,"visual_style":"human_analyst_chart_first","prediction_markings":{"direction":side,"entry_trigger":entry,"tp1":tp1,"tp2":tp2,"sl":sl,"signal_price":signal,"risk_reward":rr},"derived_context":{"recent_high":recent_hi,"recent_low":recent_lo,"last_close":last,"six_candle_move_pct":move},"generated_at":datetime.now(timezone.utc).isoformat()}
+    meta={"status":"HISTORICAL_SNAPSHOT_CREATED","renderer":"analyst_square_chart_renderer_v7",
+        "signal_created_at":s.get("signal_created_at"),
+        "signal_created_at_ms":s.get("signal_created_at_ms"),
+        "data_cutoff":s.get("data_cutoff"),
+        "snapshot_frozen_at":s.get("frozen_at"),"provider":"Local historical OHLCV renderer","base_symbol":symbol,"timeframe":"1H","candle_count":len(rows),"candle_policy":"completed_candles_only","lookahead_protection":True,"visual_style":"human_analyst_chart_first","prediction_markings":{"direction":side,"entry_trigger":entry,"tp1":tp1,"tp2":tp2,"sl":sl,"signal_price":signal,"risk_reward":rr},"derived_context":{"recent_high":recent_hi,"recent_low":recent_lo,"last_close":last,"six_candle_move_pct":move},"generated_at":datetime.now(timezone.utc).isoformat()}
     META.write_text(json.dumps(meta,indent=2)+"\n",encoding="utf-8"); print(json.dumps(meta,indent=2))
 
 if __name__=="__main__": main()
