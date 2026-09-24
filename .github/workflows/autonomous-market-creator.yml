@@ -187,6 +187,7 @@ jobs:
           python -m json.tool data/live/nic_dashboard.json >/dev/null
       - name: Human-level editorial intelligence
         run: python src/creator_21_0_human_level_editor.py
+          python src/nic_human_editor_intelligence.py
       - name: Unified control-plane snapshot
         run: |
           python -m compileall -q src
@@ -298,15 +299,19 @@ jobs:
           GEMINI_DAILY_BUDGET: '20'
         run: |
           python src/candidate_script_scorer_4.py
+          # Train the deterministic human editor from accumulated NIC observations
+          # before every edit. Learning is advisory only; safety/evidence gates remain authoritative.
+          NIC_EDITOR_PHASE=prepare python src/nic_human_editor_intelligence.py
           # Do not depend on filesystem mtime: GitHub runner/checkouts can make
           # freshly generated reports appear older than the 60-minute window.
-          # The scorer has already selected from these reports, so use the
-          # newest multi-agent report deterministically and fail only if none exists.
           DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-)
           test -n "$DRAFT_PATH"
           test -f "$DRAFT_PATH"
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
+          NIC_EDITOR_PHASE=record python src/nic_human_editor_intelligence.py
+          python -m json.tool data/live/nic_human_editor_intelligence.json >/dev/null
+          python -m json.tool data/intelligence/nic_human_editor_intelligence_report.json >/dev/null
           python -m json.tool "$DRAFT_PATH" >/dev/null
           blocked=$(python -c 'import json; print(str(json.load(open("data/live/editorial_polish.json")).get("status", "")).upper()=="BLOCKED")')
           echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
