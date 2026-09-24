@@ -61,9 +61,16 @@ def main() -> int:
     )
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps({'enabled':result.get('enabled'),'status':result.get('status'),'action':result.get('action'),'publish':result.get('publish'),'confidence':result.get('confidence')},indent=2))
-    # If configured, Jev must positively approve. If unavailable, the local
-    # deterministic/ensemble gates remain the authority rather than failing the run.
-    if result.get('enabled') and result.get('publish') is not True:
+    # Jev is advisory only. A configured-but-invalid credential must never
+    # turn into a pipeline failure or block the deterministic publication path.
+    # 401/403 are represented explicitly as disabled_invalid_api_key by the
+    # decision layer; local gates remain authoritative in that case.
+    if result.get('status') in {'disabled_no_api_key', 'disabled_invalid_api_key',
+                                'unavailable_http', 'unavailable_transport'}:
+        return 0
+    # When Jev is genuinely available, require its positive approval only after
+    # the deterministic gates have already passed.
+    if result.get('enabled') and result.get('jev_authoritative') and result.get('publish') is not True:
         return 1
     return 0
 
