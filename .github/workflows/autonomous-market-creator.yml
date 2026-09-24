@@ -56,7 +56,7 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence"
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate"
           python src/nic_model_router.py
           echo 'Core, Jev, ensemble, NIC and macro modules imported successfully'
       - name: Reset creator cycle
@@ -169,6 +169,24 @@ jobs:
           python src/creator_agent_supervisor.py
           python -m json.tool data/live/creator_agent_supervisor.json >/dev/null
           python -m json.tool data/live/agent_mesh_300.json >/dev/null
+      - name: Autonomous self-development gate
+        id: self_development
+        run: |
+          python src/autonomous_self_development_gate.py
+          run_it=$(python -c 'import json; print(str(json.load(open("data/live/autonomous_self_development_gate.json")).get("run_self_engineer", False)).lower())')
+          echo "run_self_engineer=$run_it" >> "$GITHUB_OUTPUT"
+          echo "Autonomous self-development approved=$run_it"
+      - name: Autonomous guarded self-engineering
+        if: ${{ steps.self_development.outputs.run_self_engineer == 'true' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.6-flash
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          python src/self_engineer.py
+          test -f data/live/self_engineering_report.json
       - name: Optional guarded self-engineering
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_self_engineering == true }}
         env:
@@ -196,6 +214,10 @@ jobs:
           python src/creator_identity_6_6.py
           python src/creator_mission_7.py
           python src/audience_growth_director.py
+          python src/creator_self_training_controller.py
+          python -m json.tool data/live/creator_self_training.json >/dev/null
+          python src/content_master_router.py
+          python -m json.tool data/live/content_master_route.json >/dev/null
           python src/autonomous_cadence_6.py
           python src/market_regime_intelligence.py
           python src/pre_router_intelligence.py
