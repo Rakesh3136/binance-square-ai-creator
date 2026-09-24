@@ -136,6 +136,8 @@ jobs:
           python src/creator_self_training_controller.py
           python -m json.tool data/live/creator_self_training.json >/dev/null
           python -m json.tool data/intelligence/creator_self_training_report.json >/dev/null
+          python src/content_master_router.py
+          python -m json.tool data/live/content_master_route.json >/dev/null
       - name: NIC Dashboard Telemetry Summary
         run: |
           python - <<'PY'
