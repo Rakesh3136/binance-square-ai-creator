@@ -59,7 +59,6 @@ def main():
  }
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(route,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
  pre["content_master_route"]=route
- PREF.write_text(json.dumps(pre,indent=2,ensure_ascii=False)+"
-",encoding="utf-8")
+ PREF.write_text(json.dumps(pre,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
  print(json.dumps(route,indent=2,ensure_ascii=False))
 if __name__=="__main__":main()
