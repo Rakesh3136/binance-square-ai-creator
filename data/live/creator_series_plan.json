@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-09-24T07:49:46.001043+00:00",
+  "status": "READY",
+  "active_series": [
+    {
+      "series_id": "ONE-20260924-SHORT",
+      "symbol": "ONE",
+      "thesis_direction": "SHORT",
+      "episodes": [
+        {
+          "episode": 1,
+          "type": "SETUP",
+          "condition": "fresh verified setup",
+          "required_evidence": [
+            "trigger",
+            "tp1",
+            "tp2",
+            "sl"
+          ]
+        },
+        {
+          "episode": 2,
+          "type": "CONFIRMATION",
+          "condition": "only if fresh evidence changes or confirms the thesis",
+          "required_evidence": [
+            "new market evidence"
+          ]
+        },
+        {
+          "episode": 3,
+          "type": "OUTCOME",
+          "condition": "only after the defined outcome window closes",
+          "required_evidence": [
+            "timestamped outcome"
+          ]
+        },
+        {
+          "episode": 4,
+          "type": "LESSON",
+          "condition": "only if outcome is verified",
+          "required_evidence": [
+            "outcome",
+            "what_changed"
+          ]
+        },
+        {
+          "episode": 5,
+          "type": "NEXT_TEST",
+          "condition": "only if a new eligible opportunity exists",
+          "required_evidence": [
+            "new opportunity contract"
+          ]
+        }
+      ],
+      "publication_policy": "Episodes are opportunities, not obligations. Never publish a follow-up solely to continue a series.",
+      "prior_series_posts": [
+        {
+          "post_id": "369397971563643",
+          "category": "capital_flow_short",
+          "format": null,
+          "published_at": "2026-09-22T11:24:11.780371+00:00",
+          "experiment_id": ""
+        },
+        {
+          "post_id": "369622284012801",
+          "category": "capital_flow_short",
+          "format": null,
+          "published_at": "2026-09-23T02:36:55.537173+00:00",
+          "experiment_id": ""
+        },
+        {
+          "post_id": "370007524274575",
+          "category": "capital_flow_short",
+          "format": null,
+          "published_at": "2026-09-24T04:44:28.352057+00:00",
+          "experiment_id": ""
+        }
+      ],
+      "accountability_policy": "Never rewrite history; preserve original call, timestamp and outcome."
+    }
+  ],
+  "templates": [
+    "3-Minute Market Radar",
+    "Breakout or Fakeout?",
+    "Yesterday's Call: Result",
+    "One Chart, One Lesson"
+  ],
+  "rules": {
+    "no_forced_followup": true,
+    "outcome_must_be_timestamped": true,
+    "prediction_lineage_immutable": true,
+    "series_does_not_override_signal_first": true,
+    "series_does_not_override_editorial_quality": true
+  }
+}
