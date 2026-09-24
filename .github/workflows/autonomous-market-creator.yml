@@ -64,7 +64,7 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence"
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence, nic_experiment_governor"
           python src/nic_model_router.py
           echo 'Core, Jev, ensemble, NIC and portfolio modules imported successfully'
       - name: Reset creator cycle
@@ -99,6 +99,12 @@ jobs:
           python src/creator_7_5_growth_portfolio.py
           python src/creator_8_0_revenue_engine.py
           python src/creator_8_4_monetization_feedback.py
+          python src/nic_opportunity_genome.py
+          python src/nic_revenue_pattern_lab.py
+          python src/nic_experiment_governor.py
+          python -m json.tool data/live/nic_opportunity_genome.json >/dev/null
+          python -m json.tool data/live/nic_revenue_pattern_lab.json >/dev/null
+          python -m json.tool data/live/nic_experiment_governor.json >/dev/null
           python src/monetization_funnel_optimizer.py
           python src/creator_series_engine.py
           python -m json.tool data/live/monetization_funnel_optimizer.json >/dev/null
