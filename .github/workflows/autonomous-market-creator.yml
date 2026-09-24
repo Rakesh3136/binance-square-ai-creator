@@ -393,6 +393,8 @@ jobs:
         run: |
           python src/extract_publication.py
           python src/write_to_earn_eligibility_gate.py
+          python src/write_to_earn_master.py
+          python -m json.tool data/live/write_to_earn_master.json >/dev/null
           python src/binance_square_publisher.py
           python src/creator_20_0_publication_verifier.py
           python src/call_tracker.py
