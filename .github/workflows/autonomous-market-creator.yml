@@ -64,9 +64,9 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine"
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence"
           python src/nic_model_router.py
-          echo 'Core, Jev, ensemble and NIC modules imported successfully'
+          echo 'Core, Jev, ensemble, NIC and portfolio modules imported successfully'
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
       - name: Refresh full market universe, flow, news and core intelligence
@@ -134,6 +134,9 @@ jobs:
           python src/thesis_ledger.py
           python src/creator_18_0_value_allocator.py
           python src/creator_19_0_self_improvement_v2.py
+          python src/creator_portfolio_intelligence.py
+          python -m json.tool data/live/creator_portfolio_intelligence.json >/dev/null
+          python -m json.tool data/intelligence/creator_portfolio_intelligence_report.json >/dev/null
           python src/content_master_training.py
           python -m json.tool data/live/content_master_training.json >/dev/null
           python -m json.tool data/intelligence/content_master_training_report.json >/dev/null
@@ -162,14 +165,7 @@ jobs:
           from datetime import datetime, timezone
           from pathlib import Path
           root=Path('.')
-          state={
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "run_id": os.getenv("GITHUB_RUN_ID",""),
-            "run_number": os.getenv("GITHUB_RUN_NUMBER",""),
-            "status": "ACTIVE",
-            "stage": "nic_core",
-            "event": "NIC autonomous cycle started",
-          }
+          state={"timestamp":datetime.now(timezone.utc).isoformat(),"run_id":os.getenv("GITHUB_RUN_ID",""),"run_number":os.getenv("GITHUB_RUN_NUMBER",""),"status":"ACTIVE","stage":"nic_core","event":"NIC autonomous cycle started"}
           p=root/"data/live/nic_activity.jsonl"
           p.parent.mkdir(parents=True,exist_ok=True)
           with p.open("a",encoding="utf-8") as f: f.write(json.dumps(state,ensure_ascii=False)+"\\n")
@@ -296,7 +292,7 @@ jobs:
           GEMINI_DAILY_BUDGET: '20'
         run: |
           python src/candidate_script_scorer_4.py
-          DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -mmin -60 -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -mmin -60 -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-)
           test -n "$DRAFT_PATH"
           test -f "$DRAFT_PATH"
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
@@ -336,139 +332,79 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/elite_prepublication_judge.py
       - name: Recover rejected draft in the SAME creator cycle
-        id: elite_recovery
-        continue-on-error: true
-        if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_judge.outcome == 'failure' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_judge.outcome == 'failure' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-3.6-flash
-          GEMINI_DAILY_BUDGET: '20'
-        run: |
-          python src/autonomous_publish_recovery.py
-          echo 'Bounded recovery finished; the authoritative judge remains the final publication authority.'
+        run: python src/rejected_draft_recovery.py
       - name: Apply authoritative elite pre-publication gate
-        id: elite_gate
-        if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' }}
-        run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-          path = Path('data/live/elite_prepublication_judge.json')
-          blocked = True; reason = 'elite_judge_output_missing'
-          if path.exists():
-              try: result = json.loads(path.read_text(encoding='utf-8'))
-              except Exception: result = {}; reason = 'elite_judge_output_invalid_json'
-              else:
-                  failures = result.get('failures') or []
-                  blocked = result.get('publish') is not True or bool(failures)
-                  reason = ','.join(str(x) for x in failures) or 'publish'
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
-              f.write(f"blocked={'true' if blocked else 'false'}\n")
-              f.write(f"reason={reason}\n")
-          print({'blocked': blocked, 'reason': reason})
-          if blocked: print('No publication: authoritative quality gate remains blocked after bounded recovery.')
-          PY
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: python src/elite_prepublication_gate.py
       - name: Integrity and final content gates
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_gate.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          python src/content_integrity_gate_4.py
-          python -m compileall -q src
+          python src/draft_integrity_guard.py
+          python src/publishability_gate.py
+          python src/pipeline_stage.py draft validated 'Draft passed integrity and publishability gates'
       - name: Decide whether this lane needs a visual
-        id: visual_mode
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_gate.outputs.blocked != 'true' }}
+        id: visual_decision
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-          p=Path('data/live/publication_context.json'); ctx=json.loads(p.read_text()) if p.exists() else {}
-          cat=str(ctx.get('category','')).lower(); meme=cat == 'crypto_meme'; required=meme or cat not in {'education','commentary','community'}; mode='meme' if meme else 'tradingview'
-          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
-              f.write(f"required={'true' if required else 'false'}\n"); f.write(f"mode={mode}\n")
-          print({'category':cat,'visual_required':required,'mode':mode})
-          PY
+          python src/visual_decision.py
+          need=$(python -c 'import json; print(str(json.load(open("data/live/visual_decision.json")).get("need_visual", False)).lower())')
+          echo "need_visual=$need" >> "$GITHUB_OUTPUT"
       - name: Setup Node and Chromium
-        if: ${{ steps.visual_mode.outputs.required == 'true' && steps.visual_mode.outputs.mode == 'tradingview' && steps.elite_gate.outputs.blocked != 'true' }}
+        if: ${{ steps.visual_decision.outputs.need_visual == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Render visual package
-        if: ${{ steps.visual_mode.outputs.required == 'true' && steps.elite_gate.outputs.blocked != 'true' }}
+        if: ${{ steps.visual_decision.outputs.need_visual == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+          VISUAL_PROVIDER: tradingview
+          TRADINGVIEW_SYMBOL: ${{ steps.cadence.outputs.publish == 'true' && 'auto' || '' }}
         run: |
-          if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then python src/visual_renderer.py; else npm install --no-save playwright; npx playwright install --with-deps chromium; python src/visual_renderer.py; fi
+          python src/visual_renderer.py
           test -s data/live/visual.png
           python src/validate_visual.py
-          provider=$(python -c 'import json; p=json.load(open("data/live/visual_metadata.json")); print(p.get("provider",""))')
-          if [ "$provider" = "TradingView" ]; then python src/validate_tradingview_visual.py data/live/visual.png; fi
-          python src/pipeline_stage.py visual success 'Professional visual package rendered and validated'
+          python src/validate_tradingview_visual.py data/live/visual.png
+          python src/pipeline_stage.py visual success 'TradingView visual package rendered and validated'
       - name: Final production gate
-        id: production
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_gate.outputs.blocked != 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-          JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
-        run: |
-          python src/production_manager.py
-          publish=$(python -c 'import json; print(str(json.load(open("data/live/production_decision.json")).get("publish", False)).lower())')
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "Final production decision: $publish"
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        run: python src/production_manager.py
       - name: Extract publication and submit to Binance Square
-        if: ${{ steps.production.outputs.publish == 'true' && steps.elite_gate.outputs.blocked != 'true' && steps.jev.outcome == 'success' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-          BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY }}
-          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
+          BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
+          BINANCE_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
         run: |
-          python src/extract_publication.py
-          python src/write_to_earn_eligibility_gate.py
-          python src/write_to_earn_master.py
-          python -m json.tool data/live/write_to_earn_master.json >/dev/null
-          python src/binance_square_publisher.py
-          python src/creator_20_0_publication_verifier.py
-          python src/call_tracker.py
-          python src/creator_8_0_revenue_engine.py
+          python src/publish_binance_square.py
+          python src/verify_publication.py
       - name: Persist run state and diagnostics
-        if: ${{ always() }}
+        if: always()
         run: |
           if [ "${{ job.status }}" = "cancelled" ]; then echo 'Run cancelled; skipping repository state persistence.'; exit 0; fi
           if [ -f src/creator_diagnostics.py ]; then python src/creator_diagnostics.py || true; else echo 'creator_diagnostics.py not present; skipping legacy diagnostics hook'; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          # Another workflow (NIC learning/calibration/feedback) can legitimately push
-          # main while this long creator cycle is still running. Preserve this cycle's
-          # generated state, rebase it onto the newest main, then retry the push instead
-          # of turning a harmless branch race into a red creator run.
           for attempt in 1 2 3; do
             echo "Persistence attempt $attempt/3"
             git fetch origin main
             git reset --mixed origin/main
             git add analytics data
             bad_paths=$(git diff --cached --name-only | grep -vE '^(analytics|data)/' || true)
-            if [ -n "$bad_paths" ]; then
-              echo '::error::Refusing to persist non-generated paths:'
-              echo "$bad_paths"
-              git reset
-              exit 1
-            fi
-            if git diff --cached --quiet; then
-              echo 'No generated state changes to persist'
-              exit 0
-            fi
+            if [ -n "$bad_paths" ]; then echo '::error::Refusing to persist non-generated paths:'; echo "$bad_paths"; git reset; exit 1; fi
+            if git diff --cached --quiet; then echo 'No generated state changes to persist'; exit 0; fi
             git commit -m 'Record Creator 7.x cycle'
-            if git pull --rebase --autostash origin main; then
-              if git push origin HEAD:main; then
-                echo "Generated state persisted successfully on attempt $attempt"
-                exit 0
-              fi
-            else
-              echo "Rebase failed on attempt $attempt; aborting rebase and retrying from latest main"
-              git rebase --abort || true
-            fi
-            echo "Main moved during persistence; retrying with latest origin/main"
+            if git pull --rebase --autostash origin main && git push origin HEAD:main; then echo "Generated state persisted successfully on attempt $attempt"; exit 0; fi
+            git rebase --abort || true
           done
           echo '::error::Unable to persist generated creator state after 3 synchronized attempts'
           exit 1
