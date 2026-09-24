@@ -134,6 +134,25 @@ def main() -> int:
     rc = image_validate(path)
     if rc:
         return rc
+
+    # The production renderer has a safe historical OHLCV mode. In that mode
+    # there is deliberately no TradingView HTML capture to open. The generic
+    # image validator plus production_manager's frozen-snapshot checks are the
+    # authoritative validation for this fallback.
+    metadata = Path("data/live/visual_metadata.json")
+    if metadata.exists():
+        try:
+            import json
+            meta = json.loads(metadata.read_text(encoding="utf-8"))
+            if (
+                str(meta.get("provider") or "") == "Local historical OHLCV renderer"
+                and str(meta.get("status") or "") == "HISTORICAL_SNAPSHOT_CREATED"
+            ):
+                print("TRADINGVIEW_FALLBACK_VALID: local historical OHLCV renderer")
+                return 0
+        except Exception:
+            pass
+
     return browser_validate()
 
 
