@@ -57,8 +57,7 @@ def main():
   "monetization":{"cashtag_required":True,"verified_widget_preferred":True,"quality_over_clicks":True,"eligible_content_note":"Use only formats supported by the publisher; do not claim unavailable video/live capabilities."},
   "rules":{"signal_requires_verified_setup":True,"non_signal_requires_verified_event_or_market_evidence":True,"meme_is_secondary":True,"never_force_weak_story":True,"never_infer_revenue":True}
  }
- OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(route,indent=2,ensure_ascii=False)+"
-",encoding="utf-8")
+ OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(route,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
  pre["content_master_route"]=route
  PREF.write_text(json.dumps(pre,indent=2,ensure_ascii=False)+"
 ",encoding="utf-8")
