@@ -386,7 +386,7 @@ jobs:
           test -s data/live/visual.png
           python src/validate_visual.py
           python src/validate_tradingview_visual.py data/live/visual.png
-          python src/pipeline_stage.py visual success 'TradingView visual package rendered and validated'
+          python src/pipeline_stage.py visual success 'Visual package rendered and validated'
       - name: Final production gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
