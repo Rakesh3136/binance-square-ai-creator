@@ -349,7 +349,9 @@ def choose(xs,rows,market,live_symbols,allow_editorial=False):
         if flow_complete(e):
             return e,blocked_rows
         blocked_rows.append({'symbol':e.get('symbol'),'reason':'prediction_contract_missing_verified_ohlcv'})
-    return None,blocked_rowsdef main():
+    return None,blocked_rows
+
+def main():
     pre=load(PREFLIGHT)
     brief=load(DIRECTOR)
     cad=load(CADENCE)
