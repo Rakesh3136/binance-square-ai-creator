@@ -64,7 +64,8 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence, nic_experiment_governor, nic_human_editor_intelligence, resolve_publish_draft"
+          python src/pipeline_contract_validator.py
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence, nic_experiment_governor, nic_human_editor_intelligence, resolve_publish_draft, pipeline_contract_validator, visual_decision, publication_payload_builder"
           python src/nic_model_router.py
           echo 'Core, Jev, ensemble, NIC and portfolio modules imported successfully'
       - name: Reset creator cycle
@@ -362,9 +363,9 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          python src/draft_integrity_guard.py
-          python src/publishability_gate.py
-          python src/pipeline_stage.py draft validated 'Draft passed integrity and publishability gates'
+          python src/content_integrity_gate_4.py
+          python -m json.tool data/live/content_integrity_gate.json >/dev/null
+          python src/pipeline_stage.py draft validated 'Draft passed content integrity gate'
       - name: Decide whether this lane needs a visual
         id: visual_decision
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
@@ -393,16 +394,29 @@ jobs:
           python src/pipeline_stage.py visual success 'TradingView visual package rendered and validated'
       - name: Final production gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/production_manager.py
+      - name: Build final publication payload and Write-to-Earn readiness
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/publication_payload_builder.py
+          python -m json.tool data/live/publication_payload.json >/dev/null
+          python src/write_to_earn_eligibility_gate.py
+          python src/write_to_earn_master.py
+          python -m json.tool data/live/write_to_earn_eligibility.json >/dev/null
+          python -m json.tool data/live/write_to_earn_master.json >/dev/null
       - name: Extract publication and submit to Binance Square
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-          BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
-          BINANCE_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_API_KEY }}
+          BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY || secrets.BINANCE_API_KEY }}
         run: |
-          python src/publish_binance_square.py
-          python src/verify_publication.py
+          python src/binance_square_publisher.py
+          python src/creator_20_0_publication_verifier.py
       - name: Persist run state and diagnostics
         if: always()
         run: |
