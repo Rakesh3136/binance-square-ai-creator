@@ -12,3 +12,5 @@ Full integrity repair + Creator Portfolio Intelligence validation
 NIC local-only independence + deterministic editorial recovery validation
 2026-09-24T18:25:00Z
 NIC durable memory graph + keyless learning validation
+2026-09-24T18:40:00Z
+NIC Experiment Governor + evidence-safe capacity control validation
