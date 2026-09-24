@@ -33,12 +33,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with: {fetch-depth: 0}
+        with:
+          fetch-depth: 0
       - name: Setup Python
         uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+        with:
+          python-version: '3.12'
       - name: Reject stale queued creator run
-        env: {GH_TOKEN: ${{ github.token }}}
+        env:
+          GH_TOKEN: ${{ github.token }}}
         run: |
           set -euo pipefail
           git fetch origin main
@@ -278,11 +281,13 @@ jobs:
           echo "Editorial blocked=$blocked"
       - name: Automatic news headline integrity repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
-        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/news_headline_integrity_repair.py
       - name: Automatic hook diversity repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
-        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/hook_diversity_rewriter.py
       - name: Automatic mechanism and reader-value repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
@@ -350,7 +355,8 @@ jobs:
       - name: Setup Node and Chromium
         if: ${{ steps.visual_mode.outputs.required == 'true' && steps.visual_mode.outputs.mode == 'tradingview' && steps.elite_gate.outputs.blocked != 'true' }}
         uses: actions/setup-node@v4
-        with: {node-version: '24'}
+        with:
+          node-version: '24'
       - name: Render visual package
         if: ${{ steps.visual_mode.outputs.required == 'true' && steps.elite_gate.outputs.blocked != 'true' }}
         env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
