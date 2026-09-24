@@ -9,7 +9,7 @@ import json, os, re
 from datetime import datetime, timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-CONTEXT=ROOT/'data/live/publication_context.json'; OUT=ROOT/'data/live/editorial_polish.json'
+CONTEXT=ROOT/'data/live/publication_context.json'; OUT=ROOT/'data/live/editorial_polish.json'; LEARNING=ROOT/'data/live/nic_human_editor_intelligence.json'
 ALIASES={'bitcoin':'BTC','btc':'BTC','ether':'ETH','ethereum':'ETH','eth':'ETH','binance coin':'BNB','bnb':'BNB','solana':'SOL','sol':'SOL','xrp':'XRP','ripple':'XRP','dogecoin':'DOGE','doge':'DOGE','cardano':'ADA','ada':'ADA','avalanche':'AVAX','avax':'AVAX','chainlink':'LINK','link':'LINK','zcash':'ZEC','zec':'ZEC','tron':'TRX','trx':'TRX','polkadot':'DOT','dot':'DOT','shiba inu':'SHIB','shib':'SHIB','sui':'SUI','toncoin':'TON','ton':'TON','pepe':'PEPE','floki':'FLOKI'}
 GENERIC_PHRASES=('what do you think','thoughts?','comment below','like and follow','bullish or bearish?','this is interesting','fresh check','quick market check','here is what matters','here’s what matters')
 TEMPLATE_SENTENCES=('bear case:','bull case:','price reclaims the range','sellers keep control below support','buyers keep control above')
@@ -53,7 +53,21 @@ def repetition_artifact(text):
     fixed_cases=bool(re.search(r'bear case:.*bull case:',low))
     return hits,template_hits,fixed_drop or fixed_cases
 
+def learned_question_style():
+    try:
+        state=load(LEARNING,{})
+        return str((state.get('editor_policy') or {}).get('preferred_question_style') or '').strip()
+    except Exception:
+        return ''
+
 def deterministic_question(symbol,category):
+    learned=learned_question_style()
+    if learned == 'confirmation':
+        return f'What confirmation on ${{symbol}} would make you treat this setup as real rather than an early headline move?'
+    if learned == 'reaction':
+        return f'What specific reaction on ${{symbol}} would make you change your read?'
+    if learned == 'follow_through':
+        return f'What would you watch next on ${{symbol}} to decide whether this move has follow-through?'
     lane=str(category or '').lower()
     if lane in {'next_gainer_candidate','next_loser_candidate','capital_flow_long','capital_flow_short','technical_setup'}:
         return f'What confirmation on ${symbol} would make you treat this setup as real rather than an early headline move?'
@@ -86,7 +100,7 @@ def main():
         write_block(report,path,'repetitive_feed_template',1); return 0
     generic_found=[p for p in GENERIC_PHRASES if p in edited.lower()]
     draft.update({'post':edited,'text':edited,'editorial_style':draft.get('editorial_style') or 'authored','human_editor':{'status':'PRESERVED','version':'human-editor-v20','hook_preserved':first_before==first_after,'question_count':1,'question_source':'deterministic_contract_repair' if not re.search(r'\?',original) else 'author','generic_phrases_detected':generic_found,'template_hits':template_hits,'fact_policy':'preserve supplied evidence only','authored_narrative_preserved':True,'edited_at':datetime.now(timezone.utc).isoformat()}})
-    OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps({'status':'PRESERVED','version':'human-editor-v19','hook_preserved':first_before==first_after,'question_count':1,'question_source':draft['human_editor']['question_source'],'warnings':[] if not generic_found else ['generic_phrase_present'],'template_hits':template_hits,'characters':len(edited),'draft_path':str(path)},indent=2,ensure_ascii=False),encoding='utf-8'); path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps({'status':'PRESERVED','version':'human-editor-v19','hook_preserved':first_before==first_after,'question_count':1,'question_source':draft['human_editor']['question_source'],'template_hits':template_hits,'characters':len(edited)}))
+    OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps({'status':'PRESERVED','version':'human-editor-v21','hook_preserved':first_before==first_after,'question_count':1,'question_source':draft['human_editor']['question_source'],'warnings':[] if not generic_found else ['generic_phrase_present'],'template_hits':template_hits,'characters':len(edited),'draft_path':str(path)},indent=2,ensure_ascii=False),encoding='utf-8'); path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps({'status':'PRESERVED','version':'human-editor-v19','hook_preserved':first_before==first_after,'question_count':1,'question_source':draft['human_editor']['question_source'],'template_hits':template_hits,'characters':len(edited)}))
 if __name__=='__main__':
     try:
         main()
