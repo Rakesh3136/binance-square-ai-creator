@@ -64,9 +64,9 @@ jobs:
       - name: Early code integrity check
         run: |
           python -m compileall -q src
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core"
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence"
           python src/nic_model_router.py
-          echo 'Core, Jev, ensemble and NIC modules imported successfully'
+          echo 'Core, Jev, ensemble, NIC and macro modules imported successfully'
       - name: Reset creator cycle
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
       - name: Refresh full market universe, flow, news and core intelligence
@@ -76,11 +76,11 @@ jobs:
           python src/full_universe_ranker_bridge.py
           python src/capital_flow_intelligence.py
           python src/news_scanner.py
+          python src/global_macro_intelligence.py
           python src/run_creator_intelligence.py
           python src/editorial_preflight.py
           python src/tradingview_asset_gate.py
-        env:
-          TOPIC: ${{ github.event.inputs.topic || '' }}
+          python -m json.tool data/live/global_macro_intelligence.json >/dev/null
       - name: Measure previous publications and resolve prediction outcomes
         run: |
           python src/square_performance_collector.py
@@ -149,17 +149,9 @@ jobs:
           from datetime import datetime, timezone
           from pathlib import Path
           root=Path('.')
-          state={
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "run_id": os.getenv("GITHUB_RUN_ID",""),
-            "run_number": os.getenv("GITHUB_RUN_NUMBER",""),
-            "status": "ACTIVE",
-            "stage": "nic_core",
-            "event": "NIC autonomous cycle started",
-          }
-          p=root/"data/live/nic_activity.jsonl"
-          p.parent.mkdir(parents=True,exist_ok=True)
-          with p.open("a",encoding="utf-8") as f: f.write(json.dumps(state,ensure_ascii=False)+"\\n")
+          state={"timestamp":datetime.now(timezone.utc).isoformat(),"run_id":os.getenv("GITHUB_RUN_ID",""),"run_number":os.getenv("GITHUB_RUN_NUMBER",""),"status":"ACTIVE","stage":"nic_core","event":"NIC autonomous cycle started"}
+          p=root/"data/live/nic_activity.jsonl"; p.parent.mkdir(parents=True,exist_ok=True)
+          with p.open("a",encoding="utf-8") as f:f.write(json.dumps(state,ensure_ascii=False)+"\n")
           print(json.dumps(state,indent=2))
           PY
       - name: Superhuman Creator Core
@@ -215,7 +207,7 @@ jobs:
           python src/creator_identity_6_6.py
           python src/creator_mission_7.py
           python src/audience_growth_director.py
-          python src/autonomous_cadence_6.py
+          python src.autonomous_cadence_6.py
           python src/market_regime_intelligence.py
           python src/pre_router_intelligence.py
           python src/signal_first_router.py
@@ -406,10 +398,6 @@ jobs:
           if [ -f src/creator_diagnostics.py ]; then python src/creator_diagnostics.py || true; else echo 'creator_diagnostics.py not present; skipping legacy diagnostics hook'; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          # Another workflow (NIC learning/calibration/feedback) can legitimately push
-          # main while this long creator cycle is still running. Preserve this cycle's
-          # generated state, rebase it onto the newest main, then retry the push instead
-          # of turning a harmless branch race into a red creator run.
           for attempt in 1 2 3; do
             echo "Persistence attempt $attempt/3"
             git fetch origin main
