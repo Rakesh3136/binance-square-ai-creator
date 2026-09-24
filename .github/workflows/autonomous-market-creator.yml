@@ -348,11 +348,6 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/elite_prepublication_judge.py
-      - name: Recover rejected draft in the SAME creator cycle
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.elite_judge.outcome == 'failure' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-        run: python src/rejected_draft_recovery.py
       - name: Apply authoritative elite pre-publication gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
