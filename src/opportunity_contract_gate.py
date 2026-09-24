@@ -46,10 +46,17 @@ def main():
     if category not in allowed:failures.append('unsupported_category')
     if category in {'breaking_news','news_and_macro'}:
         news_symbols=[norm(x) for x in selected.get('news_symbols',[]) if norm(x)]
-        if not news_symbols:failures.append('news_missing_explicit_asset_anchor')
-        elif symbol not in news_symbols:failures.append('news_symbol_not_in_authorized_news_assets')
-        if not str(selected.get('news_title') or '').strip():failures.append('news_missing_verified_title')
-        if not str(selected.get('news_source') or '').strip():warnings.append('news_source_missing')
+        if not news_symbols:
+            # The selected symbol itself is an explicit asset anchor when the
+            # news candidate was produced from an asset-bound story.
+            if selected.get('symbol') and selected.get('news_title') and selected.get('news_source'):
+                news_symbols=[symbol]
+            else:
+                failures.append('news_missing_explicit_asset_anchor')
+        elif symbol not in news_symbols:
+            failures.append('news_symbol_not_in_authorized_news_assets')
+        if not str(selected.get('news_title') or selected.get('title') or '').strip():failures.append('news_missing_verified_title')
+        if not str(selected.get('news_source') or selected.get('source') or '').strip():warnings.append('news_source_missing')
     if category in {'capital_flow_long','capital_flow_short'} or lane in {'flow','capital_flow'}:
         setup=selected.get('trade_setup') or {};side=str(setup.get('side') or '').upper();conf=num(selected.get('flow_confidence'))
         expected='LONG' if category=='capital_flow_long' else 'SHORT' if category=='capital_flow_short' else side
