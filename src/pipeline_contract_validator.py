@@ -17,10 +17,14 @@ REQUIRED_ORDER = [
     "src/candidate_script_scorer_4.py",
     "src/resolve_publish_draft.py",
     "src/human_editor.py",
+    "src/content_integrity_gate_4.py",
     "src/elite_prepublication_gate.py",
     "src/production_manager.py",
-    "src/publish_binance_square.py",
-    "src/verify_publication.py",
+    "src/publication_payload_builder.py",
+    "src/write_to_earn_eligibility_gate.py",
+    "src/write_to_earn_master.py",
+    "src/binance_square_publisher.py",
+    "src/creator_20_0_publication_verifier.py",
 ]
 
 
