@@ -12,6 +12,7 @@ MACRO=ROOT/"data/live/global_macro_intelligence.json"
 IMPACT=ROOT/"data/live/cross_asset_impact.json"
 FUNNEL=ROOT/"data/live/monetization_funnel_optimizer.json"
 SERIES=ROOT/"data/live/creator_series_plan.json"
+GOV=ROOT/"data/live/nic_experiment_governor.json"
 OUT=ROOT/"data/live/content_master_route.json"
 LANES={
  "capital_flow_long":("signal","CAPITAL FLOW LONG THESIS","capital_flow_long","tradingview"),
@@ -36,7 +37,7 @@ def load(p):
   x=json.loads(p.read_text(encoding="utf-8")); return x if isinstance(x,dict) else {}
  except Exception:return {}
 def main():
- pre,director,aud,learn,macro,impact,funnel,series=map(load,(PREF,DIRECTOR,AUD,LEARN,MACRO,IMPACT,FUNNEL,SERIES))
+ pre,director,aud,learn,macro,impact,funnel,series,gov=map(load,(PREF,DIRECTOR,AUD,LEARN,MACRO,IMPACT,FUNNEL,SERIES,GOV))
  selected=pre.get("selected_opportunity") or (aud.get("selected") if isinstance(aud.get("selected"),dict) else {})
  cat=str(selected.get("category") or (director.get("primary_story") or {}).get("lane") or "").lower()
  if cat not in LANES:
@@ -57,8 +58,9 @@ def main():
   "macro_context":{"primary_theme":macro_event,"event_count":macro.get("event_count",0),"impact_ready":bool(impact_signal or impact)},
   "funnel":{"next_tests":funnel.get("next_tests",[])[:4],"verified_revenue":(funnel.get("current_evidence") or {}).get("verified_revenue",0)},
   "series":{"status":series.get("status"),"active_series":series.get("active_series",[])[:2]},
+  "experiment_governor":{"decision":gov.get("decision",{}),"capacity_share":(gov.get("decision") or {}).get("capacity_share",0),"evidence_summary":gov.get("evidence_summary",{})},
   "learning":{"plan_id":learn.get("plan_id"),"next_experiment":(learn.get("policy") or {}).get("next_experiment"),"underrepresented_lanes":(learn.get("policy") or {}).get("underrepresented_lanes",[])},
-  "monetization":{"cashtag_required":True,"verified_widget_preferred":True,"quality_over_clicks":True,"funnel_optimizer_ready":bool(funnel),"series_engine_ready":bool(series),"series_status":series.get("status"),"eligible_content_note":"Use only formats supported by the publisher; do not claim unavailable video/live capabilities."},
+  "monetization":{"cashtag_required":True,"verified_widget_preferred":True,"quality_over_clicks":True,"funnel_optimizer_ready":bool(funnel),"series_engine_ready":bool(series),"series_status":series.get("status"),"experiment_governor_ready":bool(gov),"eligible_content_note":"Use only formats supported by the publisher; do not claim unavailable video/live capabilities."},
   "rules":{"signal_requires_verified_setup":True,"non_signal_requires_verified_event_or_market_evidence":True,"meme_is_secondary":True,"never_force_weak_story":True,"never_infer_revenue":True}
  }
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(route,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
