@@ -26,7 +26,7 @@ def evaluate(*,symbol,category,post,direction,entry,tp1,tp2,sl,opportunity_score
     except urllib.error.HTTPError as exc:
         try: detail=exc.read().decode(errors='replace')[:1000]
         except Exception: detail=''
-        result.update({'status':'unavailable_auth' if exc.code in {401,403} else 'unavailable_http','error':f'HTTPError: {exc.code} {exc.reason}','error_detail':detail,'publish':bool(deterministic_ok),'action':'local_gates_only','confidence':0.0})
+        result.update({'status':'disabled_invalid_api_key' if exc.code in {401,403} else 'unavailable_http','error':f'HTTPError: {exc.code} {exc.reason}','error_detail':detail,'publish':bool(deterministic_ok),'action':'local_gates_only','confidence':0.0,'jev_authoritative':False})
     except (urllib.error.URLError,TimeoutError) as exc: result.update({'status':'unavailable_transport','error':f'{type(exc).__name__}: {exc}','publish':bool(deterministic_ok),'action':'local_gates_only','confidence':0.0})
     except Exception as exc: result.update({'status':'error','error':f'{type(exc).__name__}: {exc}','publish':False})
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)); return result
