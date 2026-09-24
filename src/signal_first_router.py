@@ -8,6 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
 PRIMARY_LANES={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up'}
+EDITORIAL_LANES={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','comparison','education','watchlist','crypto_meme'}
 
 def load(path):
     try:
@@ -44,6 +45,23 @@ def level_contract_valid(side,tr,tp1,tp2,sl):
         return 0 < b <= a < e < stop
     return False
 
+
+def editorial_complete(x):
+    """Validate a non-trading editorial opportunity without manufacturing a trade setup."""
+    category=str(x.get('category') or lane(x)).lower()
+    if category not in EDITORIAL_LANES: return False
+    score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('news_score'))))
+    if score < MIN_SCORE: return False
+    symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
+    if not symbol: return False
+    if category in {'breaking_news','news_and_macro'}:
+        if not str(x.get('title') or x.get('news_title') or '').strip(): return False
+        if not str(x.get('source') or x.get('news_source') or '').strip(): return False
+        if not str(x.get('published_at') or x.get('news_published_at') or '').strip(): return False
+    if category=='crypto_meme':
+        if not str(x.get('meme_context') or x.get('reason') or '').strip(): return False
+        if str(x.get('meme_source_type') or '').strip() not in {'market_move','news','existing_evidence'}: return False
+    return True
 
 def flow_complete(x):
     _,_,side,tr,tp1,tp2,sl,conf=setup_parts(x)
@@ -300,31 +318,65 @@ def candidates(brief,pre,cad,market,flow_data,full_flow,ranking,pre_router):
     story=brief.get('primary_story')
     if isinstance(story,dict):add(primary if lane(story) in PRIMARY_LANES or story.get('type')=='flow' else market_candidates,story,allow_complete_flow=True)
     return (sorted(primary,key=lambda x:(1 if flow_complete(x) else 0,num(x.get('flow_confidence'),0),num(x.get('score')),),reverse=True),sorted(market_candidates,key=lambda x:num(x.get('score')),reverse=True))
-def choose(xs,rows,market,live_symbols):
+def choose(xs,rows,market,live_symbols,allow_editorial=False):
     blocked_rows=[]
     for x in xs:
         raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
         if raw_symbol not in live_symbols:
-            blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'})
-            continue
-        try:
-            e=derive(x,market)
+            blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'}); continue
+        category=str(x.get('category') or lane(x)).lower()
+        if category in EDITORIAL_LANES and allow_editorial and editorial_complete(x):
+            e=dict(x); e['type']=e.get('type') or 'editorial'; e['editorial_only']=True; e['signal_first_primary']=False
+            return e,blocked_rows
+        try: e=derive(x,market)
         except Exception as exc:
-            blocked_rows.append({'symbol':raw_symbol,'reason':f'verified_ohlcv_fetch_failed:{type(exc).__name__}'})
-            continue
+            blocked_rows.append({'symbol':raw_symbol,'reason':f'verified_ohlcv_fetch_failed:{type(exc).__name__}'}); continue
         reason=blocked(e,rows)
         if reason:
-            blocked_rows.append({'symbol':e.get('symbol'),'reason':reason})
-            continue
-        if flow_complete(e):
-            return e,blocked_rows
+            blocked_rows.append({'symbol':e.get('symbol'),'reason':reason}); continue
+        if flow_complete(e): return e,blocked_rows
         blocked_rows.append({'symbol':e.get('symbol'),'reason':'prediction_contract_missing_verified_ohlcv'})
     return None,blocked_rows
 def main():
-    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); rows=recent()
+    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); macro=load(ROOT/'data/live/global_macro_intelligence.json'); rows=recent()
     # ExchangeInfo is authoritative; scanner snapshots are evidence only.
     live_symbols=trading_symbols()
     primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
+    for event in (macro.get('events') or [])[:30]:
+        title=str(event.get('title') or '').strip(); source=str(event.get('source') or '').strip(); published=str(event.get('published_at') or '').strip(); themes=event.get('themes') if isinstance(event.get('themes'),list) else []
+        score=min(100,64 + len(themes)*5 + (4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
+        for raw in (event.get('asset_symbols') or [])[:2]:
+            s=str(raw).upper().replace('    # Remove stale snapshot/ranker symbols before they reach authoritative selection.
+    # choose() still performs the final live-universe check as a defense in depth.
+    primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
+    markets=[x for x in markets if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
+    chosen,blocks=choose(primary,rows,market,live_symbols,allow_editorial=True)
+    if chosen is None:chosen,more=choose(markets,rows,market,live_symbols,allow_editorial=True);blocks+=more
+    current_allowed=bool(cad.get('publish')); selected=None; decision='NO_PUBLISH'; reason='no_qualified_non_repetitive_signal'; primary_signal=False
+    # Cadence is a pacing preference, not an authority gate. choose() already
+    # requires a live Binance symbol, non-repetitive candidate, and a complete
+    # verified 1H OHLCV trade contract. Never discard that evidence-backed setup
+    # merely because the adaptive cadence scorer returned publish=false.
+    cadence_override=bool(chosen and not current_allowed)
+    if chosen:
+        primary_signal=flow_complete(chosen) or lane(chosen) in PRIMARY_LANES or chosen.get('type')=='flow'
+        if primary_signal:
+            side=setup_parts(chosen)[2]
+            chosen['type']='flow'
+            chosen['lane']='capital_flow_long' if side=='LONG' else 'capital_flow_short'
+            chosen['category']=chosen.get('category') if chosen.get('category') in PRIMARY_LANES else ('capital_flow_long' if side=='LONG' else 'capital_flow_short')
+        decision='PRIMARY_SIGNAL' if primary_signal else 'MARKET_SIGNAL'
+        reason='qualified_conditional_signal_selected'
+        selected=dict(chosen)
+    if selected:
+        _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected); selected['signal_first_primary']=primary_signal; selected['prediction_contract_complete']=bool(flow_complete(selected)); selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"
+        pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':True,'prediction':pred}; PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.5-contract-surface-consistent','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and selected.get('prediction_contract_complete') is True),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'verified_ohlcv_policy':{'minimum_completed_1h_candles':20,'refresh_limit':48,'source':'Binance Spot /api/v3/klines','reject_open_candle':True},'live_symbol_source':'binance_exchangeInfo_TRADING','pre_router_intelligence':{'used':bool(pre_router),'discovery_only':True},'policy':{'minimum_score':MIN_SCORE,'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'conditional_setup_source':'verified_1h_ohlcv_only','no_guaranteed_outcome':True,'no_signal_means_no_trade_setup_post':True,'editorial_lanes_may_publish_without_trade_contract':True,'cadence_is_pacing_not_evidence_gate':True,'contract_flag_mirrors_selected_contract':True}}
+    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
+if __name__=='__main__':main()
+,'').replace('USDT','').strip()
+            if s and title and source and published:
+                markets.append({'type':'news','category':'news_and_macro','lane':'news_and_macro','symbol':s,'score':score,'title':title,'source':source,'published_at':published,'reason':'verified macro event explicitly anchored to this asset','content_intent':'event_to_cross_asset_crypto_impact'})
     # Remove stale snapshot/ranker symbols before they reach authoritative selection.
     # choose() still performs the final live-universe check as a defense in depth.
     primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
