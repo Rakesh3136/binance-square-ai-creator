@@ -124,6 +124,15 @@ def learn(events):
     return state
 
 def main():
+    events=rows(EVENTS)
+    phase=str(__import__("os").environ.get("NIC_EDITOR_PHASE","record")).lower()
+    if phase=="prepare":
+        state=learn(events)
+        LIVE.mkdir(parents=True,exist_ok=True);INTEL.mkdir(parents=True,exist_ok=True)
+        STATE.write_text(json.dumps(state,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+        REPORT.write_text(json.dumps({"version":"1.0","status":"READY","phase":"prepare","event_count":len(events),"repeatable_patterns":len(state["repeatable_patterns"]),"editor_policy":state["editor_policy"]},indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+        print(json.dumps({"status":"READY","phase":"prepare","event_count":len(events),"repeatable_patterns":len(state["repeatable_patterns"]),"preferred_question_style":state["editor_policy"]["preferred_question_style"]}))
+        return
     ctx=extract_context(); polish=load(POLISH,{}) or {}; score=load(SCORE,{}) or {}
     winner=score.get("winner") or {}; post=""
     if isinstance(winner,dict):post=str(winner.get("script") or "")
