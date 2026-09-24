@@ -1,3 +1,3 @@
-2026-09-25T09:30:00Z
-Validate corrected final content gate stage wiring
-Run the autonomous pipeline end-to-end through publication payload, Write-to-Earn readiness, Binance Square submission, and durable truth verification
+2026-09-25T10:00:00Z
+Validate visual fallback routing after renderer/validator reconciliation
+Run the complete autonomous publication pipeline through payload creation, Write-to-Earn readiness, Binance Square submission, and durable publication verification
