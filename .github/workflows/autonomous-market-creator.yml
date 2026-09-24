@@ -1,10 +1,8 @@
 name: Binance Square AI Creator — Single Autonomous Orchestrator
-
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/creator-recovery.trigger'
+    paths: ['.github/creator-recovery.trigger']
   schedule:
     - cron: '*/20 * * * *'
   workflow_dispatch:
@@ -19,14 +17,11 @@ on:
         required: false
         default: false
         type: boolean
-
 env:
   PYTHONUNBUFFERED: '1'
-
 concurrency:
   group: unified-binance-square-creator
   cancel-in-progress: false
-
 jobs:
   creator:
     runs-on: ubuntu-latest
@@ -38,15 +33,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: {fetch-depth: 0}
       - name: Setup Python
         uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+        with: {python-version: '3.12'}
       - name: Reject stale queued creator run
-        env:
-          GH_TOKEN: ${{ github.token }}
+        env: {GH_TOKEN: ${{ github.token }}}
         run: |
           set -euo pipefail
           git fetch origin main
@@ -134,23 +126,20 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          files = ["data/live/nic_core_state.json","data/live/nic_activity.jsonl"]
-          for name in files:
-              p=Path(name)
-              print("NIC_TELEMETRY", name, "present=", p.exists(), "bytes=", p.stat().st_size if p.exists() else 0)
-          if Path(files[0]).exists():
-              s=json.loads(Path(files[0]).read_text())
-              print("NIC_TELEMETRY_STATE", json.dumps({"symbol":s.get("symbol"),"direction":s.get("direction"),"evidence_score":s.get("evidence_score"),"hook_family":s.get("hook_family")}))
+          for name in ["data/live/nic_core_state.json","data/live/nic_activity.jsonl"]:
+              p=Path(name); print("NIC_TELEMETRY",name,"present=",p.exists(),"bytes=",p.stat().st_size if p.exists() else 0)
+          if Path("data/live/nic_core_state.json").exists():
+              s=json.loads(Path("data/live/nic_core_state.json").read_text())
+              print("NIC_TELEMETRY_STATE",json.dumps({"symbol":s.get("symbol"),"direction":s.get("direction"),"evidence_score":s.get("evidence_score"),"hook_family":s.get("hook_family")}))
           PY
       - name: NIC Live Activity Snapshot
         run: |
           python - <<'PY'
-          import json, os
-          from datetime import datetime, timezone
+          import json,os
+          from datetime import datetime,timezone
           from pathlib import Path
-          root=Path('.')
           state={"timestamp":datetime.now(timezone.utc).isoformat(),"run_id":os.getenv("GITHUB_RUN_ID",""),"run_number":os.getenv("GITHUB_RUN_NUMBER",""),"status":"ACTIVE","stage":"nic_core","event":"NIC autonomous cycle started"}
-          p=root/"data/live/nic_activity.jsonl"; p.parent.mkdir(parents=True,exist_ok=True)
+          p=Path("data/live/nic_activity.jsonl");p.parent.mkdir(parents=True,exist_ok=True)
           with p.open("a",encoding="utf-8") as f:f.write(json.dumps(state,ensure_ascii=False)+"\n")
           print(json.dumps(state,indent=2))
           PY
@@ -207,7 +196,7 @@ jobs:
           python src/creator_identity_6_6.py
           python src/creator_mission_7.py
           python src/audience_growth_director.py
-          python src.autonomous_cadence_6.py
+          python src/autonomous_cadence_6.py
           python src/market_regime_intelligence.py
           python src/pre_router_intelligence.py
           python src/signal_first_router.py
@@ -267,18 +256,15 @@ jobs:
           echo "Editorial blocked=$blocked"
       - name: Automatic news headline integrity repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: python src/news_headline_integrity_repair.py
       - name: Automatic hook diversity repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: python src/hook_diversity_rewriter.py
       - name: Automatic mechanism and reader-value repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: python src/mechanism_value_rewriter.py
       - name: Activate Jev second-opinion gate
         id: jev
@@ -292,8 +278,7 @@ jobs:
         id: elite_judge
         continue-on-error: true
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: python src/elite_prepublication_judge.py
       - name: Recover rejected draft in the SAME creator cycle
         id: elite_recovery
@@ -304,35 +289,27 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
           GEMINI_DAILY_BUDGET: '20'
-        run: |
-          python src/autonomous_publish_recovery.py
-          echo 'Bounded recovery finished; the authoritative judge remains the final publication authority.'
+        run: python src/autonomous_publish_recovery.py
       - name: Apply authoritative elite pre-publication gate
         id: elite_gate
         if: ${{ always() && steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' }}
         run: |
           python - <<'PY'
-          import json, os
+          import json,os
           from pathlib import Path
-          path = Path('data/live/elite_prepublication_judge.json')
-          blocked = True; reason = 'elite_judge_output_missing'
+          path=Path('data/live/elite_prepublication_judge.json');blocked=True;reason='elite_judge_output_missing'
           if path.exists():
-              try: result = json.loads(path.read_text(encoding='utf-8'))
-              except Exception: result = {}; reason = 'elite_judge_output_invalid_json'
+              try: result=json.loads(path.read_text(encoding='utf-8'))
+              except Exception: result={};reason='elite_judge_output_invalid_json'
               else:
-                  failures = result.get('failures') or []
-                  blocked = result.get('publish') is not True or bool(failures)
-                  reason = ','.join(str(x) for x in failures) or 'publish'
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
-              f.write(f"blocked={'true' if blocked else 'false'}\n")
-              f.write(f"reason={reason}\n")
-          print({'blocked': blocked, 'reason': reason})
-          if blocked: print('No publication: authoritative quality gate remains blocked after bounded recovery.')
+                  failures=result.get('failures') or [];blocked=result.get('publish') is not True or bool(failures);reason=','.join(str(x) for x in failures) or 'publish'
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
+              f.write(f"blocked={'true' if blocked else 'false'}\n");f.write(f"reason={reason}\n")
+          print({'blocked':blocked,'reason':reason})
           PY
       - name: Integrity and final content gates
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_gate.outputs.blocked != 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: |
           python src/content_integrity_gate_4.py
           python -m compileall -q src
@@ -341,23 +318,20 @@ jobs:
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_gate.outputs.blocked != 'true' }}
         run: |
           python - <<'PY'
-          import json, os
+          import json,os
           from pathlib import Path
-          p=Path('data/live/publication_context.json'); ctx=json.loads(p.read_text()) if p.exists() else {}
-          cat=str(ctx.get('category','')).lower(); meme=cat == 'crypto_meme'; required=meme or cat not in {'education','commentary','community'}; mode='meme' if meme else 'tradingview'
-          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
-              f.write(f"required={'true' if required else 'false'}\n"); f.write(f"mode={mode}\n")
+          p=Path('data/live/publication_context.json');ctx=json.loads(p.read_text()) if p.exists() else {}
+          cat=str(ctx.get('category','')).lower();meme=cat=='crypto_meme';required=meme or cat not in {'education','commentary','community'};mode='meme' if meme else 'tradingview'
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:f.write(f"required={'true' if required else 'false'}\n");f.write(f"mode={mode}\n")
           print({'category':cat,'visual_required':required,'mode':mode})
           PY
       - name: Setup Node and Chromium
         if: ${{ steps.visual_mode.outputs.required == 'true' && steps.visual_mode.outputs.mode == 'tradingview' && steps.elite_gate.outputs.blocked != 'true' }}
         uses: actions/setup-node@v4
-        with:
-          node-version: '24'
+        with: {node-version: '24'}
       - name: Render visual package
         if: ${{ steps.visual_mode.outputs.required == 'true' && steps.elite_gate.outputs.blocked != 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        env: {DRAFT_PATH: ${{ steps.editorial.outputs.path }}}
         run: |
           if [ "${{ steps.visual_mode.outputs.mode }}" = "meme" ]; then python src/visual_renderer.py; else npm install --no-save playwright; npx playwright install --with-deps chromium; python src/visual_renderer.py; fi
           test -s data/live/visual.png
@@ -395,36 +369,19 @@ jobs:
         if: ${{ always() }}
         run: |
           if [ "${{ job.status }}" = "cancelled" ]; then echo 'Run cancelled; skipping repository state persistence.'; exit 0; fi
-          if [ -f src/creator_diagnostics.py ]; then python src/creator_diagnostics.py || true; else echo 'creator_diagnostics.py not present; skipping legacy diagnostics hook'; fi
+          if [ -f src/creator_diagnostics.py ]; then python src/creator_diagnostics.py || true; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           for attempt in 1 2 3; do
-            echo "Persistence attempt $attempt/3"
             git fetch origin main
             git reset --mixed origin/main
             git add analytics data
             bad_paths=$(git diff --cached --name-only | grep -vE '^(analytics|data)/' || true)
-            if [ -n "$bad_paths" ]; then
-              echo '::error::Refusing to persist non-generated paths:'
-              echo "$bad_paths"
-              git reset
-              exit 1
-            fi
-            if git diff --cached --quiet; then
-              echo 'No generated state changes to persist'
-              exit 0
-            fi
+            if [ -n "$bad_paths" ]; then echo '::error::Refusing to persist non-generated paths:'; echo "$bad_paths"; git reset; exit 1; fi
+            if git diff --cached --quiet; then echo 'No generated state changes to persist'; exit 0; fi
             git commit -m 'Record Creator 7.x cycle'
-            if git pull --rebase --autostash origin main; then
-              if git push origin HEAD:main; then
-                echo "Generated state persisted successfully on attempt $attempt"
-                exit 0
-              fi
-            else
-              echo "Rebase failed on attempt $attempt; aborting rebase and retrying from latest main"
-              git rebase --abort || true
-            fi
-            echo "Main moved during persistence; retrying with latest origin/main"
+            if git pull --rebase --autostash origin main && git push origin HEAD:main; then exit 0; fi
+            git rebase --abort || true
           done
           echo '::error::Unable to persist generated creator state after 3 synchronized attempts'
           exit 1
