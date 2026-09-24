@@ -186,7 +186,8 @@ jobs:
           python src/nic_dashboard_state.py
           python -m json.tool data/live/nic_dashboard.json >/dev/null
       - name: Human-level editorial intelligence
-        run: python src/creator_21_0_human_level_editor.py
+        run: |
+          python src/creator_21_0_human_level_editor.py
           python src/nic_human_editor_intelligence.py
       - name: Unified control-plane snapshot
         run: |
