@@ -1,0 +1,35 @@
+name: NIC — Write-to-Earn Monetization Intelligence
+on:
+  schedule:
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  monetization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate and build monetization ledger
+        run: |
+          python -m compileall -q src
+          python src/wte_monetization_attribution.py
+          python -m json.tool data/live/wte_monetization_attribution.json >/dev/null
+          python -m json.tool data/intelligence/wte_monetization_attribution_report.json >/dev/null
+          python src/creator_8_4_monetization_feedback.py
+          python src/monetization_funnel_optimizer.py
+          python src/nic_memory_graph.py
+      - name: Commit monetization intelligence
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analytics data/live data/intelligence
+          git diff --cached --quiet || git commit -m 'Update keyless Write-to-Earn monetization intelligence'
+          git pull --rebase --autostash origin main || true
+          git push origin main || true
