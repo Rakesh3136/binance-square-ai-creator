@@ -24,7 +24,6 @@ REQUIRED_ORDER = [
     "src/write_to_earn_eligibility_gate.py",
     "src/write_to_earn_master.py",
     "src/binance_square_publisher.py",
-    "src/creator_20_0_publication_verifier.py",
 ]
 
 
@@ -73,6 +72,16 @@ def main() -> int:
 
     if "DRAFT_PATH=$(python src/resolve_publish_draft.py)" not in text:
         print("ERROR: deterministic draft resolver is not wired into the editor stage", file=sys.stderr)
+        return 2
+
+    publisher_line = "python src/binance_square_publisher.py"
+    verifier_line = "python src/creator_20_0_publication_verifier.py"
+    publish_block = text[text.find("Extract publication and submit to Binance Square"):]
+    if publisher_line not in publish_block or verifier_line not in publish_block:
+        print("ERROR: publication publisher/verifier pair is not wired", file=sys.stderr)
+        return 2
+    if publish_block.find(publisher_line) >= publish_block.find(verifier_line):
+        print("ERROR: publication verifier must run after publisher", file=sys.stderr)
         return 2
 
     print(
