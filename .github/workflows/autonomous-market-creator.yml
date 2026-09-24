@@ -298,7 +298,11 @@ jobs:
           GEMINI_DAILY_BUDGET: '20'
         run: |
           python src/candidate_script_scorer_4.py
-          DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -mmin -60 -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          # Do not depend on filesystem mtime: GitHub runner/checkouts can make
+          # freshly generated reports appear older than the 60-minute window.
+          # The scorer has already selected from these reports, so use the
+          # newest multi-agent report deterministically and fail only if none exists.
+          DRAFT_PATH=$(find data/reports -type f -name '*-multi-agent.json' -printf '%T@ %p\\n' | sort -nr | head -1 | cut -d' ' -f2-)
           test -n "$DRAFT_PATH"
           test -f "$DRAFT_PATH"
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
