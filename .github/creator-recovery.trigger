@@ -14,3 +14,5 @@ NIC local-only independence + deterministic editorial recovery validation
 NIC durable memory graph + keyless learning validation
 2026-09-24T18:40:00Z
 NIC Experiment Governor + evidence-safe capacity control validation
+2026-09-24T18:45:00Z
+Repair human-editor hard failure and rerun full publication path
