@@ -85,6 +85,16 @@ def main():
     if hard_template:
         write_block(report,path,'repetitive_feed_template',1); return 0
     generic_found=[p for p in GENERIC_PHRASES if p in edited.lower()]
-    draft.update({'post':edited,'text':edited,'editorial_style':draft.get('editorial_style') or 'authored','human_editor':{'status':'PRESERVED','version':'human-editor-v19','hook_preserved':first_before==first_after,'question_count':1,'question_source':'deterministic_contract_repair' if not re.search(r'\?',original) else 'author','generic_phrases_detected':generic_found,'template_hits':template_hits,'fact_policy':'preserve supplied evidence only','authored_narrative_preserved':True,'edited_at':datetime.now(timezone.utc).isoformat()}})
+    draft.update({'post':edited,'text':edited,'editorial_style':draft.get('editorial_style') or 'authored','human_editor':{'status':'PRESERVED','version':'human-editor-v20','hook_preserved':first_before==first_after,'question_count':1,'question_source':'deterministic_contract_repair' if not re.search(r'\?',original) else 'author','generic_phrases_detected':generic_found,'template_hits':template_hits,'fact_policy':'preserve supplied evidence only','authored_narrative_preserved':True,'edited_at':datetime.now(timezone.utc).isoformat()}})
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps({'status':'PRESERVED','version':'human-editor-v19','hook_preserved':first_before==first_after,'question_count':1,'question_source':draft['human_editor']['question_source'],'warnings':[] if not generic_found else ['generic_phrase_present'],'template_hits':template_hits,'characters':len(edited),'draft_path':str(path)},indent=2,ensure_ascii=False),encoding='utf-8'); path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps({'status':'PRESERVED','version':'human-editor-v19','hook_preserved':first_before==first_after,'question_count':1,'question_source':draft['human_editor']['question_source'],'template_hits':template_hits,'characters':len(edited)}))
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try:
+        main()
+    except Exception as exc:
+        # The editor is preservation-only. A local editor defect must never
+        # crash the autonomous creator cycle or bypass downstream safety gates.
+        OUT.parent.mkdir(parents=True,exist_ok=True)
+        result={'status':'BLOCKED','version':'human-editor-v20','reason':f'editor_exception:{type(exc).__name__}:{exc}','fail_closed':True,'edited_at':datetime.now(timezone.utc).isoformat()}
+        OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
+        print(json.dumps(result,ensure_ascii=False))
+
