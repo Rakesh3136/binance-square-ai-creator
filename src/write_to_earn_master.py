@@ -34,5 +34,7 @@ def main():
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     REPORT.write_text(json.dumps({"version":"WTE-MASTER-1.0","status":result["status"],"generated_at":result["generated_at"],"blockers":blockers},indent=2)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
-    if blockers: raise SystemExit(2)
-if __name__=="__main__": main()
+    # Ineligibility is expected control flow, not a Python failure. The
+    # publisher consumes the explicit WTE gate state and decides whether to skip.
+    return 0
+if __name__=="__main__": raise SystemExit(main())
