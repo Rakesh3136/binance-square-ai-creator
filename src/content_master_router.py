@@ -1,6 +1,8 @@
 """Content Master Router for differentiated, evidence-backed Square publishing."""
 from __future__ import annotations
 import json
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
@@ -13,6 +15,7 @@ IMPACT=ROOT/"data/live/cross_asset_impact.json"
 FUNNEL=ROOT/"data/live/monetization_funnel_optimizer.json"
 SERIES=ROOT/"data/live/creator_series_plan.json"
 GOV=ROOT/"data/live/nic_experiment_governor.json"
+FINANCE=ROOT/"data/live/nic_financial_market_intelligence.json"
 OUT=ROOT/"data/live/content_master_route.json"
 LANES={
  "capital_flow_long":("signal","CAPITAL FLOW LONG THESIS","capital_flow_long","tradingview"),
@@ -37,7 +40,8 @@ def load(p):
   x=json.loads(p.read_text(encoding="utf-8")); return x if isinstance(x,dict) else {}
  except Exception:return {}
 def main():
- pre,director,aud,learn,macro,impact,funnel,series,gov=map(load,(PREF,DIRECTOR,AUD,LEARN,MACRO,IMPACT,FUNNEL,SERIES,GOV))
+ subprocess.run([sys.executable,str(ROOT/"src/nic_financial_market_intelligence.py")],check=True)
+ pre,director,aud,learn,macro,impact,funnel,series,gov,finance=map(load,(PREF,DIRECTOR,AUD,LEARN,MACRO,IMPACT,FUNNEL,SERIES,GOV,FINANCE))
  selected=pre.get("selected_opportunity") or (aud.get("selected") if isinstance(aud.get("selected"),dict) else {})
  cat=str(selected.get("category") or (director.get("primary_story") or {}).get("lane") or "").lower()
  if cat not in LANES:
@@ -55,7 +59,7 @@ def main():
   "visual_mode":visual,
   "symbol":str(selected.get("symbol") or "").upper().replace("USDT","").replace("$",""),
   "reason":"Content Master maps the authoritative opportunity to the right publishing form; self-training only influences bounded preferences.",
-  "macro_context":{"primary_theme":macro_event,"event_count":macro.get("event_count",0),"impact_ready":bool(impact_signal or impact)},
+  "macro_context":{"primary_theme":macro_event,"event_count":macro.get("event_count",0),"impact_ready":bool(impact_signal or impact),"financial_intelligence_ready":bool(finance)},
   "funnel":{"next_tests":funnel.get("next_tests",[])[:4],"verified_revenue":(funnel.get("current_evidence") or {}).get("verified_revenue",0)},
   "series":{"status":series.get("status"),"active_series":series.get("active_series",[])[:2]},
   "experiment_governor":{"decision":gov.get("decision",{}),"capacity_share":(gov.get("decision") or {}).get("capacity_share",0),"evidence_summary":gov.get("evidence_summary",{})},
