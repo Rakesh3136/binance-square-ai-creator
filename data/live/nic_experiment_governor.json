@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-09-24T17:47:49.806488+00:00",
+  "status": "READY",
+  "decision": {
+    "decision": "CONTINUE_ACTIVE",
+    "reason": "Insufficient explicit experiment attribution; keep the test eligible but do not force publication.",
+    "capacity_share": 0.15,
+    "experiment": {
+      "experiment_id": "74-exp-20260906051743",
+      "status": "ACTIVE",
+      "created_at": "2026-09-06T05:17:43.536764+00:00",
+      "mode": "EXPLORATION",
+      "hypothesis": "Test whether experiment_format=data_driven_breakdown improves the outcome versus the account baseline while holding other major choices stable.",
+      "primary_variable": "experiment_format",
+      "control_value": "__baseline__",
+      "treatment_value": "data_driven_breakdown",
+      "objective_metric": "outcome_score",
+      "secondary_metrics": [
+        "views",
+        "likes",
+        "comments",
+        "shares",
+        "quotes",
+        "follower_growth"
+      ],
+      "sample_target": 10,
+      "observed_context": {
+        "treatment_sample": 0,
+        "control_sample": 0,
+        "observed_lift_percent": 0
+      },
+      "reason": "Choose the next test where additional evidence can reduce uncertainty without sacrificing editorial quality.",
+      "stop_rules": [
+        "Do not claim causality from observational evidence.",
+        "Skip weak stories rather than manufacture a test post.",
+        "Never use fake engagement or guaranteed-return language."
+      ]
+    },
+    "stop_reason": null,
+    "replication_ready": false
+  },
+  "capacity_policy": {
+    "experiment_capacity_is_a_soft_budget": true,
+    "maximum_experiment_share": 0.25,
+    "zero_capacity_when_stopped": true,
+    "replication_requires_fresh_eligible_story": true,
+    "exploration_preserved": true,
+    "no_forced_story": true
+  },
+  "evidence_summary": {
+    "genome_repeatable_patterns": 2,
+    "genome_verified_patterns": 0,
+    "revenue_lab_status": "READY"
+  },
+  "handoff": {
+    "publication_eligibility": "unchanged_and_authoritative",
+    "signal_first": "unchanged_and_authoritative",
+    "safety_and_integrity": "unchanged_and_authoritative",
+    "revenue": "verified_only"
+  },
+  "rules": [
+    "Governor allocates experiment capacity; it does not decide whether a story is publishable.",
+    "Do not infer causality from observational lift.",
+    "Do not infer revenue from views, engagement, prediction success or clicks.",
+    "Never manufacture a story to complete an experiment.",
+    "Stop/replicate decisions are resource decisions, not claims of market or audience causality.",
+    "A replication must use a fresh eligible opportunity and retain the experiment lineage.",
+    "Missing evidence remains missing."
+  ]
+}
