@@ -31,13 +31,32 @@ REQUIRED_ORDER = [
     "src/binance_square_publisher.py",
 ]
 
-SCRIPT_RE = re.compile(r"\bpython(?:3(?:\.\d+)?)?\s+(src/[A-Za-z0-9_./-]+\.py)\b")
+SCRIPT_RE = re.compile(r"(?<![A-Za-z0-9_./-])python(?:3(?:\.\d+)?)?\s+(src/[A-Za-z0-9_./-]+\.py)(?![A-Za-z0-9_./-])")
+
+
+def _mask_non_execution_regions(text: str) -> str:
+    """Mask import-only Python snippets and comments before stage scanning."""
+    # The workflow's large PYTHONPATH smoke-test is deliberately not an
+    # execution stage. Mask it so imported module names cannot satisfy ordering.
+    text = re.sub(
+        r"PYTHONPATH=src\s+python\s+-c\s+\".*?\"",
+        lambda m: " " * len(m.group(0)),
+        text,
+        flags=re.DOTALL,
+    )
+    # Also ignore YAML comments that happen to mention stage filenames.
+    lines = []
+    for line in text.splitlines(keepends=True):
+        stripped = line.lstrip()
+        lines.append("" if stripped.startswith("#") else line)
+    return "".join(lines)
 
 
 def referenced_scripts(text: str) -> list[str]:
-    """Collect every direct python src/*.py invocation from workflow text."""
+    """Collect direct python src/*.py invocations from workflow text."""
+    masked = _mask_non_execution_regions(text)
     seen: list[str] = []
-    for match in SCRIPT_RE.finditer(text):
+    for match in SCRIPT_RE.finditer(masked):
         script = match.group(1)
         if script not in seen:
             seen.append(script)
@@ -45,22 +64,30 @@ def referenced_scripts(text: str) -> list[str]:
 
 
 def execution_positions(text: str) -> dict[str, int]:
-    """Return positions of executable commands, excluding the import smoke-test.
+    """Return positions of executable workflow stages.
 
-    The previous validator parsed commands line-by-line and could miss valid
-    workflow commands depending on YAML indentation/formatting.  We now scan
-    the complete workflow text and explicitly mask the known PYTHONPATH import
-    smoke-test so imported module names cannot affect stage ordering.
+    Primary detection uses the executable command regex. A defensive fallback
+    recognizes an exact standalone stage path when the YAML shell syntax is
+    valid but formatted in a way the regex cannot parse. This fallback is
+    restricted to REQUIRED_ORDER and therefore cannot accidentally promote an
+    imported module to an executable stage.
     """
-    masked = re.sub(
-        r"PYTHONPATH=src\s+python\s+-c\s+\".*?\"",
-        " ",
-        text,
-        flags=re.DOTALL,
-    )
+    masked = _mask_non_execution_regions(text)
     positions: dict[str, int] = {}
     for match in SCRIPT_RE.finditer(masked):
         positions.setdefault(match.group(1), match.start(1))
+
+    for script in REQUIRED_ORDER:
+        if script in positions:
+            continue
+        # Only accept a line whose non-whitespace content is an executable
+        # python invocation (optionally followed by a shell comment).
+        line_re = re.compile(
+            rf"(?m)^\s*python(?:3(?:\.\d+)?)?\s+{re.escape(script)}(?:\s*(?:#.*)?)?$"
+        )
+        m = line_re.search(masked)
+        if m:
+            positions[script] = m.start()
     return positions
 
 
@@ -86,10 +113,7 @@ def main() -> int:
     text = WORKFLOW.read_text(encoding="utf-8")
     scripts = referenced_scripts(text)
     tracked = tracked_files()
-    missing = [
-        p for p in scripts
-        if p != "src/creator_diagnostics.py" and not script_exists(p, tracked)
-    ]
+    missing = [p for p in scripts if p != "src/creator_diagnostics.py" and not script_exists(p, tracked)]
     if missing:
         print("ERROR: workflow references missing Python files:", file=sys.stderr)
         for p in missing:
