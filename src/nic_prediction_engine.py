@@ -329,11 +329,33 @@ def build():
     except Exception:
         btc_frames = {}
 
+    # Fetch current frames and historical 1H evidence concurrently. This stage is
+    # deliberately read-only and uses bounded workers to avoid serial network
+    # latency dominating the creator cycle.
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     results = []
+    fetched = {}
+    tasks = []
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for symbol, side in candidates:
+            for interval in INTERVALS:
+                tasks.append((symbol, side, interval, "current", executor.submit(candles, symbol, interval, CURRENT_LIMIT)))
+            tasks.append((symbol, side, "1h", "historical", executor.submit(candles, symbol, "1h", BACKTEST_LIMIT)))
+
+        for symbol, side, interval, kind, future in tasks:
+            try:
+                fetched[(symbol, side, interval, kind)] = future.result()
+            except Exception:
+                fetched[(symbol, side, interval, kind)] = []
+
     for symbol, side in candidates:
         try:
-            frames = {interval: frame(candles(symbol, interval, CURRENT_LIMIT)) for interval in INTERVALS}
-            historical = candles(symbol, "1h", BACKTEST_LIMIT)
+            frames = {
+                interval: frame(fetched.get((symbol, side, interval, "current"), []))
+                for interval in INTERVALS
+            }
+            historical = fetched.get((symbol, side, "1h", "historical"), [])
             relative_strength = None
             btc_1d = (btc_frames.get("1d") or {}).get("return_12")
             asset_1d = (frames.get("1d") or {}).get("return_12")
