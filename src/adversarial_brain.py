@@ -23,6 +23,7 @@ def main():
     auth,routing,tech,regime=load(AUTH),load(ROUTING),load(TECH),load(REGIME)
     selected=routing.get("selected") if isinstance(routing.get("selected"),dict) else {}
     if not selected: selected=auth
+    editorial_only=bool(selected.get("editorial_only") or auth.get("signal_first_editorial"))
     setup=selected.get("trade_setup") if isinstance(selected.get("trade_setup"),dict) else {}
     prediction=selected.get("prediction") if isinstance(selected.get("prediction"),dict) else {}
     side=str(setup.get("side") or prediction.get("direction") or auth.get("direction") or "").upper()
@@ -30,12 +31,15 @@ def main():
     tp1=num(setup.get("tp1",prediction.get("tp1")))
     sl=num(setup.get("invalidation",prediction.get("sl",auth.get("invalidation"))))
     failures=[]; challenges=[]
-    if side not in {"LONG","SHORT"}: failures.append("missing_direction")
-    if entry is None or tp1 is None or sl is None: failures.append("incomplete_trade_contract")
-    elif side=="LONG" and not sl<entry<tp1: failures.append("invalid_long_level_order")
-    elif side=="SHORT" and not tp1<entry<sl: failures.append("invalid_short_level_order")
-    router_contract_ok = routing.get("prediction_contract_complete") is True or selected.get("prediction_contract_complete") is True
-    if not router_contract_ok: failures.append("router_contract_not_complete")
+    if not editorial_only:
+        if side not in {"LONG","SHORT"}: failures.append("missing_direction")
+        if entry is None or tp1 is None or sl is None: failures.append("incomplete_trade_contract")
+        elif side=="LONG" and not sl<entry<tp1: failures.append("invalid_long_level_order")
+        elif side=="SHORT" and not tp1<entry<sl: failures.append("invalid_short_level_order")
+        router_contract_ok = routing.get("prediction_contract_complete") is True or selected.get("prediction_contract_complete") is True
+        if not router_contract_ok: failures.append("router_contract_not_complete")
+    else:
+        router_contract_ok = True
     if selected and selected.get("signal_first_ohlcv_verified") is not True and not (selected.get("evidence") or {}).get("ohlcv_candles_used"):
         challenges.append("Signal is not carrying explicit fresh completed-candle provenance.")
     if regime.get("regime")=="HIGH_DISPERSION": challenges.append("High cross-asset dispersion: avoid treating one asset move as broad market confirmation.")
@@ -48,6 +52,7 @@ def main():
       "publish_review":publish_ok,
       "symbol":str(selected.get("symbol") or auth.get("symbol") or "").upper(),
       "direction":side,
+      "editorial_only":editorial_only,
       "challenges":challenges,"failures":failures,
       "adversarial_questions":[
         "What verified observation would falsify this thesis?",
