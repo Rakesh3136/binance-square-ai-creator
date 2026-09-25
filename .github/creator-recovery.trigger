@@ -1,2 +1,2 @@
-2026-09-25T13:40:00+05:30
-Validate NIC WAIT-safe routing: no synthetic trade fallback, no incomplete prediction publication, editorial fallback allowed, explicit NO_ELIGIBLE_OPPORTUNITY state.
+2026-09-25T13:45:00+05:30
+Architecture upgrade: immutable NIC prediction truth ledger; objective Binance OHLCV outcome resolution; pending predictions never train NIC; terminal outcomes feed postmortem, outcome learning and strategy calibration before next forecast; verify routing, editorial fallback and publication truth end-to-end.
