@@ -32,7 +32,15 @@ def num(value, default=0.0):
 
 def candles(symbol: str) -> list[list]:
     data = get_json("/api/v3/klines", {"symbol": symbol, "interval": "1h", "limit": 24})
-    return data if isinstance(data, list) else []
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    completed = []
+    for row in data if isinstance(data, list) else []:
+        try:
+            if int(row[6]) < now_ms:
+                completed.append(row)
+        except (TypeError, ValueError, IndexError):
+            continue
+    return completed
 
 def signal(symbol: str) -> dict | None:
     try: rows = candles(symbol)
