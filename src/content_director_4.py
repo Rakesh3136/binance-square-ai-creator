@@ -83,7 +83,7 @@ def main():
         missing=len(rows(r.get('missing_evidence')))
         discovery_score=clamp(max(score, n(r.get('information_advantage_score'))*.7+n(r.get('undercoverage_score'))*.3))
         base={'type':'research','symbol':s,'score':clamp(score),'research':r,'data_quality':'RESEARCH','reason':'original research finding with evidence and information advantage'}
-        stories.append({**base,'category':'research_insight','content_intent':'explain_new_research_finding'})
+        stories.append({**base,'score':discovery_score,'category':'research_insight','content_intent':'explain_new_research_finding'})
         if n(r.get('undercoverage_score'))>=65 and n(r.get('information_advantage_score'))>=65:
             stories.append({**base,'category':'data_surprise','score':clamp(score+3),'content_intent':'explain_undercovered_data_signal'})
         if n(r.get('evidence_score'))>=75 and missing==0:
