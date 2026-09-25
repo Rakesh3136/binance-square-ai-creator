@@ -79,8 +79,9 @@ def main():
     # gates still decide whether and when it actually publishes.
     for s,r in rmap.items():
         score=research_score(r)
-        if score<62:continue
+        if score<45:continue
         missing=len(rows(r.get('missing_evidence')))
+        discovery_score=clamp(max(score, n(r.get('information_advantage_score'))*.7+n(r.get('undercoverage_score'))*.3))
         base={'type':'research','symbol':s,'score':clamp(score),'research':r,'data_quality':'RESEARCH','reason':'original research finding with evidence and information advantage'}
         stories.append({**base,'category':'research_insight','content_intent':'explain_new_research_finding'})
         if n(r.get('undercoverage_score'))>=65 and n(r.get('information_advantage_score'))>=65:
