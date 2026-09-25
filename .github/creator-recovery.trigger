@@ -1,3 +1,3 @@
-2026-09-25T11:00:00Z
-Activate NIC walk-forward prediction engine and trigger-first outcome accounting
-Require multi-timeframe validation, historical setup testing, calibrated confidence shrinkage, and corrected outcome learning before directional publication
+2026-09-25T11:30:00Z
+Revalidate NIC prediction engine after parallel-fetch and calibrated-confidence upgrade
+Require trigger-first outcome accounting, multi-timeframe agreement, walk-forward evidence, NIC-calibrated confidence, and end-to-end publication validation
