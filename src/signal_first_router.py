@@ -178,11 +178,50 @@ def fetch_verified_1h_candles(symbol, limit=48):
             last=exc
     raise RuntimeError(f'Unable to fetch verified completed 1H OHLCV for {clean}: {last}')
 
+def apply_nic_prediction(candidate):
+    """Overlay NIC's validated conditional setup and calibrated confidence."""
+    e=dict(candidate)
+    pq=prediction_quality_for(e)
+    if not isinstance(pq,dict):
+        return e
+    e['prediction_quality']=pq
+    quality=num(pq.get('quality_score'),0.0)
+    calibrated=num(pq.get('calibrated_confidence'),quality)
+    rec=pq.get('recommended_setup') if isinstance(pq.get('recommended_setup'),dict) else {}
+    side=str(pq.get('side') or setup_parts(e)[2]).upper()
+    if side in {'LONG','SHORT'} and level_contract_valid(
+        side, rec.get('trigger'), rec.get('tp1'), rec.get('tp2'), rec.get('invalidation')
+    ):
+        e['trade_setup']={
+            'side':side,
+            'trigger':rec.get('trigger'),
+            'tp1':rec.get('tp1'),
+            'tp2':rec.get('tp2'),
+            'invalidation':rec.get('invalidation'),
+            'risk_per_unit':rec.get('risk_per_unit'),
+            'setup_source':'NIC_walk_forward_validated_conditional_setup',
+        }
+        e['prediction']={
+            'direction':side,
+            'entry_trigger':rec.get('trigger'),
+            'tp1':rec.get('tp1'),
+            'tp2':rec.get('tp2'),
+            'sl':rec.get('invalidation'),
+            'confidence':calibrated,
+            'nic_prediction_quality_score':quality,
+            'conditional':True,
+            'not_a_guarantee':True,
+        }
+        e['flow_confidence']=calibrated
+        e['multitimeframe']={**(e.get('multitimeframe') or {}),'confidence':calibrated}
+    return e
+
 def derive(candidate,market):
-    if flow_complete(candidate):
-        evidence=candidate.get('evidence') if isinstance(candidate.get('evidence'),dict) else {}
+    nic_candidate=apply_nic_prediction(candidate)
+    if flow_complete(nic_candidate):
+        evidence=nic_candidate.get('evidence') if isinstance(nic_candidate.get('evidence'),dict) else {}
         if num(evidence.get('ohlcv_candles_used'))>=20 and str(evidence.get('provenance','')).startswith('binance_spot_'):
-            return candidate
+            return nic_candidate
 
     candles,item=candles_for(candidate.get('symbol'),market)
     if len(candles)<20:
@@ -194,8 +233,10 @@ def derive(candidate,market):
         completed=[]
         for c in candles:
             try:
-                close_time=int(c.get('close_time',0)) if isinstance(c,dict) else 0
-                if close_time<=0 or close_time<now_ms:
+                if not isinstance(c,dict):
+                    continue
+                close_time=int(c.get('close_time',0))
+                if close_time>0 and close_time<now_ms:
                     completed.append(c)
             except Exception:
                 continue
@@ -295,6 +336,7 @@ def derive(candidate,market):
         mtf=dict(e.get('multitimeframe') or {})
         mtf['confidence']=round(calibrated,2)
         e['multitimeframe']=mtf
+    e=apply_nic_prediction(e)
     e['prediction_contract_complete']=flow_complete(e)
     return e
 def add(target,x,allow_complete_flow=False):
