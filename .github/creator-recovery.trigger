@@ -15,3 +15,6 @@ Repair: make workflow stage detection resilient to valid YAML shell formatting a
 2026-09-25T14:21:34.649Z
 Repair: technical enricher now uses historical setup snapshots only for authoritative Signal-First predictions; non-prediction editorial lanes use fresh completed candles.
 Upgrade: persistent discovery queue, diversified lane rotation, safer faster knowledge cadence, and corrected technical enricher routing; run full autonomous publication validation.
+
+2026-09-25T14:43:37Z
+Repair: route editorial technical charts to TradingView when no authoritative Signal-First prediction snapshot exists; preserve frozen historical renderer for real primary signals. Re-run full autonomous publication validation.
