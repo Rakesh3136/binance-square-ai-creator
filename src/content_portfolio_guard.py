@@ -4,9 +4,10 @@ import json, os, re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; LOG=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/content_portfolio_guard.json'
-MIN_SCORE=float(os.getenv('PORTFOLIO_MIN_SCORE','68')); RECENT_WINDOW=int(os.getenv('PORTFOLIO_RECENT_WINDOW','12')); BTC_MAX_RECENT=int(os.getenv('PORTFOLIO_BTC_MAX_RECENT','1')); ASSET_MAX_RECENT=int(os.getenv('PORTFOLIO_ASSET_MAX_RECENT','1')); SIMILARITY_BLOCK=float(os.getenv('PORTFOLIO_SIMILARITY_BLOCK','0.58')); SAME_ASSET_HOURS=float(os.getenv('PORTFOLIO_SAME_ASSET_HOURS','6'))
+PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; QUEUE=ROOT/'data/live/discovery_queue.json'; LOG=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/content_portfolio_guard.json'
+MIN_SCORE=float(os.getenv('PORTFOLIO_MIN_SCORE','68')); KNOWLEDGE_MIN_SCORE=float(os.getenv('PORTFOLIO_KNOWLEDGE_MIN_SCORE','62')); RECENT_WINDOW=int(os.getenv('PORTFOLIO_RECENT_WINDOW','12')); BTC_MAX_RECENT=int(os.getenv('PORTFOLIO_BTC_MAX_RECENT','3')); ASSET_MAX_RECENT=int(os.getenv('PORTFOLIO_ASSET_MAX_RECENT','2')); SIMILARITY_BLOCK=float(os.getenv('PORTFOLIO_SIMILARITY_BLOCK','0.58')); SAME_ASSET_HOURS=float(os.getenv('PORTFOLIO_SAME_ASSET_HOURS','2')); SAME_CATEGORY_HOURS=float(os.getenv('PORTFOLIO_SAME_CATEGORY_HOURS','6'))
 PRIMARY={'creator_signal_outcome','capital_flow_long','capital_flow_short','follow_up','technical_setup','top_gainers','top_losers','high_volatility','volume_leaders','next_gainer_candidate','next_loser_candidate'}
+KNOWLEDGE={'education','research_insight','market_mechanism','data_surprise','watchlist','comparison'}
 STOPWORDS={'the','a','an','and','or','to','of','for','in','on','with','from','as','is','are','this','that','it','its','at','by','be','has','have','will','can','now','why','what','how','than','into','after','over','under','market','crypto','price','today','latest','update','binance'}
 def load(p):
     try:
@@ -17,7 +18,7 @@ def num(v,d=0.0):
     except (TypeError,ValueError):return d
 def symbol(v):return str(v or '').upper().replace('BINANCE:','').replace('$','').strip().removesuffix('USDT')
 def category(item):return str(item.get('category') or item.get('lane') or item.get('content_category') or item.get('type') or '').lower() if isinstance(item,dict) else ''
-def lane_priority(cat):return 2 if cat in PRIMARY else (0 if cat=='crypto_meme' else 1)
+def lane_priority(cat):return 2 if cat in PRIMARY else (1.5 if cat in KNOWLEDGE else (0 if cat=='crypto_meme' else 1))
 def words(text):return {x for x in re.findall(r'[a-z0-9]{3,}',str(text or '').lower()) if x not in STOPWORDS}
 def similarity(a,b):
     x,y=words(a),words(b); return len(x&y)/max(1,len(x|y)) if x and y else 0.0
@@ -59,43 +60,69 @@ def news_supported(c):
     if category(c) not in {'breaking_news','news_and_macro','news_market_impact','news'}:return True
     s=symbol(c.get('symbol')).lower(); blob=(str(c.get('title') or '')+' '+str(c.get('news_title') or '')+' '+str(c.get('summary') or '')).lower()
     return bool(s) and bool(re.search(r'(?<![a-z0-9])(?:\$?'+re.escape(s)+r')(?![a-z0-9])',blob))
-def candidate_key(c):return f'{symbol(c.get("symbol"))}|{category(c)}|{str(c.get("type") or "").lower()}' if isinstance(c,dict) else ''
+def candidate_key(c):return f'{symbol(c.get("symbol"))}|{category(c)}|{str(c.get("type") or "").lower()}|{str(c.get("content_intent") or "").lower()}' if isinstance(c,dict) else ''
 def main():
-    pre=load(PREFLIGHT); brief=load(DIRECTOR); current=pre.get('selected_opportunity') or {}; current=current if isinstance(current,dict) else {}; recent=recent_publications(); counts=asset_counts(recent); recent_texts=[text_of(r) for r in recent[-8:]]
-    ranked=[x for x in (brief.get('ranked_stories') or []) if isinstance(x,dict) and symbol(x.get('symbol'))]
-    extra=(pre.get('opportunity_ranking_6') or {}).get('top_candidates') or []; ranked += [x for x in extra if isinstance(x,dict) and symbol(x.get('symbol'))]
+    pre=load(PREFLIGHT); brief=load(DIRECTOR); queue_state=load(QUEUE); current=pre.get('selected_opportunity') or {}; current=current if isinstance(current,dict) else {}; recent=recent_publications(); counts=asset_counts(recent); recent_texts=[text_of(r) for r in recent[-8:]]
+    queued=[]
+    for item in (queue_state.get('candidates') or []):
+        if not isinstance(item,dict):continue
+        candidate=item.get('candidate') if isinstance(item.get('candidate'),dict) else item
+        if isinstance(candidate,dict):queued.append(candidate)
+    ranked=queued + [x for x in (brief.get('ranked_stories') or []) if isinstance(x,dict)]
+    extra=(pre.get('opportunity_ranking_6') or {}).get('top_candidates') or []; ranked += [x for x in extra if isinstance(x,dict)]
     evaluated=[]; seen=set(); now=datetime.now(timezone.utc)
     for raw in ranked:
         if not isinstance(raw,dict):continue
-        s=symbol(raw.get('symbol')); cat=category(raw); key=candidate_key(raw)
-        if not s or key in seen:continue
-        seen.add(key); base=num(raw.get('ranker_score') or raw.get('score')); score=base; reasons=[]; blocked=False; count=counts.get(s,0); follow=material_followup(raw)
-        if base<MIN_SCORE:continue
+        s=symbol(raw.get('symbol')); cat=category(raw); key=candidate_key(raw); knowledge=cat in KNOWLEDGE
+        if (not s and not knowledge) or key in seen:continue
+        seen.add(key); base=num(raw.get('ranker_score') or raw.get('score')); score=base; reasons=[]; blocked=False; count=counts.get(s,0) if s else 0; follow=material_followup(raw)
+        required_floor=KNOWLEDGE_MIN_SCORE if knowledge else MIN_SCORE
+        if base<required_floor:continue
+        if knowledge:
+            research=raw.get('research') if isinstance(raw.get('research'),dict) else {}
+            evidence=max(num(raw.get('evidence_score')),num(research.get('evidence_score')),num(research.get('information_advantage_score'))*.7+num(research.get('undercoverage_score'))*.3)
+            if evidence<62:blocked=True;reasons.append(f'knowledge_evidence_too_weak_{evidence:.1f}')
         if not news_supported(raw):blocked=True;reasons.append('news_asset_not_explicitly_supported')
-        last_same=[r for r in recent if isinstance(r,dict) and symbol(r.get('symbol') or r.get('selected_lane_symbol'))==s]
-        within_window=False
+        last_same=[r for r in recent if isinstance(r,dict) and s and symbol(r.get('symbol') or r.get('selected_lane_symbol'))==s]
+        within_asset=False; same_category_recent=False
         for r in last_same:
             t=parse_time(r)
-            if t and now-t<=timedelta(hours=SAME_ASSET_HOURS):within_window=True;break
-        if within_window and not follow:blocked=True;reasons.append('same_asset_recently_published')
+            if not t:continue
+            age=now-t
+            if age<=timedelta(hours=SAME_ASSET_HOURS):within_asset=True
+            if age<=timedelta(hours=SAME_CATEGORY_HOURS) and category(r)==cat:same_category_recent=True
+        if same_category_recent and not follow:blocked=True;reasons.append('same_category_cooldown')
+        elif within_asset and not follow:score-=4;reasons.append('same_asset_short_spacing_penalty')
         if s=='BTC' and count>=BTC_MAX_RECENT and not follow:blocked=True;reasons.append(f'btc_overexposed_{count}_recent_posts')
-        elif count>=ASSET_MAX_RECENT and not follow:blocked=True;reasons.append(f'asset_overexposed_{count}_recent_posts')
+        elif s and count>=ASSET_MAX_RECENT and not follow:blocked=True;reasons.append(f'asset_overexposed_{count}_recent_posts')
         same_cat=sum(1 for r in recent[-5:] if isinstance(r,dict) and category(r)==cat)
-        if same_cat>=2 and cat not in {'creator_signal_outcome','follow_up'}:score-=6;reasons.append('category_repeat_penalty')
+        if same_cat>=1 and cat not in {'creator_signal_outcome','follow_up'}:score-=6;reasons.append('category_repeat_penalty')
+        recent_categories={category(r) for r in recent[-4:]}
+        if cat not in recent_categories:score+=8;reasons.append('lane_diversity_bonus')
+        if not s:score+=3;reasons.append('knowledge_without_asset_allowed')
         sim=max((similarity(text_of(raw),text_of(r)) for r in recent_texts),default=0.0)
         if sim>=SIMILARITY_BLOCK and not follow:blocked=True;reasons.append(f'semantic_similarity_{sim:.2f}')
         if count==0:score+=7;reasons.append('new_asset_bonus')
         if lane_priority(cat)==2:score+=8;reasons.append('primary_signal_lane_bonus')
         if cat in {'next_gainer_candidate','next_loser_candidate'}:score+=3;reasons.append('early_mover_discovery_bonus')
         evaluated.append({'candidate':raw,'score_before_guard':round(base,2),'portfolio_score':round(score,2),'lane_priority':lane_priority(cat),'asset_recent_count':count,'recent_same_category':same_cat,'max_recent_semantic_similarity':round(sim,3),'hard_block':blocked,'reasons':reasons})
-    allowed=[x for x in evaluated if not x['hard_block']]; allowed.sort(key=lambda x:(x['lane_priority'],x['portfolio_score']),reverse=True); chosen_entry=allowed[0] if allowed else None; chosen=chosen_entry['candidate'] if chosen_entry else None
+    allowed=[x for x in evaluated if not x['hard_block']]; allowed.sort(key=lambda x:(x['portfolio_score'],x['lane_priority']),reverse=True); chosen_entry=allowed[0] if allowed else None; chosen=chosen_entry['candidate'] if chosen_entry else None
     if current and material_followup(current):chosen=current; decision='PROTECTED_OUTCOME_OR_FOLLOWUP'; reason='material_outcome_update_is_allowed_to_revisit_a_recent_asset'; chosen_entry=None
     elif chosen:decision='DIVERSIFIED_STORY_SELECTED';reason='portfolio_manager_selected_the_best_non_repetitive_candidate'
     else:decision='WAIT_FOR_DIFFERENT_STORY';reason='all_qualified_candidates_are_repetitive_or_unsupported'
     publish=chosen is not None
     if publish:
-        chosen=dict(chosen);chosen['portfolio_guard_selected']=True;chosen['portfolio_score']=round(chosen_entry['portfolio_score'],2) if chosen_entry else num(chosen.get('score'));chosen['symbol']=symbol(chosen.get('symbol'))+'USDT';pre['selected_opportunity']=chosen;brief['authoritative_selection']=chosen;brief['portfolio_guard']={'decision':decision,'reason':reason,'selected_symbol':symbol(chosen.get('symbol')),'selected_category':category(chosen),'recent_asset_counts':counts,'recent_window':len(recent)};PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8');DIRECTOR.write_text(json.dumps(brief,indent=2,ensure_ascii=False),encoding='utf-8')
+        chosen=dict(chosen);chosen['portfolio_guard_selected']=True;chosen['portfolio_score']=round(chosen_entry['portfolio_score'],2) if chosen_entry else num(chosen.get('score'));raw_symbol=symbol(chosen.get('symbol'));chosen['symbol']=raw_symbol+'USDT' if raw_symbol else '';pre['selected_opportunity']=chosen;brief['authoritative_selection']=chosen;brief['portfolio_guard']={'decision':decision,'reason':reason,'selected_symbol':raw_symbol,'selected_category':category(chosen),'recent_asset_counts':counts,'recent_window':len(recent),'lane_rotation_enabled':True}
+        q_candidates=queue_state.get('candidates') if isinstance(queue_state.get('candidates'),list) else []
+        selected_key=candidate_key(chosen)
+        for item in q_candidates:
+            candidate=item.get('candidate') if isinstance(item,dict) and isinstance(item.get('candidate'),dict) else item
+            if isinstance(item,dict) and isinstance(candidate,dict) and candidate_key(candidate)==selected_key:
+                item['last_selected_at']=now.isoformat(); item['cooldown_until']=(now+timedelta(hours=4)).isoformat()
+        queue_state['candidates']=q_candidates
+        QUEUE.parent.mkdir(parents=True,exist_ok=True); QUEUE.write_text(json.dumps(queue_state,indent=2,ensure_ascii=False)+"\\n",encoding='utf-8')
+        PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8');DIRECTOR.write_text(json.dumps(brief,indent=2,ensure_ascii=False),encoding='utf-8')
     else:pre['selected_opportunity']={};PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'version':'1.5-defensive-record-normalization','publish':publish,'decision':decision,'reason':reason,'selected':chosen,'recent_asset_counts':counts,'recent_window':len(recent),'candidates_considered':len(evaluated),'blocked_candidates':[x for x in evaluated if x['hard_block']][:20],'top_allowed_candidates':allowed[:12],'policy':{'btc_max_recent_posts':BTC_MAX_RECENT,'asset_max_recent_posts':ASSET_MAX_RECENT,'same_asset_cooldown_hours':SAME_ASSET_HOURS,'publication_statuses_counted':['PUBLISHED_AUTONOMOUSLY','PUBLISHED_VERIFIED_BY_API_RESPONSE','PUBLISHED_SUBMITTED_504','VERIFIED_PUBLISHED'],'semantic_similarity_block':SIMILARITY_BLOCK,'generic_news_cannot_create_btc_fallback':True,'wait_when_repetitive':True,'outcome_followups_can_revisit_asset':True,'malformed_records_fail_closed':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'version':'1.5-defensive-record-normalization','publish':publish,'decision':decision,'reason':reason,'selected':chosen,'recent_asset_counts':counts,'recent_window':len(recent),'candidates_considered':len(evaluated),'blocked_candidates':[x for x in evaluated if x['hard_block']][:20],'top_allowed_candidates':allowed[:12],'policy':{'btc_max_recent_posts':BTC_MAX_RECENT,'asset_max_recent_posts':ASSET_MAX_RECENT,'same_asset_cooldown_hours':SAME_ASSET_HOURS,'same_category_cooldown_hours':SAME_CATEGORY_HOURS,'knowledge_lanes':sorted(KNOWLEDGE),'knowledge_min_evidence':62,'lane_rotation_enabled':True,'discovery_queue_enabled':True,'publication_statuses_counted':['PUBLISHED_AUTONOMOUSLY','PUBLISHED_VERIFIED_BY_API_RESPONSE','PUBLISHED_SUBMITTED_504','VERIFIED_PUBLISHED'],'semantic_similarity_block':SIMILARITY_BLOCK,'generic_news_cannot_create_btc_fallback':True,'wait_when_repetitive':True,'outcome_followups_can_revisit_asset':True,'malformed_records_fail_closed':True}}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps(result,indent=2,ensure_ascii=False));return 0
 if __name__=='__main__':raise SystemExit(main())
