@@ -1,4 +1,5 @@
 import json, re, urllib.parse, urllib.request, subprocess, sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -34,9 +35,10 @@ def fetch_fresh_candles(symbol, limit=48):
             with urllib.request.urlopen(req,timeout=15) as r:
                 raw=json.loads(r.read().decode('utf-8'))
             out=[]
+            now_ms=int(datetime.now(timezone.utc).timestamp()*1000)
             for row in raw:
-                if len(row)>=6:
-                    out.append({'open_time':int(row[0]),'open':float(row[1]),'high':float(row[2]),'low':float(row[3]),'close':float(row[4]),'volume':float(row[5])})
+                if len(row)>=7 and int(row[6]) < now_ms:
+                    out.append({'open_time':int(row[0]),'close_time':int(row[6]),'open':float(row[1]),'high':float(row[2]),'low':float(row[3]),'close':float(row[4]),'volume':float(row[5])})
             if out:return out
         except Exception as exc:last_error=exc
     raise RuntimeError(f'fresh 1H candles unavailable: {last_error}')
