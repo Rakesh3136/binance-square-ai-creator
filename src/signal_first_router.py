@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
 PRIMARY_LANES={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up'}
-EDITORIAL_LANES={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','comparison','education','watchlist','crypto_meme'}
+EDITORIAL_LANES={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','comparison','education','research_insight','market_mechanism','data_surprise','watchlist','crypto_meme'}
 
 def load(path):
     try:
@@ -45,7 +45,12 @@ def editorial_complete(x):
     score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('news_score'))))
     if score<MIN_SCORE:return False
     symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
-    if not symbol:return False
+    if not symbol and category not in {'education','research_insight','market_mechanism','data_surprise'}:return False
+    if category in {'education','research_insight','market_mechanism','data_surprise'}:
+        r=x.get('research') if isinstance(x.get('research'),dict) else {}
+        has_evidence=bool(str(x.get('source') or '').strip() or str(r.get('evidence_summary') or r.get('why_now') or r.get('finding') or '').strip() or r.get('evidence'))
+        if not has_evidence:return False
+        if num(r.get('evidence_score'),num(x.get('score'))) < 62:return False
     if category in {'breaking_news','news_and_macro'}:
         if not str(x.get('title') or x.get('news_title') or '').strip():return False
         if not str(x.get('source') or x.get('news_source') or '').strip():return False
@@ -190,6 +195,6 @@ def main():
     else:
         pre.pop('selected_opportunity',None); pre['signal_first_routing']={'decision':'NO_ELIGIBLE_OPPORTUNITY','primary':False,'bound_symbol':'','bound_category':'','prediction_contract_complete':False,'prediction':{}}
     PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True}}
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
