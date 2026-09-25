@@ -27,6 +27,8 @@ REQUIRED_ORDER = [
     "src/write_to_earn_eligibility_gate.py",
     "src/write_to_earn_master.py",
     "src/binance_square_publisher.py",
+    "src/creator_20_0_publication_verifier.py",
+    "src/call_tracker.py",
 ]
 
 
@@ -79,12 +81,16 @@ def main() -> int:
 
     publisher_line = "python src/binance_square_publisher.py"
     verifier_line = "python src/creator_20_0_publication_verifier.py"
+    call_tracker_line = "python src/call_tracker.py"
     publish_block = text[text.find("Extract publication and submit to Binance Square"):]
     if publisher_line not in publish_block or verifier_line not in publish_block:
         print("ERROR: publication publisher/verifier pair is not wired", file=sys.stderr)
         return 2
     if publish_block.find(publisher_line) >= publish_block.find(verifier_line):
         print("ERROR: publication verifier must run after publisher", file=sys.stderr)
+        return 2
+    if call_tracker_line not in publish_block or publish_block.find(verifier_line) >= publish_block.find(call_tracker_line):
+        print("ERROR: call tracker must run after publication verification", file=sys.stderr)
         return 2
 
     print(
