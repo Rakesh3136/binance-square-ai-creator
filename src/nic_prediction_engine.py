@@ -401,6 +401,62 @@ def build():
             if side == "SHORT" and relative_strength is not None and relative_strength <= -1.0:
                 quality += 5.0
 
+            # Build the live conditional map with the same rule family used by
+            # the walk-forward test. A setup is valid only if it remains ahead of
+            # the current price; already-triggered moves are treated as late.
+            h1_rows = fetched.get((symbol, side, "1h", "current"), [])
+            h4 = frames.get("4h") or {}
+            h1 = frames.get("1h") or {}
+            recommended_setup = {
+                "side": side,
+                "trigger": None,
+                "tp1": None,
+                "tp2": None,
+                "invalidation": None,
+                "risk_per_unit": None,
+                "state": "UNAVAILABLE",
+            }
+            if len(h1_rows) >= 22 and h4.get("atr"):
+                prior = h1_rows[-21:-1]
+                prior_high = max(x["high"] for x in prior)
+                prior_low = min(x["low"] for x in prior)
+                atr4 = float(h4["atr"])
+                last_price = float(h1.get("last") or 0.0)
+                if side == "LONG":
+                    trigger = prior_high + 0.12 * atr4
+                    if trigger > last_price:
+                        stop = trigger - 1.0 * atr4
+                        risk = trigger - stop
+                        recommended_setup = {
+                            "side": side,
+                            "trigger": trigger,
+                            "tp1": trigger + 1.8 * risk,
+                            "tp2": trigger + 2.6 * risk,
+                            "invalidation": stop,
+                            "risk_per_unit": risk,
+                            "state": "AWAITING_TRIGGER",
+                            "method": "20-bar breakout + 4H ATR",
+                        }
+                    else:
+                        recommended_setup["state"] = "ALREADY_TRIGGERED_LATE"
+                else:
+                    trigger = prior_low - 0.12 * atr4
+                    if trigger < last_price:
+                        stop = trigger + 1.0 * atr4
+                        risk = stop - trigger
+                        recommended_setup = {
+                            "side": side,
+                            "trigger": trigger,
+                            "tp1": trigger - 1.8 * risk,
+                            "tp2": trigger - 2.6 * risk,
+                            "invalidation": stop,
+                            "risk_per_unit": risk,
+                            "state": "AWAITING_TRIGGER",
+                            "method": "20-bar breakdown + 4H ATR",
+                        }
+                    else:
+                        recommended_setup["state"] = "ALREADY_TRIGGERED_LATE"
+
             reasons = list(alignment_notes)
             if terminal < MIN_EVENTS:
                 reasons.append(f"insufficient_walk_forward_samples:{terminal}<{MIN_EVENTS}")
@@ -412,6 +468,9 @@ def build():
             if atr_pct > 10:
                 reasons.append("extreme_current_volatility")
                 quality -= 8.0
+            if recommended_setup.get("state") == "ALREADY_TRIGGERED_LATE":
+                reasons.append("setup_already_triggered_late")
+                quality = min(quality, 55.0)
 
             quality = round(max(0.0, min(100.0, quality)), 2)
             status = (
@@ -419,6 +478,7 @@ def build():
                 if terminal >= MIN_EVENTS
                 and quality >= 72.0
                 and alignment >= MIN_CURRENT_ALIGNMENT
+                and recommended_setup.get("state") == "AWAITING_TRIGGER"
                 and not any(x in reasons for x in ("extreme_current_volatility", "high_intrabar_ambiguity"))
                 else "WAIT"
             )
@@ -440,6 +500,7 @@ def build():
                     } for k, v in frames.items()
                 },
                 "walk_forward": backtest,
+                "recommended_setup": recommended_setup,
                 "regime": {
                     "regime": regime.get("regime"),
                     "confidence": regime.get("confidence"),
