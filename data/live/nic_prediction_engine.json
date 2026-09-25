@@ -1,65 +1,143 @@
 {
   "version": "1.0-nic-walk-forward",
-  "generated_at": "2026-09-25T08:17:12.924228+00:00",
+  "generated_at": "2026-09-25T08:26:43.436860+00:00",
   "status": "READY",
   "minimum_walk_forward_events": 25,
   "minimum_current_alignment": 0.67,
   "candidates": [
     {
-      "symbol": "MET",
+      "symbol": "CVC",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 43.0,
+      "quality_score": 41.25,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 43.0,
-      "current_alignment": 0.25,
-      "relative_strength_to_btc": 35.7319,
+      "calibrated_confidence": 41.25,
+      "current_alignment": 0.1875,
+      "relative_strength_to_btc": 24.5146,
       "current_timeframes": {
         "1h": {
-          "rsi14": 48.73863679530001,
-          "atr_pct": 1.9486346737318905,
-          "volume_ratio": 1.0305203327591017,
-          "return_12": -1.6185991759858798,
-          "close_vs_ema20_pct": -0.03578177472534083
+          "rsi14": 48.319447759340285,
+          "atr_pct": 1.9610649871170924,
+          "volume_ratio": 0.5060191183102117,
+          "return_12": -0.26648900732845204,
+          "close_vs_ema20_pct": -0.8053306264997229
         },
         "4h": {
-          "rsi14": 55.725837043714264,
-          "atr_pct": 6.886457843681894,
-          "volume_ratio": 0.2407396974458195,
-          "return_12": -8.08358537255981,
-          "close_vs_ema20_pct": 1.7374103522039164
+          "rsi14": 55.33856982097464,
+          "atr_pct": 6.152781753984157,
+          "volume_ratio": 0.6168925568347796,
+          "return_12": 4.139130434782601,
+          "close_vs_ema20_pct": 2.2917000843024615
         },
         "1d": {
-          "rsi14": 72.5047691440389,
-          "atr_pct": 11.750098026401774,
-          "volume_ratio": 0.9651846697728855,
-          "return_12": 44.96021220159152,
-          "close_vs_ema20_pct": 28.71737094573166
+          "rsi14": 67.69106213422388,
+          "atr_pct": 19.378046494188226,
+          "volume_ratio": 2.1564447483311002,
+          "return_12": 33.74286967968408,
+          "close_vs_ema20_pct": 17.026725385861006
         }
       },
       "walk_forward": {
-        "events": 2,
+        "events": 5,
         "wins": 0,
         "losses": 0,
         "ambiguous": 0,
-        "non_terminal": 2,
+        "non_terminal": 5,
         "terminal_samples": 0,
         "win_rate": null
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 0.32053742857142853,
-        "tp1": 0.2790988571428571,
-        "tp2": 0.26068171428571424,
-        "invalidation": 0.3435588571428571,
-        "risk_per_unit": 0.02302142857142858,
+        "trigger": 0.029228942857142858,
+        "tp1": 0.025913085714285713,
+        "tp2": 0.024439371428571426,
+        "invalidation": 0.031071085714285716,
+        "risk_per_unit": 0.0018421428571428582,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 0.3343
+        "close": 0.02994
+      },
+      "regime": {
+        "regime": "MIXED",
+        "btc_1d_return": 9.22829606542448,
+        "btc_1d_buy_ratio": 0.49075337369339367,
+        "confidence": null
+      },
+      "postmortem_feedback_applied": false,
+      "reasons": [
+        "1d:trend=no,momentum=no,range=ok,consistency=no",
+        "4h:trend=no,momentum=no,range=no,consistency=no",
+        "1h:trend=no,momentum=ok,range=ok,consistency=no",
+        "extreme_volatility_penalty",
+        "btc_relative_strength=no",
+        "insufficient_walk_forward_samples:0<25"
+      ],
+      "policy": {
+        "quality_score_is_not_a_profit_probability": true,
+        "historical_test_is_out_of_sample_only": true,
+        "conditional_trigger_must_be_hit_before_target_or_stop": true,
+        "weak_evidence_means_wait": true
+      }
+    },
+    {
+      "symbol": "GPS",
+      "side": "SHORT",
+      "status": "WAIT",
+      "quality_score": 34.5,
+      "confidence_ceiling": 85.0,
+      "calibrated_confidence": 34.5,
+      "current_alignment": 0.375,
+      "relative_strength_to_btc": 13.0769,
+      "current_timeframes": {
+        "1h": {
+          "rsi14": 43.35126424315084,
+          "atr_pct": 1.3083761111806698,
+          "volume_ratio": 0.330811987310845,
+          "return_12": 0.4401408450704247,
+          "close_vs_ema20_pct": -0.6379601124773759
+        },
+        "4h": {
+          "rsi14": 45.40763201481667,
+          "atr_pct": 3.680981595092022,
+          "volume_ratio": 0.32085369069342196,
+          "return_12": -12.432847275518032,
+          "close_vs_ema20_pct": -2.375751076065802
+        },
+        "1d": {
+          "rsi14": 53.190307145981585,
+          "atr_pct": 8.551483420593373,
+          "volume_ratio": 0.5434572944066747,
+          "return_12": 22.305229455709718,
+          "close_vs_ema20_pct": 2.858688904345019
+        }
+      },
+      "walk_forward": {
+        "events": 22,
+        "wins": 1,
+        "losses": 9,
+        "ambiguous": 0,
+        "non_terminal": 12,
+        "terminal_samples": 10,
+        "win_rate": 0.1
+      },
+      "recommended_setup": {
+        "side": "SHORT",
+        "trigger": 0.011199599999999999,
+        "tp1": 0.010443599999999999,
+        "tp2": 0.010107599999999998,
+        "invalidation": 0.011619599999999999,
+        "risk_per_unit": 0.00042000000000000023,
+        "state": "AWAITING_TRIGGER",
+        "method": "20-bar breakdown + 4H ATR"
+      },
+      "latest_completed_candle": {
+        "open_time": 1790319600000,
+        "close_time": 1790323199999,
+        "close": 0.01141
       },
       "regime": {
         "regime": "MIXED",
@@ -70,8 +148,85 @@
       "postmortem_feedback_applied": false,
       "reasons": [
         "1d:trend=no,momentum=no,range=no,consistency=ok",
-        "4h:trend=no,momentum=no,range=no,consistency=no",
+        "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=ok",
+        "btc_relative_strength=no",
+        "insufficient_walk_forward_samples:10<25"
+      ],
+      "policy": {
+        "quality_score_is_not_a_profit_probability": true,
+        "historical_test_is_out_of_sample_only": true,
+        "conditional_trigger_must_be_hit_before_target_or_stop": true,
+        "weak_evidence_means_wait": true
+      }
+    },
+    {
+      "symbol": "MINA",
+      "side": "SHORT",
+      "status": "WAIT",
+      "quality_score": 44.75,
+      "confidence_ceiling": 85.0,
+      "calibrated_confidence": 44.75,
+      "current_alignment": 0.3125,
+      "relative_strength_to_btc": 27.4352,
+      "current_timeframes": {
+        "1h": {
+          "rsi14": 38.761254772116246,
+          "atr_pct": 2.4831391784181487,
+          "volume_ratio": 0.41383332363769515,
+          "return_12": -4.115226337448563,
+          "close_vs_ema20_pct": -2.9285234151717243
+        },
+        "4h": {
+          "rsi14": 51.73500321334751,
+          "atr_pct": 5.604945840997342,
+          "volume_ratio": 0.7780192047641341,
+          "return_12": -6.675567423230966,
+          "close_vs_ema20_pct": -1.4680065759326788
+        },
+        "1d": {
+          "rsi14": 74.8024990653352,
+          "atr_pct": 11.926108374384238,
+          "volume_ratio": 0.8788089066429469,
+          "return_12": 36.66352497643732,
+          "close_vs_ema20_pct": 35.007787459985494
+        }
+      },
+      "walk_forward": {
+        "events": 1,
+        "wins": 0,
+        "losses": 0,
+        "ambiguous": 0,
+        "non_terminal": 1,
+        "terminal_samples": 0,
+        "win_rate": null
+      },
+      "recommended_setup": {
+        "side": "SHORT",
+        "trigger": 0.13695971428571427,
+        "tp1": 0.12285542857142856,
+        "tp2": 0.11658685714285714,
+        "invalidation": 0.14479542857142855,
+        "risk_per_unit": 0.00783571428571428,
+        "state": "AWAITING_TRIGGER",
+        "method": "20-bar breakdown + 4H ATR"
+      },
+      "latest_completed_candle": {
+        "open_time": 1790319600000,
+        "close_time": 1790323199999,
+        "close": 0.1398
+      },
+      "regime": {
+        "regime": "MIXED",
+        "btc_1d_return": 9.22829606542448,
+        "btc_1d_buy_ratio": 0.49075337369339367,
+        "confidence": null
+      },
+      "postmortem_feedback_applied": false,
+      "reasons": [
+        "1d:trend=no,momentum=no,range=no,consistency=ok",
+        "4h:trend=no,momentum=no,range=ok,consistency=no",
+        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
         "insufficient_walk_forward_samples:0<25"
@@ -161,60 +316,60 @@
       }
     },
     {
-      "symbol": "MINA",
+      "symbol": "SQQQB",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 44.75,
+      "quality_score": 33.27,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 44.75,
-      "current_alignment": 0.3125,
-      "relative_strength_to_btc": 27.4352,
+      "calibrated_confidence": 33.27,
+      "current_alignment": 0.0,
+      "relative_strength_to_btc": null,
       "current_timeframes": {
         "1h": {
-          "rsi14": 38.761254772116246,
-          "atr_pct": 2.4831391784181487,
-          "volume_ratio": 0.41383332363769515,
-          "return_12": -4.115226337448563,
-          "close_vs_ema20_pct": -2.9285234151717243
+          "rsi14": 37.63570949121387,
+          "atr_pct": 0.534183522655295,
+          "volume_ratio": 0.26226911840226547,
+          "return_12": -0.937042459736459,
+          "close_vs_ema20_pct": -1.113053409609599
         },
         "4h": {
-          "rsi14": 51.73500321334751,
-          "atr_pct": 5.604945840997342,
-          "volume_ratio": 0.7780192047641341,
-          "return_12": -6.675567423230966,
-          "close_vs_ema20_pct": -1.4680065759326788
+          "rsi14": 35.5391967646794,
+          "atr_pct": 1.4167476035640358,
+          "volume_ratio": 0.44892481460051037,
+          "return_12": 1.5915915915915901,
+          "close_vs_ema20_pct": -2.2124543017468357
         },
         "1d": {
-          "rsi14": 74.8024990653352,
-          "atr_pct": 11.926108374384238,
-          "volume_ratio": 0.8788089066429469,
-          "return_12": 36.66352497643732,
-          "close_vs_ema20_pct": 35.007787459985494
+          "rsi14": null,
+          "atr_pct": null,
+          "volume_ratio": null,
+          "return_12": null,
+          "close_vs_ema20_pct": null
         }
       },
       "walk_forward": {
-        "events": 1,
+        "events": 7,
         "wins": 0,
-        "losses": 0,
+        "losses": 1,
         "ambiguous": 0,
-        "non_terminal": 1,
-        "terminal_samples": 0,
-        "win_rate": null
+        "non_terminal": 6,
+        "terminal_samples": 1,
+        "win_rate": 0.0
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 0.13695971428571427,
-        "tp1": 0.12285542857142856,
-        "tp2": 0.11658685714285714,
-        "invalidation": 0.14479542857142855,
-        "risk_per_unit": 0.00783571428571428,
+        "trigger": 33.65248571428572,
+        "tp1": 32.78977142857143,
+        "tp2": 32.40634285714285,
+        "invalidation": 34.13177142857143,
+        "risk_per_unit": 0.47928571428571587,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 0.1398
+        "close": 33.83
       },
       "regime": {
         "regime": "MIXED",
@@ -224,12 +379,8 @@
       },
       "postmortem_feedback_applied": false,
       "reasons": [
-        "1d:trend=no,momentum=no,range=no,consistency=ok",
-        "4h:trend=no,momentum=no,range=ok,consistency=no",
-        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
-        "extreme_volatility_penalty",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "missing_required_timeframe",
+        "insufficient_walk_forward_samples:1<25"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
@@ -316,60 +467,60 @@
       }
     },
     {
-      "symbol": "GPS",
+      "symbol": "MET",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 34.5,
+      "quality_score": 43.0,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 34.5,
-      "current_alignment": 0.375,
-      "relative_strength_to_btc": 13.0769,
+      "calibrated_confidence": 43.0,
+      "current_alignment": 0.25,
+      "relative_strength_to_btc": 35.7319,
       "current_timeframes": {
         "1h": {
-          "rsi14": 43.35126424315084,
-          "atr_pct": 1.3083761111806698,
-          "volume_ratio": 0.330811987310845,
-          "return_12": 0.4401408450704247,
-          "close_vs_ema20_pct": -0.6379601124773759
+          "rsi14": 48.73863679530001,
+          "atr_pct": 1.9486346737318905,
+          "volume_ratio": 1.0305203327591017,
+          "return_12": -1.6185991759858798,
+          "close_vs_ema20_pct": -0.03578177472534083
         },
         "4h": {
-          "rsi14": 45.40763201481667,
-          "atr_pct": 3.680981595092022,
-          "volume_ratio": 0.32085369069342196,
-          "return_12": -12.432847275518032,
-          "close_vs_ema20_pct": -2.375751076065802
+          "rsi14": 55.725837043714264,
+          "atr_pct": 6.886457843681894,
+          "volume_ratio": 0.2407396974458195,
+          "return_12": -8.08358537255981,
+          "close_vs_ema20_pct": 1.7374103522039164
         },
         "1d": {
-          "rsi14": 53.190307145981585,
-          "atr_pct": 8.551483420593373,
-          "volume_ratio": 0.5434572944066747,
-          "return_12": 22.305229455709718,
-          "close_vs_ema20_pct": 2.858688904345019
+          "rsi14": 72.5047691440389,
+          "atr_pct": 11.750098026401774,
+          "volume_ratio": 0.9651846697728855,
+          "return_12": 44.96021220159152,
+          "close_vs_ema20_pct": 28.71737094573166
         }
       },
       "walk_forward": {
-        "events": 22,
-        "wins": 1,
-        "losses": 9,
+        "events": 2,
+        "wins": 0,
+        "losses": 0,
         "ambiguous": 0,
-        "non_terminal": 12,
-        "terminal_samples": 10,
-        "win_rate": 0.1
+        "non_terminal": 2,
+        "terminal_samples": 0,
+        "win_rate": null
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 0.011199599999999999,
-        "tp1": 0.010443599999999999,
-        "tp2": 0.010107599999999998,
-        "invalidation": 0.011619599999999999,
-        "risk_per_unit": 0.00042000000000000023,
+        "trigger": 0.32053742857142853,
+        "tp1": 0.2790988571428571,
+        "tp2": 0.26068171428571424,
+        "invalidation": 0.3435588571428571,
+        "risk_per_unit": 0.02302142857142858,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 0.01141
+        "close": 0.3343
       },
       "regime": {
         "regime": "MIXED",
@@ -380,10 +531,89 @@
       "postmortem_feedback_applied": false,
       "reasons": [
         "1d:trend=no,momentum=no,range=no,consistency=ok",
-        "4h:trend=no,momentum=ok,range=ok,consistency=no",
+        "4h:trend=no,momentum=no,range=no,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=ok",
+        "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:10<25"
+        "insufficient_walk_forward_samples:0<25"
+      ],
+      "policy": {
+        "quality_score_is_not_a_profit_probability": true,
+        "historical_test_is_out_of_sample_only": true,
+        "conditional_trigger_must_be_hit_before_target_or_stop": true,
+        "weak_evidence_means_wait": true
+      }
+    },
+    {
+      "symbol": "HEI",
+      "side": "SHORT",
+      "status": "WAIT",
+      "quality_score": 51.75,
+      "confidence_ceiling": 85.0,
+      "calibrated_confidence": 51.75,
+      "current_alignment": 0.3125,
+      "relative_strength_to_btc": 15.1913,
+      "current_timeframes": {
+        "1h": {
+          "rsi14": 35.843524622172595,
+          "atr_pct": 1.1517478278440094,
+          "volume_ratio": 2.4897281893338628,
+          "return_12": -3.283173734610123,
+          "close_vs_ema20_pct": -1.7647983530756584
+        },
+        "4h": {
+          "rsi14": 41.356804090516825,
+          "atr_pct": 5.107092341887251,
+          "volume_ratio": 0.7462155778428559,
+          "return_12": -8.538163001293652,
+          "close_vs_ema20_pct": -4.024958286854052
+        },
+        "1d": {
+          "rsi14": 53.360833931700824,
+          "atr_pct": 13.007207029321751,
+          "volume_ratio": 0.32442562921738993,
+          "return_12": 24.41960447119518,
+          "close_vs_ema20_pct": 3.798136391629625
+        }
+      },
+      "walk_forward": {
+        "events": 12,
+        "wins": 3,
+        "losses": 2,
+        "ambiguous": 0,
+        "non_terminal": 7,
+        "terminal_samples": 5,
+        "win_rate": 0.6
+      },
+      "recommended_setup": {
+        "side": "SHORT",
+        "trigger": 0.14013342857142855,
+        "tp1": 0.1271348571428571,
+        "tp2": 0.12135771428571426,
+        "invalidation": 0.14735485714285712,
+        "risk_per_unit": 0.007221428571428573,
+        "state": "AWAITING_TRIGGER",
+        "method": "20-bar breakdown + 4H ATR"
+      },
+      "latest_completed_candle": {
+        "open_time": 1790319600000,
+        "close_time": 1790323199999,
+        "close": 0.1414
+      },
+      "regime": {
+        "regime": "MIXED",
+        "btc_1d_return": 9.22829606542448,
+        "btc_1d_buy_ratio": 0.49075337369339367,
+        "confidence": null
+      },
+      "postmortem_feedback_applied": false,
+      "reasons": [
+        "1d:trend=ok,momentum=no,range=no,consistency=no",
+        "4h:trend=no,momentum=ok,range=no,consistency=no",
+        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
+        "extreme_volatility_penalty",
+        "btc_relative_strength=no",
+        "insufficient_walk_forward_samples:5<25"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
@@ -547,183 +777,28 @@
       }
     },
     {
-      "symbol": "HEI",
+      "symbol": "GPROB",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 51.75,
+      "quality_score": 36.0,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 51.75,
-      "current_alignment": 0.3125,
-      "relative_strength_to_btc": 15.1913,
-      "current_timeframes": {
-        "1h": {
-          "rsi14": 35.843524622172595,
-          "atr_pct": 1.1517478278440094,
-          "volume_ratio": 2.4897281893338628,
-          "return_12": -3.283173734610123,
-          "close_vs_ema20_pct": -1.7647983530756584
-        },
-        "4h": {
-          "rsi14": 41.356804090516825,
-          "atr_pct": 5.107092341887251,
-          "volume_ratio": 0.7462155778428559,
-          "return_12": -8.538163001293652,
-          "close_vs_ema20_pct": -4.024958286854052
-        },
-        "1d": {
-          "rsi14": 53.360833931700824,
-          "atr_pct": 13.007207029321751,
-          "volume_ratio": 0.32442562921738993,
-          "return_12": 24.41960447119518,
-          "close_vs_ema20_pct": 3.798136391629625
-        }
-      },
-      "walk_forward": {
-        "events": 12,
-        "wins": 3,
-        "losses": 2,
-        "ambiguous": 0,
-        "non_terminal": 7,
-        "terminal_samples": 5,
-        "win_rate": 0.6
-      },
-      "recommended_setup": {
-        "side": "SHORT",
-        "trigger": 0.14013342857142855,
-        "tp1": 0.1271348571428571,
-        "tp2": 0.12135771428571426,
-        "invalidation": 0.14735485714285712,
-        "risk_per_unit": 0.007221428571428573,
-        "state": "AWAITING_TRIGGER",
-        "method": "20-bar breakdown + 4H ATR"
-      },
-      "latest_completed_candle": {
-        "open_time": 1790319600000,
-        "close_time": 1790323199999,
-        "close": 0.1414
-      },
-      "regime": {
-        "regime": "MIXED",
-        "btc_1d_return": 9.22829606542448,
-        "btc_1d_buy_ratio": 0.49075337369339367,
-        "confidence": null
-      },
-      "postmortem_feedback_applied": false,
-      "reasons": [
-        "1d:trend=ok,momentum=no,range=no,consistency=no",
-        "4h:trend=no,momentum=ok,range=no,consistency=no",
-        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
-        "extreme_volatility_penalty",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:5<25"
-      ],
-      "policy": {
-        "quality_score_is_not_a_profit_probability": true,
-        "historical_test_is_out_of_sample_only": true,
-        "conditional_trigger_must_be_hit_before_target_or_stop": true,
-        "weak_evidence_means_wait": true
-      }
-    },
-    {
-      "symbol": "CHR",
-      "side": "SHORT",
-      "status": "WAIT",
-      "quality_score": 49.75,
-      "confidence_ceiling": 85.0,
-      "calibrated_confidence": 49.75,
-      "current_alignment": 0.3125,
-      "relative_strength_to_btc": 22.4941,
-      "current_timeframes": {
-        "1h": {
-          "rsi14": 48.01971635584766,
-          "atr_pct": 1.600163420945113,
-          "volume_ratio": 1.7425527408578296,
-          "return_12": -1.1775788977861579,
-          "close_vs_ema20_pct": -0.595170572797088
-        },
-        "4h": {
-          "rsi14": 57.46169235901528,
-          "atr_pct": 6.853465885877707,
-          "volume_ratio": 0.17739626979419276,
-          "return_12": -4.549590536851689,
-          "close_vs_ema20_pct": 2.393010461616063
-        },
-        "1d": {
-          "rsi14": 71.00597124968657,
-          "atr_pct": 9.699637145544953,
-          "volume_ratio": 2.0048165742094795,
-          "return_12": 31.722428748451037,
-          "close_vs_ema20_pct": 21.461651486829435
-        }
-      },
-      "walk_forward": {
-        "events": 1,
-        "wins": 0,
-        "losses": 0,
-        "ambiguous": 0,
-        "non_terminal": 1,
-        "terminal_samples": 0,
-        "win_rate": null
-      },
-      "recommended_setup": {
-        "side": "SHORT",
-        "trigger": 0.020337457142857143,
-        "tp1": 0.017749314285714284,
-        "tp2": 0.01659902857142857,
-        "invalidation": 0.021775314285714286,
-        "risk_per_unit": 0.0014378571428571435,
-        "state": "AWAITING_TRIGGER",
-        "method": "20-bar breakdown + 4H ATR"
-      },
-      "latest_completed_candle": {
-        "open_time": 1790319600000,
-        "close_time": 1790323199999,
-        "close": 0.02098
-      },
-      "regime": {
-        "regime": "MIXED",
-        "btc_1d_return": 9.22829606542448,
-        "btc_1d_buy_ratio": 0.49075337369339367,
-        "confidence": null
-      },
-      "postmortem_feedback_applied": false,
-      "reasons": [
-        "1d:trend=no,momentum=no,range=no,consistency=ok",
-        "4h:trend=no,momentum=no,range=ok,consistency=no",
-        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
-      ],
-      "policy": {
-        "quality_score_is_not_a_profit_probability": true,
-        "historical_test_is_out_of_sample_only": true,
-        "conditional_trigger_must_be_hit_before_target_or_stop": true,
-        "weak_evidence_means_wait": true
-      }
-    },
-    {
-      "symbol": "SQQQB",
-      "side": "SHORT",
-      "status": "WAIT",
-      "quality_score": 33.27,
-      "confidence_ceiling": 85.0,
-      "calibrated_confidence": 33.27,
+      "calibrated_confidence": 36.0,
       "current_alignment": 0.0,
       "relative_strength_to_btc": null,
       "current_timeframes": {
         "1h": {
-          "rsi14": 37.63570949121387,
-          "atr_pct": 0.534183522655295,
-          "volume_ratio": 0.26226911840226547,
-          "return_12": -0.937042459736459,
-          "close_vs_ema20_pct": -1.113053409609599
+          "rsi14": 48.55405602033722,
+          "atr_pct": 1.2935883014623182,
+          "volume_ratio": 1.4244930561033613,
+          "return_12": 0.7936507936507908,
+          "close_vs_ema20_pct": -0.05255441909072234
         },
         "4h": {
-          "rsi14": 35.5391967646794,
-          "atr_pct": 1.4167476035640358,
-          "volume_ratio": 0.44892481460051037,
-          "return_12": 1.5915915915915901,
-          "close_vs_ema20_pct": -2.2124543017468357
+          "rsi14": 45.4752160658124,
+          "atr_pct": 2.4184476940382473,
+          "volume_ratio": 1.3102319154455695,
+          "return_12": -2.3076923076923106,
+          "close_vs_ema20_pct": -0.9808795083781296
         },
         "1d": {
           "rsi14": null,
@@ -734,28 +809,28 @@
         }
       },
       "walk_forward": {
-        "events": 7,
+        "events": 13,
         "wins": 0,
-        "losses": 1,
+        "losses": 2,
         "ambiguous": 0,
-        "non_terminal": 6,
-        "terminal_samples": 1,
+        "non_terminal": 11,
+        "terminal_samples": 2,
         "win_rate": 0.0
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 33.65248571428572,
-        "tp1": 32.78977142857143,
-        "tp2": 32.40634285714285,
-        "invalidation": 34.13177142857143,
-        "risk_per_unit": 0.47928571428571587,
+        "trigger": 1.2463142857142857,
+        "tp1": 1.1910285714285715,
+        "tp2": 1.1664571428571429,
+        "invalidation": 1.2770285714285714,
+        "risk_per_unit": 0.030714285714285694,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 33.83
+        "close": 1.27
       },
       "regime": {
         "regime": "MIXED",
@@ -766,7 +841,7 @@
       "postmortem_feedback_applied": false,
       "reasons": [
         "missing_required_timeframe",
-        "insufficient_walk_forward_samples:1<25"
+        "insufficient_walk_forward_samples:2<25"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
@@ -776,60 +851,60 @@
       }
     },
     {
-      "symbol": "RAY",
+      "symbol": "牛来",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 36.77,
+      "quality_score": 30.0,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 36.77,
-      "current_alignment": 0.125,
-      "relative_strength_to_btc": 27.7685,
+      "calibrated_confidence": 30.0,
+      "current_alignment": 0.0,
+      "relative_strength_to_btc": null,
       "current_timeframes": {
         "1h": {
-          "rsi14": 46.78045136360406,
-          "atr_pct": 2.390242869843775,
-          "volume_ratio": 0.3540557197469213,
-          "return_12": -6.970546340118544,
-          "close_vs_ema20_pct": -1.562591056534668
+          "rsi14": 47.021165597220616,
+          "atr_pct": 1.854917234664068,
+          "volume_ratio": 0.7268114957593821,
+          "return_12": -1.1549566891241647,
+          "close_vs_ema20_pct": -0.04548833143590558
         },
         "4h": {
-          "rsi14": 56.0483563533988,
-          "atr_pct": 7.0722964677326,
-          "volume_ratio": 0.3366467715168183,
-          "return_12": 12.722008796837581,
-          "close_vs_ema20_pct": 3.0084516198425337
+          "rsi14": 44.793977869481736,
+          "atr_pct": 6.082904437334818,
+          "volume_ratio": 0.282540583869749,
+          "return_12": -7.685393258426965,
+          "close_vs_ema20_pct": -2.9657692406226177
         },
         "1d": {
-          "rsi14": 77.39438667779072,
-          "atr_pct": 11.237471348550814,
-          "volume_ratio": 1.2813026918008583,
-          "return_12": 36.99681342264418,
-          "close_vs_ema20_pct": 37.139433798613794
+          "rsi14": null,
+          "atr_pct": null,
+          "volume_ratio": null,
+          "return_12": null,
+          "close_vs_ema20_pct": null
         }
       },
       "walk_forward": {
-        "events": 3,
-        "wins": 0,
-        "losses": 1,
+        "events": 14,
+        "wins": 1,
+        "losses": 4,
         "ambiguous": 0,
-        "non_terminal": 2,
-        "terminal_samples": 1,
-        "win_rate": 0.0
+        "non_terminal": 9,
+        "terminal_samples": 5,
+        "win_rate": 0.2
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 1.9344177142857144,
-        "tp1": 1.6766834285714292,
-        "tp2": 1.562134857142858,
-        "invalidation": 2.0776034285714284,
-        "risk_per_unit": 0.14318571428571403,
+        "trigger": 0.09699034285714285,
+        "tp1": 0.08574548571428571,
+        "tp2": 0.08074777142857142,
+        "invalidation": 0.1032374857142857,
+        "risk_per_unit": 0.006247142857142854,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 2.0246
+        "close": 0.1027
       },
       "regime": {
         "regime": "MIXED",
@@ -839,90 +914,8 @@
       },
       "postmortem_feedback_applied": false,
       "reasons": [
-        "1d:trend=no,momentum=no,range=no,consistency=no",
-        "4h:trend=no,momentum=no,range=no,consistency=no",
-        "1h:trend=no,momentum=ok,range=ok,consistency=no",
-        "extreme_volatility_penalty",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:1<25"
-      ],
-      "policy": {
-        "quality_score_is_not_a_profit_probability": true,
-        "historical_test_is_out_of_sample_only": true,
-        "conditional_trigger_must_be_hit_before_target_or_stop": true,
-        "weak_evidence_means_wait": true
-      }
-    },
-    {
-      "symbol": "CVC",
-      "side": "SHORT",
-      "status": "WAIT",
-      "quality_score": 41.25,
-      "confidence_ceiling": 85.0,
-      "calibrated_confidence": 41.25,
-      "current_alignment": 0.1875,
-      "relative_strength_to_btc": 24.5146,
-      "current_timeframes": {
-        "1h": {
-          "rsi14": 48.319447759340285,
-          "atr_pct": 1.9610649871170924,
-          "volume_ratio": 0.5060191183102117,
-          "return_12": -0.26648900732845204,
-          "close_vs_ema20_pct": -0.8053306264997229
-        },
-        "4h": {
-          "rsi14": 55.33856982097464,
-          "atr_pct": 6.152781753984157,
-          "volume_ratio": 0.6168925568347796,
-          "return_12": 4.139130434782601,
-          "close_vs_ema20_pct": 2.2917000843024615
-        },
-        "1d": {
-          "rsi14": 67.69106213422388,
-          "atr_pct": 19.378046494188226,
-          "volume_ratio": 2.1564447483311002,
-          "return_12": 33.74286967968408,
-          "close_vs_ema20_pct": 17.026725385861006
-        }
-      },
-      "walk_forward": {
-        "events": 5,
-        "wins": 0,
-        "losses": 0,
-        "ambiguous": 0,
-        "non_terminal": 5,
-        "terminal_samples": 0,
-        "win_rate": null
-      },
-      "recommended_setup": {
-        "side": "SHORT",
-        "trigger": 0.029228942857142858,
-        "tp1": 0.025913085714285713,
-        "tp2": 0.024439371428571426,
-        "invalidation": 0.031071085714285716,
-        "risk_per_unit": 0.0018421428571428582,
-        "state": "AWAITING_TRIGGER",
-        "method": "20-bar breakdown + 4H ATR"
-      },
-      "latest_completed_candle": {
-        "open_time": 1790319600000,
-        "close_time": 1790323199999,
-        "close": 0.02994
-      },
-      "regime": {
-        "regime": "MIXED",
-        "btc_1d_return": 9.22829606542448,
-        "btc_1d_buy_ratio": 0.49075337369339367,
-        "confidence": null
-      },
-      "postmortem_feedback_applied": false,
-      "reasons": [
-        "1d:trend=no,momentum=no,range=ok,consistency=no",
-        "4h:trend=no,momentum=no,range=no,consistency=no",
-        "1h:trend=no,momentum=ok,range=ok,consistency=no",
-        "extreme_volatility_penalty",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "missing_required_timeframe",
+        "insufficient_walk_forward_samples:5<25"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
@@ -935,60 +928,138 @@
   "selected_passes": [],
   "selected_waits": [
     {
-      "symbol": "MET",
+      "symbol": "CVC",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 43.0,
+      "quality_score": 41.25,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 43.0,
-      "current_alignment": 0.25,
-      "relative_strength_to_btc": 35.7319,
+      "calibrated_confidence": 41.25,
+      "current_alignment": 0.1875,
+      "relative_strength_to_btc": 24.5146,
       "current_timeframes": {
         "1h": {
-          "rsi14": 48.73863679530001,
-          "atr_pct": 1.9486346737318905,
-          "volume_ratio": 1.0305203327591017,
-          "return_12": -1.6185991759858798,
-          "close_vs_ema20_pct": -0.03578177472534083
+          "rsi14": 48.319447759340285,
+          "atr_pct": 1.9610649871170924,
+          "volume_ratio": 0.5060191183102117,
+          "return_12": -0.26648900732845204,
+          "close_vs_ema20_pct": -0.8053306264997229
         },
         "4h": {
-          "rsi14": 55.725837043714264,
-          "atr_pct": 6.886457843681894,
-          "volume_ratio": 0.2407396974458195,
-          "return_12": -8.08358537255981,
-          "close_vs_ema20_pct": 1.7374103522039164
+          "rsi14": 55.33856982097464,
+          "atr_pct": 6.152781753984157,
+          "volume_ratio": 0.6168925568347796,
+          "return_12": 4.139130434782601,
+          "close_vs_ema20_pct": 2.2917000843024615
         },
         "1d": {
-          "rsi14": 72.5047691440389,
-          "atr_pct": 11.750098026401774,
-          "volume_ratio": 0.9651846697728855,
-          "return_12": 44.96021220159152,
-          "close_vs_ema20_pct": 28.71737094573166
+          "rsi14": 67.69106213422388,
+          "atr_pct": 19.378046494188226,
+          "volume_ratio": 2.1564447483311002,
+          "return_12": 33.74286967968408,
+          "close_vs_ema20_pct": 17.026725385861006
         }
       },
       "walk_forward": {
-        "events": 2,
+        "events": 5,
         "wins": 0,
         "losses": 0,
         "ambiguous": 0,
-        "non_terminal": 2,
+        "non_terminal": 5,
         "terminal_samples": 0,
         "win_rate": null
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 0.32053742857142853,
-        "tp1": 0.2790988571428571,
-        "tp2": 0.26068171428571424,
-        "invalidation": 0.3435588571428571,
-        "risk_per_unit": 0.02302142857142858,
+        "trigger": 0.029228942857142858,
+        "tp1": 0.025913085714285713,
+        "tp2": 0.024439371428571426,
+        "invalidation": 0.031071085714285716,
+        "risk_per_unit": 0.0018421428571428582,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 0.3343
+        "close": 0.02994
+      },
+      "regime": {
+        "regime": "MIXED",
+        "btc_1d_return": 9.22829606542448,
+        "btc_1d_buy_ratio": 0.49075337369339367,
+        "confidence": null
+      },
+      "postmortem_feedback_applied": false,
+      "reasons": [
+        "1d:trend=no,momentum=no,range=ok,consistency=no",
+        "4h:trend=no,momentum=no,range=no,consistency=no",
+        "1h:trend=no,momentum=ok,range=ok,consistency=no",
+        "extreme_volatility_penalty",
+        "btc_relative_strength=no",
+        "insufficient_walk_forward_samples:0<25"
+      ],
+      "policy": {
+        "quality_score_is_not_a_profit_probability": true,
+        "historical_test_is_out_of_sample_only": true,
+        "conditional_trigger_must_be_hit_before_target_or_stop": true,
+        "weak_evidence_means_wait": true
+      }
+    },
+    {
+      "symbol": "GPS",
+      "side": "SHORT",
+      "status": "WAIT",
+      "quality_score": 34.5,
+      "confidence_ceiling": 85.0,
+      "calibrated_confidence": 34.5,
+      "current_alignment": 0.375,
+      "relative_strength_to_btc": 13.0769,
+      "current_timeframes": {
+        "1h": {
+          "rsi14": 43.35126424315084,
+          "atr_pct": 1.3083761111806698,
+          "volume_ratio": 0.330811987310845,
+          "return_12": 0.4401408450704247,
+          "close_vs_ema20_pct": -0.6379601124773759
+        },
+        "4h": {
+          "rsi14": 45.40763201481667,
+          "atr_pct": 3.680981595092022,
+          "volume_ratio": 0.32085369069342196,
+          "return_12": -12.432847275518032,
+          "close_vs_ema20_pct": -2.375751076065802
+        },
+        "1d": {
+          "rsi14": 53.190307145981585,
+          "atr_pct": 8.551483420593373,
+          "volume_ratio": 0.5434572944066747,
+          "return_12": 22.305229455709718,
+          "close_vs_ema20_pct": 2.858688904345019
+        }
+      },
+      "walk_forward": {
+        "events": 22,
+        "wins": 1,
+        "losses": 9,
+        "ambiguous": 0,
+        "non_terminal": 12,
+        "terminal_samples": 10,
+        "win_rate": 0.1
+      },
+      "recommended_setup": {
+        "side": "SHORT",
+        "trigger": 0.011199599999999999,
+        "tp1": 0.010443599999999999,
+        "tp2": 0.010107599999999998,
+        "invalidation": 0.011619599999999999,
+        "risk_per_unit": 0.00042000000000000023,
+        "state": "AWAITING_TRIGGER",
+        "method": "20-bar breakdown + 4H ATR"
+      },
+      "latest_completed_candle": {
+        "open_time": 1790319600000,
+        "close_time": 1790323199999,
+        "close": 0.01141
       },
       "regime": {
         "regime": "MIXED",
@@ -999,8 +1070,85 @@
       "postmortem_feedback_applied": false,
       "reasons": [
         "1d:trend=no,momentum=no,range=no,consistency=ok",
-        "4h:trend=no,momentum=no,range=no,consistency=no",
+        "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=ok",
+        "btc_relative_strength=no",
+        "insufficient_walk_forward_samples:10<25"
+      ],
+      "policy": {
+        "quality_score_is_not_a_profit_probability": true,
+        "historical_test_is_out_of_sample_only": true,
+        "conditional_trigger_must_be_hit_before_target_or_stop": true,
+        "weak_evidence_means_wait": true
+      }
+    },
+    {
+      "symbol": "MINA",
+      "side": "SHORT",
+      "status": "WAIT",
+      "quality_score": 44.75,
+      "confidence_ceiling": 85.0,
+      "calibrated_confidence": 44.75,
+      "current_alignment": 0.3125,
+      "relative_strength_to_btc": 27.4352,
+      "current_timeframes": {
+        "1h": {
+          "rsi14": 38.761254772116246,
+          "atr_pct": 2.4831391784181487,
+          "volume_ratio": 0.41383332363769515,
+          "return_12": -4.115226337448563,
+          "close_vs_ema20_pct": -2.9285234151717243
+        },
+        "4h": {
+          "rsi14": 51.73500321334751,
+          "atr_pct": 5.604945840997342,
+          "volume_ratio": 0.7780192047641341,
+          "return_12": -6.675567423230966,
+          "close_vs_ema20_pct": -1.4680065759326788
+        },
+        "1d": {
+          "rsi14": 74.8024990653352,
+          "atr_pct": 11.926108374384238,
+          "volume_ratio": 0.8788089066429469,
+          "return_12": 36.66352497643732,
+          "close_vs_ema20_pct": 35.007787459985494
+        }
+      },
+      "walk_forward": {
+        "events": 1,
+        "wins": 0,
+        "losses": 0,
+        "ambiguous": 0,
+        "non_terminal": 1,
+        "terminal_samples": 0,
+        "win_rate": null
+      },
+      "recommended_setup": {
+        "side": "SHORT",
+        "trigger": 0.13695971428571427,
+        "tp1": 0.12285542857142856,
+        "tp2": 0.11658685714285714,
+        "invalidation": 0.14479542857142855,
+        "risk_per_unit": 0.00783571428571428,
+        "state": "AWAITING_TRIGGER",
+        "method": "20-bar breakdown + 4H ATR"
+      },
+      "latest_completed_candle": {
+        "open_time": 1790319600000,
+        "close_time": 1790323199999,
+        "close": 0.1398
+      },
+      "regime": {
+        "regime": "MIXED",
+        "btc_1d_return": 9.22829606542448,
+        "btc_1d_buy_ratio": 0.49075337369339367,
+        "confidence": null
+      },
+      "postmortem_feedback_applied": false,
+      "reasons": [
+        "1d:trend=no,momentum=no,range=no,consistency=ok",
+        "4h:trend=no,momentum=no,range=ok,consistency=no",
+        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
         "insufficient_walk_forward_samples:0<25"
@@ -1090,60 +1238,60 @@
       }
     },
     {
-      "symbol": "MINA",
+      "symbol": "SQQQB",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 44.75,
+      "quality_score": 33.27,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 44.75,
-      "current_alignment": 0.3125,
-      "relative_strength_to_btc": 27.4352,
+      "calibrated_confidence": 33.27,
+      "current_alignment": 0.0,
+      "relative_strength_to_btc": null,
       "current_timeframes": {
         "1h": {
-          "rsi14": 38.761254772116246,
-          "atr_pct": 2.4831391784181487,
-          "volume_ratio": 0.41383332363769515,
-          "return_12": -4.115226337448563,
-          "close_vs_ema20_pct": -2.9285234151717243
+          "rsi14": 37.63570949121387,
+          "atr_pct": 0.534183522655295,
+          "volume_ratio": 0.26226911840226547,
+          "return_12": -0.937042459736459,
+          "close_vs_ema20_pct": -1.113053409609599
         },
         "4h": {
-          "rsi14": 51.73500321334751,
-          "atr_pct": 5.604945840997342,
-          "volume_ratio": 0.7780192047641341,
-          "return_12": -6.675567423230966,
-          "close_vs_ema20_pct": -1.4680065759326788
+          "rsi14": 35.5391967646794,
+          "atr_pct": 1.4167476035640358,
+          "volume_ratio": 0.44892481460051037,
+          "return_12": 1.5915915915915901,
+          "close_vs_ema20_pct": -2.2124543017468357
         },
         "1d": {
-          "rsi14": 74.8024990653352,
-          "atr_pct": 11.926108374384238,
-          "volume_ratio": 0.8788089066429469,
-          "return_12": 36.66352497643732,
-          "close_vs_ema20_pct": 35.007787459985494
+          "rsi14": null,
+          "atr_pct": null,
+          "volume_ratio": null,
+          "return_12": null,
+          "close_vs_ema20_pct": null
         }
       },
       "walk_forward": {
-        "events": 1,
+        "events": 7,
         "wins": 0,
-        "losses": 0,
+        "losses": 1,
         "ambiguous": 0,
-        "non_terminal": 1,
-        "terminal_samples": 0,
-        "win_rate": null
+        "non_terminal": 6,
+        "terminal_samples": 1,
+        "win_rate": 0.0
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 0.13695971428571427,
-        "tp1": 0.12285542857142856,
-        "tp2": 0.11658685714285714,
-        "invalidation": 0.14479542857142855,
-        "risk_per_unit": 0.00783571428571428,
+        "trigger": 33.65248571428572,
+        "tp1": 32.78977142857143,
+        "tp2": 32.40634285714285,
+        "invalidation": 34.13177142857143,
+        "risk_per_unit": 0.47928571428571587,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 0.1398
+        "close": 33.83
       },
       "regime": {
         "regime": "MIXED",
@@ -1153,12 +1301,8 @@
       },
       "postmortem_feedback_applied": false,
       "reasons": [
-        "1d:trend=no,momentum=no,range=no,consistency=ok",
-        "4h:trend=no,momentum=no,range=ok,consistency=no",
-        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
-        "extreme_volatility_penalty",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "missing_required_timeframe",
+        "insufficient_walk_forward_samples:1<25"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
@@ -1245,60 +1389,60 @@
       }
     },
     {
-      "symbol": "GPS",
+      "symbol": "MET",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 34.5,
+      "quality_score": 43.0,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 34.5,
-      "current_alignment": 0.375,
-      "relative_strength_to_btc": 13.0769,
+      "calibrated_confidence": 43.0,
+      "current_alignment": 0.25,
+      "relative_strength_to_btc": 35.7319,
       "current_timeframes": {
         "1h": {
-          "rsi14": 43.35126424315084,
-          "atr_pct": 1.3083761111806698,
-          "volume_ratio": 0.330811987310845,
-          "return_12": 0.4401408450704247,
-          "close_vs_ema20_pct": -0.6379601124773759
+          "rsi14": 48.73863679530001,
+          "atr_pct": 1.9486346737318905,
+          "volume_ratio": 1.0305203327591017,
+          "return_12": -1.6185991759858798,
+          "close_vs_ema20_pct": -0.03578177472534083
         },
         "4h": {
-          "rsi14": 45.40763201481667,
-          "atr_pct": 3.680981595092022,
-          "volume_ratio": 0.32085369069342196,
-          "return_12": -12.432847275518032,
-          "close_vs_ema20_pct": -2.375751076065802
+          "rsi14": 55.725837043714264,
+          "atr_pct": 6.886457843681894,
+          "volume_ratio": 0.2407396974458195,
+          "return_12": -8.08358537255981,
+          "close_vs_ema20_pct": 1.7374103522039164
         },
         "1d": {
-          "rsi14": 53.190307145981585,
-          "atr_pct": 8.551483420593373,
-          "volume_ratio": 0.5434572944066747,
-          "return_12": 22.305229455709718,
-          "close_vs_ema20_pct": 2.858688904345019
+          "rsi14": 72.5047691440389,
+          "atr_pct": 11.750098026401774,
+          "volume_ratio": 0.9651846697728855,
+          "return_12": 44.96021220159152,
+          "close_vs_ema20_pct": 28.71737094573166
         }
       },
       "walk_forward": {
-        "events": 22,
-        "wins": 1,
-        "losses": 9,
+        "events": 2,
+        "wins": 0,
+        "losses": 0,
         "ambiguous": 0,
-        "non_terminal": 12,
-        "terminal_samples": 10,
-        "win_rate": 0.1
+        "non_terminal": 2,
+        "terminal_samples": 0,
+        "win_rate": null
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 0.011199599999999999,
-        "tp1": 0.010443599999999999,
-        "tp2": 0.010107599999999998,
-        "invalidation": 0.011619599999999999,
-        "risk_per_unit": 0.00042000000000000023,
+        "trigger": 0.32053742857142853,
+        "tp1": 0.2790988571428571,
+        "tp2": 0.26068171428571424,
+        "invalidation": 0.3435588571428571,
+        "risk_per_unit": 0.02302142857142858,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 0.01141
+        "close": 0.3343
       },
       "regime": {
         "regime": "MIXED",
@@ -1309,10 +1453,89 @@
       "postmortem_feedback_applied": false,
       "reasons": [
         "1d:trend=no,momentum=no,range=no,consistency=ok",
-        "4h:trend=no,momentum=ok,range=ok,consistency=no",
+        "4h:trend=no,momentum=no,range=no,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=ok",
+        "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:10<25"
+        "insufficient_walk_forward_samples:0<25"
+      ],
+      "policy": {
+        "quality_score_is_not_a_profit_probability": true,
+        "historical_test_is_out_of_sample_only": true,
+        "conditional_trigger_must_be_hit_before_target_or_stop": true,
+        "weak_evidence_means_wait": true
+      }
+    },
+    {
+      "symbol": "HEI",
+      "side": "SHORT",
+      "status": "WAIT",
+      "quality_score": 51.75,
+      "confidence_ceiling": 85.0,
+      "calibrated_confidence": 51.75,
+      "current_alignment": 0.3125,
+      "relative_strength_to_btc": 15.1913,
+      "current_timeframes": {
+        "1h": {
+          "rsi14": 35.843524622172595,
+          "atr_pct": 1.1517478278440094,
+          "volume_ratio": 2.4897281893338628,
+          "return_12": -3.283173734610123,
+          "close_vs_ema20_pct": -1.7647983530756584
+        },
+        "4h": {
+          "rsi14": 41.356804090516825,
+          "atr_pct": 5.107092341887251,
+          "volume_ratio": 0.7462155778428559,
+          "return_12": -8.538163001293652,
+          "close_vs_ema20_pct": -4.024958286854052
+        },
+        "1d": {
+          "rsi14": 53.360833931700824,
+          "atr_pct": 13.007207029321751,
+          "volume_ratio": 0.32442562921738993,
+          "return_12": 24.41960447119518,
+          "close_vs_ema20_pct": 3.798136391629625
+        }
+      },
+      "walk_forward": {
+        "events": 12,
+        "wins": 3,
+        "losses": 2,
+        "ambiguous": 0,
+        "non_terminal": 7,
+        "terminal_samples": 5,
+        "win_rate": 0.6
+      },
+      "recommended_setup": {
+        "side": "SHORT",
+        "trigger": 0.14013342857142855,
+        "tp1": 0.1271348571428571,
+        "tp2": 0.12135771428571426,
+        "invalidation": 0.14735485714285712,
+        "risk_per_unit": 0.007221428571428573,
+        "state": "AWAITING_TRIGGER",
+        "method": "20-bar breakdown + 4H ATR"
+      },
+      "latest_completed_candle": {
+        "open_time": 1790319600000,
+        "close_time": 1790323199999,
+        "close": 0.1414
+      },
+      "regime": {
+        "regime": "MIXED",
+        "btc_1d_return": 9.22829606542448,
+        "btc_1d_buy_ratio": 0.49075337369339367,
+        "confidence": null
+      },
+      "postmortem_feedback_applied": false,
+      "reasons": [
+        "1d:trend=ok,momentum=no,range=no,consistency=no",
+        "4h:trend=no,momentum=ok,range=no,consistency=no",
+        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
+        "extreme_volatility_penalty",
+        "btc_relative_strength=no",
+        "insufficient_walk_forward_samples:5<25"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
@@ -1476,183 +1699,28 @@
       }
     },
     {
-      "symbol": "HEI",
+      "symbol": "GPROB",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 51.75,
+      "quality_score": 36.0,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 51.75,
-      "current_alignment": 0.3125,
-      "relative_strength_to_btc": 15.1913,
-      "current_timeframes": {
-        "1h": {
-          "rsi14": 35.843524622172595,
-          "atr_pct": 1.1517478278440094,
-          "volume_ratio": 2.4897281893338628,
-          "return_12": -3.283173734610123,
-          "close_vs_ema20_pct": -1.7647983530756584
-        },
-        "4h": {
-          "rsi14": 41.356804090516825,
-          "atr_pct": 5.107092341887251,
-          "volume_ratio": 0.7462155778428559,
-          "return_12": -8.538163001293652,
-          "close_vs_ema20_pct": -4.024958286854052
-        },
-        "1d": {
-          "rsi14": 53.360833931700824,
-          "atr_pct": 13.007207029321751,
-          "volume_ratio": 0.32442562921738993,
-          "return_12": 24.41960447119518,
-          "close_vs_ema20_pct": 3.798136391629625
-        }
-      },
-      "walk_forward": {
-        "events": 12,
-        "wins": 3,
-        "losses": 2,
-        "ambiguous": 0,
-        "non_terminal": 7,
-        "terminal_samples": 5,
-        "win_rate": 0.6
-      },
-      "recommended_setup": {
-        "side": "SHORT",
-        "trigger": 0.14013342857142855,
-        "tp1": 0.1271348571428571,
-        "tp2": 0.12135771428571426,
-        "invalidation": 0.14735485714285712,
-        "risk_per_unit": 0.007221428571428573,
-        "state": "AWAITING_TRIGGER",
-        "method": "20-bar breakdown + 4H ATR"
-      },
-      "latest_completed_candle": {
-        "open_time": 1790319600000,
-        "close_time": 1790323199999,
-        "close": 0.1414
-      },
-      "regime": {
-        "regime": "MIXED",
-        "btc_1d_return": 9.22829606542448,
-        "btc_1d_buy_ratio": 0.49075337369339367,
-        "confidence": null
-      },
-      "postmortem_feedback_applied": false,
-      "reasons": [
-        "1d:trend=ok,momentum=no,range=no,consistency=no",
-        "4h:trend=no,momentum=ok,range=no,consistency=no",
-        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
-        "extreme_volatility_penalty",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:5<25"
-      ],
-      "policy": {
-        "quality_score_is_not_a_profit_probability": true,
-        "historical_test_is_out_of_sample_only": true,
-        "conditional_trigger_must_be_hit_before_target_or_stop": true,
-        "weak_evidence_means_wait": true
-      }
-    },
-    {
-      "symbol": "CHR",
-      "side": "SHORT",
-      "status": "WAIT",
-      "quality_score": 49.75,
-      "confidence_ceiling": 85.0,
-      "calibrated_confidence": 49.75,
-      "current_alignment": 0.3125,
-      "relative_strength_to_btc": 22.4941,
-      "current_timeframes": {
-        "1h": {
-          "rsi14": 48.01971635584766,
-          "atr_pct": 1.600163420945113,
-          "volume_ratio": 1.7425527408578296,
-          "return_12": -1.1775788977861579,
-          "close_vs_ema20_pct": -0.595170572797088
-        },
-        "4h": {
-          "rsi14": 57.46169235901528,
-          "atr_pct": 6.853465885877707,
-          "volume_ratio": 0.17739626979419276,
-          "return_12": -4.549590536851689,
-          "close_vs_ema20_pct": 2.393010461616063
-        },
-        "1d": {
-          "rsi14": 71.00597124968657,
-          "atr_pct": 9.699637145544953,
-          "volume_ratio": 2.0048165742094795,
-          "return_12": 31.722428748451037,
-          "close_vs_ema20_pct": 21.461651486829435
-        }
-      },
-      "walk_forward": {
-        "events": 1,
-        "wins": 0,
-        "losses": 0,
-        "ambiguous": 0,
-        "non_terminal": 1,
-        "terminal_samples": 0,
-        "win_rate": null
-      },
-      "recommended_setup": {
-        "side": "SHORT",
-        "trigger": 0.020337457142857143,
-        "tp1": 0.017749314285714284,
-        "tp2": 0.01659902857142857,
-        "invalidation": 0.021775314285714286,
-        "risk_per_unit": 0.0014378571428571435,
-        "state": "AWAITING_TRIGGER",
-        "method": "20-bar breakdown + 4H ATR"
-      },
-      "latest_completed_candle": {
-        "open_time": 1790319600000,
-        "close_time": 1790323199999,
-        "close": 0.02098
-      },
-      "regime": {
-        "regime": "MIXED",
-        "btc_1d_return": 9.22829606542448,
-        "btc_1d_buy_ratio": 0.49075337369339367,
-        "confidence": null
-      },
-      "postmortem_feedback_applied": false,
-      "reasons": [
-        "1d:trend=no,momentum=no,range=no,consistency=ok",
-        "4h:trend=no,momentum=no,range=ok,consistency=no",
-        "1h:trend=ok,momentum=ok,range=ok,consistency=no",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
-      ],
-      "policy": {
-        "quality_score_is_not_a_profit_probability": true,
-        "historical_test_is_out_of_sample_only": true,
-        "conditional_trigger_must_be_hit_before_target_or_stop": true,
-        "weak_evidence_means_wait": true
-      }
-    },
-    {
-      "symbol": "SQQQB",
-      "side": "SHORT",
-      "status": "WAIT",
-      "quality_score": 33.27,
-      "confidence_ceiling": 85.0,
-      "calibrated_confidence": 33.27,
+      "calibrated_confidence": 36.0,
       "current_alignment": 0.0,
       "relative_strength_to_btc": null,
       "current_timeframes": {
         "1h": {
-          "rsi14": 37.63570949121387,
-          "atr_pct": 0.534183522655295,
-          "volume_ratio": 0.26226911840226547,
-          "return_12": -0.937042459736459,
-          "close_vs_ema20_pct": -1.113053409609599
+          "rsi14": 48.55405602033722,
+          "atr_pct": 1.2935883014623182,
+          "volume_ratio": 1.4244930561033613,
+          "return_12": 0.7936507936507908,
+          "close_vs_ema20_pct": -0.05255441909072234
         },
         "4h": {
-          "rsi14": 35.5391967646794,
-          "atr_pct": 1.4167476035640358,
-          "volume_ratio": 0.44892481460051037,
-          "return_12": 1.5915915915915901,
-          "close_vs_ema20_pct": -2.2124543017468357
+          "rsi14": 45.4752160658124,
+          "atr_pct": 2.4184476940382473,
+          "volume_ratio": 1.3102319154455695,
+          "return_12": -2.3076923076923106,
+          "close_vs_ema20_pct": -0.9808795083781296
         },
         "1d": {
           "rsi14": null,
@@ -1663,28 +1731,28 @@
         }
       },
       "walk_forward": {
-        "events": 7,
+        "events": 13,
         "wins": 0,
-        "losses": 1,
+        "losses": 2,
         "ambiguous": 0,
-        "non_terminal": 6,
-        "terminal_samples": 1,
+        "non_terminal": 11,
+        "terminal_samples": 2,
         "win_rate": 0.0
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 33.65248571428572,
-        "tp1": 32.78977142857143,
-        "tp2": 32.40634285714285,
-        "invalidation": 34.13177142857143,
-        "risk_per_unit": 0.47928571428571587,
+        "trigger": 1.2463142857142857,
+        "tp1": 1.1910285714285715,
+        "tp2": 1.1664571428571429,
+        "invalidation": 1.2770285714285714,
+        "risk_per_unit": 0.030714285714285694,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 33.83
+        "close": 1.27
       },
       "regime": {
         "regime": "MIXED",
@@ -1695,7 +1763,7 @@
       "postmortem_feedback_applied": false,
       "reasons": [
         "missing_required_timeframe",
-        "insufficient_walk_forward_samples:1<25"
+        "insufficient_walk_forward_samples:2<25"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
@@ -1705,60 +1773,60 @@
       }
     },
     {
-      "symbol": "RAY",
+      "symbol": "牛来",
       "side": "SHORT",
       "status": "WAIT",
-      "quality_score": 36.77,
+      "quality_score": 30.0,
       "confidence_ceiling": 85.0,
-      "calibrated_confidence": 36.77,
-      "current_alignment": 0.125,
-      "relative_strength_to_btc": 27.7685,
+      "calibrated_confidence": 30.0,
+      "current_alignment": 0.0,
+      "relative_strength_to_btc": null,
       "current_timeframes": {
         "1h": {
-          "rsi14": 46.78045136360406,
-          "atr_pct": 2.390242869843775,
-          "volume_ratio": 0.3540557197469213,
-          "return_12": -6.970546340118544,
-          "close_vs_ema20_pct": -1.562591056534668
+          "rsi14": 47.021165597220616,
+          "atr_pct": 1.854917234664068,
+          "volume_ratio": 0.7268114957593821,
+          "return_12": -1.1549566891241647,
+          "close_vs_ema20_pct": -0.04548833143590558
         },
         "4h": {
-          "rsi14": 56.0483563533988,
-          "atr_pct": 7.0722964677326,
-          "volume_ratio": 0.3366467715168183,
-          "return_12": 12.722008796837581,
-          "close_vs_ema20_pct": 3.0084516198425337
+          "rsi14": 44.793977869481736,
+          "atr_pct": 6.082904437334818,
+          "volume_ratio": 0.282540583869749,
+          "return_12": -7.685393258426965,
+          "close_vs_ema20_pct": -2.9657692406226177
         },
         "1d": {
-          "rsi14": 77.39438667779072,
-          "atr_pct": 11.237471348550814,
-          "volume_ratio": 1.2813026918008583,
-          "return_12": 36.99681342264418,
-          "close_vs_ema20_pct": 37.139433798613794
+          "rsi14": null,
+          "atr_pct": null,
+          "volume_ratio": null,
+          "return_12": null,
+          "close_vs_ema20_pct": null
         }
       },
       "walk_forward": {
-        "events": 3,
-        "wins": 0,
-        "losses": 1,
+        "events": 14,
+        "wins": 1,
+        "losses": 4,
         "ambiguous": 0,
-        "non_terminal": 2,
-        "terminal_samples": 1,
-        "win_rate": 0.0
+        "non_terminal": 9,
+        "terminal_samples": 5,
+        "win_rate": 0.2
       },
       "recommended_setup": {
         "side": "SHORT",
-        "trigger": 1.9344177142857144,
-        "tp1": 1.6766834285714292,
-        "tp2": 1.562134857142858,
-        "invalidation": 2.0776034285714284,
-        "risk_per_unit": 0.14318571428571403,
+        "trigger": 0.09699034285714285,
+        "tp1": 0.08574548571428571,
+        "tp2": 0.08074777142857142,
+        "invalidation": 0.1032374857142857,
+        "risk_per_unit": 0.006247142857142854,
         "state": "AWAITING_TRIGGER",
         "method": "20-bar breakdown + 4H ATR"
       },
       "latest_completed_candle": {
         "open_time": 1790319600000,
         "close_time": 1790323199999,
-        "close": 2.0246
+        "close": 0.1027
       },
       "regime": {
         "regime": "MIXED",
@@ -1768,90 +1836,8 @@
       },
       "postmortem_feedback_applied": false,
       "reasons": [
-        "1d:trend=no,momentum=no,range=no,consistency=no",
-        "4h:trend=no,momentum=no,range=no,consistency=no",
-        "1h:trend=no,momentum=ok,range=ok,consistency=no",
-        "extreme_volatility_penalty",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:1<25"
-      ],
-      "policy": {
-        "quality_score_is_not_a_profit_probability": true,
-        "historical_test_is_out_of_sample_only": true,
-        "conditional_trigger_must_be_hit_before_target_or_stop": true,
-        "weak_evidence_means_wait": true
-      }
-    },
-    {
-      "symbol": "CVC",
-      "side": "SHORT",
-      "status": "WAIT",
-      "quality_score": 41.25,
-      "confidence_ceiling": 85.0,
-      "calibrated_confidence": 41.25,
-      "current_alignment": 0.1875,
-      "relative_strength_to_btc": 24.5146,
-      "current_timeframes": {
-        "1h": {
-          "rsi14": 48.319447759340285,
-          "atr_pct": 1.9610649871170924,
-          "volume_ratio": 0.5060191183102117,
-          "return_12": -0.26648900732845204,
-          "close_vs_ema20_pct": -0.8053306264997229
-        },
-        "4h": {
-          "rsi14": 55.33856982097464,
-          "atr_pct": 6.152781753984157,
-          "volume_ratio": 0.6168925568347796,
-          "return_12": 4.139130434782601,
-          "close_vs_ema20_pct": 2.2917000843024615
-        },
-        "1d": {
-          "rsi14": 67.69106213422388,
-          "atr_pct": 19.378046494188226,
-          "volume_ratio": 2.1564447483311002,
-          "return_12": 33.74286967968408,
-          "close_vs_ema20_pct": 17.026725385861006
-        }
-      },
-      "walk_forward": {
-        "events": 5,
-        "wins": 0,
-        "losses": 0,
-        "ambiguous": 0,
-        "non_terminal": 5,
-        "terminal_samples": 0,
-        "win_rate": null
-      },
-      "recommended_setup": {
-        "side": "SHORT",
-        "trigger": 0.029228942857142858,
-        "tp1": 0.025913085714285713,
-        "tp2": 0.024439371428571426,
-        "invalidation": 0.031071085714285716,
-        "risk_per_unit": 0.0018421428571428582,
-        "state": "AWAITING_TRIGGER",
-        "method": "20-bar breakdown + 4H ATR"
-      },
-      "latest_completed_candle": {
-        "open_time": 1790319600000,
-        "close_time": 1790323199999,
-        "close": 0.02994
-      },
-      "regime": {
-        "regime": "MIXED",
-        "btc_1d_return": 9.22829606542448,
-        "btc_1d_buy_ratio": 0.49075337369339367,
-        "confidence": null
-      },
-      "postmortem_feedback_applied": false,
-      "reasons": [
-        "1d:trend=no,momentum=no,range=ok,consistency=no",
-        "4h:trend=no,momentum=no,range=no,consistency=no",
-        "1h:trend=no,momentum=ok,range=ok,consistency=no",
-        "extreme_volatility_penalty",
-        "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "missing_required_timeframe",
+        "insufficient_walk_forward_samples:5<25"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
