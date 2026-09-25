@@ -66,24 +66,50 @@ def fail(message: str, code: str, exit_code: int = 2) -> int:
     return exit_code
 
 
-def skip(message: str, code: str, symbol: str = "", category: str = "") -> int:
+def skip(
+    message: str,
+    code: str,
+    symbol: str = "",
+    category: str = "",
+    existing: dict | None = None,
+) -> int:
+    existing = existing if isinstance(existing, dict) else {}
+    existing_id = canonical_post_id(
+        existing.get("canonical_post_id") or existing.get("post_id") or existing.get("link")
+    )
+    existing_link = str(existing.get("link") or "").strip() or (
+        f"https://www.binance.com/square/post/{existing_id}" if existing_id else None
+    )
+    is_existing_verified = code == "PUBLISH_BLOCKED_DUPLICATE" and bool(existing_id)
     result = {
         "status": code,
         "message": message,
         "checked_at": now(),
         "endpoint": ENDPOINT,
+        # post_id is reserved for a publication created/identified by THIS run.
         "post_id": None,
         "link": None,
         "symbol": symbol or None,
         "category": category or None,
         "publication_proof": "none",
+        "current_run_publication": "NO_NEW_PUBLICATION" if code == "PUBLISH_BLOCKED_DUPLICATE" else code,
+        "publication_state": (
+            "CURRENT_RUN_NO_NEW_PUBLICATION — EXISTING_POST_VERIFIED"
+            if is_existing_verified
+            else code
+        ),
+        "existing_publication": {
+            "verified": is_existing_verified,
+            "canonical_post_id": existing_id or None,
+            "link": existing_link,
+            "status": str(existing.get("status") or "") or None,
+            "published_at": existing.get("published_at") or existing.get("timestamp"),
+        },
     }
     LIVE.mkdir(parents=True, exist_ok=True)
     RESULT_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0
-
-
 def text_payload() -> str:
     d = load(PAYLOAD_PATH)
     t = str(d.get("text") or d.get("bodyTextOnly") or d.get("content") or "").strip()
@@ -114,7 +140,7 @@ def recent_rows():
     return rows
 
 
-def duplicate_reason(text: str, symbol: str, category: str, context: dict, frozen: dict) -> str:
+def duplicate_match(text: str, symbol: str, category: str, context: dict, frozen: dict):
     target = clean_symbol(symbol)
     current_direction = str(
         context.get("direction")
@@ -138,7 +164,7 @@ def duplicate_reason(text: str, symbol: str, category: str, context: dict, froze
             continue
         old = str(row.get("text") or row.get("post") or row.get("content") or "").strip()
         if old and old == text.strip():
-            return f"exact_text_duplicate_within_{DUPLICATE_HOURS:g}h"
+            return f"exact_text_duplicate_within_{DUPLICATE_HOURS:g}h", row
 
         same_asset_category = target and rs == target and row_category == str(category or "").lower()
         if not same_asset_category:
@@ -157,14 +183,18 @@ def duplicate_reason(text: str, symbol: str, category: str, context: dict, froze
             same_trigger = str(current_trigger) == str(old_trigger) if current_trigger is not None and old_trigger is not None else True
             same_invalidation = str(current_invalidation) == str(old_invalidation) if current_invalidation is not None and old_invalidation is not None else True
             if same_direction and same_trigger and same_invalidation:
-                return f"same_asset_category_and_setup_within_{DUPLICATE_HOURS:g}h"
+                return f"same_asset_category_and_setup_within_{DUPLICATE_HOURS:g}h", row
 
         # For non-signal posts, retain the conservative old cooldown.
         if not current_direction and not old_direction and not any(k in text.lower() for k in ("result", "outcome", "invalidated", "follow-up", "follow up")):
-            return f"same_asset_and_category_within_{DUPLICATE_HOURS:g}h"
+            return f"same_asset_and_category_within_{DUPLICATE_HOURS:g}h", row
 
     return ""
 
+
+def duplicate_reason(text: str, symbol: str, category: str, context: dict, frozen: dict) -> str:
+    reason, _ = duplicate_match(text, symbol, category, context, frozen)
+    return reason
 
 def append(row: dict) -> None:
     ANALYTICS.mkdir(parents=True, exist_ok=True)
@@ -224,21 +254,38 @@ def main() -> int:
             })
             return skip(f"Publication skipped by W2E eligibility gate: {reason}", "PUBLISH_SKIPPED_WTE_INELIGIBLE", symbol, category)
 
-        dup = duplicate_reason(text, symbol, category, context, frozen)
+        dup, existing = duplicate_match(text, symbol, category, context, frozen)
         if dup:
+            existing_id = canonical_post_id(
+                existing.get("canonical_post_id") or existing.get("post_id") or existing.get("link")
+            )
+            existing_link = str(existing.get("link") or "").strip() or (
+                f"https://www.binance.com/square/post/{existing_id}" if existing_id else None
+            )
             append({
                 "timestamp": now(),
                 "status": "PUBLISH_BLOCKED_DUPLICATE",
                 "post_id": None,
                 "link": None,
+                "existing_post_id": existing_id or None,
+                "existing_post_link": existing_link,
+                "existing_publication_status": str(existing.get("status") or "") or None,
+                "existing_publication_verified_at": existing.get("published_at") or existing.get("timestamp"),
                 "symbol": symbol,
                 "category": category,
                 "text": text,
                 "reason": dup,
-                "publication_proof": "none",
+                "publication_proof": "existing_verified_publication_log",
             })
             # Duplicate protection is an intentional safety skip, not a workflow failure.
-            return skip(f"Duplicate publication blocked: {dup}", "PUBLISH_BLOCKED_DUPLICATE", symbol, category)
+            # Keep the current run's post_id null; expose the verified prior post separately.
+            return skip(
+                f"Duplicate publication blocked: {dup}",
+                "PUBLISH_BLOCKED_DUPLICATE",
+                symbol,
+                category,
+                existing,
+            )
 
         visual_requested = bool(
             context.get("visual_requested")
