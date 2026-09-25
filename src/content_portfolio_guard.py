@@ -66,6 +66,10 @@ def main():
     queued=[]
     for item in (queue_state.get('candidates') or []):
         if not isinstance(item,dict):continue
+        cooldown=item.get('cooldown_until') if isinstance(item,dict) else None
+        try:
+            if cooldown and datetime.fromisoformat(str(cooldown).replace('Z','+00:00'))>datetime.now(timezone.utc):continue
+        except Exception:pass
         candidate=item.get('candidate') if isinstance(item.get('candidate'),dict) else item
         if isinstance(candidate,dict):queued.append(candidate)
     ranked=queued + [x for x in (brief.get('ranked_stories') or []) if isinstance(x,dict)]
