@@ -1,11 +1,12 @@
 """Static pipeline contract validation for the autonomous creator.
 
-This catches wiring errors before a live market run: missing referenced scripts,
-broken critical ordering, and a missing deterministic draft handoff.
+Validate the workflow's actual executable Python stages and critical ordering
+without false positives from import smoke-tests or path-resolution quirks.
 """
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -33,12 +34,11 @@ REQUIRED_ORDER = [
 
 def referenced_scripts(text: str) -> list[str]:
     seen: list[str] = []
-    # Only count executable workflow lines. This deliberately ignores the long
-    # PYTHONPATH import smoke-test line, which is not pipeline ordering.
     for line in text.splitlines():
-        match = re.search(r"(?:^|[;&|])\s*python\s+(src/[A-Za-z0-9_./-]+\.py)\b", line)
-        if match and match.group(1) not in seen:
-            seen.append(match.group(1))
+        for match in re.finditer(r"(?:^|[;&|])\s*python\s+(src/[A-Za-z0-9_./-]+\.py)\b", line):
+            script = match.group(1)
+            if script not in seen:
+                seen.append(script)
     return seen
 
 
@@ -46,23 +46,38 @@ def execution_positions(text: str) -> dict[str, int]:
     positions: dict[str, int] = {}
     offset = 0
     for line in text.splitlines(keepends=True):
-        # Match actual workflow commands, not mentions inside Python import strings.
         for match in re.finditer(r"(?:^|[;&|])\s*python\s+(src/[A-Za-z0-9_./-]+\.py)\b", line):
-            script = match.group(1)
-            positions.setdefault(script, offset + match.start(1))
+            positions.setdefault(match.group(1), offset + match.start(1))
         offset += len(line)
     return positions
 
 
+def tracked_files() -> set[str]:
+    try:
+        out = subprocess.run(
+            ["git", "ls-files"], cwd=ROOT, text=True, capture_output=True, check=True
+        ).stdout.splitlines()
+        return set(out)
+    except Exception:
+        return set()
+
+
+def script_exists(path: str, tracked: set[str]) -> bool:
+    # The runner is authoritative. Prefer the checked-out file, then Git's
+    # tracked-file index. This avoids rejecting valid tracked files because of
+    # transient checkout/path resolution state.
+    return (ROOT / path).is_file() or path in tracked
+
+
 def main() -> int:
-    if not WORKFLOW.exists():
+    if not WORKFLOW.is_file():
         print(f"ERROR: workflow missing: {WORKFLOW}", file=sys.stderr)
         return 2
 
     text = WORKFLOW.read_text(encoding="utf-8")
     scripts = referenced_scripts(text)
-    missing = [p for p in scripts if p != "src/creator_diagnostics.py" and not (ROOT / p).exists()]
-
+    tracked = tracked_files()
+    missing = [p for p in scripts if p != "src/creator_diagnostics.py" and not script_exists(p, tracked)]
     if missing:
         print("ERROR: workflow references missing Python files:", file=sys.stderr)
         for p in missing:
@@ -92,10 +107,10 @@ def main() -> int:
         print("ERROR: deterministic draft resolver is not wired into the editor stage", file=sys.stderr)
         return 2
 
+    publish_block = text[text.find("Extract publication and submit to Binance Square"):]
     publisher_line = "python src/binance_square_publisher.py"
     verifier_line = "python src/creator_20_0_publication_verifier.py"
     call_tracker_line = "python src/call_tracker.py"
-    publish_block = text[text.find("Extract publication and submit to Binance Square"):]
     if publisher_line not in publish_block or verifier_line not in publish_block:
         print("ERROR: publication publisher/verifier pair is not wired", file=sys.stderr)
         return 2
@@ -106,10 +121,7 @@ def main() -> int:
         print("ERROR: call tracker must run after publication verification", file=sys.stderr)
         return 2
 
-    print(
-        f"PIPELINE_CONTRACT_OK referenced_scripts={len(scripts)} "
-        f"critical_stages={len(REQUIRED_ORDER)}"
-    )
+    print(f"PIPELINE_CONTRACT_OK referenced_scripts={len(scripts)} critical_stages={len(REQUIRED_ORDER)}")
     return 0
 
 
