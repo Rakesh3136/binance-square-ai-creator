@@ -12,3 +12,5 @@ Repair: harden tracked-file detection in pipeline contract validator and rerun f
 Repair: validator command parser falsely missed valid critical workflow stages; use complete-workflow executable command scan and explicitly mask only the PYTHONPATH import smoke-test.
 2026-09-25T18:05:00+05:30
 Repair: make workflow stage detection resilient to valid YAML shell formatting and add a regression test for all critical stages.
+2026-09-25T14:21:34.649Z
+Repair: technical enricher now uses historical setup snapshots only for authoritative Signal-First predictions; non-prediction editorial lanes use fresh completed candles.
