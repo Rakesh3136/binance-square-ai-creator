@@ -1,16 +1,18 @@
 {
-  "version": "24.1",
-  "checked_at": "2026-09-25T01:30:37.014950+00:00",
+  "version": "25.0-trigger-first-state-machine",
+  "checked_at": "2026-09-25T02:42:26.543144+00:00",
   "open_calls_seen": 0,
   "new_outcomes": 0,
   "wins": 0,
   "invalidated": 0,
+  "ambiguous": 0,
   "terminal_outcomes": 0,
   "errors": [],
   "rules": [
-    "No guarantee is inferred.",
-    "Ambiguous paths remain OPEN.",
-    "Frozen reference/targets/invalidation are immutable.",
+    "A conditional prediction cannot win unless its entry trigger is crossed first.",
+    "Pre-trigger target/stop touches do not resolve a call.",
+    "If one completed candle crosses both target and invalidation, the result is AMBIGUOUS because intrabar order is unknown.",
+    "Frozen reference/trigger/targets/invalidation remain immutable.",
     "No result is declared without fresh Binance OHLCV."
   ]
 }
