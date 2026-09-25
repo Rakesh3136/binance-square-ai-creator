@@ -321,7 +321,6 @@ def build():
     flow = load(FLOW, {})
     full_flow = load(FULL_FLOW, {})
     market = load(MARKET, {})
-    regime = load(REGIME, {})
     postmortem = load(POSTMORTEM, {})
     candidates = candidate_symbols(flow, full_flow)
     btc_frames = {}
@@ -330,6 +329,14 @@ def build():
             btc_frames[interval] = frame(candles("BTC", interval, CURRENT_LIMIT))
     except Exception:
         btc_frames = {}
+
+    btc_trend = num((btc_frames.get("1d") or {}).get("return_12"), 0.0)
+    btc_flow = num((btc_frames.get("1d") or {}).get("buy_ratio"), 0.5)
+    fresh_regime = (
+        "RISK_ON" if btc_trend > 0 and btc_flow >= 0.51
+        else "RISK_OFF" if btc_trend < 0 and btc_flow <= 0.49
+        else "MIXED"
+    )
 
     # Fetch current frames and historical 1H evidence concurrently. This stage is
     # deliberately read-only and uses bounded workers to avoid serial network
@@ -374,7 +381,7 @@ def build():
             quality += (alignment - 0.5) * 28.0
 
             # Repeated post-fix failure contexts receive a bounded penalty.
-            current_regime = str(regime.get("regime") or "UNKNOWN")
+            current_regime = fresh_regime
             quality_band = (
                 "LT70" if quality < 70 else
                 "70_79" if quality < 80 else
@@ -502,8 +509,10 @@ def build():
                 "walk_forward": backtest,
                 "recommended_setup": recommended_setup,
                 "regime": {
-                    "regime": regime.get("regime"),
-                    "confidence": regime.get("confidence"),
+                    "regime": fresh_regime,
+                    "btc_1d_return": btc_trend,
+                    "btc_1d_buy_ratio": btc_flow,
+                    "confidence": None,
                 },
                 "postmortem_feedback_applied": bool(any(
                     isinstance(x, dict)
