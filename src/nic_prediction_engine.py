@@ -515,6 +515,14 @@ def build():
                 },
                 "walk_forward": backtest,
                 "recommended_setup": recommended_setup,
+                "latest_completed_candle": (
+                    {
+                        "open_time": h1_rows[-1].get("open_time"),
+                        "close_time": h1_rows[-1].get("close_time"),
+                        "close": h1_rows[-1].get("close"),
+                    }
+                    if h1_rows and isinstance(h1_rows[-1], dict) else {}
+                ),
                 "regime": {
                     "regime": fresh_regime,
                     "btc_1d_return": btc_trend,
