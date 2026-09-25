@@ -1,2 +1,2 @@
-2026-09-25T09:07:12+05:30
-Upgrade: make the full authoritative brain and decision ensemble lane-aware; editorial Signal-First stories must pass evidence/editorial review without requiring a trade direction/TP/SL contract, while trade lanes remain fully contract-gated.
+2026-09-25T16:05:00+05:30
+Repair: validate visual packages by their actual provider; non-TradingView meme/editorial visuals must not be rejected for missing TradingView capture HTML, while real TradingView charts retain browser validation. Re-run full autonomous publication path after validator repair.
