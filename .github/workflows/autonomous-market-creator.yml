@@ -65,7 +65,7 @@ jobs:
         run: |
           python -m compileall -q src
           python src/pipeline_contract_validator.py
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence, nic_experiment_governor, nic_human_editor_intelligence, resolve_publish_draft, pipeline_contract_validator, visual_decision, publication_payload_builder, nic_prediction_engine, nic_prediction_accuracy_gate, nic_prediction_contract_validator, nic_prediction_postmortem, nic_historical_prediction_audit, nic_outcome_learner, call_tracker"
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence, nic_experiment_governor, nic_human_editor_intelligence, resolve_publish_draft, pipeline_contract_validator, visual_decision, publication_payload_builder, nic_prediction_engine, nic_prediction_accuracy_gate, nic_prediction_contract_validator, nic_prediction_postmortem, nic_historical_prediction_audit, nic_outcome_learner, nic_prediction_truth_loop, call_tracker"
           python src/nic_model_router.py
           echo 'Core, Jev, ensemble, NIC and portfolio modules imported successfully'
       - name: Reset creator cycle
@@ -91,6 +91,7 @@ jobs:
           python src/square_performance_collector.py
           python src/square_post_detail_collector.py
           python src/creator_24_1_prediction_outcomes.py
+          python src/nic_prediction_truth_loop.py
           python src/nic_historical_prediction_audit.py
           python src/nic_prediction_postmortem.py
           python src/nic_outcome_learner.py
@@ -133,7 +134,7 @@ jobs:
           python src/creator_22_3_draft_intelligence.py
       - name: Reliability, repair and autonomous reasoning layers
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python src/market_regime_intelligence.py
@@ -231,7 +232,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
@@ -242,7 +243,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.6-flash
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
@@ -313,8 +314,6 @@ jobs:
           GEMINI_DAILY_BUDGET: '20'
         run: |
           python src/candidate_script_scorer_4.py
-          # Train the deterministic human editor from accumulated NIC observations
-          # before every edit. Learning is advisory only; safety/evidence gates remain authoritative.
           NIC_EDITOR_PHASE=prepare python src/nic_human_editor_intelligence.py
           DRAFT_PATH=$(python src/resolve_publish_draft.py)
           test -s "$DRAFT_PATH"
