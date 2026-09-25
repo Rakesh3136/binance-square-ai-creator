@@ -68,7 +68,7 @@ def main():
   "experiment_governor":{"decision":gov.get("decision",{}),"capacity_share":(gov.get("decision") or {}).get("capacity_share",0),"evidence_summary":gov.get("evidence_summary",{})},
   "learning":{"plan_id":learn.get("plan_id"),"next_experiment":(learn.get("policy") or {}).get("next_experiment"),"underrepresented_lanes":(learn.get("policy") or {}).get("underrepresented_lanes",[])},
   "monetization":{"cashtag_required":True,"verified_widget_preferred":True,"quality_over_clicks":True,"funnel_optimizer_ready":bool(funnel),"series_engine_ready":bool(series),"series_status":series.get("status"),"experiment_governor_ready":bool(gov),"eligible_content_note":"Use only formats supported by the publisher; do not claim unavailable video/live capabilities."},
-  "rules":{"signal_requires_verified_setup":True,"non_signal_requires_verified_event_or_market_evidence":True,"knowledge_discovery_lanes":{"research_insight","market_mechanism","data_surprise","education","watchlist","comparison"},"meme_is_secondary":True,"never_force_weak_story":True,"never_infer_revenue":True}
+  "rules":{"signal_requires_verified_setup":True,"non_signal_requires_verified_event_or_market_evidence":True,"knowledge_discovery_lanes":["research_insight","market_mechanism","data_surprise","education","watchlist","comparison"],"meme_is_secondary":True,"never_force_weak_story":True,"never_infer_revenue":True}
  }
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(route,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
  pre["content_master_route"]=route
