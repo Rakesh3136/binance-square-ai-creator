@@ -33,68 +33,33 @@ def setup_parts(x):
     side=str(s.get('side') or p.get('direction') or x.get('flow_side') or '').upper(); tr=s.get('trigger',p.get('entry_trigger')); tp1=s.get('tp1',p.get('tp1')); tp2=s.get('tp2',p.get('tp2')); sl=s.get('invalidation',p.get('sl')); conf=num(x.get('flow_confidence'),num((x.get('multitimeframe') or {}).get('confidence'),num(p.get('confidence'),num(x.get('score')))))
     return s,p,side,tr,tp1,tp2,sl,conf
 def level_contract_valid(side,tr,tp1,tp2,sl):
-    try:
-        e,a,b,stop=[float(v) for v in (tr,tp1,tp2,sl)]
-    except (TypeError,ValueError):
-        return False
-    if min(e,a,b,stop) <= 0:
-        return False
-    if side == 'LONG':
-        return stop < e < a <= b
-    if side == 'SHORT':
-        return 0 < b <= a < e < stop
+    try:e,a,b,stop=[float(v) for v in (tr,tp1,tp2,sl)]
+    except (TypeError,ValueError):return False
+    if min(e,a,b,stop)<=0:return False
+    if side=='LONG':return stop<e<a<=b
+    if side=='SHORT':return 0<b<=a<e<stop
     return False
-
-
 def editorial_complete(x):
-    """Validate a non-trading editorial opportunity without manufacturing a trade setup."""
     category=str(x.get('category') or lane(x)).lower()
-    if category not in EDITORIAL_LANES: return False
+    if category not in EDITORIAL_LANES:return False
     score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('news_score'))))
-    if score < MIN_SCORE: return False
+    if score<MIN_SCORE:return False
     symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
-    if not symbol: return False
+    if not symbol:return False
     if category in {'breaking_news','news_and_macro'}:
-        if not str(x.get('title') or x.get('news_title') or '').strip(): return False
-        if not str(x.get('source') or x.get('news_source') or '').strip(): return False
-        if not str(x.get('published_at') or x.get('news_published_at') or '').strip(): return False
-    if category=='crypto_meme':
-        if not str(x.get('meme_context') or x.get('reason') or '').strip(): return False
-        if str(x.get('meme_source_type') or '').strip() not in {'market_move','news','existing_evidence'}: return False
+        if not str(x.get('title') or x.get('news_title') or '').strip():return False
+        if not str(x.get('source') or x.get('news_source') or '').strip():return False
+        if not str(x.get('published_at') or x.get('news_published_at') or '').strip():return False
+    if category=='crypto_meme' and str(x.get('meme_source_type') or '').strip() not in {'market_move','news','existing_evidence'}:return False
     return True
 def prediction_quality_for(x):
-    # Always read the current-cycle NIC output. Embedded scores can be stale and
-    # must never become prediction authority.
     predictions=load(PREDICTION).get('candidates') or []
-    symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
-    _,_,side,_,_,_,_,_=setup_parts(x)
-    matches=[
-        p for p in predictions
-        if isinstance(p,dict)
-        and str(p.get('symbol') or '').upper().replace('USDT','').strip()==symbol
-        and str(p.get('side') or '').upper()==side
-    ]
+    symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip(); _,_,side,_,_,_,_,_=setup_parts(x)
+    matches=[p for p in predictions if isinstance(p,dict) and str(p.get('symbol') or '').upper().replace('USDT','').strip()==symbol and str(p.get('side') or '').upper()==side]
     return max(matches,key=lambda p:num(p.get('quality_score')),default={})
-
-
 def flow_complete(x):
-    _,_,side,tr,tp1,tp2,sl,conf=setup_parts(x)
-    pq=prediction_quality_for(x)
-    quality=num(pq.get('quality_score'))
-    status=str(pq.get('status') or '').upper()
-    # A deterministic conditional contract is not sufficient by itself anymore:
-    # NIC must have tested the setup historically and found current multi-timeframe
-    # evidence coherent enough to continue.
-    return (
-        side in {'LONG','SHORT'}
-        and level_contract_valid(side,tr,tp1,tp2,sl)
-        and conf>=MIN_FLOW_CONF
-        and status=='PASS'
-        and quality>=72.0
-        and num(pq.get('current_alignment'))>=0.67
-        and num((pq.get('walk_forward') or {}).get('terminal_samples'))>=20
-        and str((pq.get('recommended_setup') or {}).get('state') or '').upper()=='AWAITING_TRIGGER'
-    )
+    _,_,side,tr,tp1,tp2,sl,conf=setup_parts(x); pq=prediction_quality_for(x)
+    return (side in {'LONG','SHORT'} and level_contract_valid(side,tr,tp1,tp2,sl) and conf>=MIN_FLOW_CONF and str(pq.get('status') or '').upper()=='PASS' and num(pq.get('quality_score'))>=72.0 and num(pq.get('current_alignment'))>=0.67 and num((pq.get('walk_forward') or {}).get('terminal_samples'))>=20 and str((pq.get('recommended_setup') or {}).get('state') or '').upper()=='AWAITING_TRIGGER')
 def norm(v):
     v=re.sub(r'\$?[0-9]+(?:\.[0-9]+)?',' ',str(v or '').lower()); return re.sub(r'\s+',' ',re.sub(r'[^a-z0-9 ]+',' ',v)).strip()
 def blocked(x,rows):
@@ -106,476 +71,125 @@ def blocked(x,rows):
         if new and old and SequenceMatcher(None,new,old).ratio()>=SIM:return 'high_text_similarity_recent'
     return ''
 def trading_symbols():
-    """Return Binance's current TRADING spot symbols; never infer tradability from market snapshots."""
-    bases=('https://data-api.binance.vision','https://api-gcp.binance.com','https://api1.binance.com','https://api2.binance.com')
-    last=None
+    bases=('https://data-api.binance.vision','https://api-gcp.binance.com','https://api1.binance.com','https://api2.binance.com'); last=None
     for api in bases:
         try:
             req=urllib.request.Request(api+'/api/v3/exchangeInfo?symbolStatus=TRADING',headers={'User-Agent':'binance-square-ai-creator/4.0','Accept':'application/json'})
-            with urllib.request.urlopen(req,timeout=15) as h:
-                data=json.loads(h.read().decode('utf-8'))
+            with urllib.request.urlopen(req,timeout=15) as h:data=json.loads(h.read().decode('utf-8'))
             symbols={str(x.get('symbol','')).upper() for x in data.get('symbols',[]) if str(x.get('status','')).upper()=='TRADING'}
             if symbols:return {s[:-4] if s.endswith('USDT') else s for s in symbols if s.endswith('USDT')}
         except Exception as exc:last=exc
     raise RuntimeError(f'Unable to verify Binance trading symbols before Signal-First selection: {last}')
-BINANCE_BASES=(
-    'https://data-api.binance.vision',
-    'https://api-gcp.binance.com',
-    'https://api1.binance.com',
-    'https://api2.binance.com',
-)
-
-def candles_for(symbol,market):
-    sym=str(symbol).upper().replace('USDT','')
-    for key in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
-        for item in market.get(key) or []:
-            if str(item.get('symbol','')).upper().replace('USDT','')==sym:
-                return item.get('candles_1h') or [],item
-    return [],None
-
-def fetch_verified_1h_candles(symbol, limit=48):
-    """Fetch fresh completed Binance Spot 1H candles for the selected live symbol."""
-    clean=str(symbol or '').upper().replace('BINANCE:','').replace('USDT','').strip()
-    if not clean:
-        return []
-    request_symbol=f'{clean}USDT'
-    now_ms=int(datetime.now(timezone.utc).timestamp()*1000)
-    last=None
-    for base in BINANCE_BASES:
-        try:
-            url=base+'/api/v3/klines?'+urllib.parse.urlencode({
-                'symbol':request_symbol,
-                'interval':'1h',
-                'limit':str(limit),
-            })
-            req=urllib.request.Request(
-                url,
-                headers={'User-Agent':'binance-square-ai-creator/4.0','Accept':'application/json'},
-            )
-            with urllib.request.urlopen(req,timeout=20) as h:
-                raw=json.loads(h.read().decode('utf-8'))
-            candles=[]
-            for row in raw:
-                try:
-                    close_time=int(row[6])
-                    if close_time>=now_ms:
-                        continue
-                    candles.append({
-                        'open_time':int(row[0]),
-                        'open':float(row[1]),
-                        'high':float(row[2]),
-                        'low':float(row[3]),
-                        'close':float(row[4]),
-                        'volume':float(row[5]),
-                        'close_time':close_time,
-                    })
-                except (TypeError,ValueError,IndexError):
-                    continue
-            if len(candles)>=20:
-                return candles
-            last=RuntimeError(f'only {len(candles)} completed 1H candles returned for {clean}')
-        except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError,ValueError) as exc:
-            last=exc
-    raise RuntimeError(f'Unable to fetch verified completed 1H OHLCV for {clean}: {last}')
-
 def apply_nic_prediction(candidate):
-    """Overlay NIC's validated conditional setup and calibrated confidence."""
-    e=dict(candidate)
-    pq=prediction_quality_for(e)
-    if not isinstance(pq,dict):
-        return e
-    e['prediction_quality']=pq
-    quality=num(pq.get('quality_score'),0.0)
-    calibrated=num(pq.get('calibrated_confidence'),quality)
-    rec=pq.get('recommended_setup') if isinstance(pq.get('recommended_setup'),dict) else {}
-    side=str(pq.get('side') or setup_parts(e)[2]).upper()
-    if side in {'LONG','SHORT'} and level_contract_valid(
-        side, rec.get('trigger'), rec.get('tp1'), rec.get('tp2'), rec.get('invalidation')
-    ):
-        e['trade_setup']={
-            'side':side,
-            'trigger':rec.get('trigger'),
-            'tp1':rec.get('tp1'),
-            'tp2':rec.get('tp2'),
-            'invalidation':rec.get('invalidation'),
-            'risk_per_unit':rec.get('risk_per_unit'),
-            'setup_source':'NIC_walk_forward_validated_conditional_setup',
-        }
-        e['prediction']={
-            'direction':side,
-            'entry_trigger':rec.get('trigger'),
-            'tp1':rec.get('tp1'),
-            'tp2':rec.get('tp2'),
-            'sl':rec.get('invalidation'),
-            'confidence':calibrated,
-            'nic_prediction_quality_score':quality,
-            'conditional':True,
-            'not_a_guarantee':True,
-        }
-        e['flow_confidence']=calibrated
-        e['multitimeframe']={**(e.get('multitimeframe') or {}),'confidence':calibrated}
+    e=dict(candidate); pq=prediction_quality_for(e)
+    if not isinstance(pq,dict):return e
+    e['prediction_quality']=pq; quality=num(pq.get('quality_score')); calibrated=num(pq.get('calibrated_confidence'),quality); rec=pq.get('recommended_setup') if isinstance(pq.get('recommended_setup'),dict) else {}; side=str(pq.get('side') or setup_parts(e)[2]).upper()
+    if side in {'LONG','SHORT'} and level_contract_valid(side,rec.get('trigger'),rec.get('tp1'),rec.get('tp2'),rec.get('invalidation')):
+        e['trade_setup']={'side':side,'trigger':rec.get('trigger'),'tp1':rec.get('tp1'),'tp2':rec.get('tp2'),'invalidation':rec.get('invalidation'),'risk_per_unit':rec.get('risk_per_unit'),'setup_source':'NIC_walk_forward_validated_conditional_setup'}
+        e['prediction']={'direction':side,'entry_trigger':rec.get('trigger'),'tp1':rec.get('tp1'),'tp2':rec.get('tp2'),'sl':rec.get('invalidation'),'confidence':calibrated,'nic_prediction_quality_score':quality,'conditional':True,'not_a_guarantee':True}
+        e['flow_confidence']=calibrated; e['multitimeframe']={**(e.get('multitimeframe') or {}),'confidence':calibrated}
     return e
 
 def derive(candidate,market):
-    nic_candidate=apply_nic_prediction(candidate)
-    if flow_complete(nic_candidate):
-        evidence=nic_candidate.get('evidence') if isinstance(nic_candidate.get('evidence'),dict) else {}
-        if num(evidence.get('ohlcv_candles_used'))>=20 and str(evidence.get('provenance','')).startswith('binance_spot_'):
-            return nic_candidate
+    """Only derive a trading setup from an already validated NIC prediction.
 
-    candles,item=candles_for(candidate.get('symbol'),market)
-    if len(candles)<20:
-        candles=fetch_verified_1h_candles(candidate.get('symbol'),limit=48)
-    else:
-        # The scanner snapshot may contain an open candle; use only completed
-        # candles and refresh when fewer than 20 completed candles remain.
-        now_ms=int(datetime.now(timezone.utc).timestamp()*1000)
-        completed=[]
-        for c in candles:
-            try:
-                if not isinstance(c,dict):
-                    continue
-                close_time=int(c.get('close_time',0))
-                if close_time>0 and close_time<now_ms:
-                    completed.append(c)
-            except Exception:
-                continue
-        candles=completed
-        if len(candles)<20:
-            candles=fetch_verified_1h_candles(candidate.get('symbol'),limit=48)
-
-    if len(candles)<20:
-        return candidate
-
-    highs=[]; lows=[]; closes=[]
-    for c in candles[-24:]:
-        try:
-            if isinstance(c,dict):
-                h=float(c['high']); l=float(c['low']); cl=float(c['close'])
-            else:
-                h=float(c[2]); l=float(c[3]); cl=float(c[4])
-            highs.append(h); lows.append(l); closes.append(cl)
-        except Exception:
-            continue
-    if len(highs)<20:
-        return candidate
-
-    # Preserve the upstream direction when present; otherwise infer only from
-    # the candidate's observed signed move. Never fabricate a directional signal.
-    _,existing_prediction,existing_side,_,_,_,_,existing_conf=setup_parts(candidate)
-    category=str(candidate.get('category') or lane(candidate)).lower()
-    side=existing_side if existing_side in {'LONG','SHORT'} else (
-        'LONG' if num(candidate.get('price_change_6h_pct'),num(candidate.get('price_change_percent')))>=0
-        else 'SHORT'
-    )
-    last=closes[-1]
-    rh=max(highs[:-1]); rl=min(lows[:-1]); span=max(rh-rl,last*0.002)
-    if last<=0 or rh<=0 or rl<=0:
-        return candidate
-    if side=='LONG':
-        trigger=max(last,rh)*1.002
-        sl=min(rl,last-span*0.75)
-        risk=trigger-sl
-        if risk<=0:return candidate
-        tp1=trigger+risk; tp2=trigger+2*risk
-    else:
-        trigger=min(last,rl)*0.998
-        sl=max(rh,last+span*0.75)
-        risk=sl-trigger
-        risk=min(risk,trigger*0.45)
-        if risk<=0:return candidate
-        tp1=trigger-risk; tp2=trigger-2*risk
-
-    if not level_contract_valid(side,trigger,tp1,tp2,sl):
-        return candidate
-
-    conf=max(
-        MIN_FLOW_CONF,
-        min(95.0,num(candidate.get('flow_confidence'),num(candidate.get('score'),num(candidate.get('discovery_score'),existing_conf or 72))))
-    )
-    e=dict(candidate)
-    e['trade_setup']={
-        'side':side,
-        'trigger':trigger,
-        'tp1':tp1,
-        'tp2':tp2,
-        'invalidation':sl,
-        'risk_per_unit':risk,
-        'setup_source':'verified_completed_binance_1h_ohlcv_conditional',
-    }
-    e['prediction']={
-        'direction':side,
-        'entry_trigger':trigger,
-        'tp1':tp1,
-        'tp2':tp2,
-        'sl':sl,
-        'confidence':conf,
-        'conditional':True,
-        'not_a_guarantee':True,
-    }
-    e['flow_confidence']=max(num(candidate.get('flow_confidence')),conf)
-    e['evidence']={
-        'provenance':'binance_spot_1h_klines_completed_candles',
-        'ohlcv_candles_used':len(candles),
-        'last_price':last,
-        'recent_high':rh,
-        'recent_low':rl,
-        'data_cutoff':candles[-1].get('close_time') if isinstance(candles[-1],dict) else None,
-        'candles_1h':candles[-24:],
-    }
-    e['signal_first_ohlcv_verified']=True
-    e['prediction_quality']=prediction_quality_for(e)
-    pq=e['prediction_quality'] if isinstance(e.get('prediction_quality'),dict) else {}
-    calibrated=num(pq.get('calibrated_confidence'),num(pq.get('quality_score'),conf))
-    if calibrated:
-        e['flow_confidence']=round(calibrated,2)
-        pred=dict(e.get('prediction') or {})
-        pred['confidence']=round(calibrated,2)
-        pred['nic_prediction_quality_score']=round(calibrated,2)
-        e['prediction']=pred
-        mtf=dict(e.get('multitimeframe') or {})
-        mtf['confidence']=round(calibrated,2)
-        e['multitimeframe']=mtf
-    e=apply_nic_prediction(e)
-    e['prediction_contract_complete']=flow_complete(e)
-    return e
+    The old implementation could synthesize LONG/SHORT levels from recent OHLCV
+    when NIC failed. That made the router look productive while bypassing the
+    prediction-accuracy gate. A failed NIC prediction is now a hard WAIT for the
+    trading lane; editorial selection remains available separately.
+    """
+    return apply_nic_prediction(candidate)
 def add(target,x,allow_complete_flow=False):
     if not isinstance(x,dict) or not x.get('symbol'):return
-    score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('discovery_score'))))
-    complete=flow_complete(x)
-    if score>=MIN_SCORE or (allow_complete_flow and complete):
-        target.append({**x,'score':score})
+    score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('discovery_score')))); complete=flow_complete(x)
+    if score>=MIN_SCORE or (allow_complete_flow and complete):target.append({**x,'score':score})
 def candidates(brief,pre,cad,market,flow_data,full_flow,ranking,pre_router):
     primary=[]; market_candidates=[]
     for source in (brief.get('ranked_stories'),pre.get('ranked_stories')):
         if isinstance(source,list):
             for x in source:
                 if not isinstance(x,dict) or not x.get('symbol'):continue
-                score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('discovery_score'))))
-                is_flow=lane(x) in PRIMARY_LANES or x.get('type')=='flow'
-                if is_flow and (score>=MIN_SCORE or flow_complete(x)):
-                    primary.append({**x,'score':score})
-                elif score>=MIN_SCORE:
-                    market_candidates.append({**x,'score':score})
+                score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('discovery_score')))); is_flow=lane(x) in PRIMARY_LANES or x.get('type')=='flow'
+                if is_flow and (score>=MIN_SCORE or flow_complete(x)):primary.append({**x,'score':score})
+                elif score>=MIN_SCORE:market_candidates.append({**x,'score':score})
     selected=pre.get('selected_opportunity')
     if isinstance(selected,dict):
-        selected_is_flow=lane(selected) in PRIMARY_LANES or selected.get('type')=='flow' or flow_complete(selected)
-        add(primary if selected_is_flow else market_candidates,selected,allow_complete_flow=selected_is_flow)
-
+        selected_is_flow=lane(selected) in PRIMARY_LANES or selected.get('type')=='flow' or flow_complete(selected); add(primary if selected_is_flow else market_candidates,selected,allow_complete_flow=selected_is_flow)
     for x in (flow_data.get('top_conditional_setups') or []):
         if isinstance(x,dict) and flow_complete(x):
-            side=setup_parts(x)[2]
-            primary.append({**x,'type':'flow','lane':x.get('lane') or ('capital_flow_long' if side=='LONG' else 'capital_flow_short'),'category':x.get('category') or ('capital_flow_long' if side=='LONG' else 'capital_flow_short'),'score':num(x.get('flow_score'),x.get('flow_confidence'))})
-
+            side=setup_parts(x)[2]; primary.append({**x,'type':'flow','lane':x.get('lane') or ('capital_flow_long' if side=='LONG' else 'capital_flow_short'),'category':x.get('category') or ('capital_flow_long' if side=='LONG' else 'capital_flow_short'),'score':num(x.get('flow_score'),x.get('flow_confidence'))})
     for x in (full_flow.get('early_movers') or []):
         if not isinstance(x,dict) or str(x.get('flow_state','')).upper() not in {'EARLY','DEVELOPING'}:continue
         move=num(x.get('price_change_6h_pct'),num(x.get('price_change_percent')))
-        if move>0: cat='next_gainer_candidate'
-        elif move<0: cat='next_loser_candidate'
-        else: continue
-        candidate={**x,'category':cat,'lane':'capital_flow_long' if cat=='next_gainer_candidate' else 'capital_flow_short','type':'flow','flow_confidence':num(x.get('discovery_score'),0)}
-        if num(candidate.get('discovery_score'))>=45: primary.append(candidate)
-
+        if move==0:continue
+        cat='next_gainer_candidate' if move>0 else 'next_loser_candidate'; candidate={**x,'category':cat,'lane':'capital_flow_long' if move>0 else 'capital_flow_short','type':'flow','flow_confidence':num(x.get('discovery_score'),0)}
+        if num(candidate.get('discovery_score'))>=45:primary.append(candidate)
     for x in (market.get('top_content_signals') or []):
-        if not isinstance(x,dict) or not x.get('symbol'): continue
+        if not isinstance(x,dict) or not x.get('symbol'):continue
         move=num(x.get('price_change_6h_pct'),num(x.get('price_change_percent')))
-        if move == 0: continue
-        cat='next_gainer_candidate' if move > 0 else 'next_loser_candidate'
-        candidate={**x,'category':cat,'lane':'capital_flow_long' if move > 0 else 'capital_flow_short','type':'flow','flow_confidence':num(x.get('content_signal_score'),num(x.get('score'),72))}
-        if num(candidate.get('content_signal_score'),0) >= MIN_SCORE:
-            primary.append(candidate)
-
+        if move==0:continue
+        cat='next_gainer_candidate' if move>0 else 'next_loser_candidate'; candidate={**x,'category':cat,'lane':'capital_flow_long' if move>0 else 'capital_flow_short','type':'flow','flow_confidence':num(x.get('content_signal_score'),num(x.get('score'),72))}
+        if num(candidate.get('content_signal_score'),0)>=MIN_SCORE:primary.append(candidate)
     ranking_items=[]
     if isinstance(ranking.get('selected'),dict):ranking_items.append(ranking['selected'])
     if isinstance(ranking.get('top_candidates'),list):ranking_items.extend(x for x in ranking['top_candidates'] if isinstance(x,dict))
-    for x in ranking_items:
-        add(market_candidates,{**x,'type':x.get('type','market'),'lane':x.get('lane') or x.get('category') or 'market','reason':x.get('reason') or 'authoritative opportunity ranking'})
-    if cad.get('selected_symbol') and num(cad.get('ranker_score'),num(cad.get('effective_score')))>=MIN_SCORE:
-        add(market_candidates,{'symbol':cad['selected_symbol'],'category':cad.get('selected_category','market'),'lane':'market','type':'market','score':num(cad.get('ranker_score'),num(cad.get('effective_score'))),'reason':'authoritative cadence selection'})
-    # Discovery shortlist from the pre-router intelligence layer. This never grants
-    # publication authority; choose() still re-verifies live status, OHLCV and contract.
+    for x in ranking_items:add(market_candidates,{**x,'type':x.get('type','market'),'lane':x.get('lane') or x.get('category') or 'market','reason':x.get('reason') or 'authoritative opportunity ranking'})
+    if cad.get('selected_symbol') and num(cad.get('ranker_score'),num(cad.get('effective_score')))>=MIN_SCORE:add(market_candidates,{'symbol':cad['selected_symbol'],'category':cad.get('selected_category','market'),'lane':'market','type':'market','score':num(cad.get('ranker_score'),num(cad.get('effective_score'))),'reason':'authoritative cadence selection'})
     for x in (pre_router.get('shortlist') or [])[:40]:
-        if isinstance(x,dict) and x.get('symbol'):
-            add(primary, {**x, 'type':'flow', 'lane':x.get('lane') or 'flow', 'category':x.get('category') or 'flow', 'score':num(x.get('pre_router_priority'))})
-
+        if isinstance(x,dict) and x.get('symbol'):add(primary,{**x,'type':'flow','lane':x.get('lane') or 'flow','category':x.get('category') or 'flow','score':num(x.get('pre_router_priority'))})
     story=brief.get('primary_story')
     if isinstance(story,dict):add(primary if lane(story) in PRIMARY_LANES or story.get('type')=='flow' else market_candidates,story,allow_complete_flow=True)
     return (sorted(primary,key=lambda x:(1 if flow_complete(x) else 0,num(x.get('flow_confidence'),0),num(x.get('score')),),reverse=True),sorted(market_candidates,key=lambda x:num(x.get('score')),reverse=True))
 def choose(xs,rows,market,live_symbols,allow_editorial=False):
     blocked_rows=[]
-    # Directional candidates are prioritized by NIC's validated quality rather
-    # than the legacy flow-confidence heuristic.
     def order_key(x):
-        pq=prediction_quality_for(x)
-        return (
-            str(pq.get('status') or '').upper()=='PASS',
-            num(pq.get('quality_score')),
-            num(pq.get('calibrated_confidence')),
-            num(x.get('flow_confidence')),
-            num(x.get('score')),
-        )
+        pq=prediction_quality_for(x); return (str(pq.get('status') or '').upper()=='PASS',num(pq.get('quality_score')),num(pq.get('calibrated_confidence')),num(x.get('flow_confidence')),num(x.get('score')))
     xs=sorted(xs,key=order_key,reverse=True)
     for x in xs:
         raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
-        if raw_symbol not in live_symbols:
-            blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'})
-            continue
+        if raw_symbol not in live_symbols:blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'});continue
         category=str(x.get('category') or lane(x)).lower()
         if category in EDITORIAL_LANES and allow_editorial and editorial_complete(x):
-            e=dict(x)
-            e['type']=e.get('type') or 'editorial'
-            e['editorial_only']=True
-            e['signal_first_primary']=False
+            e=dict(x); e['type']=e.get('type') or 'editorial'; e['editorial_only']=True; e['signal_first_primary']=False
             if category in {'breaking_news','news_and_macro'}:
-                e['news_title']=e.get('news_title') or e.get('title') or ''
-                e['news_source']=e.get('news_source') or e.get('source') or ''
-                e['news_published_at']=e.get('news_published_at') or e.get('published_at') or ''
-                s=str(e.get('symbol') or '').upper().replace('USDT','').replace('$','').strip()
-                e['news_symbols']=list(dict.fromkeys([*(e.get('news_symbols') or []), s])) if s else list(e.get('news_symbols') or [])
+                e['news_title']=e.get('news_title') or e.get('title') or ''; e['news_source']=e.get('news_source') or e.get('source') or ''; e['news_published_at']=e.get('news_published_at') or e.get('published_at') or ''
+                s=str(e.get('symbol') or '').upper().replace('USDT','').replace('$','').strip(); e['news_symbols']=list(dict.fromkeys([*(e.get('news_symbols') or []),s])) if s else list(e.get('news_symbols') or [])
             return e,blocked_rows
-        try:
-            e=derive(x,market)
-        except Exception as exc:
-            blocked_rows.append({'symbol':raw_symbol,'reason':f'verified_ohlcv_fetch_failed:{type(exc).__name__}'})
-            continue
+        try:e=derive(x,market)
+        except Exception as exc:blocked_rows.append({'symbol':raw_symbol,'reason':f'prediction_validation_failed:{type(exc).__name__}'});continue
         reason=blocked(e,rows)
-        if reason:
-            blocked_rows.append({'symbol':e.get('symbol'),'reason':reason})
-            continue
-        if flow_complete(e):
-            return e,blocked_rows
-        blocked_rows.append({'symbol':e.get('symbol'),'reason':'prediction_contract_missing_verified_ohlcv'})
+        if reason:blocked_rows.append({'symbol':e.get('symbol'),'reason':reason});continue
+        if flow_complete(e):return e,blocked_rows
+        blocked_rows.append({'symbol':e.get('symbol'),'reason':'NIC_prediction_not_verified_or_accuracy_gate_wait'})
     return None,blocked_rows
-
 def main():
-    pre=load(PREFLIGHT)
-    brief=load(DIRECTOR)
-    cad=load(CADENCE)
-    market=load(MARKET)
-    flow=load(FLOW)
-    full_flow=load(FULL_FLOW)
-    ranking=load(RANKING)
-    pre_router=load(PRE_ROUTER)
-    macro=load(ROOT/'data/live/global_macro_intelligence.json')
-    rows=recent()
-
-    # ExchangeInfo is authoritative; scanner snapshots are evidence only.
-    live_symbols=trading_symbols()
-    primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
-
-    # Macro events can create editorial candidates only when the source itself
-    # provides an explicit asset symbol. Never substitute a generic asset.
+    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); macro=load(ROOT/'data/live/global_macro_intelligence.json'); rows=recent()
+    live_symbols=trading_symbols(); primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
     for event in (macro.get('events') or [])[:30]:
-        title=str(event.get('title') or '').strip()
-        source=str(event.get('source') or '').strip()
-        published=str(event.get('published_at') or '').strip()
-        themes=event.get('themes') if isinstance(event.get('themes'),list) else []
-        score=min(100,64 + len(themes)*5 + (4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
+        title=str(event.get('title') or '').strip(); source=str(event.get('source') or '').strip(); published=str(event.get('published_at') or '').strip(); themes=event.get('themes') if isinstance(event.get('themes'),list) else []; score=min(100,64+len(themes)*5+(4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
         for raw in (event.get('asset_symbols') or [])[:2]:
             s=str(raw).upper().replace('USDT','').strip()
-            if s and title and source and published:
-                markets.append({
-                    'type':'news',
-                    'category':'news_and_macro',
-                    'lane':'news_and_macro',
-                    'symbol':s,
-                    'score':score,
-                    'title':title,
-                    'source':source,
-                    'published_at':published,
-                    'reason':'verified macro event explicitly anchored to this asset',
-                    'content_intent':'event_to_cross_asset_crypto_impact',
-                })
-
-    # Remove stale snapshot/ranker symbols before authoritative selection.
-    primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
-    markets=[x for x in markets if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
-
+            if s and title and source and published:markets.append({'type':'news','category':'news_and_macro','lane':'news_and_macro','symbol':s,'score':score,'title':title,'source':source,'published_at':published,'reason':'verified macro event explicitly anchored to this asset','content_intent':'event_to_cross_asset_crypto_impact'})
+    primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]; markets=[x for x in markets if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
     chosen,blocks=choose(primary,rows,market,live_symbols,allow_editorial=True)
-    if chosen is None:
-        chosen,more=choose(markets,rows,market,live_symbols,allow_editorial=True)
-        blocks+=more
-
-    current_allowed=bool(cad.get('publish'))
-    selected=None
-    decision='NO_PUBLISH'
-    reason='no_qualified_non_repetitive_signal'
-    primary_signal=False
-
-    # Cadence is pacing, not an evidence authority. A verified opportunity may
-    # publish when otherwise eligible even if the cadence scorer says "wait".
-    cadence_override=bool(chosen and not current_allowed)
-
+    if chosen is None:chosen,more=choose(markets,rows,market,live_symbols,allow_editorial=True);blocks+=more
+    current_allowed=bool(cad.get('publish')); selected=None; decision='NO_PUBLISH'; reason='NO_ELIGIBLE_OPPORTUNITY'; primary_signal=False; cadence_override=False
     if chosen:
-        primary_signal=flow_complete(chosen) or lane(chosen) in PRIMARY_LANES or chosen.get('type')=='flow'
+        contract_ok=flow_complete(chosen)
+        primary_signal=contract_ok
         if primary_signal:
-            side=setup_parts(chosen)[2]
-            chosen['type']='flow'
-            chosen['lane']='capital_flow_long' if side=='LONG' else 'capital_flow_short'
-            chosen['category']=chosen.get('category') if chosen.get('category') in PRIMARY_LANES else ('capital_flow_long' if side=='LONG' else 'capital_flow_short')
-        decision='PRIMARY_SIGNAL' if primary_signal else 'MARKET_SIGNAL'
-        reason='qualified_conditional_signal_selected' if primary_signal else 'qualified_editorial_or_market_story_selected'
-        selected=dict(chosen)
-
+            side=setup_parts(chosen)[2]; chosen['type']='flow'; chosen['lane']='capital_flow_long' if side=='LONG' else 'capital_flow_short'; chosen['category']=chosen.get('category') if chosen.get('category') in PRIMARY_LANES else ('capital_flow_long' if side=='LONG' else 'capital_flow_short')
+            decision='PRIMARY_SIGNAL'; reason='qualified_conditional_signal_selected'; selected=dict(chosen)
+        elif bool(chosen.get('editorial_only')):
+            decision='EDITORIAL_SIGNAL'; reason='qualified_editorial_story_selected'; selected=dict(chosen)
+        else:
+            blocks.append({'symbol':chosen.get('symbol'),'reason':'selected_candidate_lacks_authoritative_prediction_contract'}); reason='NO_ELIGIBLE_OPPORTUNITY'
+    cadence_override=bool(selected and not current_allowed)
     if selected:
-        _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected)
-        contract_ok=bool(flow_complete(selected))
-        selected['signal_first_primary']=primary_signal
-        selected['prediction_contract_complete']=contract_ok
-        selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"
-        pre['selected_opportunity']=selected
-        pre['signal_first_routing']={
-            'decision':decision,
-            'primary':primary_signal,
-            'bound_symbol':str(selected.get('symbol') or '').upper(),
-            'bound_category':selected.get('category') or lane(selected),
-            'prediction_contract_complete':contract_ok,
-            'prediction':pred,
-        }
-        PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-
-    result={
-        'generated_at':datetime.now(timezone.utc).isoformat(),
-        'router_version':'2.6-integrity-repair',
-        'publish':bool(selected),
-        'decision':decision,
-        'reason':reason,
-        'primary_signal':primary_signal,
-        'selected':selected,
-        'prediction_contract_complete':bool(selected and flow_complete(selected)),
-        'cadence_publish_on_disk':current_allowed,
-        'cadence_override':cadence_override,
-        'blocked_candidates':blocks,
-        'candidate_counts':{
-            'primary':len(primary),
-            'market':len(markets),
-            'live_usdt_symbols':len(live_symbols),
-            'pre_router_shortlist':len(pre_router.get('shortlist') or []),
-        },
-        'verified_ohlcv_policy':{
-            'minimum_completed_1h_candles':20,
-            'refresh_limit':48,
-            'source':'Binance Spot /api/v3/klines',
-            'reject_open_candle':True,
-        },
-        'live_symbol_source':'binance_exchangeInfo_TRADING',
-        'pre_router_intelligence':{
-            'used':bool(pre_router),
-            'discovery_only':True,
-        },
-        'policy':{
-            'minimum_score':MIN_SCORE,
-            'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],
-            'conditional_setup_source':'verified_1h_ohlcv_only',
-            'no_guaranteed_outcome':True,
-            'no_signal_means_no_trade_setup_post':True,
-            'editorial_lanes_may_publish_without_trade_contract':True,
-            'cadence_is_pacing_not_evidence_gate':True,
-            'contract_flag_mirrors_selected_contract':True,
-        },
-    }
-    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
-    print(json.dumps(result,indent=2,ensure_ascii=False))
-
-if __name__=='__main__':
-    main()
+        _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected); contract_ok=bool(flow_complete(selected)); selected['signal_first_primary']=primary_signal; selected['prediction_contract_complete']=contract_ok; selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"; pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':contract_ok,'prediction':pred}
+    else:
+        pre.pop('selected_opportunity',None); pre['signal_first_routing']={'decision':'NO_ELIGIBLE_OPPORTUNITY','primary':False,'bound_symbol':'','bound_category':'','prediction_contract_complete':False,'prediction':{}}
+    PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True}}
+    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
+if __name__=='__main__':main()
