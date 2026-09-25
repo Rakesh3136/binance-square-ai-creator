@@ -18,3 +18,6 @@ Upgrade: persistent discovery queue, diversified lane rotation, safer faster kno
 
 2026-09-25T14:43:37Z
 Repair: route editorial technical charts to TradingView when no authoritative Signal-First prediction snapshot exists; preserve frozen historical renderer for real primary signals. Re-run full autonomous publication validation.
+
+2026-09-25T15:10:00Z
+Repair: image publication failed after visual verification with Binance content/add parser error; add one fresh media re-upload retry while preserving image-required lanes and never downgrading to text-only.
