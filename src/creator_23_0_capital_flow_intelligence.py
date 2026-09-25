@@ -78,12 +78,20 @@ def get_json(base: str, path: str, params: dict):
 
 def spot_klines(symbol: str, interval: str):
     data = get_json(SPOT_BASE, "/api/v3/klines", {"symbol": symbol, "interval": interval, "limit": KLINE_LIMIT})
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     rows = []
     for r in data if isinstance(data, list) else []:
         if not isinstance(r, list) or len(r) < 11:
             continue
+        try:
+            close_time = int(r[6])
+            if close_time >= now_ms:
+                continue
+        except (TypeError, ValueError, IndexError):
+            continue
         rows.append({
-            "open_time": int(r[0]), "open": num(r[1]), "high": num(r[2]), "low": num(r[3]),
+            "open_time": int(r[0]), "close_time": close_time,
+            "open": num(r[1]), "high": num(r[2]), "low": num(r[3]),
             "close": num(r[4]), "volume": num(r[5]), "quote_volume": num(r[7]),
             "trades": int(num(r[8])), "taker_buy_base": num(r[9]), "taker_buy_quote": num(r[10]),
         })
