@@ -1,9 +1,17 @@
 {
-  "version": "1.0-nic-walk-forward",
-  "generated_at": "2026-09-25T06:29:00.628609+00:00",
+  "version": "1.0-conservative-accuracy-gate",
+  "generated_at": "2026-09-25T06:29:00.684769+00:00",
   "status": "READY",
-  "minimum_walk_forward_events": 25,
-  "minimum_current_alignment": 0.67,
+  "policy": {
+    "min_terminal_samples": 40,
+    "min_win_rate": 0.6,
+    "min_wilson_lower_95": 0.52,
+    "min_current_alignment": 0.75,
+    "max_ambiguous_rate": 0.1,
+    "max_current_atr_pct": 8.0,
+    "no_confidence_boost_from_raw_quality": true,
+    "weak_evidence_means_wait": true
+  },
   "candidates": [
     {
       "symbol": "FOGO",
@@ -73,14 +81,30 @@
         "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=no",
         "btc_relative_strength=ok",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "current_volatility_above_8.0pct:8.89",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.75,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.889386475593373
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "PENGU",
@@ -150,14 +174,30 @@
         "4h:trend=no,momentum=no,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 7.658464928387805
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "GPS",
@@ -227,14 +267,31 @@
         "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=ok,consistency=ok",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:10<25"
+        "insufficient_walk_forward_samples:10<25",
+        "insufficient_terminal_samples:10<40",
+        "win_rate_below_0.60:0.100",
+        "wilson_lower_below_0.52:0.018",
+        "multi_timeframe_alignment_below_0.75:0.438",
+        "current_volatility_above_8.0pct:8.55",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 10,
+        "wins": 1,
+        "losses": 9,
+        "win_rate": 0.1,
+        "wilson_lower_95": 0.0179,
+        "current_alignment": 0.4375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.551483420593373
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "牛来",
@@ -301,14 +358,30 @@
       "postmortem_feedback_applied": false,
       "reasons": [
         "missing_required_timeframe",
-        "insufficient_walk_forward_samples:5<25"
+        "insufficient_walk_forward_samples:5<25",
+        "insufficient_terminal_samples:5<40",
+        "win_rate_below_0.60:0.200",
+        "wilson_lower_below_0.52:0.036",
+        "multi_timeframe_alignment_below_0.75:0.000",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 5,
+        "wins": 1,
+        "losses": 4,
+        "win_rate": 0.2,
+        "wilson_lower_95": 0.0362,
+        "current_alignment": 0.0,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 6.182007046701949
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "KERNEL",
@@ -379,14 +452,31 @@
         "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.375",
+        "current_volatility_above_8.0pct:10.64",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 10.636363636363638
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "HEI",
@@ -457,14 +547,30 @@
         "1h:trend=ok,momentum=ok,range=no,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:5<25"
+        "insufficient_walk_forward_samples:5<25",
+        "insufficient_terminal_samples:5<40",
+        "wilson_lower_below_0.52:0.231",
+        "multi_timeframe_alignment_below_0.75:0.250",
+        "current_volatility_above_8.0pct:13.01",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 5,
+        "wins": 3,
+        "losses": 2,
+        "win_rate": 0.6,
+        "wilson_lower_95": 0.2307,
+        "current_alignment": 0.25,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 13.007207029321751
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "RAY",
@@ -535,14 +641,31 @@
         "1h:trend=no,momentum=ok,range=ok,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:1<25"
+        "insufficient_walk_forward_samples:1<25",
+        "insufficient_terminal_samples:1<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.125",
+        "current_volatility_above_8.0pct:11.24",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 1,
+        "wins": 0,
+        "losses": 1,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 11.237471348550814
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "MINA",
@@ -613,14 +736,31 @@
         "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.250",
+        "current_volatility_above_8.0pct:11.93",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.25,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 11.926108374384238
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "KITE",
@@ -690,14 +830,30 @@
         "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=no",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 6.261560221956264
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "EIGEN",
@@ -767,14 +923,31 @@
         "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.375",
+        "current_volatility_above_8.0pct:8.28",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.284875007493557
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "SQQQB",
@@ -841,14 +1014,31 @@
       "reasons": [
         "missing_required_timeframe",
         "insufficient_walk_forward_samples:1<25",
-        "setup_already_triggered_late"
+        "setup_already_triggered_late",
+        "insufficient_terminal_samples:1<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.000",
+        "NIC_engine_status_not_PASS",
+        "conditional_setup_not_awaiting_trigger"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 1,
+        "wins": 0,
+        "losses": 1,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.0,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 1.3958752515090522
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "ARMB",
@@ -918,14 +1108,30 @@
         "4h:trend=no,momentum=no,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=ok",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:6<25"
+        "insufficient_walk_forward_samples:6<25",
+        "insufficient_terminal_samples:6<40",
+        "win_rate_below_0.60:0.333",
+        "wilson_lower_below_0.52:0.097",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 6,
+        "wins": 2,
+        "losses": 4,
+        "win_rate": 0.3333,
+        "wilson_lower_95": 0.0968,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 5.339579212039417
+      },
+      "accuracy_gate_pass": false
     }
   ],
   "selected_passes": [],
@@ -998,14 +1204,30 @@
         "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=no",
         "btc_relative_strength=ok",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "current_volatility_above_8.0pct:8.89",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.75,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.889386475593373
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "PENGU",
@@ -1075,14 +1297,30 @@
         "4h:trend=no,momentum=no,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 7.658464928387805
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "GPS",
@@ -1152,14 +1390,31 @@
         "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=ok,consistency=ok",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:10<25"
+        "insufficient_walk_forward_samples:10<25",
+        "insufficient_terminal_samples:10<40",
+        "win_rate_below_0.60:0.100",
+        "wilson_lower_below_0.52:0.018",
+        "multi_timeframe_alignment_below_0.75:0.438",
+        "current_volatility_above_8.0pct:8.55",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 10,
+        "wins": 1,
+        "losses": 9,
+        "win_rate": 0.1,
+        "wilson_lower_95": 0.0179,
+        "current_alignment": 0.4375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.551483420593373
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "牛来",
@@ -1226,14 +1481,30 @@
       "postmortem_feedback_applied": false,
       "reasons": [
         "missing_required_timeframe",
-        "insufficient_walk_forward_samples:5<25"
+        "insufficient_walk_forward_samples:5<25",
+        "insufficient_terminal_samples:5<40",
+        "win_rate_below_0.60:0.200",
+        "wilson_lower_below_0.52:0.036",
+        "multi_timeframe_alignment_below_0.75:0.000",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 5,
+        "wins": 1,
+        "losses": 4,
+        "win_rate": 0.2,
+        "wilson_lower_95": 0.0362,
+        "current_alignment": 0.0,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 6.182007046701949
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "KERNEL",
@@ -1304,14 +1575,31 @@
         "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.375",
+        "current_volatility_above_8.0pct:10.64",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 10.636363636363638
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "HEI",
@@ -1382,14 +1670,30 @@
         "1h:trend=ok,momentum=ok,range=no,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:5<25"
+        "insufficient_walk_forward_samples:5<25",
+        "insufficient_terminal_samples:5<40",
+        "wilson_lower_below_0.52:0.231",
+        "multi_timeframe_alignment_below_0.75:0.250",
+        "current_volatility_above_8.0pct:13.01",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 5,
+        "wins": 3,
+        "losses": 2,
+        "win_rate": 0.6,
+        "wilson_lower_95": 0.2307,
+        "current_alignment": 0.25,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 13.007207029321751
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "RAY",
@@ -1460,14 +1764,31 @@
         "1h:trend=no,momentum=ok,range=ok,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:1<25"
+        "insufficient_walk_forward_samples:1<25",
+        "insufficient_terminal_samples:1<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.125",
+        "current_volatility_above_8.0pct:11.24",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 1,
+        "wins": 0,
+        "losses": 1,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 11.237471348550814
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "MINA",
@@ -1538,14 +1859,31 @@
         "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "extreme_volatility_penalty",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.250",
+        "current_volatility_above_8.0pct:11.93",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.25,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 11.926108374384238
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "KITE",
@@ -1615,14 +1953,30 @@
         "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=no",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 6.261560221956264
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "EIGEN",
@@ -1692,14 +2046,31 @@
         "4h:trend=no,momentum=ok,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=ok,consistency=no",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:0<25"
+        "insufficient_walk_forward_samples:0<25",
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.375",
+        "current_volatility_above_8.0pct:8.28",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.284875007493557
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "SQQQB",
@@ -1766,14 +2137,31 @@
       "reasons": [
         "missing_required_timeframe",
         "insufficient_walk_forward_samples:1<25",
-        "setup_already_triggered_late"
+        "setup_already_triggered_late",
+        "insufficient_terminal_samples:1<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.000",
+        "NIC_engine_status_not_PASS",
+        "conditional_setup_not_awaiting_trigger"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 1,
+        "wins": 0,
+        "losses": 1,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.0,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 1.3958752515090522
+      },
+      "accuracy_gate_pass": false
     },
     {
       "symbol": "ARMB",
@@ -1843,22 +2231,302 @@
         "4h:trend=no,momentum=no,range=ok,consistency=no",
         "1h:trend=ok,momentum=ok,range=no,consistency=ok",
         "btc_relative_strength=no",
-        "insufficient_walk_forward_samples:6<25"
+        "insufficient_walk_forward_samples:6<25",
+        "insufficient_terminal_samples:6<40",
+        "win_rate_below_0.60:0.333",
+        "wilson_lower_below_0.52:0.097",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
       ],
       "policy": {
         "quality_score_is_not_a_profit_probability": true,
         "historical_test_is_out_of_sample_only": true,
         "conditional_trigger_must_be_hit_before_target_or_stop": true,
         "weak_evidence_means_wait": true
-      }
+      },
+      "accuracy_gate": {
+        "terminal_samples": 6,
+        "wins": 2,
+        "losses": 4,
+        "win_rate": 0.3333,
+        "wilson_lower_95": 0.0968,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 5.339579212039417
+      },
+      "accuracy_gate_pass": false
     }
   ],
-  "guardrails": [
-    "No setup is accepted from a single 1H observation.",
-    "Historical outcomes are tested with the trigger-first state machine.",
-    "Confidence is shrunk toward neutral when historical sample size is small.",
-    "Multi-timeframe disagreement lowers quality.",
-    "BTC-relative strength is supporting context, not a causal law.",
-    "This engine cannot override safety/publication gates or fabricate a market outcome."
+  "audit": [
+    {
+      "symbol": "FOGO",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "current_volatility_above_8.0pct:8.89",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.75,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.889386475593373
+      }
+    },
+    {
+      "symbol": "PENGU",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 7.658464928387805
+      }
+    },
+    {
+      "symbol": "GPS",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:10<40",
+        "win_rate_below_0.60:0.100",
+        "wilson_lower_below_0.52:0.018",
+        "multi_timeframe_alignment_below_0.75:0.438",
+        "current_volatility_above_8.0pct:8.55",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 10,
+        "wins": 1,
+        "losses": 9,
+        "win_rate": 0.1,
+        "wilson_lower_95": 0.0179,
+        "current_alignment": 0.4375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.551483420593373
+      }
+    },
+    {
+      "symbol": "牛来",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:5<40",
+        "win_rate_below_0.60:0.200",
+        "wilson_lower_below_0.52:0.036",
+        "multi_timeframe_alignment_below_0.75:0.000",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 5,
+        "wins": 1,
+        "losses": 4,
+        "win_rate": 0.2,
+        "wilson_lower_95": 0.0362,
+        "current_alignment": 0.0,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 6.182007046701949
+      }
+    },
+    {
+      "symbol": "KERNEL",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.375",
+        "current_volatility_above_8.0pct:10.64",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 10.636363636363638
+      }
+    },
+    {
+      "symbol": "HEI",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:5<40",
+        "wilson_lower_below_0.52:0.231",
+        "multi_timeframe_alignment_below_0.75:0.250",
+        "current_volatility_above_8.0pct:13.01",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 5,
+        "wins": 3,
+        "losses": 2,
+        "win_rate": 0.6,
+        "wilson_lower_95": 0.2307,
+        "current_alignment": 0.25,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 13.007207029321751
+      }
+    },
+    {
+      "symbol": "RAY",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:1<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.125",
+        "current_volatility_above_8.0pct:11.24",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 1,
+        "wins": 0,
+        "losses": 1,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 11.237471348550814
+      }
+    },
+    {
+      "symbol": "MINA",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.250",
+        "current_volatility_above_8.0pct:11.93",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.25,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 11.926108374384238
+      }
+    },
+    {
+      "symbol": "KITE",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 6.261560221956264
+      }
+    },
+    {
+      "symbol": "EIGEN",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:0<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.375",
+        "current_volatility_above_8.0pct:8.28",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.375,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 8.284875007493557
+      }
+    },
+    {
+      "symbol": "SQQQB",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:1<40",
+        "win_rate_below_0.60:0.000",
+        "wilson_lower_below_0.52:0.000",
+        "multi_timeframe_alignment_below_0.75:0.000",
+        "NIC_engine_status_not_PASS",
+        "conditional_setup_not_awaiting_trigger"
+      ],
+      "metrics": {
+        "terminal_samples": 1,
+        "wins": 0,
+        "losses": 1,
+        "win_rate": 0.0,
+        "wilson_lower_95": 0.0,
+        "current_alignment": 0.0,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 1.3958752515090522
+      }
+    },
+    {
+      "symbol": "ARMB",
+      "side": "SHORT",
+      "passed": false,
+      "reasons": [
+        "insufficient_terminal_samples:6<40",
+        "win_rate_below_0.60:0.333",
+        "wilson_lower_below_0.52:0.097",
+        "multi_timeframe_alignment_below_0.75:0.312",
+        "NIC_engine_status_not_PASS"
+      ],
+      "metrics": {
+        "terminal_samples": 6,
+        "wins": 2,
+        "losses": 4,
+        "win_rate": 0.3333,
+        "wilson_lower_95": 0.0968,
+        "current_alignment": 0.3125,
+        "ambiguous_rate": 0.0,
+        "max_current_atr_pct": 5.339579212039417
+      }
+    }
   ]
 }
