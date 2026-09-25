@@ -7,6 +7,7 @@ TradingView; meme lanes retain the meme renderer.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -30,6 +31,46 @@ def load(path: Path):
 def clean_symbol(value) -> str:
     raw = str(value or "").upper().replace("BINANCE:", "").strip()
     return raw[:-4] if raw.endswith("USDT") else raw
+
+
+def ensure_playwright() -> None:
+    """Ensure the Node TradingView renderer can import Playwright on CI runners.
+
+    The workflow installs Node but the repository intentionally does not require
+    a persistent node_modules tree. Bootstrap only when the TradingView lane is
+    actually selected, keeping ordinary creator cycles lightweight.
+    """
+    node = shutil.which("node")
+    npm = shutil.which("npm")
+    if not node or not npm:
+        raise SystemExit("TradingView renderer requires node and npm")
+
+    probe = subprocess.run(
+        [node, "-e", "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))"],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if probe.returncode == 0:
+        return
+
+    print("Playwright package missing; bootstrapping TradingView renderer dependency")
+    subprocess.run(
+        [npm, "install", "--no-save", "--no-package-lock", "playwright@latest"],
+        cwd=ROOT,
+        check=True,
+    )
+    subprocess.run(
+        [npx for npx in [shutil.which("npx")] if npx][0],
+        cwd=ROOT,
+        check=True,
+    ) if False else None
+
+    npx = shutil.which("npx")
+    if not npx:
+        raise SystemExit("npm installed Playwright but npx is unavailable")
+    subprocess.run([npx, "playwright", "install", "--with-deps", "chromium"], cwd=ROOT, check=True)
 
 
 def main() -> int:
@@ -67,6 +108,8 @@ def main() -> int:
 
     if cat == "crypto_meme":
         return subprocess.run(["python", str(MEME)], cwd=ROOT, check=False).returncode
+
+    ensure_playwright()
     return subprocess.run(["node", str(TRADINGVIEW)], cwd=ROOT, check=False).returncode
 
 
