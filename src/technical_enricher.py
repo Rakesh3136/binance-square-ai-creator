@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'
 AUTHORITATIVE=ROOT/'data/live/authoritative_opportunity.json'
+ROUTING=ROOT/'data/live/signal_first_routing.json'
 MARKET=ROOT/'data/live/market_snapshot.json'
 REPORTS=ROOT/'data/reports'
 TECH_LANES={'technical_setup','high_volatility','top_gainers','top_losers','creator_signal_outcome','capital_flow_long','capital_flow_short','flow','follow_up'}
@@ -56,19 +57,24 @@ def main():
     if category not in TECH_LANES or not symbol:
         print(json.dumps({'status':'SKIP','reason':'non-chart editorial lane'})); return
 
-    # Freeze the Signal-First market state before any chart rendering. Refresh the
-    # ephemeral snapshot every cycle so a previous asset can never leak into this one.
-    if category in TECH_LANES and symbol:
+    # Only use the immutable historical snapshot when this cycle has an
+    # authoritative Signal-First prediction. Editorial/technical lanes without
+    # that contract use fresh completed candles instead of failing the whole run.
+    has_authoritative_prediction = (
+        routing.get('decision') == 'PRIMARY_SIGNAL'
+        and routing.get('prediction_contract_complete') is not False
+    )
+    if has_authoritative_prediction:
         result = subprocess.run([sys.executable, str(ROOT/'src/historical_setup_snapshot.py')], cwd=ROOT, text=True, capture_output=True)
         if result.returncode != 0:
             raise SystemExit(f'historical setup snapshot failed: {result.stderr.strip() or result.stdout.strip()}')
         print(result.stdout.strip())
 
     market=load(MARKET,{})
-    historical = load(ROOT/'data/live/historical_setup_snapshot.json', {})
-    if str(historical.get('symbol') or '').upper() != symbol:
+    historical = load(ROOT/'data/live/historical_setup_snapshot.json', {}) if has_authoritative_prediction else {}
+    if has_authoritative_prediction and str(historical.get('symbol') or '').upper() != symbol:
         raise SystemExit(f'historical setup snapshot symbol mismatch after refresh: {historical.get("symbol")} != {symbol}')
-    use_historical = bool(historical.get('status') == 'FROZEN')
+    use_historical = bool(has_authoritative_prediction and historical.get('status') == 'FROZEN')
 
     item=find_item(market,symbol)
     candles=(historical.get('candles_1h') if use_historical else (item or {}).get('candles_1h') or []) or []
