@@ -533,7 +533,7 @@ def build():
                     isinstance(x, dict)
                     and x.get("action") == "PENALIZE_REPEATED_FAILURE"
                     and str(x.get("side") or "").upper() == side
-                    and str(x.get("regime") or "") == str(regime.get("regime") or "UNKNOWN")
+                    and str(x.get("regime") or "") == fresh_regime
                     for x in feedback
                 )),
                 "reasons": reasons,
