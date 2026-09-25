@@ -44,57 +44,82 @@ def now():
 
 
 def main():
-    outcome = read_json(LIVE / "prediction_outcomes.json", {})
-    publication = read_json(LIVE / "publication_result.json", {})
     contract = read_json(LIVE / "prediction_contract.json", {})
+    publication = read_json(LIVE / "publication_result.json", {})
 
-    status = str(outcome.get("status") or outcome.get("outcome") or "UNVERIFIED").upper()
-    verified = status in {"TP1", "TP2", "SL", "INVALIDATED", "AMBIGUOUS", "EXPIRED"} or bool(outcome.get("verified"))
+    # Learn only from the corrected trigger-first evaluator. This deliberately
+    # ignores legacy outcome labels produced by the previous accounting logic.
+    evaluated = []
+    for row in rows(PREDICTION_OUTCOMES):
+        version = str(row.get("evaluator_version") or "")
+        outcome = str(row.get("outcome") or "").upper()
+        if version.startswith("25.") and outcome in {"WIN", "INVALIDATED", "AMBIGUOUS"}:
+            evaluated.append(row)
+
+    # One terminal label per call_id: latest terminal record wins.
+    terminal_by_call = {}
+    for row in evaluated:
+        cid = str(row.get("call_id") or "")
+        if cid:
+            terminal_by_call[cid] = row
+    evaluated = list(terminal_by_call.values())
+
+    wins = sum(str(x.get("outcome")).upper() == "WIN" for x in evaluated)
+    losses = sum(str(x.get("outcome")).upper() == "INVALIDATED" for x in evaluated)
+    ambiguous = sum(str(x.get("outcome")).upper() == "AMBIGUOUS" for x in evaluated)
+    samples = len(evaluated)
+    win_rate = wins / max(wins + losses, 1)
+
     record = {
         "recorded_at": now(),
-        "symbol": outcome.get("symbol") or contract.get("symbol"),
-        "prediction_id": outcome.get("prediction_id") or contract.get("prediction_id"),
-        "outcome": status,
-        "verified": verified,
-        "entry": outcome.get("entry") or contract.get("entry"),
-        "tp1": outcome.get("tp1") or contract.get("tp1"),
-        "tp2": outcome.get("tp2") or contract.get("tp2"),
-        "sl": outcome.get("sl") or contract.get("sl"),
-        "publication_status": publication.get("status") or publication.get("publication_status"),
+        "symbol": contract.get("symbol") or None,
+        "prediction_id": contract.get("prediction_id") or None,
+        "outcome": "BATCH_SUMMARY",
+        "verified": True,
+        "publication_status": publication.get("status"),
         "publication_proof": bool(publication.get("post_id") or publication.get("publication_proof")),
+        "evaluator_version": "25.0-trigger-first-state-machine",
+        "terminal_samples": samples,
+        "wins": wins,
+        "losses": losses,
+        "ambiguous": ambiguous,
+        "win_rate": round(win_rate, 4) if wins + losses else None,
     }
 
     existing = rows(LEDGER)
-    key = (record.get("prediction_id"), record.get("symbol"), record.get("outcome"))
-    if not any((x.get("prediction_id"), x.get("symbol"), x.get("outcome")) == key and key[0] for x in existing):
+    batch_key = f"25.0|{samples}|{wins}|{losses}|{ambiguous}"
+    if not any(str(x.get("batch_key") or "") == batch_key for x in existing):
+        record["batch_key"] = batch_key
         LEDGER.parent.mkdir(parents=True, exist_ok=True)
         with LEDGER.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
         existing.append(record)
 
-    verified_rows = [x for x in existing if x.get("verified")]
-    wins = sum(x.get("outcome") in {"TP1", "TP2"} for x in verified_rows)
-    losses = sum(x.get("outcome") in {"SL", "INVALIDATED"} for x in verified_rows)
-    ambiguous = sum(x.get("outcome") in {"AMBIGUOUS", "EXPIRED"} for x in verified_rows)
-    samples = len(verified_rows)
-
-    # Conservative calibration signal: never promote strategy changes from a
-    # single sample and never modify deterministic risk/price contracts here.
-    calibration = "INSUFFICIENT_DATA" if samples < 10 else ("POSITIVE" if wins > losses else "REVIEW")
     state = {
-        "schema": "NIC-LEARN-1.0",
+        "schema": "NIC-LEARN-2.0",
         "updated_at": now(),
-        "verified_outcomes": samples,
+        "verified_terminal_outcomes": samples,
         "wins": wins,
         "losses": losses,
         "ambiguous": ambiguous,
-        "calibration_state": calibration,
-        "training_mode": "OUTCOME_LEARNING_NOT_FOUNDATION_MODEL_TRAINING",
+        "win_rate_excluding_ambiguous": round(win_rate, 4) if wins + losses else None,
+        "calibration_state": "INSUFFICIENT_DATA" if samples < 10 else ("POSITIVE" if wins > losses else "REVIEW"),
+        "training_mode": "POST_FIX_OUTCOME_LEARNING",
+        "legacy_outcomes_excluded": True,
         "deterministic_contract_immutable": True,
         "publication_gates_immutable": True,
-        "learning_can_change": ["strategy_weights", "confidence_calibration", "content_experiment_priority"],
-        "learning_cannot_change": ["frozen_price_contract", "risk_gates", "publication_safety_gates"],
-        "next_requirement": "Collect >=10 independently verified outcomes before promoting a strategy-weight change.",
+        "learning_can_change": [
+            "strategy_weights",
+            "confidence_calibration",
+            "prediction_quality_threshold",
+            "content_experiment_priority",
+        ],
+        "learning_cannot_change": [
+            "frozen_price_contract",
+            "risk_gates",
+            "publication_safety_gates",
+        ],
+        "next_requirement": "Collect >=10 post-fix terminal outcomes before promoting prediction-strategy changes.",
     }
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
