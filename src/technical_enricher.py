@@ -60,6 +60,7 @@ def main():
     # Only use the immutable historical snapshot when this cycle has an
     # authoritative Signal-First prediction. Editorial/technical lanes without
     # that contract use fresh completed candles instead of failing the whole run.
+    routing = load(ROUTING,{})
     has_authoritative_prediction = (
         routing.get('decision') == 'PRIMARY_SIGNAL'
         and routing.get('prediction_contract_complete') is not False
