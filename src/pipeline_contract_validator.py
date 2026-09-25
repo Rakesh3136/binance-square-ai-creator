@@ -33,10 +33,25 @@ REQUIRED_ORDER = [
 
 def referenced_scripts(text: str) -> list[str]:
     seen: list[str] = []
-    for match in re.findall(r"python\s+(src/[A-Za-z0-9_./-]+\.py)\b", text):
-        if match not in seen:
-            seen.append(match)
+    # Only count executable workflow lines. This deliberately ignores the long
+    # PYTHONPATH import smoke-test line, which is not pipeline ordering.
+    for line in text.splitlines():
+        match = re.search(r"(?:^|[;&|])\s*python\s+(src/[A-Za-z0-9_./-]+\.py)\b", line)
+        if match and match.group(1) not in seen:
+            seen.append(match.group(1))
     return seen
+
+
+def execution_positions(text: str) -> dict[str, int]:
+    positions: dict[str, int] = {}
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        # Match actual workflow commands, not mentions inside Python import strings.
+        for match in re.finditer(r"(?:^|[;&|])\s*python\s+(src/[A-Za-z0-9_./-]+\.py)\b", line):
+            script = match.group(1)
+            positions.setdefault(script, offset + match.start(1))
+        offset += len(line)
+    return positions
 
 
 def main() -> int:
@@ -46,7 +61,6 @@ def main() -> int:
 
     text = WORKFLOW.read_text(encoding="utf-8")
     scripts = referenced_scripts(text)
-    # creator_diagnostics.py is intentionally optional in the persistence hook.
     missing = [p for p in scripts if p != "src/creator_diagnostics.py" and not (ROOT / p).exists()]
 
     if missing:
@@ -55,8 +69,8 @@ def main() -> int:
             print(f" - {p}", file=sys.stderr)
         return 2
 
-    positions = {p: text.find(p) for p in REQUIRED_ORDER}
-    absent = [p for p, pos in positions.items() if pos < 0]
+    positions = execution_positions(text)
+    absent = [p for p in REQUIRED_ORDER if p not in positions]
     if absent:
         print("ERROR: critical pipeline stages missing:", file=sys.stderr)
         for p in absent:
