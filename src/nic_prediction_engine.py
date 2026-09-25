@@ -34,7 +34,7 @@ BASES = (
 INTERVALS = ("1h", "4h", "1d")
 CURRENT_LIMIT = 70
 BACKTEST_LIMIT = 220
-MIN_EVENTS = 20
+MIN_EVENTS = 25
 MIN_CURRENT_ALIGNMENT = 0.67
 MAX_ASSETS = 12
 
@@ -468,6 +468,10 @@ def build():
             if terminal < MIN_EVENTS:
                 reasons.append(f"insufficient_walk_forward_samples:{terminal}<{MIN_EVENTS}")
                 quality = min(quality, 60.0)
+            win_rate = num(backtest.get("win_rate"), 0.0)
+            if terminal >= MIN_EVENTS and win_rate < 0.55:
+                reasons.append(f"historical_win_rate_below_55pct:{win_rate:.3f}")
+                quality = min(quality, 66.0)
             if backtest.get("ambiguous", 0) > max(2, terminal * 0.2):
                 reasons.append("high_intrabar_ambiguity")
                 quality -= 6.0
@@ -486,6 +490,8 @@ def build():
                 and quality >= 72.0
                 and alignment >= MIN_CURRENT_ALIGNMENT
                 and recommended_setup.get("state") == "AWAITING_TRIGGER"
+                and terminal >= MIN_EVENTS
+                and num(backtest.get("win_rate")) >= 0.55
                 and not any(x in reasons for x in ("extreme_current_volatility", "high_intrabar_ambiguity"))
                 else "WAIT"
             )
@@ -494,7 +500,8 @@ def build():
                 "side": side,
                 "status": status,
                 "quality_score": quality,
-                "calibrated_confidence": quality,
+                "confidence_ceiling": 85.0,
+                "calibrated_confidence": min(85.0, quality),
                 "current_alignment": round(alignment, 4),
                 "relative_strength_to_btc": round(relative_strength, 4) if relative_strength is not None else None,
                 "current_timeframes": {
