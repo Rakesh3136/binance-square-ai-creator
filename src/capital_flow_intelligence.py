@@ -93,9 +93,20 @@ def build_conditional_setups(rows: list[dict]) -> list[dict]:
 def main()->int:
     tickers=get_json("/api/v3/ticker/24hr",{"type":"FULL"}); ticker_rows=tickers if isinstance(tickers,list) else []; selected=select_assets(ticker_rows)
     rows=[]; quote_by_symbol=dict(selected)
-    for symbol,_ in selected:
-        result=signal(symbol)
-        if result: result["quote_volume_usdt"]=round(quote_by_symbol[symbol],2); rows.append(result)
+    # Bounded concurrency keeps the full-universe flow scan from becoming the
+    # bottleneck while still using public read-only Binance data.
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures={executor.submit(signal,symbol): (symbol, quote) for symbol, quote in selected}
+        for future in as_completed(futures):
+            symbol, quote=futures[future]
+            try:
+                result=future.result()
+            except Exception:
+                result=None
+            if result:
+                result["quote_volume_usdt"]=round(quote,2)
+                rows.append(result)
     rows.sort(key=lambda x:x["flow_score"],reverse=True); leaders=rows[:5]; laggards=sorted(rows,key=lambda x:x["flow_score"])[:5]; setups=build_conditional_setups(rows)
     rotation="RISK_ON_ROTATION" if leaders and sum(x["flow_score"] for x in leaders)>0 else "RISK_OFF_OR_DEFENSIVE"
     spread=(sum(x["flow_score"] for x in leaders)/len(leaders)-sum(x["flow_score"] for x in laggards)/len(laggards)) if leaders and laggards else 0
