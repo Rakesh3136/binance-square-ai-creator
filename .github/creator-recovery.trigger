@@ -1,3 +1,2 @@
-2026-09-25T17:30:00Z
-Clean-room NIC prediction validation after final hardening
-Closed candles only; NIC-owned setup levels; fresh macro context; multi-timeframe trend consistency; fresh BTC regime; 25+ walk-forward terminal samples; 55% hit-rate floor; 85 confidence ceiling; historical diagnostics; trigger-first outcomes; hard contract validation; full publication verification
+2026-09-25T12:00:00+05:30
+Harden NIC prediction: learn from previous-cycle outcomes before current-cycle forecasting; require fresh NIC prediction engine output; apply conservative accuracy gate using terminal samples, win rate, Wilson lower bound, multi-timeframe alignment, ambiguity and volatility; no verified evidence means WAIT; run full publication verification.
