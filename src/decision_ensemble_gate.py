@@ -30,9 +30,10 @@ def main():
     # is a contextual dossier (status=READY), not an approval/review decision.
     specialists=[('adversarial','adversarial_decision.json'),('counterfactual','counterfactual_analysis.json'),('research','research_decision.json'),('local_models','local_model_critic.json')]
     direction=str(frozen.get('direction') or '').upper()
+    editorial_only=bool(frozen.get('signal_first_editorial') or (signal.get('selected') or {}).get('editorial_only'))
     contract=all(frozen.get(k) is not None for k in ('entry_trigger','tp1','tp2','sl'))
     signal_ok=signal.get('publish') is True and bool(signal.get('selected'))
-    frozen_ok=bool(frozen.get('binance_verified')) and direction in {'LONG','SHORT'} and contract
+    frozen_ok=bool(frozen.get('binance_verified')) and ((editorial_only and bool(frozen.get('news_authoritative') or frozen.get('reason'))) or (direction in {'LONG','SHORT'} and contract))
     votes=[{'agent':'signal_first','decision':'PASS' if signal_ok else 'BLOCK','reason':'authoritative signal router'},
            {'agent':'frozen_contract','decision':'PASS' if frozen_ok else 'BLOCK','reason':'live symbol + direction + complete setup contract'}]
     for name,path in specialists:
@@ -45,7 +46,7 @@ def main():
         votes.append({'agent':name,'decision':'BLOCK' if blocked else ('PASS' if approved else 'REVIEW'),'reason':str(data.get('reason') or data.get('message') or 'specialist output')[:500]})
     passes=sum(v['decision']=='PASS' for v in votes); blocks=sum(v['decision']=='BLOCK' for v in votes); reviews=sum(v['decision']=='REVIEW' for v in votes)
     decision='BLOCK' if not frozen_ok or not signal_ok else ('REVIEW' if blocks or reviews else 'PASS')
-    result={'version':'1.4','generated_at':datetime.now(timezone.utc).isoformat(),'symbol':frozen.get('symbol'),'direction':direction,'decision':decision,'publish_authorized':decision=='PASS','vote_count':len(votes),'passes':passes,'blocks':blocks,'reviews':reviews,'disagreement':bool(blocks or reviews),'votes':votes,'policy':'Independent reviewers may require review, but cannot override deterministic market/evidence failures.'}
+    result={'version':'1.4','generated_at':datetime.now(timezone.utc).isoformat(),'symbol':frozen.get('symbol'),'direction':direction,'editorial_only':editorial_only,'decision':decision,'publish_authorized':decision=='PASS','vote_count':len(votes),'passes':passes,'blocks':blocks,'reviews':reviews,'disagreement':bool(blocks or reviews),'votes':votes,'policy':'Independent reviewers may require review, but cannot override deterministic market/evidence failures.'}
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
     try:
         subprocess.run([sys.executable,str(ROOT/'src/decision_calibration.py')],cwd=str(ROOT),check=False,timeout=30)
