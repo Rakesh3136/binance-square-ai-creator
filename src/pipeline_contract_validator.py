@@ -15,6 +15,7 @@ WORKFLOW = ROOT / ".github" / "workflows" / "autonomous-market-creator.yml"
 REQUIRED_ORDER = [
     "src/capital_flow_intelligence.py",
     "src/nic_prediction_engine.py",
+    "src/nic_prediction_contract_validator.py",
     "src/signal_first_router.py",
     "src/safe_creator_runner.py",
     "src/candidate_script_scorer_4.py",
