@@ -1,17 +1,20 @@
 {
-  "schema": "NIC-LEARN-1.0",
-  "updated_at": "2026-09-25T00:42:37.933090+00:00",
-  "verified_outcomes": 0,
+  "schema": "NIC-LEARN-2.0",
+  "updated_at": "2026-09-25T02:35:44.569869+00:00",
+  "verified_terminal_outcomes": 0,
   "wins": 0,
   "losses": 0,
   "ambiguous": 0,
+  "win_rate_excluding_ambiguous": null,
   "calibration_state": "INSUFFICIENT_DATA",
-  "training_mode": "OUTCOME_LEARNING_NOT_FOUNDATION_MODEL_TRAINING",
+  "training_mode": "POST_FIX_OUTCOME_LEARNING",
+  "legacy_outcomes_excluded": true,
   "deterministic_contract_immutable": true,
   "publication_gates_immutable": true,
   "learning_can_change": [
     "strategy_weights",
     "confidence_calibration",
+    "prediction_quality_threshold",
     "content_experiment_priority"
   ],
   "learning_cannot_change": [
@@ -19,5 +22,5 @@
     "risk_gates",
     "publication_safety_gates"
   ],
-  "next_requirement": "Collect >=10 independently verified outcomes before promoting a strategy-weight change."
+  "next_requirement": "Collect >=10 post-fix terminal outcomes before promoting prediction-strategy changes."
 }
