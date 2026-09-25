@@ -10,3 +10,5 @@ Repair: pipeline contract validator was matching NIC prediction contract validat
 Repair: harden tracked-file detection in pipeline contract validator and rerun full autonomous creator.
 2026-09-25T17:45:00+05:30
 Repair: validator command parser falsely missed valid critical workflow stages; use complete-workflow executable command scan and explicitly mask only the PYTHONPATH import smoke-test.
+2026-09-25T18:05:00+05:30
+Repair: make workflow stage detection resilient to valid YAML shell formatting and add a regression test for all critical stages.
