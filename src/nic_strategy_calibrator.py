@@ -21,8 +21,17 @@ def rows():
     for line in LEDGER.read_text(encoding="utf-8").splitlines():
         try:
             x=json.loads(line)
-            if isinstance(x,dict) and x.get("verified"): out.append(x)
-        except Exception: pass
+            # Only post-fix outcomes may teach strategy. Legacy rows were
+            # produced before trigger-first accounting was enforced.
+            if (
+                isinstance(x,dict)
+                and x.get("verified")
+                and str(x.get("evaluator_version") or "").startswith("25.")
+                and str(x.get("outcome") or "").upper() in {"WIN","INVALIDATED","AMBIGUOUS"}
+            ):
+                out.append(x)
+        except Exception:
+            pass
     return out
 
 
@@ -50,7 +59,7 @@ def main():
       "frozen_contract_immutable":True,
       "risk_gates_immutable":True,
       "publication_gates_immutable":True,
-      "promotion_threshold":MIN_SAMPLES,
+      "promotion_threshold":MIN_SAMPLES,"legacy_outcomes_excluded":True,
       "note":"Weights are bounded and may inform ensemble calibration only; they cannot create or publish a signal."
     }
     OUT.parent.mkdir(parents=True,exist_ok=True)
