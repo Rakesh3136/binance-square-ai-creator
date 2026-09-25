@@ -19,6 +19,16 @@ async function api(base,endpoint,body){
   if(j.code!=='000000') throw new Error(`Binance API error [${j.code}]: ${j.message||'unknown'}`);
   return j.data;
 }
+async function publishImageWithRetry(text, imageUrl, attempt = 1){
+  try {
+    return await api(V1,'/content/add',{contentType:1,bodyTextOnly:text,imageList:[imageUrl]});
+  } catch (e) {
+    if (attempt >= 2) throw e;
+    console.error(`Image publication attempt ${attempt} failed: ${e.message}; retrying with a fresh media submission...`);
+    throw e;
+  }
+}
+
 async function main(){
   const imageName=path.basename(imagePath);
   const ticket=await api(V2,'/image/presignedUrl',{imageName});
@@ -34,7 +44,28 @@ async function main(){
     await new Promise(r=>setTimeout(r,3000));
   }
   if(!status?.imageUrl) throw new Error('Square image processing timed out');
-  const result=await api(V1,'/content/add',{contentType:1,bodyTextOnly:text,imageList:[status.imageUrl]});
+  let result;
+  try {
+    result = await publishImageWithRetry(text, status.imageUrl, 1);
+  } catch (firstError) {
+    // A transient Square media/content mismatch can occur after a valid image
+    // upload. Re-upload the same source once and publish with the new processed
+    // URL. Never fall back to text-only here because this lane explicitly
+    // requires the verified visual package.
+    const retryTicket=await api(V2,'/image/presignedUrl',{imageName});
+    if(!retryTicket?.presignedUrl || !retryTicket?.fileTicket) throw firstError;
+    await fetch(retryTicket.presignedUrl,{method:'PUT',headers:{'Content-Type':type},body:fs.readFileSync(imagePath)});
+    let retryStatus;
+    for(let i=0;i<10;i++){
+      retryStatus=await api(V2,'/image/imageStatus',{fileTicket:retryTicket.fileTicket});
+      if(retryStatus.status===1) break;
+      if(retryStatus.status===2) throw new Error(`Square image processing failed on retry: ${retryStatus.failedReason||'unknown'}`);
+      await new Promise(r=>setTimeout(r,3000));
+    }
+    if(!retryStatus?.imageUrl) throw new Error('Square image retry processing timed out');
+    result=await publishImageWithRetry(text,retryStatus.imageUrl,2);
+    status.imageUrl=retryStatus.imageUrl;
+  }
   console.log(JSON.stringify({status:result.publishStatus==='submitted_unknown_504'?'PUBLISHED_SUBMITTED_504':'PUBLISHED_VERIFIED_BY_API_RESPONSE',post_id:result.id||null,link:result.shareLink||null,image_url:status.imageUrl}));
 }
 main().catch(e=>{console.error(e.stack||e);process.exit(1)});
