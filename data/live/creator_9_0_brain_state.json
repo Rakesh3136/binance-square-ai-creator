@@ -1,9 +1,9 @@
 {
   "version": "9.1",
-  "generated_at": "2026-09-25T09:09:58.675065+00:00",
-  "action": "WAIT_FOR_ADVERSARIAL_REVIEW",
+  "generated_at": "2026-09-25T09:52:55.322428+00:00",
+  "action": "RESEARCH_OR_WAIT",
   "confidence": "LOW",
-  "reason": "The adversarial evidence layer found a contract or evidence failure.",
+  "reason": "No sufficiently strong publish directive is available at the strategy layer.",
   "primary_asset": "BTC",
   "story_lane": "news_and_macro",
   "market_regime": "HIGH_DISPERSION",
@@ -34,17 +34,17 @@
   },
   "regime_intelligence": {
     "version": "1.0",
-    "generated_at": "2026-09-25T09:09:58.649454+00:00",
+    "generated_at": "2026-09-25T09:52:55.296411+00:00",
     "regime": "HIGH_DISPERSION",
     "confidence": "MEDIUM",
     "reason": "Large cross-asset dispersion indicates selective rather than uniform conditions.",
     "evidence": {
       "observations": 70,
-      "average_6h_change_pct": -8.3481,
-      "dispersion_pct": 40.2264,
+      "average_6h_change_pct": -8.2526,
+      "dispersion_pct": 40.2697,
       "positive_movers": 26,
       "negative_movers": 42,
-      "large_movers": 66,
+      "large_movers": 67,
       "conditional_flow_setups": 0,
       "volume_observations": 70
     },
@@ -56,20 +56,17 @@
   },
   "adversarial_review": {
     "version": "1.0",
-    "generated_at": "2026-09-25T08:46:17.972887+00:00",
-    "status": "BLOCK",
-    "publish_review": false,
+    "generated_at": "2026-09-25T09:10:11.603353+00:00",
+    "status": "PASS",
+    "publish_review": true,
     "symbol": "BTC",
     "direction": "",
+    "editorial_only": true,
     "challenges": [
       "Signal is not carrying explicit fresh completed-candle provenance.",
       "High cross-asset dispersion: avoid treating one asset move as broad market confirmation."
     ],
-    "failures": [
-      "missing_direction",
-      "incomplete_trade_contract",
-      "router_contract_not_complete"
-    ],
+    "failures": [],
     "adversarial_questions": [
       "What verified observation would falsify this thesis?",
       "Are Entry, TP1 and SL derived from the same frozen contract?",
@@ -135,7 +132,7 @@
     "never_publish_filler": true
   },
   "next_cycle": {
-    "action": "WAIT_FOR_ADVERSARIAL_REVIEW",
+    "action": "RESEARCH_OR_WAIT",
     "instruction": "Continue research/diversification. Waiting is correct when evidence or story quality is insufficient."
   },
   "guardrails": [
