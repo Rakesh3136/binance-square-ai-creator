@@ -1,3 +1,3 @@
-2026-09-25T15:00:00Z
-Clean-room NIC prediction validation on latest source
-Closed-candle evidence, NIC-owned setup levels, 25+ walk-forward terminal samples, 55% hit-rate floor, fresh BTC regime, current-cycle confidence, hard prediction contract, corrected trigger-first outcomes, and full publication verification
+2026-09-25T16:00:00Z
+Final clean-room validation of NIC prediction + historical audit learning loop
+Require current-cycle NIC-only confidence, NIC-owned conditional levels, closed-candle evidence, 25+ walk-forward samples, 55% terminal hit-rate floor, fresh BTC regime, historical legacy diagnostics, corrected trigger-first outcomes, and complete publication verification
