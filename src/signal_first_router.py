@@ -283,7 +283,19 @@ def derive(candidate,market):
         'candles_1h':candles[-24:],
     }
     e['signal_first_ohlcv_verified']=True
-    e['prediction_contract_complete']=True
+    e['prediction_quality']=prediction_quality_for(e)
+    pq=e['prediction_quality'] if isinstance(e.get('prediction_quality'),dict) else {}
+    calibrated=num(pq.get('calibrated_confidence'),num(pq.get('quality_score'),conf))
+    if calibrated:
+        e['flow_confidence']=round(calibrated,2)
+        pred=dict(e.get('prediction') or {})
+        pred['confidence']=round(calibrated,2)
+        pred['nic_prediction_quality_score']=round(calibrated,2)
+        e['prediction']=pred
+        mtf=dict(e.get('multitimeframe') or {})
+        mtf['confidence']=round(calibrated,2)
+        e['multitimeframe']=mtf
+    e['prediction_contract_complete']=flow_complete(e)
     return e
 def add(target,x,allow_complete_flow=False):
     if not isinstance(x,dict) or not x.get('symbol'):return
@@ -349,6 +361,18 @@ def candidates(brief,pre,cad,market,flow_data,full_flow,ranking,pre_router):
     return (sorted(primary,key=lambda x:(1 if flow_complete(x) else 0,num(x.get('flow_confidence'),0),num(x.get('score')),),reverse=True),sorted(market_candidates,key=lambda x:num(x.get('score')),reverse=True))
 def choose(xs,rows,market,live_symbols,allow_editorial=False):
     blocked_rows=[]
+    # Directional candidates are prioritized by NIC's validated quality rather
+    # than the legacy flow-confidence heuristic.
+    def order_key(x):
+        pq=prediction_quality_for(x)
+        return (
+            str(pq.get('status') or '').upper()=='PASS',
+            num(pq.get('quality_score')),
+            num(pq.get('calibrated_confidence')),
+            num(x.get('flow_confidence')),
+            num(x.get('score')),
+        )
+    xs=sorted(xs,key=order_key,reverse=True)
     for x in xs:
         raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
         if raw_symbol not in live_symbols:
