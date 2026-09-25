@@ -6,3 +6,5 @@ Repair: validate duplicate-publication telemetry; distinguish current-run no-pub
 Upgrade: enable evidence-backed NIC discovery, knowledge, research, education, mechanism and data-surprise publishing lanes; preserve originality, duplicate, Jev and elite gates.
 2026-09-25T11:30:00Z
 Repair: pipeline contract validator was matching NIC prediction contract validator inside the import smoke-test; validate actual workflow execution commands only, then rerun full autonomous creator.
+2026-09-25T12:05:00Z
+Repair: harden tracked-file detection in pipeline contract validator and rerun full autonomous creator.
