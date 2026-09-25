@@ -16,6 +16,7 @@ CALLS = ROOT / "analytics" / "call_ledger.jsonl"
 OUTCOMES = ROOT / "analytics" / "prediction_outcomes.jsonl"
 OUT = ROOT / "data" / "live" / "nic_prediction_postmortem.json"
 REPORT = ROOT / "data" / "intelligence" / "nic_prediction_postmortem_report.json"
+HIST_AUDIT = ROOT / "data" / "intelligence" / "nic_historical_prediction_audit_report.json"
 
 
 def jsonl(path: Path) -> list[dict]:
@@ -90,6 +91,18 @@ def main() -> int:
 
     rows = [enrich(x) for x in terminal]
 
+    try:
+        historical_audit = json.loads(HIST_AUDIT.read_text(encoding="utf-8")) if HIST_AUDIT.exists() else {}
+    except Exception:
+        historical_audit = {}
+
+    legacy_diagnostics = {
+        "records_audited": historical_audit.get("records_audited", 0),
+        "by_direction": historical_audit.get("by_direction", {}),
+        "calibration_eligible": False,
+        "purpose": "structural_diagnostics_only",
+    }
+
     def stats(items):
         wins = sum(x["win"] for x in items)
         losses = sum(x["loss"] for x in items)
@@ -154,6 +167,7 @@ def main() -> int:
         "terminal_samples": len(rows),
         "by_dimension": groups,
         "repeated_context_feedback": feedback,
+        "legacy_prediction_diagnostics": legacy_diagnostics,
         "guardrails": [
             "Legacy outcome labels are excluded.",
             "Ambiguous candles do not count as wins or losses.",
@@ -172,6 +186,7 @@ def main() -> int:
             "generated_at": now,
             "terminal_samples": len(rows),
             "feedback_count": len(feedback),
+            "legacy_prediction_diagnostics": legacy_diagnostics,
             "by_dimension": groups,
         }, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
