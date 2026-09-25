@@ -1,2 +1,2 @@
-2026-09-25T12:00:00+05:30
-Harden NIC prediction: learn from previous-cycle outcomes before current-cycle forecasting; require fresh NIC prediction engine output; apply conservative accuracy gate using terminal samples, win rate, Wilson lower bound, multi-timeframe alignment, ambiguity and volatility; no verified evidence means WAIT; run full publication verification.
+2026-09-25T13:40:00+05:30
+Validate NIC WAIT-safe routing: no synthetic trade fallback, no incomplete prediction publication, editorial fallback allowed, explicit NO_ELIGIBLE_OPPORTUNITY state.
