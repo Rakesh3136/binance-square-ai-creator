@@ -21,6 +21,7 @@ FLOW = LIVE / "capital_flow_intelligence.json"
 FULL_FLOW = LIVE / "full_universe_flow.json"
 MARKET = LIVE / "market_snapshot.json"
 REGIME = LIVE / "market_regime_intelligence.json"
+POSTMORTEM = LIVE / "nic_prediction_postmortem.json"
 OUT = LIVE / "nic_prediction_engine.json"
 REPORT = ROOT / "data" / "intelligence" / "nic_prediction_engine_report.json"
 
@@ -321,6 +322,7 @@ def build():
     full_flow = load(FULL_FLOW, {})
     market = load(MARKET, {})
     regime = load(REGIME, {})
+    postmortem = load(POSTMORTEM, {})
     candidates = candidate_symbols(flow, full_flow)
     btc_frames = {}
     try:
@@ -370,6 +372,26 @@ def build():
             quality = 50.0
             quality += (smoothed - 0.5) * 60.0
             quality += (alignment - 0.5) * 28.0
+
+            # Repeated post-fix failure contexts receive a bounded penalty.
+            current_regime = str(regime.get("regime") or "UNKNOWN")
+            quality_band = (
+                "LT70" if quality < 70 else
+                "70_79" if quality < 80 else
+                "80_89" if quality < 90 else
+                "90_PLUS"
+            )
+            feedback = postmortem.get("repeated_context_feedback") or []
+            for item in feedback:
+                if (
+                    isinstance(item, dict)
+                    and item.get("action") == "PENALIZE_REPEATED_FAILURE"
+                    and str(item.get("side") or "").upper() == side
+                    and str(item.get("quality_band") or "") == quality_band
+                    and str(item.get("regime") or "") == current_regime
+                ):
+                    penalty = min(8.0, max(0.0, float(item.get("bounded_quality_penalty") or 0.0)))
+                    quality -= penalty
 
             h1 = frames.get("1h") or {}
             if h1.get("volume_ratio", 1.0) >= 1.2:
@@ -422,6 +444,13 @@ def build():
                     "regime": regime.get("regime"),
                     "confidence": regime.get("confidence"),
                 },
+                "postmortem_feedback_applied": bool(any(
+                    isinstance(x, dict)
+                    and x.get("action") == "PENALIZE_REPEATED_FAILURE"
+                    and str(x.get("side") or "").upper() == side
+                    and str(x.get("regime") or "") == str(regime.get("regime") or "UNKNOWN")
+                    for x in feedback
+                )),
                 "reasons": reasons,
                 "policy": {
                     "quality_score_is_not_a_profit_probability": True,
