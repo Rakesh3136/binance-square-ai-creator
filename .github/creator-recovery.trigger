@@ -1,2 +1,2 @@
-2026-09-25T14:05:00+05:30
-Upgrade NIC World Model: persistent regime memory linked to immutable prediction truth outcomes; distinguish current regime from learned regime performance; insufficient samples remain uncertain; regime context is advisory and never overrides frozen prediction contracts; validate full autonomous cycle.
+2026-09-25T14:20:00+05:30
+Repair: preserve Signal-First editorial selections through opportunity freeze; never replace a valid editorial story with a generic portfolio candidate; keep incomplete predictions blocked; validate world-model regime memory and full autonomous publication path.
