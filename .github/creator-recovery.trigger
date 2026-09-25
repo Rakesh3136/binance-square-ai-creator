@@ -1,3 +1,3 @@
-2026-09-25T11:30:00Z
-Revalidate NIC prediction engine after parallel-fetch and calibrated-confidence upgrade
-Require trigger-first outcome accounting, multi-timeframe agreement, walk-forward evidence, NIC-calibrated confidence, and end-to-end publication validation
+2026-09-25T11:45:00Z
+Start isolated validation for calibrated NIC prediction engine
+Verify walk-forward prediction quality, trigger-first outcomes, authoritative NIC confidence, and the full publication path without stale-run interference
