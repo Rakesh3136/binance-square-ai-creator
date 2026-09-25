@@ -135,23 +135,35 @@ def main() -> int:
     if rc:
         return rc
 
-    # The production renderer has a safe historical OHLCV mode. In that mode
-    # there is deliberately no TradingView HTML capture to open. The generic
-    # image validator plus production_manager's frozen-snapshot checks are the
-    # authoritative validation for this fallback.
+    # Validation is shared by all visual lanes. Signal-First technical
+    # charts may use the local historical renderer, while meme/editorial
+    # visuals intentionally do not create TradingView HTML. After the image
+    # quality checks above, only the actual TradingView lane needs browser
+    # validation.
     metadata = Path("data/live/visual_metadata.json")
     if metadata.exists():
         try:
             import json
             meta = json.loads(metadata.read_text(encoding="utf-8"))
-            if (
-                str(meta.get("provider") or "") == "Local historical OHLCV renderer"
-                and str(meta.get("status") or "") == "HISTORICAL_SNAPSHOT_CREATED"
-            ):
+            provider = str(meta.get("provider") or "")
+            status = str(meta.get("status") or "")
+            visual_type = str(meta.get("visual_type") or "").lower()
+
+            if provider == "Local historical OHLCV renderer" and status == "HISTORICAL_SNAPSHOT_CREATED":
                 print("TRADINGVIEW_FALLBACK_VALID: local historical OHLCV renderer")
                 return 0
-        except Exception:
-            pass
+
+            non_tradingview_types = {
+                "meme", "crypto_meme", "real_world_photo_meme",
+                "editorial", "news", "infographic", "education",
+            }
+            if visual_type in non_tradingview_types or (
+                provider and provider not in {"TradingView", "Local historical OHLCV renderer"}
+            ):
+                print(f"NON_TRADINGVIEW_VISUAL_VALID: provider={provider or '<unknown>'} type={visual_type or '<unknown>'}")
+                return 0
+        except Exception as e:
+            print(f"TRADINGVIEW_METADATA_WARNING: {type(e).__name__}:{e}")
 
     return browser_validate()
 
