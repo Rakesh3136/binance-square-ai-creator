@@ -82,7 +82,18 @@ def main() -> int:
         "creator_signal_outcome", "follow_up",
     }
 
-    if cat in signal_lanes:
+    routing = load(ROOT / "data/live/signal_first_routing.json")
+    authoritative_signal = (
+        str(routing.get("decision") or "").upper() == "PRIMARY_SIGNAL"
+        and routing.get("prediction_contract_complete") is not False
+        and bool(routing.get("selected"))
+    )
+
+    # Historical charts are mandatory only for an authoritative Signal-First
+    # trade contract. Editorial/knowledge stories can still request a chart,
+    # but they must use the ordinary TradingView renderer instead of failing
+    # because no frozen prediction snapshot exists.
+    if cat in signal_lanes and authoritative_signal:
         expected = clean_symbol(ctx.get("symbol") or frozen.get("symbol"))
         snap = load(SNAPSHOT)
         actual = clean_symbol(snap.get("symbol"))
