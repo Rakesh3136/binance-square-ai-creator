@@ -27,8 +27,6 @@ REQUIRED_ORDER = [
     "src/write_to_earn_eligibility_gate.py",
     "src/write_to_earn_master.py",
     "src/binance_square_publisher.py",
-    "src/creator_20_0_publication_verifier.py",
-    "src/call_tracker.py",
 ]
 
 
