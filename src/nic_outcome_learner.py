@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LIVE = ROOT / "data/live"
 ANALYTICS = ROOT / "analytics"
 LEDGER = LIVE / "nic_outcome_ledger.jsonl"
+PREDICTION_OUTCOMES = ANALYTICS / "prediction_outcomes.jsonl"
 REPORT = LIVE / "nic_learning_state.json"
 MEMORY = ANALYTICS / "strategy_memory.json"
 
