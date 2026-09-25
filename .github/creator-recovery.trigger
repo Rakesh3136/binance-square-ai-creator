@@ -1,2 +1,2 @@
-2026-09-25T13:45:00+05:30
-Architecture upgrade: immutable NIC prediction truth ledger; objective Binance OHLCV outcome resolution; pending predictions never train NIC; terminal outcomes feed postmortem, outcome learning and strategy calibration before next forecast; verify routing, editorial fallback and publication truth end-to-end.
+2026-09-25T14:05:00+05:30
+Upgrade NIC World Model: persistent regime memory linked to immutable prediction truth outcomes; distinguish current regime from learned regime performance; insufficient samples remain uncertain; regime context is advisory and never overrides frozen prediction contracts; validate full autonomous cycle.
