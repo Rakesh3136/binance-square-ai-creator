@@ -65,7 +65,7 @@ jobs:
         run: |
           python -m compileall -q src
           python src/pipeline_contract_validator.py
-          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence, nic_experiment_governor, nic_human_editor_intelligence, resolve_publish_draft, pipeline_contract_validator, visual_decision, publication_payload_builder, nic_prediction_engine, nic_prediction_postmortem, call_tracker"
+          PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence, nic_experiment_governor, nic_human_editor_intelligence, resolve_publish_draft, pipeline_contract_validator, visual_decision, publication_payload_builder, nic_prediction_engine, nic_prediction_contract_validator, nic_prediction_postmortem, call_tracker"
           python src/nic_model_router.py
           echo 'Core, Jev, ensemble, NIC and portfolio modules imported successfully'
       - name: Reset creator cycle
@@ -78,6 +78,8 @@ jobs:
           python src/capital_flow_intelligence.py
           python src/nic_prediction_engine.py
           python -m json.tool data/live/nic_prediction_engine.json >/dev/null
+          python src/nic_prediction_contract_validator.py
+          python -m json.tool data/live/nic_prediction_contract_validation.json >/dev/null
           python src/news_scanner.py
           python src/global_macro_intelligence.py
           python src/cross_asset_impact_engine.py
