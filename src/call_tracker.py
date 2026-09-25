@@ -355,10 +355,34 @@ def main():
         ),
         "direction": direction,
         "post_id": post_id,
+        "nic_prediction_quality": None,
+        "market_regime_at_entry": None,
         "status": "OPEN" if explicit and verified_publication else "NO_EXPLICIT_CALL",
         "verification": "unverified_until_fresh_market_data_confirms_target_or_invalidation",
         "source": "verified technical enrichment + frozen publication context + verified Square publication",
     }
+
+    # Capture immutable prediction diagnostics at creation time. These
+    # values are advisory learning inputs only; they never rewrite the setup.
+    if explicit and verified_publication:
+        try:
+            pred_path = ROOT / "data/live/nic_prediction_engine.json"
+            pred = load(pred_path, {})
+            matches = [
+                x for x in (pred.get("candidates") or [])
+                if str(x.get("symbol") or "").upper() == symbol
+                and str(x.get("side") or "").upper() == direction.replace("_BIAS","")
+            ]
+            if matches:
+                best = max(matches, key=lambda x: float(x.get("quality_score") or 0))
+                record["nic_prediction_quality"] = float(best.get("quality_score") or 0)
+        except Exception:
+            pass
+        try:
+            regime = load(ROOT / "data/live/market_regime_intelligence.json", {})
+            record["market_regime_at_entry"] = str(regime.get("regime") or "UNKNOWN")
+        except Exception:
+            pass
 
     if linked:
         linked.update({"post_id": post_id or linked.get("post_id"), "category": category})
