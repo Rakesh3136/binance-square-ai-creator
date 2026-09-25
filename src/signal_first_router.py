@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
+PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
 PRIMARY_LANES={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up'}
 EDITORIAL_LANES={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','comparison','education','watchlist','crypto_meme'}
@@ -62,9 +62,39 @@ def editorial_complete(x):
         if not str(x.get('meme_context') or x.get('reason') or '').strip(): return False
         if str(x.get('meme_source_type') or '').strip() not in {'market_move','news','existing_evidence'}: return False
     return True
+def prediction_quality_for(x):
+    embedded=x.get('prediction_quality')
+    if isinstance(embedded,dict):
+        return embedded
+    predictions=load(PREDICTION).get('candidates') or []
+    symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
+    _,_,side,_,_,_,_,_=setup_parts(x)
+    matches=[
+        p for p in predictions
+        if isinstance(p,dict)
+        and str(p.get('symbol') or '').upper().replace('USDT','').strip()==symbol
+        and str(p.get('side') or '').upper()==side
+    ]
+    return max(matches,key=lambda p:num(p.get('quality_score')),default={})
+
+
 def flow_complete(x):
     _,_,side,tr,tp1,tp2,sl,conf=setup_parts(x)
-    return side in {'LONG','SHORT'} and level_contract_valid(side,tr,tp1,tp2,sl) and conf>=MIN_FLOW_CONF
+    pq=prediction_quality_for(x)
+    quality=num(pq.get('quality_score'))
+    status=str(pq.get('status') or '').upper()
+    # A deterministic conditional contract is not sufficient by itself anymore:
+    # NIC must have tested the setup historically and found current multi-timeframe
+    # evidence coherent enough to continue.
+    return (
+        side in {'LONG','SHORT'}
+        and level_contract_valid(side,tr,tp1,tp2,sl)
+        and conf>=MIN_FLOW_CONF
+        and status=='PASS'
+        and quality>=72.0
+        and num(pq.get('current_alignment'))>=0.67
+        and num((pq.get('walk_forward') or {}).get('terminal_samples'))>=20
+    )
 def norm(v):
     v=re.sub(r'\$?[0-9]+(?:\.[0-9]+)?',' ',str(v or '').lower()); return re.sub(r'\s+',' ',re.sub(r'[^a-z0-9 ]+',' ',v)).strip()
 def blocked(x,rows):
