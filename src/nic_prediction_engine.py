@@ -161,6 +161,9 @@ def frame(rows: list[dict]) -> dict:
     prior_high = max(x["high"] for x in rows[-21:-1])
     prior_low = min(x["low"] for x in rows[-21:-1])
     avg_vol = sum(x["quote_volume"] for x in rows[-21:-1]) / 20
+    recent_high = max(x["high"] for x in rows[-20:])
+    recent_low = min(x["low"] for x in rows[-20:])
+    range_width = max(recent_high - recent_low, 1e-12)
     volume_ratio = rows[-1]["quote_volume"] / avg_vol if avg_vol > 0 else 1.0
     buy_ratio = (
         sum(x["taker_buy_quote"] for x in rows[-20:])
@@ -177,6 +180,11 @@ def frame(rows: list[dict]) -> dict:
         "buy_ratio": buy_ratio,
         "prior_high": prior_high,
         "prior_low": prior_low,
+        "range_position_20": (last - recent_low) / range_width,
+        "trend_consistency_20": (
+            sum(1 for x in closes[-20:] if x >= (e20 or x)) / 20.0
+            if e20 else 0.5
+        ),
         "close_vs_ema20_pct": ((last / e20) - 1.0) * 100.0 if e20 else 0.0,
         "return_12": ((last / closes[-13]) - 1.0) * 100.0 if len(closes) > 13 and closes[-13] else 0.0,
     }
@@ -197,8 +205,21 @@ def current_direction_score(side: str, frames: dict[str, dict], relative_strengt
             (item.get("rsi14") is not None)
             and (50.0 <= item["rsi14"] <= 72.0 if side == "LONG" else 28.0 <= item["rsi14"] <= 50.0)
         )
-        checks.extend([trend, momentum])
-        notes.append(f"{name}:trend={'ok' if trend else 'no'},momentum={'ok' if momentum else 'no'}")
+        position = bool(
+            0.60 <= num(item.get("range_position_20"), 0.5) <= 0.95
+            if side == "LONG"
+            else 0.05 <= num(item.get("range_position_20"), 0.5) <= 0.40
+        )
+        consistency = bool(
+            num(item.get("trend_consistency_20"), 0.5) >= 0.60
+            if side == "LONG"
+            else num(item.get("trend_consistency_20"), 0.5) <= 0.40
+        )
+        checks.extend([trend, momentum, position, consistency])
+        notes.append(
+            f"{name}:trend={'ok' if trend else 'no'},momentum={'ok' if momentum else 'no'},"
+            f"range={'ok' if position else 'no'},consistency={'ok' if consistency else 'no'}"
+        )
 
     alignment = sum(checks) / max(len(checks), 1)
     for item in needed:
@@ -407,6 +428,10 @@ def build():
                 quality += 5.0
             if side == "SHORT" and relative_strength is not None and relative_strength <= -1.0:
                 quality += 5.0
+            if fresh_regime == "RISK_ON":
+                quality += 3.0 if side == "LONG" else -3.0
+            elif fresh_regime == "RISK_OFF":
+                quality += 3.0 if side == "SHORT" else -3.0
 
             # Build the live conditional map with the same rule family used by
             # the walk-forward test. A setup is valid only if it remains ahead of
