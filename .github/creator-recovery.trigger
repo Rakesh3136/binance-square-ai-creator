@@ -1,2 +1,2 @@
-2026-09-25T14:20:00+05:30
-Repair: preserve Signal-First editorial selections through opportunity freeze; never replace a valid editorial story with a generic portfolio candidate; keep incomplete predictions blocked; validate world-model regime memory and full autonomous publication path.
+2026-09-25T09:07:12+05:30
+Upgrade: make the full authoritative brain and decision ensemble lane-aware; editorial Signal-First stories must pass evidence/editorial review without requiring a trade direction/TP/SL contract, while trade lanes remain fully contract-gated.
