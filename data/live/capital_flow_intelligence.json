@@ -1,6 +1,6 @@
 {
   "version": "23.0",
-  "generated_at": "2026-09-25T09:51:42.479815+00:00",
+  "generated_at": "2026-09-25T10:06:27.683530+00:00",
   "status": "READY",
   "method": "Binance spot multi-timeframe OHLCV + taker-buy proxy + Binance futures OI/funding/taker/long-short proxies + BTC-relative rotation",
   "symbols_scanned": [
@@ -9,8 +9,8 @@
     "ETH",
     "USDC",
     "SOL",
-    "XRP",
     "ZEC",
+    "XRP",
     "NEAR",
     "USD1",
     "ONDO",
@@ -32,14 +32,14 @@
       "ETH",
       "USDC",
       "SOL",
-      "XRP"
+      "ZEC"
     ],
     "laggards": [
       "BNB",
       "ETH",
       "USDC",
       "SOL",
-      "XRP"
+      "ZEC"
     ],
     "reader_model": "When BTC is weak, prefer relative-strength leaders for watchlists and relative underperformers for conditional downside analysis; do not state that a coin will pump solely because BTC falls."
   },
@@ -92,7 +92,7 @@
     },
     {
       "symbol": "BTC",
-      "last_price": 84608.19,
+      "last_price": 84394.01,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -110,9 +110,9 @@
         "confidence": 49.5
       },
       "market_context": {
-        "quote_volume_usdt": 1452663825.93,
+        "quote_volume_usdt": 1443059319.31,
         "liquidity_score": 100.0,
-        "spot_move_pct": 1.71
+        "spot_move_pct": 1.264
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -138,7 +138,7 @@
     },
     {
       "symbol": "ETH",
-      "last_price": 2703.56,
+      "last_price": 2694.01,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -156,9 +156,9 @@
         "confidence": 49.5
       },
       "market_context": {
-        "quote_volume_usdt": 685318725.47,
+        "quote_volume_usdt": 683194581.84,
         "liquidity_score": 100.0,
-        "spot_move_pct": 2.282
+        "spot_move_pct": 1.976
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -184,7 +184,7 @@
     },
     {
       "symbol": "USDC",
-      "last_price": 1.00007,
+      "last_price": 1.0001,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -202,9 +202,9 @@
         "confidence": 49.5
       },
       "market_context": {
-        "quote_volume_usdt": 3020204583.18,
+        "quote_volume_usdt": 3018445514.32,
         "liquidity_score": 100.0,
-        "spot_move_pct": -0.007
+        "spot_move_pct": -0.006
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -230,7 +230,7 @@
     },
     {
       "symbol": "SOL",
-      "last_price": 118.25,
+      "last_price": 117.95,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -248,55 +248,9 @@
         "confidence": 49.5
       },
       "market_context": {
-        "quote_volume_usdt": 311040595.46,
+        "quote_volume_usdt": 316390184.55,
         "liquidity_score": 100.0,
-        "spot_move_pct": 4.332
-      },
-      "flow_notes": [],
-      "relative_strength_to_btc": null,
-      "trade_setup": {
-        "side": "WAIT",
-        "trigger": null,
-        "invalidation": null,
-        "tp1": null,
-        "tp2": null,
-        "risk_reward_tp1": null,
-        "basis": "insufficient alignment"
-      },
-      "data_quality": {
-        "missing_intervals": [
-          "1h:RuntimeError",
-          "4h:RuntimeError",
-          "12h:RuntimeError",
-          "1d:RuntimeError"
-        ],
-        "futures_metrics_available": false
-      },
-      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
-    },
-    {
-      "symbol": "XRP",
-      "last_price": 1.5562,
-      "timeframes": {},
-      "futures": {
-        "available": false,
-        "funding_rate": null,
-        "open_interest_change_pct": null,
-        "taker_buy_sell_ratio": null,
-        "long_short_ratio": null
-      },
-      "multitimeframe": {
-        "trend_score": 50.0,
-        "momentum_score": 50.0,
-        "flow_proxy_score": 50.0,
-        "bull_alignment": true,
-        "bear_alignment": true,
-        "confidence": 49.5
-      },
-      "market_context": {
-        "quote_volume_usdt": 303316080.95,
-        "liquidity_score": 100.0,
-        "spot_move_pct": 6.589
+        "spot_move_pct": 4.288
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -322,7 +276,7 @@
     },
     {
       "symbol": "ZEC",
-      "last_price": 1588.4,
+      "last_price": 1573.51,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -340,9 +294,55 @@
         "confidence": 49.5
       },
       "market_context": {
-        "quote_volume_usdt": 302151220.29,
+        "quote_volume_usdt": 305832652.77,
         "liquidity_score": 100.0,
-        "spot_move_pct": 7.093
+        "spot_move_pct": 6.682
+      },
+      "flow_notes": [],
+      "relative_strength_to_btc": null,
+      "trade_setup": {
+        "side": "WAIT",
+        "trigger": null,
+        "invalidation": null,
+        "tp1": null,
+        "tp2": null,
+        "risk_reward_tp1": null,
+        "basis": "insufficient alignment"
+      },
+      "data_quality": {
+        "missing_intervals": [
+          "1h:RuntimeError",
+          "4h:RuntimeError",
+          "12h:RuntimeError",
+          "1d:RuntimeError"
+        ],
+        "futures_metrics_available": false
+      },
+      "epistemic_status": "DERIVED_OBSERVATION_WITH_CONDITIONAL_SETUP"
+    },
+    {
+      "symbol": "XRP",
+      "last_price": 1.5472,
+      "timeframes": {},
+      "futures": {
+        "available": false,
+        "funding_rate": null,
+        "open_interest_change_pct": null,
+        "taker_buy_sell_ratio": null,
+        "long_short_ratio": null
+      },
+      "multitimeframe": {
+        "trend_score": 50.0,
+        "momentum_score": 50.0,
+        "flow_proxy_score": 50.0,
+        "bull_alignment": true,
+        "bear_alignment": true,
+        "confidence": 49.5
+      },
+      "market_context": {
+        "quote_volume_usdt": 303797599.63,
+        "liquidity_score": 100.0,
+        "spot_move_pct": 6.016
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -368,7 +368,7 @@
     },
     {
       "symbol": "NEAR",
-      "last_price": 4.951,
+      "last_price": 4.922,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -386,9 +386,9 @@
         "confidence": 49.5
       },
       "market_context": {
-        "quote_volume_usdt": 245115537.07,
+        "quote_volume_usdt": 248707593.83,
         "liquidity_score": 100.0,
-        "spot_move_pct": 17.909
+        "spot_move_pct": 17.977
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -414,7 +414,7 @@
     },
     {
       "symbol": "USD1",
-      "last_price": 0.99957,
+      "last_price": 0.99961,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -429,12 +429,12 @@
         "flow_proxy_score": 50.0,
         "bull_alignment": true,
         "bear_alignment": true,
-        "confidence": 49.359
+        "confidence": 49.356
       },
       "market_context": {
-        "quote_volume_usdt": 169437665.59,
-        "liquidity_score": 99.061,
-        "spot_move_pct": 0.001
+        "quote_volume_usdt": 168421202.99,
+        "liquidity_score": 99.038,
+        "spot_move_pct": 0.005
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -460,7 +460,7 @@
     },
     {
       "symbol": "ONDO",
-      "last_price": 0.5579,
+      "last_price": 0.5552,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -475,12 +475,12 @@
         "flow_proxy_score": 50.0,
         "bull_alignment": true,
         "bear_alignment": true,
-        "confidence": 49.296
+        "confidence": 49.298
       },
       "market_context": {
-        "quote_volume_usdt": 152230000.81,
-        "liquidity_score": 98.643,
-        "spot_move_pct": 31.394
+        "quote_volume_usdt": 152678507.86,
+        "liquidity_score": 98.654,
+        "spot_move_pct": 30.882
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -506,7 +506,7 @@
     },
     {
       "symbol": "LTC",
-      "last_price": 70.76,
+      "last_price": 70.42,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -521,12 +521,12 @@
         "flow_proxy_score": 50.0,
         "bull_alignment": true,
         "bear_alignment": true,
-        "confidence": 49.147
+        "confidence": 49.144
       },
       "market_context": {
-        "quote_volume_usdt": 118045230.84,
-        "liquidity_score": 97.648,
-        "spot_move_pct": 5.659
+        "quote_volume_usdt": 117436880.1,
+        "liquidity_score": 97.628,
+        "spot_move_pct": 6.118
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
@@ -552,7 +552,7 @@
     },
     {
       "symbol": "XPL",
-      "last_price": 0.11572,
+      "last_price": 0.11428,
       "timeframes": {},
       "futures": {
         "available": false,
@@ -567,12 +567,12 @@
         "flow_proxy_score": 50.0,
         "bull_alignment": true,
         "bear_alignment": true,
-        "confidence": 48.737
+        "confidence": 48.74
       },
       "market_context": {
-        "quote_volume_usdt": 58594297.57,
-        "liquidity_score": 94.911,
-        "spot_move_pct": 31.515
+        "quote_volume_usdt": 58948343.09,
+        "liquidity_score": 94.934,
+        "spot_move_pct": 29.805
       },
       "flow_notes": [],
       "relative_strength_to_btc": null,
