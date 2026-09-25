@@ -63,9 +63,8 @@ def editorial_complete(x):
         if str(x.get('meme_source_type') or '').strip() not in {'market_move','news','existing_evidence'}: return False
     return True
 def prediction_quality_for(x):
-    embedded=x.get('prediction_quality')
-    if isinstance(embedded,dict):
-        return embedded
+    # Always read the current-cycle NIC output. Embedded scores can be stale and
+    # must never become prediction authority.
     predictions=load(PREDICTION).get('candidates') or []
     symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
     _,_,side,_,_,_,_,_=setup_parts(x)
@@ -94,6 +93,7 @@ def flow_complete(x):
         and quality>=72.0
         and num(pq.get('current_alignment'))>=0.67
         and num((pq.get('walk_forward') or {}).get('terminal_samples'))>=20
+        and str((pq.get('recommended_setup') or {}).get('state') or '').upper()=='AWAITING_TRIGGER'
     )
 def norm(v):
     v=re.sub(r'\$?[0-9]+(?:\.[0-9]+)?',' ',str(v or '').lower()); return re.sub(r'\s+',' ',re.sub(r'[^a-z0-9 ]+',' ',v)).strip()
