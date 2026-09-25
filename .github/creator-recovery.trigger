@@ -1,3 +1,3 @@
-2026-09-25T13:30:00Z
-Validate hardened NIC prediction ownership and outcome learning
-Use fresh-cycle NIC evidence only, closed candles only, NIC-generated conditional levels, walk-forward validation, trigger-first outcomes, postmortem feedback, and full publication verification
+2026-09-25T14:00:00Z
+Final clean-room validation of NIC prediction hardening
+Use fresh-cycle NIC state only; closed candles only; NIC-generated trigger/TP/SL; walk-forward validation; multi-timeframe agreement; calibrated confidence; postmortem feedback; trigger-first outcomes; and full Binance Square publication verification
