@@ -48,9 +48,13 @@ def editorial_complete(x):
     if not symbol and category not in {'education','research_insight','market_mechanism','data_surprise'}:return False
     if category in {'education','research_insight','market_mechanism','data_surprise'}:
         r=x.get('research') if isinstance(x.get('research'),dict) else {}
-        has_evidence=bool(str(x.get('source') or '').strip() or str(r.get('evidence_summary') or r.get('why_now') or r.get('finding') or '').strip() or r.get('evidence'))
-        if not has_evidence:return False
-        if num(r.get('evidence_score'),num(x.get('score'))) < 62:return False
+        has_structured_evidence=bool(r) and bool(str(r.get('epistemic_note') or '').strip())
+        has_direct_evidence=bool(str(x.get('source') or '').strip() or str(r.get('evidence_summary') or r.get('finding') or '').strip() or r.get('evidence'))
+        if not (has_direct_evidence or has_structured_evidence):return False
+        evidence_score=num(r.get('evidence_score'),0)
+        information_score=num(r.get('information_advantage_score'),num(x.get('score')))
+        undercoverage_score=num(r.get('undercoverage_score'),0)
+        if max(evidence_score, information_score*.7+undercoverage_score*.3) < 62:return False
     if category in {'breaking_news','news_and_macro'}:
         if not str(x.get('title') or x.get('news_title') or '').strip():return False
         if not str(x.get('source') or x.get('news_source') or '').strip():return False
