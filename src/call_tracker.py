@@ -70,32 +70,86 @@ def fetch_klines(symbol, start_ms, end_ms):
 
 
 def evaluate_call(call, candles):
-    direction = str(call.get("direction") or "").upper()
+    """Resolve a conditional call as a trigger-first state machine."""
+    direction = str(call.get("direction") or "").upper().replace("_BIAS", "")
     targets = [num(x) for x in call.get("targets", []) if num(x) is not None]
     invalidation = num(call.get("invalidation"))
-    if not targets or invalidation is None or direction not in {"LONG", "SHORT"}:
+    trigger = num(call.get("trigger") or call.get("entry_trigger") or call.get("entry"))
+    if not targets or invalidation is None or trigger is None or direction not in {"LONG", "SHORT"}:
         return None
-    targets = sorted(targets, reverse=direction == "SHORT")
-    hit = set(str(x) for x in (call.get("target_hits") or []))
+
+    start_time = None
+    try:
+        start_time = datetime.fromisoformat(
+            str(call.get("recorded_at") or call.get("created_at") or "").replace("Z", "+00:00")
+        ).astimezone(timezone.utc)
+    except Exception:
+        pass
+
+    target_hits = set(str(x) for x in (call.get("target_hits") or []))
+    activated = bool(call.get("trigger_activated"))
+
+    ordered = []
     for candle in candles:
+        try:
+            candle_time = datetime.fromtimestamp(int(candle[0]) / 1000, timezone.utc)
+        except Exception:
+            continue
+        if start_time is not None and candle_time <= start_time:
+            continue
+        ordered.append((candle_time, candle))
+
+    for candle_time, candle in ordered:
         high = num(candle[2]); low = num(candle[3])
         if high is None or low is None:
             continue
-        if direction == "LONG":
-            sl = low <= invalidation
-            tp = [i for i, level in enumerate(targets) if high >= level and str(i) not in hit]
-        else:
-            sl = high >= invalidation
-            tp = [i for i, level in enumerate(targets) if low <= level and str(i) not in hit]
-        if sl and tp:
-            return {"status": "AMBIGUOUS_SAME_CANDLE", "target_hits": sorted(hit), "observed_at": datetime.fromtimestamp(int(candle[0])/1000, timezone.utc).isoformat(), "reason": "Target and invalidation were both inside the same candle; execution order is unknown."}
-        for i in tp:
-            hit.add(str(i))
-        if len(hit) == len(targets):
-            return {"status": "TARGETS_COMPLETE", "target_hits": sorted(hit), "observed_at": datetime.fromtimestamp(int(candle[0])/1000, timezone.utc).isoformat()}
+
+        if not activated:
+            activated = high >= trigger if direction == "LONG" else low <= trigger
+            if not activated:
+                continue
+
+        sl = low <= invalidation if direction == "LONG" else high >= invalidation
+        sorted_targets = sorted(targets, reverse=direction == "SHORT")
+        pending = [
+            idx for idx, level in enumerate(sorted_targets)
+            if (high >= level if direction == "LONG" else low <= level)
+            and str(idx) not in target_hits
+        ]
+
+        if sl and pending:
+            return {
+                "status": "AMBIGUOUS_SAME_CANDLE",
+                "target_hits": sorted(target_hits),
+                "trigger_activated": True,
+                "observed_at": candle_time.isoformat(),
+                "reason": "Target and invalidation were both crossed in one candle; intrabar order is unknown.",
+            }
+
+        for idx in pending:
+            target_hits.add(str(idx))
+
+        if len(target_hits) == len(targets):
+            return {
+                "status": "TARGETS_COMPLETE",
+                "target_hits": sorted(target_hits),
+                "trigger_activated": True,
+                "observed_at": candle_time.isoformat(),
+            }
+
         if sl:
-            return {"status": "STOP_AFTER_TARGETS" if hit else "STOP_BEFORE_TARGET", "target_hits": sorted(hit), "observed_at": datetime.fromtimestamp(int(candle[0])/1000, timezone.utc).isoformat()}
-    return {"status": "OPEN", "target_hits": sorted(hit)}
+            return {
+                "status": "STOP_AFTER_TARGETS" if target_hits else "STOP_BEFORE_TARGET",
+                "target_hits": sorted(target_hits),
+                "trigger_activated": True,
+                "observed_at": candle_time.isoformat(),
+            }
+
+    return {
+        "status": "OPEN",
+        "target_hits": sorted(target_hits),
+        "trigger_activated": activated,
+    }
 
 
 def load_ledger():
@@ -293,6 +347,12 @@ def main():
         "reference_price": price,
         "targets": [num(x) for x in targets if num(x) is not None],
         "invalidation": invalidation,
+        "trigger": num(
+            tech.get("entry_trigger")
+            or tech.get("entry")
+            or selected.get("entry_trigger")
+            or selected.get("trigger")
+        ),
         "direction": direction,
         "post_id": post_id,
         "status": "OPEN" if explicit and verified_publication else "NO_EXPLICIT_CALL",
