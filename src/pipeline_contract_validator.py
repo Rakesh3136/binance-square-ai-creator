@@ -31,24 +31,36 @@ REQUIRED_ORDER = [
     "src/binance_square_publisher.py",
 ]
 
+SCRIPT_RE = re.compile(r"\bpython(?:3(?:\.\d+)?)?\s+(src/[A-Za-z0-9_./-]+\.py)\b")
+
 
 def referenced_scripts(text: str) -> list[str]:
+    """Collect every direct python src/*.py invocation from workflow text."""
     seen: list[str] = []
-    for line in text.splitlines():
-        for match in re.finditer(r"(?:^|[;&|])\s*python\s+(src/[A-Za-z0-9_./-]+\.py)\b", line):
-            script = match.group(1)
-            if script not in seen:
-                seen.append(script)
+    for match in SCRIPT_RE.finditer(text):
+        script = match.group(1)
+        if script not in seen:
+            seen.append(script)
     return seen
 
 
 def execution_positions(text: str) -> dict[str, int]:
+    """Return positions of executable commands, excluding the import smoke-test.
+
+    The previous validator parsed commands line-by-line and could miss valid
+    workflow commands depending on YAML indentation/formatting.  We now scan
+    the complete workflow text and explicitly mask the known PYTHONPATH import
+    smoke-test so imported module names cannot affect stage ordering.
+    """
+    masked = re.sub(
+        r"PYTHONPATH=src\s+python\s+-c\s+\".*?\"",
+        " ",
+        text,
+        flags=re.DOTALL,
+    )
     positions: dict[str, int] = {}
-    offset = 0
-    for line in text.splitlines(keepends=True):
-        for match in re.finditer(r"(?:^|[;&|])\s*python\s+(src/[A-Za-z0-9_./-]+\.py)\b", line):
-            positions.setdefault(match.group(1), offset + match.start(1))
-        offset += len(line)
+    for match in SCRIPT_RE.finditer(masked):
+        positions.setdefault(match.group(1), match.start(1))
     return positions
 
 
@@ -63,9 +75,6 @@ def tracked_files() -> set[str]:
 
 
 def script_exists(path: str, tracked: set[str]) -> bool:
-    # The runner is authoritative. Prefer the checked-out file, then Git's
-    # tracked-file index. This avoids rejecting valid tracked files because of
-    # transient checkout/path resolution state.
     return (ROOT / path).is_file() or path in tracked
 
 
@@ -77,7 +86,10 @@ def main() -> int:
     text = WORKFLOW.read_text(encoding="utf-8")
     scripts = referenced_scripts(text)
     tracked = tracked_files()
-    missing = [p for p in scripts if p != "src/creator_diagnostics.py" and not script_exists(p, tracked)]
+    missing = [
+        p for p in scripts
+        if p != "src/creator_diagnostics.py" and not script_exists(p, tracked)
+    ]
     if missing:
         print("ERROR: workflow references missing Python files:", file=sys.stderr)
         for p in missing:
@@ -107,7 +119,12 @@ def main() -> int:
         print("ERROR: deterministic draft resolver is not wired into the editor stage", file=sys.stderr)
         return 2
 
-    publish_block = text[text.find("Extract publication and submit to Binance Square"):]
+    publish_marker = "Extract publication and submit to Binance Square"
+    marker_index = text.find(publish_marker)
+    if marker_index < 0:
+        print("ERROR: publication stage marker is missing", file=sys.stderr)
+        return 2
+    publish_block = text[marker_index:]
     publisher_line = "python src/binance_square_publisher.py"
     verifier_line = "python src/creator_20_0_publication_verifier.py"
     call_tracker_line = "python src/call_tracker.py"
