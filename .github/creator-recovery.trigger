@@ -8,3 +8,5 @@ Upgrade: enable evidence-backed NIC discovery, knowledge, research, education, m
 Repair: pipeline contract validator was matching NIC prediction contract validator inside the import smoke-test; validate actual workflow execution commands only, then rerun full autonomous creator.
 2026-09-25T12:05:00Z
 Repair: harden tracked-file detection in pipeline contract validator and rerun full autonomous creator.
+2026-09-25T17:45:00+05:30
+Repair: validator command parser falsely missed valid critical workflow stages; use complete-workflow executable command scan and explicitly mask only the PYTHONPATH import smoke-test.
