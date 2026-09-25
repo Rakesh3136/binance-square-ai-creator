@@ -13,11 +13,15 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / "analytics" / "publication_log.jsonl"
 OUT = ROOT / "data" / "live" / "nic_historical_prediction_audit.jsonl"
 REPORT = ROOT / "data" / "intelligence" / "nic_historical_prediction_audit_report.json"
+
+MAX_POSTS = 60
+CACHE_HOURS = 3
 
 BASES = (
     "https://data-api.binance.vision",
@@ -125,12 +129,23 @@ def evaluate(direction, trigger, tp1, invalidation, candles):
 
 
 def main() -> int:
-    rows = read_jsonl(LOG)
-    records = []
-    seen = set()
     now = datetime.now(timezone.utc)
+    if REPORT.exists():
+        try:
+            generated = dt(json.loads(REPORT.read_text(encoding="utf-8")).get("generated_at"))
+            if generated and now - generated < timedelta(hours=CACHE_HOURS):
+                cached = json.loads(REPORT.read_text(encoding="utf-8"))
+                print(json.dumps({**cached, "status": "CACHED"}, indent=2, ensure_ascii=False))
+                return 0
+        except Exception:
+            pass
 
-    for row in rows:
+    rows = read_jsonl(LOG)
+    candidates = []
+    seen = set()
+    for row in reversed(rows):
+        if len(candidates) >= MAX_POSTS:
+            break
         if str(row.get("status") or "") not in {
             "PUBLISHED_VERIFIED_BY_API_RESPONSE",
             "VERIFIED_PUBLISHED",
@@ -140,68 +155,82 @@ def main() -> int:
         category = str(row.get("category") or "").lower()
         if category not in TRADING_CATEGORIES:
             continue
-
         post_id = str(row.get("canonical_post_id") or row.get("post_id") or "")
         symbol = re.sub(r"USDT$", "", str(row.get("symbol") or "").upper())
         published = dt(row.get("published_at") or row.get("timestamp"))
         if not post_id or not symbol or not published or post_id in seen:
             continue
-
         text = str(row.get("text") or row.get("post") or "")
         m = LEVEL_RE.search(text)
         if not m:
             continue
-
-        trigger, tp1, tp2, invalidation = [float(x) for x in m.groups()]
+        try:
+            trigger, tp1, tp2, invalidation = [float(x) for x in m.groups()]
+        except ValueError:
+            continue
         direction = str(row.get("direction") or "").upper()
         if direction not in {"LONG", "SHORT"}:
-            direction = "LONG" if " LONG" in text.upper() or " LONG
-" in text.upper() else "SHORT"
-
+            direction = "LONG" if re.search(r"\bLONG\b", text.upper()) else "SHORT"
         end = min(now, published + timedelta(hours=120))
-        try:
-            candles = fetch_klines(symbol, int(published.timestamp() * 1000), int(end.timestamp() * 1000))
-        except Exception as exc:
-            records.append({
-                "post_id": post_id,
-                "symbol": symbol,
-                "direction": direction,
-                "published_at": published.isoformat(),
-                "status": "DATA_UNAVAILABLE",
-                "error": type(exc).__name__,
-            })
-            seen.add(post_id)
-            continue
-
-        outcome, activated, trigger_time, terminal_time = evaluate(
-            direction, trigger, tp1, invalidation, candles
-        )
-        records.append({
+        candidates.append({
             "post_id": post_id,
             "symbol": symbol,
             "category": category,
+            "published": published,
             "direction": direction,
-            "published_at": published.isoformat(),
             "trigger": trigger,
             "tp1": tp1,
             "tp2": tp2,
             "invalidation": invalidation,
-            "outcome": outcome,
-            "trigger_activated": activated,
-            "trigger_activated_at": trigger_time.isoformat() if trigger_time else None,
-            "terminal_at": terminal_time.isoformat() if terminal_time else None,
-            "evaluator_version": "1.0-historical-trigger-first",
-            "calibration_eligible": False,
-            "policy": "Diagnostic legacy call audit only; not clean post-fix calibration data.",
+            "end": end,
         })
         seen.add(post_id)
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(
-        "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in records),
-        encoding="utf-8",
-    )
+    def audit_one(item):
+        try:
+            candles = fetch_klines(
+                item["symbol"],
+                int(item["published"].timestamp() * 1000),
+                int(item["end"].timestamp() * 1000),
+            )
+            outcome, activated, trigger_time, terminal_time = evaluate(
+                item["direction"], item["trigger"], item["tp1"], item["invalidation"], candles
+            )
+            return {
+                "post_id": item["post_id"],
+                "symbol": item["symbol"],
+                "category": item["category"],
+                "direction": item["direction"],
+                "published_at": item["published"].isoformat(),
+                "trigger": item["trigger"],
+                "tp1": item["tp1"],
+                "tp2": item["tp2"],
+                "invalidation": item["invalidation"],
+                "outcome": outcome,
+                "trigger_activated": activated,
+                "trigger_activated_at": trigger_time.isoformat() if trigger_time else None,
+                "terminal_at": terminal_time.isoformat() if terminal_time else None,
+                "evaluator_version": "1.0-historical-trigger-first",
+                "calibration_eligible": False,
+                "policy": "Diagnostic legacy call audit only; not clean post-fix calibration data.",
+            }
+        except Exception as exc:
+            return {
+                "post_id": item["post_id"],
+                "symbol": item["symbol"],
+                "category": item["category"],
+                "direction": item["direction"],
+                "published_at": item["published"].isoformat(),
+                "status": "DATA_UNAVAILABLE",
+                "error": type(exc).__name__,
+                "calibration_eligible": False,
+            }
 
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(audit_one, item) for item in candidates]
+        records = [future.result() for future in as_completed(futures)]
+
+    records.sort(key=lambda x: str(x.get("published_at") or ""))
     counted = [x for x in records if x.get("outcome") in {
         "TP1_HIT", "STOP_AFTER_TRIGGER", "AMBIGUOUS", "UNTRIGGERED", "OPEN"
     }]
@@ -227,8 +256,9 @@ def main() -> int:
     }
 
     report = {
-        "version": "1.0-historical-trigger-first",
+        "version": "1.1-historical-trigger-first",
         "generated_at": now.isoformat(),
+        "records_considered": len(candidates),
         "records_audited": len(counted),
         "by_direction": summary,
         "total": total,
@@ -240,6 +270,11 @@ def main() -> int:
             "Legacy engagement outcomes are not substitutes for market outcomes.",
         ],
     }
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(
+        "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in records),
+        encoding="utf-8",
+    )
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, ensure_ascii=False))
