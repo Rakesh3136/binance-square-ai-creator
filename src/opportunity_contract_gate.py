@@ -16,7 +16,7 @@ def num(value,default=0.0):
     try:
         n=float(value); return n if math.isfinite(n) else default
     except Exception:return default
-def valid_symbol(value):return bool(re.fullmatch(r'[A-Z][A-Z0-9]{0,14}',norm(value)))
+def valid_symbol(value):return bool(re.fullmatch(r'[A-Z0-9]{1,15}',norm(value)))
 
 def signal_first_ohlcv_contract(selected):
     """Signal-First is an independent evidence lane: verified 1H OHLCV can
