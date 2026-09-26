@@ -64,27 +64,37 @@ def sentences(text):
     ]
 
 
-def replacement_for_repeat(sentence, symbol_text, ordinal):
-    """Change only wording around the existing sentence body.
+def replacement_for_repeat(sentence, symbol_text, ordinal, repeated_norm=None):
+    """Rewrite only the lead-in and retain the original sentence body.
 
-    The body is retained verbatim so market facts and qualifications inside the
-    repeated sentence cannot be silently changed. The added lead-in makes the
-    normalized sentence distinct from the recent published version.
+    The chosen lead-in is deterministic but must not recreate a sentence that
+    already exists in the recent-publication set. Market facts are preserved.
     """
     original = str(sentence).strip()
     body = re.sub(r"^(notably|importantly|specifically|in practice),\s*", "", original, flags=re.I).strip()
     if not body:
         return ""
+    repeated_norm = repeated_norm or set()
     lead_ins = (
-        "For this setup,",
-        "The practical implication is that",
-        "Keep the conditional framing clear:",
-        "In this case,",
+        "The evidence check is:",
+        "The asset-specific read is:",
+        "A useful distinction here is:",
+        "The test that matters here is:",
+        "The current evidence says:",
+        "The conditional case rests on:",
+        "The relevant market detail is:",
+        "The next confirmation question is:",
     )
-    lead = lead_ins[ordinal % len(lead_ins)]
-    if lead.endswith(":"):
-        return f"{lead} {body}"
-    return f"{lead} {body[:1].lower() + body[1:]}"
+    body_text = body[:1].lower() + body[1:]
+    candidates = []
+    for offset in range(len(lead_ins)):
+        lead = lead_ins[(ordinal + offset) % len(lead_ins)]
+        candidate = f"{lead} {body_text}"
+        normalized = normalize_sentence(candidate)
+        candidates.append((candidate, normalized))
+        if normalized not in repeated_norm:
+            return candidate
+    return candidates[0][0] if candidates else ""
 
 
 def main():
@@ -155,7 +165,7 @@ def main():
         matched_repeat = next((item for item in repeated if item and (item == normalized or item in normalized or normalized in item)), None)
         if matched_repeat:
             replacement = replacement_for_repeat(
-                sentence, symbol_text, repair_index
+                sentence, symbol_text, repair_index, repeated
             )
             if not replacement:
                 OUT.write_text(
