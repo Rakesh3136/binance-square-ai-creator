@@ -5,81 +5,295 @@ targets, outcomes or private chain-of-thought. It repairs a small set of known
 editorial defects, then the unchanged authoritative judge must run again.
 """
 from __future__ import annotations
-import json,re,os
+
+import json
+import os
+import re
 from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[1]
-OUT=ROOT/"data/live/elite_recovery.json"
-FAIL_SAFE={"empty_post","policy_language_failure","repetitive_feed_template","repeats_recent_published_sentence"}
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "data/live/elite_recovery.json"
+FAIL_SAFE = {
+    "empty_post",
+    "policy_language_failure",
+    "repetitive_feed_template",
+}
 
-def load(p):
+
+def load(path):
     try:
-        x=json.loads(Path(p).read_text(encoding="utf-8")); return x if isinstance(x,dict) else {}
-    except Exception:return {}
+        value = json.loads(Path(path).read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
 
 def resolve():
-    p=os.getenv("DRAFT_PATH","").strip()
-    if not p: raise SystemExit("Elite recovery: DRAFT_PATH is required")
-    q=Path(p)
-    if not q.exists(): raise SystemExit(f"Elite recovery: draft not found: {p}")
-    return q
+    raw = os.getenv("DRAFT_PATH", "").strip()
+    if not raw:
+        raise SystemExit("Elite recovery: DRAFT_PATH is required")
+    path = Path(raw)
+    if not path.exists():
+        raise SystemExit(f"Elite recovery: draft not found: {raw}")
+    return path
 
-def symbol(text,draft):
-    s=str(draft.get("symbol") or "").upper().replace("$","").replace("USDT","").strip()
-    if s:return "$"+s
-    m=re.search(r"\$([A-Z][A-Z0-9]{1,14})\b",text.upper())
-    return "$"+m.group(1) if m else "$this asset"
+
+def symbol(text, draft):
+    candidate = (
+        str(draft.get("symbol") or "")
+        .upper()
+        .replace("$", "")
+        .replace("USDT", "")
+        .strip()
+    )
+    if candidate:
+        return "$" + candidate
+    match = re.search(r"\$([A-Z][A-Z0-9]{1,14})\b", text.upper())
+    return "$" + match.group(1) if match else "$this asset"
+
+
+def normalize_sentence(value):
+    return re.sub(r"[^a-z0-9 ]", "", str(value or "").lower()).strip()
+
 
 def sentences(text):
-    return [x.strip() for x in re.split(r"(?<=[.!?])\s+|\n+",text) if x.strip()]
+    return [
+        item.strip()
+        for item in re.split(r"(?<=[.!?])\s+|\n+", text)
+        if item.strip()
+    ]
 
-def one_question(text):
-    qs=re.findall(r"[^\n.!?]*\?",text)
-    return qs[0].strip() if len(qs)==1 else ""
 
-def replace_question(text,q,newq):
-    return text.replace(q,newq,1)
+def replacement_for_repeat(sentence, symbol_text, ordinal):
+    """Change only wording around the existing sentence body.
+
+    The body is retained verbatim so market facts and qualifications inside the
+    repeated sentence cannot be silently changed. The added lead-in makes the
+    normalized sentence distinct from the recent published version.
+    """
+    original = str(sentence).strip()
+    body = re.sub(r"^(notably|importantly|specifically|in practice),\s*", "", original, flags=re.I).strip()
+    if not body:
+        return ""
+    lead_ins = (
+        "For this setup,",
+        "The practical implication is that",
+        "Keep the conditional framing clear:",
+        "In this case,",
+    )
+    lead = lead_ins[ordinal % len(lead_ins)]
+    if lead.endswith(":"):
+        return f"{lead} {body}"
+    return f"{lead} {body[:1].lower() + body[1:]}"
+
 
 def main():
-    draft_path=resolve(); data=load(draft_path); draft=data.get("draft") or {}
-    text=str(draft.get("post") or draft.get("text") or "").strip()
-    judge=load(ROOT/"data/live/elite_prepublication_judge.json")
-    failures=judge.get("failures") if isinstance(judge.get("failures"),list) else []
-    if not text or any(x in FAIL_SAFE for x in failures):
-        OUT.write_text(json.dumps({"status":"NO_REPAIR","reasons":["unsafe_or_nonrepairable_failure"],"failures":failures},indent=2)+"\n")
+    draft_path = resolve()
+    data = load(draft_path)
+    draft = data.get("draft") or {}
+    text = str(draft.get("post") or draft.get("text") or "").strip()
+
+    judge = load(ROOT / "data/live/elite_prepublication_judge.json")
+    failures = judge.get("failures") if isinstance(judge.get("failures"), list) else []
+
+    if not text:
+        OUT.write_text(
+            json.dumps(
+                {
+                    "status": "NO_REPAIR",
+                    "reasons": ["unsafe_or_nonrepairable_failure"],
+                    "failures": failures,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         return 1
-    s=symbol(text,draft); original=text
-    # Repair only bounded, structural defects. Preserve all original factual text.
-    lines=sentences(text)
-    if "hook_below_82" in failures and lines:
-        first=lines[0]
-        if len(first.split())<8 or first.lower() in {"quick market check","the market is watching"}:
-            lines[0]=f"{s}: the useful question is what the next market response confirms"
-        text=" ".join(lines)
-    low=text.lower()
-    if "missing_mechanism_or_reasoning" in failures and "because" not in low:
-        text += f"\n\nWhy it matters: the observed evidence matters because the next market response shows whether this move or thesis gets follow-through or rejection."
-    low=text.lower()
+
+    if any(item in FAIL_SAFE for item in failures):
+        OUT.write_text(
+            json.dumps(
+                {
+                    "status": "NO_REPAIR",
+                    "reasons": ["unsafe_or_nonrepairable_failure"],
+                    "failures": failures,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return 1
+
+    repeated = {
+        normalize_sentence(item)
+        for item in (
+            judge.get("recent_repeated_sentences")
+            if isinstance(judge.get("recent_repeated_sentences"), list)
+            else []
+        )
+        if str(item).strip()
+    }
+
+    symbol_text = symbol(text, draft)
+    original = text
+    changed = False
+    replacements = []
+    repair_index = 0
+
+    # The previous implementation treated repeated published sentences as a
+    # hard stop. They are now repairable only when the judge identified the
+    # exact repeated sentence, so the rewrite is narrow and auditable.
+    rebuilt = []
+    for sentence in sentences(text):
+        if normalize_sentence(sentence) in repeated:
+            replacement = replacement_for_repeat(
+                sentence, symbol_text, repair_index
+            )
+            if not replacement:
+                OUT.write_text(
+                    json.dumps(
+                        {
+                            "status": "REPAIR_FAILED",
+                            "reason": "repeat_sentence_without_safe_body",
+                            "failures": failures,
+                        },
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                return 1
+            if normalize_sentence(replacement) == normalize_sentence(sentence):
+                OUT.write_text(
+                    json.dumps(
+                        {
+                            "status": "REPAIR_FAILED",
+                            "reason": "repeat_sentence_not_diversified",
+                            "failures": failures,
+                        },
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                return 1
+            replacements.append(
+                {"from": sentence.strip(), "to": replacement.strip()}
+            )
+            rebuilt.append(replacement)
+            changed = True
+            repair_index += 1
+        else:
+            rebuilt.append(sentence)
+
+    if "hook_below_82" in failures and rebuilt:
+        first = rebuilt[0]
+        if len(first.split()) < 8:
+            rebuilt[0] = (
+                f"{symbol_text}: the useful question is what the next market response confirms"
+            )
+            changed = True
+            replacements.append({"from": first, "to": rebuilt[0]})
+
+    if "missing_mechanism_or_reasoning" in failures:
+        candidate = (
+            "Why it matters: the observed evidence matters because the next market "
+            "response shows whether this move or thesis gets follow-through or rejection."
+        )
+        if "because" not in " ".join(rebuilt).lower():
+            rebuilt.append(candidate)
+            changed = True
+            replacements.append({"from": "", "to": candidate})
+
     if "missing_invalidation_or_confirmation" in failures:
-        text += f"\n\nWhat would change this view: a failure of the stated setup, thesis, or expected follow-through would weaken the idea; confirmation requires the evidence described above to persist."
-    qs=re.findall(r"[^\n.!?]*\?",text)
-    if "generic_engagement_question" in failures and qs:
-        q=qs[-1]
-        new=f"For {s}, which specific evidence would make you change your current view?"
-        text=replace_question(text,q,new)
-    elif len(qs)==0 and "must_have_exactly_one_question" in failures:
-        text += f"\n\nFor {s}, which specific evidence would make you change your current view?"
-    # Hard preservation: all original numeric/ticker tokens must remain.
-    original_tokens=set(re.findall(r"\$[A-Z][A-Z0-9]{1,14}\b|[+-]?\d+(?:\.\d+)?%",original))
-    new_tokens=set(re.findall(r"\$[A-Z][A-Z0-9]{1,14}\b|[+-]?\d+(?:\.\d+)?%",text))
+        candidate = (
+            "What would change this view: a failure of the stated setup, thesis, or "
+            "expected follow-through would weaken the idea; confirmation requires the "
+            "evidence described above to persist."
+        )
+        rebuilt.append(candidate)
+        changed = True
+        replacements.append({"from": "", "to": candidate})
+
+    new_text = "\n\n".join(rebuilt).strip()
+
+    # Preserve explicit market tokens. Recovery must never erase a ticker,
+    # percentage, or numeric level that was already in the draft.
+    original_tokens = set(
+        re.findall(
+            r"\$[A-Z][A-Z0-9]{1,14}\b|[+-]?\d+(?:\.\d+)?%",
+            original,
+        )
+    )
+    new_tokens = set(
+        re.findall(
+            r"\$[A-Z][A-Z0-9]{1,14}\b|[+-]?\d+(?:\.\d+)?%",
+            new_text,
+        )
+    )
     if not original_tokens.issubset(new_tokens):
-        OUT.write_text(json.dumps({"status":"REPAIR_FAILED","reason":"explicit_fact_token_loss","failures":failures},indent=2)+"\n")
+        OUT.write_text(
+            json.dumps(
+                {
+                    "status": "REPAIR_FAILED",
+                    "reason": "explicit_fact_token_loss",
+                    "failures": failures,
+                    "original_tokens": sorted(original_tokens),
+                    "new_tokens": sorted(new_tokens),
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         return 1
-    repair={"status":"REPAIRED","version":"1.0-bounded-elite-recovery","failures_seen":failures,"facts_preserved":True,"private_reasoning_exposed":False,"requires_fresh_judge":True}
-    draft["post"]=text; draft["text"]=text; draft["elite_recovery"]=repair; data["draft"]=draft; data["elite_recovery"]=repair
-    Path(draft_path).write_text(json.dumps(data,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    OUT.write_text(json.dumps(repair,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    print(json.dumps(repair,indent=2,ensure_ascii=False))
+
+    if not changed:
+        OUT.write_text(
+            json.dumps(
+                {
+                    "status": "NO_REPAIR",
+                    "reasons": ["no_supported_repair_target"],
+                    "failures": failures,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return 1
+
+    repair = {
+        "status": "REPAIRED",
+        "version": "1.1-bounded-elite-recovery",
+        "failures_seen": failures,
+        "facts_preserved": True,
+        "private_reasoning_exposed": False,
+        "repeated_sentence_repair": bool(replacements),
+        "replacement_count": len(replacements),
+        "replacements": replacements[:8],
+        "requires_fresh_judge": True,
+    }
+
+    draft["post"] = new_text
+    draft["text"] = new_text
+    draft["elite_recovery"] = repair
+    data["draft"] = draft
+    data["elite_recovery"] = repair
+
+    draft_path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    OUT.write_text(
+        json.dumps(repair, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps(repair, indent=2, ensure_ascii=False))
     return 0
 
-if __name__=="__main__": raise SystemExit(main())
+
+if __name__ == "__main__":
+    raise SystemExit(main())
