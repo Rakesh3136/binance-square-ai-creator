@@ -42,7 +42,7 @@ def main():
     score=num(selected.get('score',selected.get('selected_score',frozen.get('score',0))),-1)
     if score < -1e-9 or score > 100.0+1e-9:failures.append('selected_score_out_of_bounds')
     if not category:failures.append('missing_category')
-    allowed={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','technical_setup','comparison','education','watchlist','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','crypto_meme'}
+    allowed={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','technical_setup','comparison','education','watchlist','research_insight','market_mechanism','data_surprise','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','crypto_meme'}
     if category not in allowed:failures.append('unsupported_category')
     if category in {'breaking_news','news_and_macro'}:
         news_symbols=[norm(x) for x in selected.get('news_symbols',[]) if norm(x)]
