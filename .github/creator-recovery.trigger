@@ -22,3 +22,6 @@ Repair: route editorial technical charts to TradingView when no authoritative Si
 2026-09-25T15:10:00Z
 Repair: image publication failed after visual verification with Binance content/add parser error; add one fresh media re-upload retry while preserving image-required lanes and never downgrading to text-only.
 Repair: align Square image publisher with official Binance Skills Hub upload/publish flow, expose exact upstream HTTP/code/message diagnostics, and retry once with fresh media without text-only downgrade. Re-run full autonomous publication validation.
+
+2026-09-26T02:22:00Z
+Repair: restore the canonical Binance Square AI Creator workflow name and complete job graph after recovery helper corruption; remove temporary repair workflow and trigger, then run the full autonomous pipeline from the restored YAML.
