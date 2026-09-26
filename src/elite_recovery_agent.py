@@ -279,6 +279,7 @@ def main():
         "private_reasoning_exposed": False,
         "repeated_sentence_repair": bool(replacements),
         "match_mode": "normalized_exact_or_containment" if replacements else "none",
+        "match_mode": "normalized_exact_or_containment" if replacements else "none",
         "replacement_count": len(replacements),
         "replacements": replacements[:8],
         "requires_fresh_judge": True,
