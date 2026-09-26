@@ -400,7 +400,11 @@ def main() -> int:
         "visual_attached": use_image,
         "visual_path": str(VISUAL) if use_image else None,
         "visual_url": api_result.get("image_url"),
-        "editorial_style": str(context.get("editorial_style") or ""),\n        "voice_mode": str(context.get("voice_mode") or (context.get("creative_variation") or {}).get("voice_mode") or ""),\n        "structure": str(context.get("structure") or (context.get("creative_variation") or {}).get("structure") or ""),\n        "hook_family": str(context.get("hook_family") or (context.get("creative_variation") or {}).get("hook_family") or ""),\n        "visual_profile": str(context.get("visual_profile") or (context.get("creative_variation") or {}).get("visual_profile") or ""),
+        "editorial_style": str(context.get("editorial_style") or ""),
+        "voice_mode": str(context.get("voice_mode") or (context.get("creative_variation") or {}).get("voice_mode") or ""),
+        "structure": str(context.get("structure") or (context.get("creative_variation") or {}).get("structure") or ""),
+        "hook_family": str(context.get("hook_family") or (context.get("creative_variation") or {}).get("hook_family") or ""),
+        "visual_profile": str(context.get("visual_profile") or (context.get("creative_variation") or {}).get("visual_profile") or ""),
         "publication_id_verified": bool(post_id),
         "publication_proof": proof,
         "monetization": {
