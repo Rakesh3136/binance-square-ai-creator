@@ -44,8 +44,8 @@ def has_any(text,terms): return any(k in text for k in terms)
 
 def semantic_specificity(text,facts,adv=None):
     low=text.lower()
-    upper_tokens=set(re.findall(r'\b[A-Z][A-Z0-9]{1,9}\b',text))
-    dollar_tokens=set(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b',text))
+    upper_tokens=set(re.findall(r'\b[0-9]*[A-Z][A-Z0-9]{0,9}\b',text))
+    dollar_tokens=set(re.findall(r'\$[A-Z0-9]{1,15}\b',text))
     symbols=discussed_symbols(text)
     entities=sum(1 for k in ENTITY_TERMS if k in low)
     numeric=len(re.findall(r'\b\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?',text))
@@ -57,8 +57,8 @@ def semantic_specificity(text,facts,adv=None):
     return min(100,35+asset_anchor+named+context+concrete+research_anchor)
 
 def discussed_symbols(text):
-    symbols=set(re.findall(r'\$([A-Z][A-Z0-9]{1,14})\b', text.upper()))
-    symbols |= set(x.upper() for x in re.findall(r'\b([A-Z][A-Z0-9]{1,14})USDT\b', text.upper()))
+    symbols=set(re.findall(r'\$([A-Z0-9]{1,15})\b', text.upper()))
+    symbols |= set(x.upper() for x in re.findall(r'\b([A-Z0-9]{1,15})USDT\b', text.upper()))
     return symbols
 
 def research_advantage(research,data,text):
@@ -90,7 +90,7 @@ def research_advantage(research,data,text):
 
 def originality_score(text,facts,attribution,mechanism,invalidation,adv):
     low=text.lower(); symbols=discussed_symbols(text)
-    named_tokens=set(re.findall(r'\b[A-Z][A-Z0-9]{1,9}\b',text)) | set(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b',text))
+    named_tokens=set(re.findall(r'\b[0-9]*[A-Z][A-Z0-9]{0,9}\b',text)) | set(re.findall(r'\$[A-Z0-9]{1,15}\b',text))
     causal_hits=sum(1 for term in CAUSAL_OR_RELATIONAL_TERMS if term in low)
     sentence_count=max(1,len([s for s in re.split(r'[.!?]+',text) if s.strip()]))
     distinct_words=len(set(re.findall(r"[A-Za-z][A-Za-z'-]{2,}",low))); words=len(re.findall(r"[A-Za-z][A-Za-z'-]+",low))
@@ -133,7 +133,7 @@ def main():
     text=str(draft.get('post') or draft.get('text') or '').strip(); research=load(RESEARCH); low=text.lower()
     lines=[x.strip() for x in text.splitlines() if x.strip()]; hook=lines[0].lower() if lines else ''
     questions=re.findall(r'[^\n.!?]*\?',text)
-    facts=len(re.findall(r'\$[A-Z][A-Z0-9]{1,14}|\b\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?',text))
+    facts=len(re.findall(r'\$[A-Z0-9]{1,15}\b|\b\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?',text))
     mechanism=has_any(low,MECHANISM_TERMS); invalidation=has_any(low,INVALIDATION_TERMS); watch=has_any(low,('watch','next','signal','evidence','confirm','changes my view','what would'))
     attribution=has_any(low,('source:','reported','according to','announced','data from','according'))
     generic_q=any(q.strip().lower() in BAD_QUESTIONS for q in questions); generic_hook=hook in GENERIC or len(hook.split())<5
