@@ -288,6 +288,12 @@ jobs:
           python src/creator_brain.py
           python src/creator_brain_gate.py
           python src/pipeline_stage.py creator_brain success 'Authoritative creator brain completed'
+      - name: Build bounded creative variation plan
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        run: |
+          python src/creative_variation_guard.py
+          python -m json.tool data/live/creative_variation_guard.json >/dev/null
+
       - name: Build and refine publishable content
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
