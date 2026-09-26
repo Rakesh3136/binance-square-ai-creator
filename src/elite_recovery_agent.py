@@ -48,7 +48,7 @@ def symbol(text, draft):
     )
     if candidate:
         return "$" + candidate
-    match = re.search(r"\$([A-Z][A-Z0-9]{1,14})\b", text.upper())
+    match = re.search(r"\$([A-Z0-9]{1,15})\b", text.upper())
     return "$" + match.group(1) if match else "$this asset"
 
 
@@ -229,13 +229,13 @@ def main():
     # percentage, or numeric level that was already in the draft.
     original_tokens = set(
         re.findall(
-            r"\$[A-Z][A-Z0-9]{1,14}\b|[+-]?\d+(?:\.\d+)?%",
+            r"\$[A-Z0-9]{1,15}\b|[+-]?\d+(?:\.\d+)?%",
             original,
         )
     )
     new_tokens = set(
         re.findall(
-            r"\$[A-Z][A-Z0-9]{1,14}\b|[+-]?\d+(?:\.\d+)?%",
+            r"\$[A-Z0-9]{1,15}\b|[+-]?\d+(?:\.\d+)?%",
             new_text,
         )
     )
@@ -278,7 +278,6 @@ def main():
         "facts_preserved": True,
         "private_reasoning_exposed": False,
         "repeated_sentence_repair": bool(replacements),
-        "match_mode": "normalized_exact_or_containment" if replacements else "none",
         "match_mode": "normalized_exact_or_containment" if replacements else "none",
         "replacement_count": len(replacements),
         "replacements": replacements[:8],
