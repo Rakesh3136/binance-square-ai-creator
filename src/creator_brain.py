@@ -53,7 +53,7 @@ def main():
 
     lane_map={
         'capital_flow_long':'CAPITAL_FLOW_LONG','capital_flow_short':'CAPITAL_FLOW_SHORT',
-        'watchlist':'RESEARCH_RADAR','technical_setup':'TECHNICAL_SETUP',
+        'watchlist':'RESEARCH_RADAR','research_insight':'RESEARCH_RADAR','market_mechanism':'DATA_SURPRISE','data_surprise':'DATA_SURPRISE','technical_setup':'TECHNICAL_SETUP',
         'high_volatility':'TECHNICAL_SETUP','top_gainers':'MOMENTUM_DISCOVERY','top_losers':'MOMENTUM_DISCOVERY',
         'volume_leaders':'DATA_SURPRISE','new_listings':'NEW_LISTING','creator_signal_outcome':'CREATOR_CALL_ACCOUNTABILITY',
         'follow_up':'FOLLOW_UP','comparison':'COMPARISON','education':'EDUCATION','breaking_news':'NEWSROOM','news_and_macro':'NEWSROOM',
