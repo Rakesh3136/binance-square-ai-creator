@@ -144,7 +144,7 @@ def candidate_pool(portfolio,pre,engagement,market,signal,stale_portfolio=False)
 
 def infer_category(candidate,source):
     existing=str(candidate.get('category') or candidate.get('lane') or '').strip().lower()
-    allowed={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','technical_setup','comparison','education','watchlist','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','crypto_meme'}
+    allowed={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','technical_setup','comparison','education','watchlist','research_insight','market_mechanism','data_surprise','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up','crypto_meme'}
     if existing in allowed: return existing
     if existing=='next_gainer_candidate': return 'top_gainers'
     if existing=='next_loser_candidate': return 'top_losers'
