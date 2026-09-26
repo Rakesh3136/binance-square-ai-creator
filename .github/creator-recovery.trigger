@@ -1,2 +1,2 @@
-2026-09-26T07:02:00Z
-Upgrade: activate transparent NIC decision summaries and learning snapshots; publish a bounded NIC Field Note every fourth autonomous cycle when no primary signal is active; verify research, publication and learning telemetry end-to-end.
+2026-09-26T14:18:00Z
+Upgrade: strengthen content-master writing diversity, enforce story-specific mobile-first writing, rotate verified TradingView visual profiles by editorial lane and recent visual history, and keep transparent NIC learning posts bounded; validate the complete autonomous publication loop.
