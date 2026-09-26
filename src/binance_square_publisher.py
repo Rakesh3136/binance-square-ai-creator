@@ -189,7 +189,7 @@ def duplicate_match(text: str, symbol: str, category: str, context: dict, frozen
         if not current_direction and not old_direction and not any(k in text.lower() for k in ("result", "outcome", "invalidated", "follow-up", "follow up")):
             return f"same_asset_and_category_within_{DUPLICATE_HOURS:g}h", row
 
-    return ""
+    return "", None
 
 
 def duplicate_reason(text: str, symbol: str, category: str, context: dict, frozen: dict) -> str:
