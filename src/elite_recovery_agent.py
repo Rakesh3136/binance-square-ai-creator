@@ -147,7 +147,13 @@ def main():
     # exact repeated sentence, so the rewrite is narrow and auditable.
     rebuilt = []
     for sentence in sentences(text):
-        if normalize_sentence(sentence) in repeated:
+        normalized = normalize_sentence(sentence)
+        # The judge normalizes punctuation/line boundaries independently. A repeated
+        # item may therefore be a substring of one draft sentence or span a small
+        # boundary. Treat containment as an exact evidence match, never as fuzzy
+        # semantic similarity, so recovery remains deterministic and auditable.
+        matched_repeat = next((item for item in repeated if item and (item == normalized or item in normalized or normalized in item)), None)
+        if matched_repeat:
             replacement = replacement_for_repeat(
                 sentence, symbol_text, repair_index
             )
@@ -272,6 +278,7 @@ def main():
         "facts_preserved": True,
         "private_reasoning_exposed": False,
         "repeated_sentence_repair": bool(replacements),
+        "match_mode": "normalized_exact_or_containment" if replacements else "none",
         "replacement_count": len(replacements),
         "replacements": replacements[:8],
         "requires_fresh_judge": True,
