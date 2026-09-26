@@ -25,3 +25,6 @@ Repair: align Square image publisher with official Binance Skills Hub upload/pub
 
 2026-09-26T02:22:00Z
 Repair: restore the canonical Binance Square AI Creator workflow name and complete job graph after recovery helper corruption; remove temporary repair workflow and trigger, then run the full autonomous pipeline from the restored YAML.
+
+2026-09-26T02:40:00Z
+Repair: harden Binance Square image publisher using the official Skills Hub request flow, preserve image-required publication, and expose exact upstream diagnostics for the content/add failure. Re-run the canonical orchestrator.
