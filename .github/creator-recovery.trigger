@@ -28,3 +28,5 @@ Repair: restore the canonical Binance Square AI Creator workflow name and comple
 
 2026-09-26T02:40:00Z
 Repair: harden Binance Square image publisher using the official Skills Hub request flow, preserve image-required publication, and expose exact upstream diagnostics for the content/add failure. Re-run the canonical orchestrator.
+2026-09-26T05:36:00Z
+Repair: fix Square publisher duplicate-match contract so no-match returns a consistent tuple; rerun the canonical orchestrator and verify the end-to-end publish stage.
