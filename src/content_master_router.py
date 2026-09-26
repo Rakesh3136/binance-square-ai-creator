@@ -1,77 +1,32 @@
 """Content Master Router for differentiated, evidence-backed Square publishing."""
 from __future__ import annotations
-import json
-import subprocess
-import sys
+import json, subprocess, sys, os
 from datetime import datetime, timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PREF=ROOT/"data/live/editorial_preflight.json"
-DIRECTOR=ROOT/"data/live/content_director_brief.json"
-AUD=ROOT/"data/live/audience_growth_director.json"
-LEARN=ROOT/"data/live/creator_self_training.json"
-MACRO=ROOT/"data/live/global_macro_intelligence.json"
-IMPACT=ROOT/"data/live/cross_asset_impact.json"
-FUNNEL=ROOT/"data/live/monetization_funnel_optimizer.json"
-SERIES=ROOT/"data/live/creator_series_plan.json"
-GOV=ROOT/"data/live/nic_experiment_governor.json"
-FINANCE=ROOT/"data/live/nic_financial_market_intelligence.json"
-OUT=ROOT/"data/live/content_master_route.json"
-LANES={
- "capital_flow_long":("signal","CAPITAL FLOW LONG THESIS","capital_flow_long","tradingview"),
- "capital_flow_short":("signal","CAPITAL FLOW SHORT THESIS","capital_flow_short","tradingview"),
- "technical_setup":("signal","TRADINGVIEW DECISION CHART","technical_setup","tradingview"),
- "creator_signal_outcome":("accountability","CALL OUTCOME / ACCOUNTABILITY","creator_signal_outcome","tradingview"),
- "follow_up":("accountability","FOLLOW-UP / UPDATE","follow_up","tradingview"),
- "breaking_news":("news","BREAKING NEWS + MARKET IMPACT","breaking_news","tradingview"),
- "news_and_macro":("news_macro","MACRO EVENT → CRYPTO IMPACT","news_and_macro","tradingview"),
- "watchlist":("research","DEEP RESEARCH RADAR","watchlist","tradingview"),
- "comparison":("research","COIN VS COIN","comparison","tradingview"),
- "education":("education","ONE CHART / ONE LESSON","education","optional"),
- "research_insight":("research","NEW RESEARCH / WHAT WE LEARNED","research_insight","optional"),
- "market_mechanism":("research","HOW THE MARKET MECHANISM WORKS","market_mechanism","optional"),
- "data_surprise":("research","DATA SURPRISE / WHY IT MATTERS","data_surprise","optional"),
- "top_gainers":("discovery","MOMENTUM EXPLAINER","top_gainers","tradingview"),
- "top_losers":("discovery","BREAKDOWN / FAKEOUT ANALYSIS","top_losers","tradingview"),
- "high_volatility":("discovery","VOLATILITY + TEST","high_volatility","tradingview"),
- "volume_leaders":("discovery","DATA SURPRISE","volume_leaders","tradingview"),
- "new_listings":("discovery","PRICE DISCOVERY WATCH","new_listings","tradingview"),
- "crypto_meme":("meme","CRYPTO MEME + MARKET CONTEXT","crypto_meme","meme"),
-}
+PREF=ROOT/"data/live/editorial_preflight.json"; DIRECTOR=ROOT/"data/live/content_director_brief.json"; AUD=ROOT/"data/live/audience_growth_director.json"; LEARN=ROOT/"data/live/creator_self_training.json"; MACRO=ROOT/"data/live/global_macro_intelligence.json"; IMPACT=ROOT/"data/live/cross_asset_impact.json"; FUNNEL=ROOT/"data/live/monetization_funnel_optimizer.json"; SERIES=ROOT/"data/live/creator_series_plan.json"; GOV=ROOT/"data/live/nic_experiment_governor.json"; FINANCE=ROOT/"data/live/nic_financial_market_intelligence.json"; JOURNAL=ROOT/"data/live/nic_transparency_journal.json"; OUT=ROOT/"data/live/content_master_route.json"
+LANES={"capital_flow_long":("signal","CAPITAL FLOW LONG THESIS","capital_flow_long","tradingview"),"capital_flow_short":("signal","CAPITAL FLOW SHORT THESIS","capital_flow_short","tradingview"),"technical_setup":("signal","TRADINGVIEW DECISION CHART","technical_setup","tradingview"),"creator_signal_outcome":("accountability","CALL OUTCOME / ACCOUNTABILITY","creator_signal_outcome","tradingview"),"follow_up":("accountability","FOLLOW-UP / UPDATE","follow_up","tradingview"),"breaking_news":("news","BREAKING NEWS + MARKET IMPACT","breaking_news","tradingview"),"news_and_macro":("news_macro","MACRO EVENT → CRYPTO IMPACT","news_and_macro","tradingview"),"watchlist":("research","DEEP RESEARCH RADAR","watchlist","tradingview"),"comparison":("research","COIN VS COIN","comparison","tradingview"),"education":("education","ONE CHART / ONE LESSON","education","optional"),"research_insight":("research","NEW RESEARCH / WHAT WE LEARNED","research_insight","optional"),"market_mechanism":("research","HOW THE MARKET MECHANISM WORKS","market_mechanism","optional"),"data_surprise":("research","DATA SURPRISE / WHY IT MATTERS","data_surprise","optional"),"nic_field_note":("accountability","NIC FIELD NOTE — WHAT I SAW / LEARNED / NEXT TEST","nic_field_note","optional"),"top_gainers":("discovery","MOMENTUM EXPLAINER","top_gainers","tradingview"),"top_losers":("discovery","BREAKDOWN / FAKEOUT ANALYSIS","top_losers","tradingview"),"high_volatility":("discovery","VOLATILITY + TEST","high_volatility","tradingview"),"volume_leaders":("discovery","DATA SURPRISE","volume_leaders","tradingview"),"new_listings":("discovery","PRICE DISCOVERY WATCH","new_listings","tradingview"),"crypto_meme":("meme","CRYPTO MEME + MARKET CONTEXT","crypto_meme","meme")}
 def load(p):
  try:
   x=json.loads(p.read_text(encoding="utf-8")); return x if isinstance(x,dict) else {}
  except Exception:return {}
 def main():
  subprocess.run([sys.executable,str(ROOT/"src/nic_financial_market_intelligence.py")],check=True)
- pre,director,aud,learn,macro,impact,funnel,series,gov,finance=map(load,(PREF,DIRECTOR,AUD,LEARN,MACRO,IMPACT,FUNNEL,SERIES,GOV,FINANCE))
+ pre,director,aud,learn,macro,impact,funnel,series,gov,finance,journal=map(load,(PREF,DIRECTOR,AUD,LEARN,MACRO,IMPACT,FUNNEL,SERIES,GOV,FINANCE,JOURNAL))
  selected=pre.get("selected_opportunity") or (aud.get("selected") if isinstance(aud.get("selected"),dict) else {})
  cat=str(selected.get("category") or (director.get("primary_story") or {}).get("lane") or "").lower()
- if cat not in LANES:
-  cat="capital_flow_long" if str(selected.get("direction") or "").upper()=="LONG" else "capital_flow_short" if str(selected.get("direction") or "").upper()=="SHORT" else "news_and_macro" if macro.get("event_count") else "watchlist"
+ routing=load(ROOT/"data/live/signal_first_routing.json")
+ primary_signal=routing.get("decision")=="PRIMARY_SIGNAL" and routing.get("primary_signal") is True
+ run_number=int(os.getenv("GITHUB_RUN_NUMBER","0") or 0)
+ field_note_due=(run_number>0 and run_number%4==0 and not primary_signal and bool(journal.get("public_reflection")))
+ if field_note_due: cat="nic_field_note"
+ if cat not in LANES: cat="capital_flow_long" if str(selected.get("direction") or "").upper()=="LONG" else "capital_flow_short" if str(selected.get("direction") or "").upper()=="SHORT" else "news_and_macro" if macro.get("event_count") else "watchlist"
  family,fmt,narrative,visual=LANES[cat]
- macro_event=macro.get("primary_theme") or "none"
- impact_signal=(impact.get("selected_impact") or {}) if isinstance(impact.get("selected_impact"),dict) else {}
- route={
-  "version":"1.0",
-  "generated_at":datetime.now(timezone.utc).isoformat(),
-  "category":cat,
-  "content_family":family,
-  "format":fmt,
-  "narrative_engine":narrative,
-  "visual_mode":visual,
-  "symbol":str(selected.get("symbol") or "").upper().replace("USDT","").replace("$",""),
-  "reason":"Content Master maps the authoritative opportunity to the right publishing form; self-training only influences bounded preferences.",
-  "macro_context":{"primary_theme":macro_event,"event_count":macro.get("event_count",0),"impact_ready":bool(impact_signal or impact),"financial_intelligence_ready":bool(finance)},
-  "funnel":{"next_tests":funnel.get("next_tests",[])[:4],"verified_revenue":(funnel.get("current_evidence") or {}).get("verified_revenue",0)},
-  "series":{"status":series.get("status"),"active_series":series.get("active_series",[])[:2]},
-  "experiment_governor":{"decision":gov.get("decision",{}),"capacity_share":(gov.get("decision") or {}).get("capacity_share",0),"evidence_summary":gov.get("evidence_summary",{})},
-  "learning":{"plan_id":learn.get("plan_id"),"next_experiment":(learn.get("policy") or {}).get("next_experiment"),"underrepresented_lanes":(learn.get("policy") or {}).get("underrepresented_lanes",[])},
-  "monetization":{"cashtag_required":True,"verified_widget_preferred":True,"quality_over_clicks":True,"funnel_optimizer_ready":bool(funnel),"series_engine_ready":bool(series),"series_status":series.get("status"),"experiment_governor_ready":bool(gov),"eligible_content_note":"Use only formats supported by the publisher; do not claim unavailable video/live capabilities."},
-  "rules":{"signal_requires_verified_setup":True,"non_signal_requires_verified_event_or_market_evidence":True,"knowledge_discovery_lanes":["research_insight","market_mechanism","data_surprise","education","watchlist","comparison"],"meme_is_secondary":True,"never_force_weak_story":True,"never_infer_revenue":True}
- }
- OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(route,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
- pre["content_master_route"]=route
- PREF.write_text(json.dumps(pre,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
- print(json.dumps(route,indent=2,ensure_ascii=False))
+ if cat=="nic_field_note":
+  selected=dict(selected); selected["category"]=cat; selected["instruction"]="Write a transparent NIC field note from verified evidence. Explain WHAT I SAW, WHY I CHOSE THIS STORY, WHAT I LEARNED FROM prior outcomes, WHAT COULD CHANGE MY MIND, and the NEXT TEST. Never expose hidden chain-of-thought. Clearly separate facts, interpretation and uncertainty. This is a public learning log, not a promise or trading instruction."
+  selected["nic_public_reflection"]=journal.get("public_reflection",{})
+  pre["selected_opportunity"]=selected
+ macro_event=macro.get("primary_theme") or "none"; impact_signal=(impact.get("selected_impact") or {}) if isinstance(impact.get("selected_impact"),dict) else {}
+ route={"version":"2.0","generated_at":datetime.now(timezone.utc).isoformat(),"category":cat,"content_family":family,"format":fmt,"narrative_engine":narrative,"visual_mode":visual,"symbol":str(selected.get("symbol") or "").upper().replace("USDT","").replace("$",""),"reason":"Content Master maps the authoritative opportunity to the right publishing form; self-training only influences bounded preferences.","nic_field_note":{"due":field_note_due,"cadence":"every 4th orchestrator cycle when no PRIMARY_SIGNAL is active","public_reflection_ready":bool(journal.get("public_reflection"))},"macro_context":{"primary_theme":macro_event,"event_count":macro.get("event_count",0),"impact_ready":bool(impact_signal or impact),"financial_intelligence_ready":bool(finance)},"funnel":{"next_tests":funnel.get("next_tests",[])[:4],"verified_revenue":(funnel.get("current_evidence") or {}).get("verified_revenue",0)},"series":{"status":series.get("status"),"active_series":series.get("active_series",[])[:2]},"experiment_governor":{"decision":gov.get("decision",{}),"capacity_share":(gov.get("decision") or {}).get("capacity_share",0),"evidence_summary":gov.get("evidence_summary",{})},"learning":{"plan_id":learn.get("plan_id"),"next_experiment":(learn.get("policy") or {}).get("next_experiment"),"underrepresented_lanes":(learn.get("policy") or {}).get("underrepresented_lanes",[])},"monetization":{"cashtag_required":True,"verified_widget_preferred":True,"quality_over_clicks":True,"funnel_optimizer_ready":bool(funnel),"series_engine_ready":bool(series),"experiment_governor_ready":bool(gov),"eligible_content_note":"Use only formats supported by the publisher; do not claim unavailable video/live capabilities."},"rules":{"signal_requires_verified_setup":True,"non_signal_requires_verified_event_or_market_evidence":True,"knowledge_discovery_lanes":["research_insight","market_mechanism","data_surprise","education","watchlist","comparison"],"transparency_lane":"nic_field_note","meme_is_secondary":True,"never_force_weak_story":True,"never_infer_revenue":True}}
+ OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(route,indent=2,ensure_ascii=False)+"\n",encoding="utf-8"); PREF.write_text(json.dumps(pre,indent=2,ensure_ascii=False)+"\n",encoding="utf-8"); print(json.dumps(route,indent=2,ensure_ascii=False))
 if __name__=="__main__":main()
