@@ -362,6 +362,17 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/elite_prepublication_judge.py
+      - name: Bounded NIC elite recovery
+        id: elite_recovery
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.jev.outcome == 'success' && steps.elite_judge.outcome == 'failure' }}
+        continue-on-error: true
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/elite_recovery_agent.py
+          if [ "$?" -eq 0 ]; then
+            python src/elite_prepublication_judge.py
+          fi
       - name: Apply authoritative elite pre-publication gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
