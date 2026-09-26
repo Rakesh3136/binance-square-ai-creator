@@ -66,7 +66,7 @@ jobs:
           python -m compileall -q src
           python src/pipeline_contract_validator.py
           python src/test_publisher_duplicate_telemetry.py
-          python -m py_compile src/content_director_4.py src/signal_first_router.py src/discovery_queue.py src/content_portfolio_guard.py src/autonomous_cadence_6.py src/technical_enricher.py
+          python -m py_compile src/content_director_4.py src/signal_first_router.py src/discovery_queue.py src/content_portfolio_guard.py src/autonomous_cadence_6.py src/technical_enricher.py src/nic_transparency_journal.py
           PYTHONPATH=src python -c "import signal_post_builder, signal_first_router, safe_creator_runner, autonomous_publish_recovery, production_manager, creator_8_4_monetization_feedback, revenue_content_director, jev_decision_gate, jev_runtime_gate, decision_ensemble_gate, nic_model_router, nic_core, global_macro_intelligence, cross_asset_impact_engine, creator_self_training_controller, content_master_router, autonomous_self_development_gate, monetization_funnel_optimizer, creator_series_engine, creator_portfolio_intelligence, nic_experiment_governor, nic_human_editor_intelligence, resolve_publish_draft, pipeline_contract_validator, visual_decision, publication_payload_builder, nic_prediction_engine, nic_prediction_accuracy_gate, nic_prediction_contract_validator, nic_prediction_postmortem, nic_historical_prediction_audit, nic_outcome_learner, nic_prediction_truth_loop, call_tracker"
           python src/nic_model_router.py
           echo 'Core, Jev, ensemble, NIC and portfolio modules imported successfully'
@@ -105,6 +105,8 @@ jobs:
           python src/creator_7_3_causal_optimizer.py
           python src/creator_7_4_adaptive_experiment_controller.py
           python src/creator_7_5_growth_portfolio.py
+          python src/nic_transparency_journal.py
+          python -m json.tool data/live/nic_transparency_journal.json >/dev/null
           python src/creator_8_0_revenue_engine.py
           python src/creator_8_4_monetization_feedback.py
           python src/nic_opportunity_genome.py
@@ -425,6 +427,19 @@ jobs:
           python src/binance_square_publisher.py
           python src/creator_20_0_publication_verifier.py
           python src/call_tracker.py
+      - name: Publish transparent NIC learning snapshot
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        run: |
+          python src/nic_transparency_journal.py
+          python -m json.tool data/live/nic_transparency_journal.json >/dev/null
+          python -m json.tool data/intelligence/nic_transparency_report.json >/dev/null
+          echo 'NIC_TRANSPARENCY_NOTE:'
+          python - <<'PY'
+          import json
+          p=json.load(open('data/live/nic_transparency_journal.json', encoding='utf-8'))
+          print(p.get('shareable_note',''))
+          PY
+
       - name: Persist run state and diagnostics
         if: always()
         run: |
