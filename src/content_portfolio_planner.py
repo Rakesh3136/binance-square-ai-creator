@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / "analytics/publication_log.jsonl"
 OUT = ROOT / "data/live/content_portfolio_plan.json"
+FOLLOW_UP = ROOT / "data/live/thesis_follow_up_opportunities.json"
 
 TREATMENTS = (
     "market_setup",
@@ -51,6 +52,14 @@ def load_recent():
             pass
     return rows[-20:]
 
+def load_follow_ups():
+    try:
+        data=json.loads(FOLLOW_UP.read_text(encoding="utf-8")) if FOLLOW_UP.exists() else {}
+        rows=data.get("opportunities",[]) if isinstance(data,dict) else []
+        return [x for x in rows if isinstance(x,dict) and x.get("eligibility")=="REQUIRES_NEW_VERIFIED_EVIDENCE_AND_MATERIALLY_NEW_PAYOFF"]
+    except Exception:
+        return []
+
 def category(row):
     for k in ("category","story_lane","lane","content_category"):
         v=str(row.get(k) or "").strip().lower()
@@ -60,12 +69,14 @@ def category(row):
 
 def main():
     recent=load_recent()
+    follow_ups=load_follow_ups()
     mapped=[CATEGORY_MAP.get(category(x), "") for x in recent]
     counts=Counter(x for x in mapped if x)
     # Prefer a treatment that has not appeared recently; otherwise choose the
     # least-used treatment. This is a diversity preference, not a publish rule.
     unused=[x for x in TREATMENTS if x not in counts]
-    selected=unused[0] if unused else min(TREATMENTS,key=lambda x:(counts[x],TREATMENTS.index(x)))
+    selected="follow_up" if follow_ups else (unused[0] if unused else min(TREATMENTS,key=lambda x:(counts[x],TREATMENTS.index(x))))
+    selected_follow_up=follow_ups[0] if follow_ups else None
     plan={
         "version":"1.0",
         "generated_at":datetime.now(timezone.utc).isoformat(),
@@ -73,6 +84,8 @@ def main():
         "selected_treatment":selected,
         "recent_verified_publications":len(recent),
         "recent_treatment_counts":dict(counts),
+        "thesis_follow_up":selected_follow_up,
+        "thesis_follow_up_candidates":len(follow_ups),
         "principles":{
             "asset_selection_unchanged":True,
             "evidence_unchanged":True,
