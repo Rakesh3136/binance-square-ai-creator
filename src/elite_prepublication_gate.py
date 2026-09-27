@@ -27,10 +27,45 @@ def load(path: Path) -> dict:
 def main() -> int:
     now = datetime.now(timezone.utc).isoformat()
     judge = load(JUDGE)
+
+    # A judge result is valid only for the current draft. This prevents a
+    # recovered draft from accidentally inheriting a PASS/BLOCK decision from
+    # an earlier version of the same cycle.
+    draft_raw = __import__("os").getenv("DRAFT_PATH", "").strip()
+    stale_judge = False
+    if draft_raw:
+        draft_path = Path(draft_raw)
+        try:
+            stale_judge = (not JUDGE.exists()) or (JUDGE.stat().st_mtime + 0.5 < draft_path.stat().st_mtime)
+        except OSError:
+            stale_judge = True
+    if stale_judge:
+        result = {
+            "version": "1.1-authoritative-wrapper",
+            "generated_at": now,
+            "status": "BLOCKED",
+            "publish": False,
+            "judge_version": judge.get("version"),
+            "overall": judge.get("overall"),
+            "failures": ["stale_or_missing_judge_for_current_draft"],
+            "decision": "STOP_BEFORE_PRODUCTION",
+            "policy": {
+                "judge_is_authoritative": True,
+                "no_content_rewrite": True,
+                "no_gate_bypass": True,
+                "fresh_judge_required": True,
+            },
+        }
+        OUT.parent.mkdir(parents=True, exist_ok=True)
+        REPORT.parent.mkdir(parents=True, exist_ok=True)
+        OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        REPORT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 1
     publish = judge.get("publish") is True
     failures = judge.get("failures") if isinstance(judge.get("failures"), list) else []
     result = {
-        "version": "1.0-authoritative-wrapper",
+        "version": "1.1-authoritative-wrapper",
         "generated_at": now,
         "status": "PASS" if publish else "BLOCKED",
         "publish": publish,
