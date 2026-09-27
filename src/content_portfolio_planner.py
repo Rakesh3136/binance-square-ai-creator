@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / "analytics/publication_log.jsonl"
 OUT = ROOT / "data/live/content_portfolio_plan.json"
 FOLLOW_UP = ROOT / "data/live/thesis_follow_up_opportunities.json"
+FOLLOW_UP = ROOT / "data/live/thesis_follow_up_opportunities.json"
 
 TREATMENTS = (
     "market_setup",
