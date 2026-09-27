@@ -9,3 +9,6 @@ Fix NIC elite recovery: repeated published sentences are repairable via exact se
 
 2026-09-27T11:30:00Z
 Content portfolio + chart diversity upgrade: rotate verified editorial treatments (market setup, breaking news, world macro, research lesson, education, transparent NIC learning note, follow-up) and bounded analyst chart treatments (decision map, trend guide, Fibonacci context, volume regime) without overriding evidence, asset selection, or publication gates.
+
+2026-09-27T12:35:00Z
+Repair validation #992: restore missing pipeline_state.py and diagnostics_report.py runtime contracts before revalidating content portfolio and chart diversity.
