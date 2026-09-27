@@ -5,7 +5,7 @@ verified monetization. It changes policy artifacts, not credentials or
 authoritative safety/publication gates. Weak samples remain hypotheses.
 """
 from __future__ import annotations
-import json, hashlib, math
+import json, hashlib, math, re
 from collections import Counter, defaultdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -41,6 +41,16 @@ def num(v,d=0.0):
 def now(): return datetime.now(timezone.utc)
 def iso(dt): return dt.isoformat()
 def token(x): return hashlib.sha256(json.dumps(x,sort_keys=True,default=str).encode()).hexdigest()[:16]
+
+def semantic_fingerprint(text):
+    tokens = re.findall(r"[a-z0-9]{3,}", str(text or "").lower())
+    return set(tokens)
+
+def novelty_overlap(current, previous):
+    a=semantic_fingerprint(current)
+    b=semantic_fingerprint(previous)
+    if not a or not b: return 0.0
+    return round(len(a & b) / max(len(a | b), 1), 4)
 
 def main():
     t=now()
@@ -137,14 +147,26 @@ def main():
     if underrepresented: next_variable="content_lane"
     if failures: next_variable="reliability"
 
+    # Semantic novelty is measured on available historical post text. It is a diagnostic signal,
+    # not permission to bypass the authoritative publication judge.
+    recent_texts=[]
+    for p in recent_pubs:
+        txt=str(p.get("post") or p.get("text") or p.get("title") or "").strip()
+        if txt: recent_texts.append(txt)
+    novelty_checks=[]
+    for current in recent_texts[-10:]:
+        overlaps=[novelty_overlap(current, old) for old in recent_texts[:-1]]
+        if overlaps: novelty_checks.append(max(overlaps))
+    avg_novelty_overlap=round(sum(novelty_checks)/len(novelty_checks),4) if novelty_checks else None
+
     policy={
-      "version":"1.0",
+      "version":"1.1",
       "generated_at":iso(t),
       "objective":"learn_to_improve_content_quality, audience_return_rate, verified_monetization and reliability",
       "hard_invariants":["never_infer_revenue","never_fake_engagement","never_publish_unsupported_claims","never_force_a_story","never_bypass_authoritative_gates"],
       "learning_method":"descriptive repeated observations + outcome feedback + bounded experiment memory",
       "recent_7d_mix":{"categories":dict(counts),"formats":dict(formats),"hooks":dict(hooks)},
-      "observed_patterns":repeated[:25],
+      "observed_patterns":repeated[:25],\n      "semantic_novelty":{"recent_comparable_posts":len(recent_texts),"average_token_overlap":avg_novelty_overlap,"policy":"diagnostic_only; authoritative novelty gate remains final"},
       "underrepresented_lanes":underrepresented,
       "macro_context":{"events":macro_events,"impact_layer_ready":impact_ready},
       "verified_monetization":{"verified_revenue_observed":round(verified_revenue,8),"source_policy":"explicit fields only"},
