@@ -1,7 +1,8 @@
-"""Build a public-safe NIC decision and learning journal.
+"""Build a public-safe NIC decision trace.
 
-This records decision summaries, evidence, uncertainty, verified outcomes and lessons.
-It deliberately does not expose hidden chain-of-thought or private internal reasoning.
+The trace exposes auditable decision information (evidence, alternatives,
+uncertainty, counter-evidence, invalidation conditions and outcomes) without
+exposing hidden chain-of-thought or private internal reasoning.
 """
 from __future__ import annotations
 import json, os
@@ -16,6 +17,8 @@ SOURCES={
  "content_master":LIVE/"content_master_training.json","opportunity_genome":LIVE/"nic_opportunity_genome.json",
  "experiment_governor":LIVE/"nic_experiment_governor.json","publication":LIVE/"publisher_result.json",
  "publication_payload":LIVE/"publication_payload.json","dashboard":LIVE/"nic_dashboard.json",
+ "thesis_ledger":ROOT/"data/intelligence/thesis_ledger.json","creator_brain":LIVE/"creator_brain_decision.json",
+ "adversarial_brain":LIVE/"adversarial_brain.json","decision_ensemble":LIVE/"decision_ensemble_gate.json",
 }
 def load(path):
  try:
@@ -26,9 +29,13 @@ def first(d,*keys):
   value=d.get(key)
   if value not in (None,"",[],{}): return value
  return None
+def compact(value, limit=500):
+ if value in (None,"",[],{}): return None
+ text=json.dumps(value,ensure_ascii=False,default=str) if not isinstance(value,str) else value
+ return text[:limit]
 def main():
  now=datetime.now(timezone.utc).isoformat(); data={k:load(v) for k,v in SOURCES.items()}
- prediction,accuracy,learning,training,master,genome,experiments,publication,payload=(data[k] for k in ("prediction","accuracy_gate","learning","self_training","content_master","opportunity_genome","experiment_governor","publication","publication_payload"))
+ prediction,accuracy,learning,training,master,genome,experiments,publication,payload,theses,brain,adversarial,ensemble=(data[k] for k in SOURCES)
  symbol=first(prediction,"symbol","asset") or first(payload,"symbol"); direction=first(prediction,"direction","bias"); evidence=first(prediction,"evidence_score","score"); confidence=first(prediction,"confidence","confidence_score"); gate=first(accuracy,"status","decision","gate"); experiment_id=first(experiments,"experiment_id") or first(payload,"experiment_id")
  lessons=[]
  for obj,label in ((learning,"learning engine"),(training,"self-training"),(master,"content master"),(genome,"opportunity genome")):
@@ -37,16 +44,25 @@ def main():
    if isinstance(value,str) and value.strip(): lessons.append({"source":label,"text":value.strip()}); break
   if len(lessons)>=4: break
  observed=[x for x in [f"Primary asset: {symbol}" if symbol else None,f"Modelled direction/bias: {direction}" if direction else None,f"Evidence score: {evidence}" if evidence is not None else None,f"Accuracy gate: {gate}" if gate else None] if x]
- lesson_text=" ".join(x["text"] for x in lessons[:2]) if lessons else "No new lesson was strong enough to publish as a standalone claim yet."
+ candidates=[]
+ raw=theses.get("theses") if isinstance(theses,dict) else None
+ if isinstance(raw,list):
+  for i,t in enumerate(raw[:5]):
+   if isinstance(t,dict): candidates.append({"index":i,"observation":compact(t.get("observation")),"mechanism":compact(t.get("mechanism")),"risk":compact(t.get("contradiction") or t.get("risk")),"why_reader_cares":compact(t.get("why_reader_care") or t.get("reader_value"))})
+ selected=first(brain,"selected_thesis","thesis","selected_opportunity")
+ counter=first(adversarial,"counter_evidence","counterpoint","risk","failure_condition")
+ invalidation=first(prediction,"invalidation","invalidation_condition","failure_condition")
  public_reasoning={
   "what_i_saw":observed,
-  "why_i_chose_it":f"I selected the strongest evidence-backed opportunity available in this cycle{f' for {symbol}' if symbol else ''}, subject to the accuracy gate and experiment policy.",
-  "what_i_learned":lesson_text,
-  "what_could_change_my_mind":"A verified outcome that contradicts the current prediction, a failed evidence gate, or new market/news evidence would change the next decision.",
+  "alternatives_considered":candidates,
+  "why_i_chose_it":"NIC selected the evidence-backed opportunity represented by the authoritative decision artifacts; this field records the decision basis, not hidden internal reasoning.",
+  "counter_evidence":compact(counter),
+  "uncertainty":compact(first(brain,"uncertainty","confidence_notes") or first(adversarial,"uncertainty")),
+  "what_would_change_my_mind":compact(invalidation) or "A verified outcome that contradicts the current prediction, a failed evidence gate, or materially new market/news evidence.",
   "next_test":experiments.get("decision") or experiments.get("selected_strategy") or experiments.get("strategy") or experiment_id,
  }
- journal={"schema_version":"2.0","timestamp":now,"run_id":os.getenv("GITHUB_RUN_ID",""),"run_number":os.getenv("GITHUB_RUN_NUMBER",""),"purpose":"Transparent NIC decision and learning summary","transparency_policy":{"exposes":["decision_summary","evidence","uncertainty","verified_outcome","lessons","next_experiment","public_reflection"],"does_not_expose":["hidden_chain_of_thought","private_internal_reasoning"]},"decision_summary":{"symbol":symbol,"direction":direction,"evidence_score":evidence,"confidence":confidence,"accuracy_gate":gate,"experiment_id":experiment_id},"what_i_observed":observed,"lessons":lessons,"outcome":{"publication_status":first(publication,"status"),"post_id":first(publication,"post_id","canonical_post_id"),"publication_proof":first(publication,"publication_proof")},"next_experiment":{"experiment_id":experiment_id,"governor":public_reasoning["next_test"]},"public_reflection":public_reasoning,"shareable_note":("NIC field note — "+(f"I focused on {symbol}. " if symbol else "")+(f"The evidence score was {evidence}. " if evidence is not None else "")+(f"The modelled direction was {direction}. " if direction else "")+"I will compare the decision with the verified outcome and use that result to calibrate the next cycle.")}
+ journal={"schema_version":"3.0","timestamp":now,"run_id":os.getenv("GITHUB_RUN_ID",""),"run_number":os.getenv("GITHUB_RUN_NUMBER",""),"purpose":"Transparent NIC decision and learning trace","transparency_policy":{"exposes":["decision_summary","evidence_summary","candidate_theses","counter_evidence","uncertainty","invalidation_conditions","verified_outcome","lessons","next_experiment"],"does_not_expose":["hidden_chain_of_thought","private_internal_reasoning"],"reason":"The trace is designed to be inspectable, reproducible and safe to publish without pretending to reveal private model reasoning."},"decision_summary":{"symbol":symbol,"direction":direction,"evidence_score":evidence,"confidence":confidence,"accuracy_gate":gate,"experiment_id":experiment_id,"ensemble_decision":first(ensemble,"decision","status")},"what_i_observed":observed,"candidate_theses":candidates,"decision_basis":{"selected_thesis":compact(selected),"counter_evidence":compact(counter),"invalidation":compact(invalidation)},"lessons":lessons,"outcome":{"publication_status":first(publication,"status"),"post_id":first(publication,"post_id","canonical_post_id"),"publication_proof":first(publication,"publication_proof")},"next_experiment":{"experiment_id":experiment_id,"governor":public_reasoning["next_test"]},"public_reflection":public_reasoning,"shareable_note":("NIC field note — "+(f"I focused on {symbol}. " if symbol else "")+(f"The evidence score was {evidence}. " if evidence is not None else "")+(f"The modelled direction was {direction}. " if direction else "")+"I will compare the decision with the verified outcome and use that result to calibrate the next cycle.")}
  LIVE.mkdir(parents=True,exist_ok=True); INTEL.mkdir(parents=True,exist_ok=True)
  OUT.write_text(json.dumps(journal,indent=2,ensure_ascii=False)+"\n",encoding="utf-8"); REPORT.write_text(json.dumps(journal,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
- print(json.dumps({"status":"TRANSPARENCY_JOURNAL_READY","symbol":symbol,"lessons":len(lessons),"public_reflection":public_reasoning},indent=2,ensure_ascii=False)); return 0
+ print(json.dumps({"status":"TRANSPARENCY_TRACE_READY","symbol":symbol,"candidate_theses":len(candidates),"lessons":len(lessons),"public_reflection":public_reasoning},indent=2,ensure_ascii=False)); return 0
 if __name__=="__main__": raise SystemExit(main())
