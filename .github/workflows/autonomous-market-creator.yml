@@ -371,10 +371,19 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
+          set +e
           python src/elite_recovery_agent.py
-          if [ "$?" -eq 0 ]; then
+          recovery_exit=$?
+          if [ "$recovery_exit" -eq 0 ]; then
+            echo "Recovery changed the draft; running a fresh authoritative judge."
+            rm -f data/live/elite_prepublication_judge.json
             python src/elite_prepublication_judge.py
+            judge_exit=$?
+            echo "Fresh judge exit=$judge_exit"
+            exit "$judge_exit"
           fi
+          echo "No bounded recovery was applied; preserving the original hard-stop."
+          exit "$recovery_exit"
       - name: Apply authoritative elite pre-publication gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
