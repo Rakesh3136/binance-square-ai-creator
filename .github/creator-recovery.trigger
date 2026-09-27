@@ -6,3 +6,6 @@ NIC upgrade: bounded elite recovery for non-fatal editorial failures; preserve v
 
 2026-09-26T16:40:00Z
 Fix NIC elite recovery: repeated published sentences are repairable via exact sentence-level deterministic rewriting; preserve verified facts and force a fresh elite judge before the authoritative gate.
+
+2026-09-27T11:30:00Z
+Content portfolio + chart diversity upgrade: rotate verified editorial treatments (market setup, breaking news, world macro, research lesson, education, transparent NIC learning note, follow-up) and bounded analyst chart treatments (decision map, trend guide, Fibonacci context, volume regime) without overriding evidence, asset selection, or publication gates.
