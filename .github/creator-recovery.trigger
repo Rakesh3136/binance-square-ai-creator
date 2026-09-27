@@ -15,3 +15,6 @@ Repair validation #992: restore missing pipeline_state.py and diagnostics_report
 
 2026-09-27T13:00:00Z
 Repair validation: correct pipeline contract validator publication-stage false failure and revalidate full content/chart diversity path.
+
+2026-09-27T13:10:00Z
+Fix validator regex escaping: detect actual workflow Python commands and validate the critical execution order deterministically.
