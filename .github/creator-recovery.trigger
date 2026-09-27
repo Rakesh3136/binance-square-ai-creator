@@ -12,3 +12,6 @@ Content portfolio + chart diversity upgrade: rotate verified editorial treatment
 
 2026-09-27T12:35:00Z
 Repair validation #992: restore missing pipeline_state.py and diagnostics_report.py runtime contracts before revalidating content portfolio and chart diversity.
+
+2026-09-27T13:00:00Z
+Repair validation: correct pipeline contract validator publication-stage false failure and revalidate full content/chart diversity path.
