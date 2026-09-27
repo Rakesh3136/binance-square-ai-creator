@@ -27,12 +27,24 @@ REQUIRED_ORDER = [
     "src/binance_square_publisher.py",
 ]
 
-SCRIPT_RE = re.compile(r"(?<![A-Za-z0-9_./-])python(?:3(?:\\.\\d+)?)?\\s+(src/[A-Za-z0-9_./-]+\\.py)(?![A-Za-z0-9_./-])")
+# Match actual workflow commands such as: python src/foo.py
+SCRIPT_RE = re.compile(
+    r"(?<![A-Za-z0-9_./-])python(?:3(?:\.\d+)?)?\s+(src/[A-Za-z0-9_./-]+\.py)(?![A-Za-z0-9_./-])"
+)
 
 
 def _mask_non_execution_regions(text: str) -> str:
-    text = re.sub(r"PYTHONPATH=src\\s+python\\s+-c\\s+\".*?\"", lambda m: " " * len(m.group(0)), text, flags=re.DOTALL)
-    return "".join("" if line.lstrip().startswith("#") else line for line in text.splitlines(keepends=True))
+    # The import smoke-test is intentionally not treated as execution order.
+    text = re.sub(
+        r'PYTHONPATH=src\s+python\s+-c\s+".*?"',
+        lambda m: " " * len(m.group(0)),
+        text,
+        flags=re.DOTALL,
+    )
+    return "".join(
+        "" if line.lstrip().startswith("#") else line
+        for line in text.splitlines(keepends=True)
+    )
 
 
 def referenced_scripts(text: str) -> list[str]:
@@ -50,19 +62,20 @@ def execution_positions(text: str) -> dict[str, int]:
     positions: dict[str, int] = {}
     for match in SCRIPT_RE.finditer(masked):
         positions.setdefault(match.group(1), match.start(1))
-    for script in REQUIRED_ORDER:
-        if script in positions:
-            continue
-        line_re = re.compile(rf"(?m)^\\s*python(?:3(?:\\.\\d+)?)?\\s+{re.escape(script)}(?:\\s*(?:#.*)?)?$")
-        m = line_re.search(masked)
-        if m:
-            positions[script] = m.start()
     return positions
 
 
 def tracked_files() -> set[str]:
     try:
-        return set(subprocess.run(["git", "ls-files"], cwd=ROOT, text=True, capture_output=True, check=True).stdout.splitlines())
+        return set(
+            subprocess.run(
+                ["git", "ls-files"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout.splitlines()
+        )
     except Exception:
         return set()
 
@@ -75,10 +88,15 @@ def main() -> int:
     if not WORKFLOW.is_file():
         print(f"ERROR: workflow missing: {WORKFLOW}", file=sys.stderr)
         return 2
+
     text = WORKFLOW.read_text(encoding="utf-8")
     scripts = referenced_scripts(text)
     tracked = tracked_files()
-    missing = [p for p in scripts if p != "src/creator_diagnostics.py" and not script_exists(p, tracked)]
+
+    missing = [
+        p for p in scripts
+        if p != "src/creator_diagnostics.py" and not script_exists(p, tracked)
+    ]
     if missing:
         print("ERROR: workflow references missing Python files:", file=sys.stderr)
         for p in missing:
@@ -93,7 +111,11 @@ def main() -> int:
             print(f" - {p}", file=sys.stderr)
         return 2
 
-    out_of_order = [(left, right) for left, right in zip(REQUIRED_ORDER, REQUIRED_ORDER[1:]) if positions[left] >= positions[right]]
+    out_of_order = [
+        (left, right)
+        for left, right in zip(REQUIRED_ORDER, REQUIRED_ORDER[1:])
+        if positions[left] >= positions[right]
+    ]
     if out_of_order:
         print("ERROR: critical pipeline order is broken:", file=sys.stderr)
         for left, right in out_of_order:
@@ -109,18 +131,16 @@ def main() -> int:
     if marker_index < 0:
         print("ERROR: publication stage marker is missing", file=sys.stderr)
         return 2
+
     publish_block = text[marker_index:]
-    publisher_line = "python src/binance_square_publisher.py"
-    if publisher_line not in publish_block:
+    if "python src/binance_square_publisher.py" not in publish_block:
         print("ERROR: Binance Square publisher is not wired into the publication stage", file=sys.stderr)
         return 2
 
-    # Publication truth is intentionally collected before content generation so the
-    # current cycle can learn from prior posts. The publisher itself writes the
-    # authoritative current-run publication_result.json. Do not require the prior-
-    # publication verifier or call tracker to appear after the publisher: that was a
-    # false contract and caused valid runs to fail at the early integrity check.
-    print(f"PIPELINE_CONTRACT_OK referenced_scripts={len(scripts)} critical_stages={len(REQUIRED_ORDER)}")
+    print(
+        f"PIPELINE_CONTRACT_OK referenced_scripts={len(scripts)} "
+        f"critical_stages={len(REQUIRED_ORDER)}"
+    )
     return 0
 
 
