@@ -124,6 +124,56 @@ def fmt_money(value):
     if value>=1_000:return f'${value/1_000:.0f}K'
     return f'${value:.0f}'
 
+def build_nic_decision_contract(preflight, brain, publication_context, research, critique, draft, visual, scout):
+    """Create one auditable contract consumed by downstream stages."""
+    selected = preflight.get("selected_opportunity") or {}
+    return {
+        "schema_version": "nic-decision-contract-1.0",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "authority": "NIC_CORE_WITH_AUTHORITATIVE_PUBLICATION_GATES",
+        "evidence": {
+            "selected_symbol": publication_context.get("symbol") or selected.get("symbol") or research.get("strongest_signal"),
+            "selected_lane": selected.get("category") or selected.get("reason"),
+            "research_source_mode": research.get("source_mode"),
+            "scout_thesis_count": len(scout.get("theses") or []) if isinstance(scout, dict) else 0,
+        },
+        "thesis": {
+            "summary": research.get("summary"),
+            "strongest_signal": research.get("strongest_signal"),
+            "opportunity_score": research.get("opportunity_score"),
+            "counterpoint": critique.get("summary"),
+        },
+        "editorial": {
+            "category": draft.get("content_category"),
+            "experiment_id": draft.get("experiment_id"),
+            "generation_mode": draft.get("generation_mode"),
+        },
+        "visual": {
+            "type": visual.get("type", "none"),
+            "use_visual": bool(visual.get("use_visual")),
+            "provider": visual.get("provider"),
+            "purpose": visual.get("purpose"),
+        },
+        "quality": {
+            "draft_quality_score": draft.get("quality_score"),
+            "private_reasoning_exposed": False,
+            "publication_status": "DRAFT_ONLY_NOT_PUBLISHED",
+        },
+        "learning_hooks": {
+            "outcome_required": True,
+            "semantic_novelty_required": True,
+            "visual_claim_consistency_required": bool(visual.get("use_visual")),
+        },
+        "hard_invariants": [
+            "verified_evidence_only",
+            "no_private_chain_of_thought_publication",
+            "no_unsupported_claims",
+            "no_duplicate_thesis",
+            "no_gate_bypass",
+            "fresh_authoritative_judge_after_recovery",
+        ],
+    }
+
 def local_market_fallback(live,preflight,memory):
     selected=preflight.get('selected_opportunity') or {}; item=find_item(live,selected.get('symbol'))
     if not item:return None
@@ -211,7 +261,7 @@ def main():
     if not draft.get('post') and draft.get('text'): draft['post']=str(draft['text']).strip()
     allowed={'candlestick_chart','market_bar_chart','market_comparison','market_range_chart','news_timeline','text_card','none'}
     if visual.get('type') not in allowed: visual={'type':'none','use_visual':False}
-    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':os.getenv('NIC_PROVIDER_ORDER','claude,gemini,openai'),'topic_instruction':TOPIC or selected.get('instruction',''),'selected_editorial_lane':selected,'engagement_strategy':preflight.get('engagement_strategy') or {},'creator_intelligence':creator_patterns,'live_market_snapshot':live,'news_discovery_snapshot':news,'strategy_memory':memory,'research':research,'critique':critique,'draft':draft,'visual_plan':visual,'status':'DRAFT_ONLY_NOT_PUBLISHED','creator_brain':creator_brain,'publication_context':publication_context,'generation_mode':generation_mode,'gemini_requests_used':0,'research_scout':scout}
+    nic_contract=build_nic_decision_contract(preflight,creator_brain,publication_context,research,critique,draft,visual,scout)\n    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':os.getenv('NIC_PROVIDER_ORDER','claude,gemini,openai'),'topic_instruction':TOPIC or selected.get('instruction',''),'selected_editorial_lane':selected,'engagement_strategy':preflight.get('engagement_strategy') or {},'creator_intelligence':creator_patterns,'live_market_snapshot':live,'news_discovery_snapshot':news,'strategy_memory':memory,'research':research,'critique':critique,'draft':draft,'visual_plan':visual,'nic_decision_contract':nic_contract,'status':'DRAFT_ONLY_NOT_PUBLISHED','creator_brain':creator_brain,'publication_context':publication_context,'generation_mode':generation_mode,'gemini_requests_used':0,'research_scout':scout}
     slug_source=TOPIC or safe_slug_value(research.get('strongest_signal')) or safe_slug_value(selected.get('category')) or 'market-opportunity'; slug=''.join(c.lower() if c.isalnum() else '-' for c in slug_source).strip('-')[:80] or 'market-opportunity'
     output=OUTPUT_DIR/f'{slug}-multi-agent.json'; output.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps({'status':'DRAFT_ONLY_NOT_PUBLISHED','report':str(output),'quality_score':draft.get('quality_score',0),'editorial_style':draft.get('editorial_style',''),'generation_mode':generation_mode,'visual_requested':visual.get('use_visual',False),'visual_type':visual.get('type','none'),'gemini_requests_used':0},indent=2))
