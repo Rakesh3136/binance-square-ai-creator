@@ -274,6 +274,16 @@ def build_pre_contract() -> dict:
 
 def dashboard_post_phase(contract: dict) -> dict:
     result = load_json(PUBLICATION_RESULT, {})
+    contract_created = contract.get("created_at")
+    result_checked = result.get("checked_at")
+    if contract_created and result_checked:
+        try:
+            created_dt = datetime.fromisoformat(str(contract_created).replace("Z", "+00:00"))
+            checked_dt = datetime.fromisoformat(str(result_checked).replace("Z", "+00:00"))
+            if checked_dt < created_dt:
+                result = {}
+        except Exception:
+            pass
     post_id = canonical_post_id(result.get("canonical_post_id") or result.get("post_id"))
     publication = read_matching_publication(post_id)
     reward, reward_source = verified_reward(post_id)
