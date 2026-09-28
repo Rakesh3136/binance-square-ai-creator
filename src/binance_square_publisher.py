@@ -19,6 +19,7 @@ RESULT_PATH = LIVE / "publication_result.json"
 CONTEXT_PATH = LIVE / "publication_context.json"
 FROZEN_PATH = LIVE / "authoritative_opportunity.json"
 WTE_PATH = LIVE / "write_to_earn_eligibility.json"
+MONETIZATION_OS_PATH = LIVE / "nic_monetization_contract.json"
 ATTRIBUTION_LOG_PATH = ANALYTICS / "publication_attribution.jsonl"
 VISUAL = LIVE / "visual.png"
 ENDPOINT = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
@@ -222,6 +223,7 @@ def main() -> int:
         text = text_payload()
         context = load(CONTEXT_PATH)
         frozen = load(FROZEN_PATH)
+        monetization_os = load(MONETIZATION_OS_PATH)
         symbol = clean_symbol(
             context.get("symbol")
             or context.get("primary_symbol")
@@ -392,7 +394,17 @@ def main() -> int:
             or (frozen.get("prediction") or {}).get("direction")
             or ""
         ).upper(),
-        "experiment_id": str(context.get("experiment_id") or frozen.get("experiment_id") or ""),
+        "experiment_id": str(monetization_os.get("experiment_id") or context.get("experiment_id") or frozen.get("experiment_id") or ""),
+        "campaign_day": monetization_os.get("campaign_day"),
+        "content_lane": str(monetization_os.get("content_lane") or context.get("content_lane") or category),
+        "content_format": str(monetization_os.get("content_format") or context.get("content_format") or ""),
+        "hook_type": str(monetization_os.get("hook_type") or context.get("hook_type") or ""),
+        "visual_type": str(monetization_os.get("visual_type") or context.get("visual_type") or ""),
+        "reader_payoff_type": str(monetization_os.get("reader_payoff_type") or context.get("reader_payoff_type") or ""),
+        "experiment_variable": str(monetization_os.get("experiment_variable") or context.get("experiment_variable") or ""),
+        "experiment_treatment": str(monetization_os.get("experiment_treatment") or context.get("experiment_treatment") or ""),
+        "cycle_id": str(monetization_os.get("cycle_id") or context.get("cycle_id") or ""),
+        "cashtag": str(monetization_os.get("cashtag") or ("$" + symbol if symbol else "")),
         "reference_price": frozen.get("reference_price") or context.get("reference_price"),
         "trigger": frozen.get("trigger") or frozen.get("entry"),
         "invalidation": frozen.get("invalidation"),
@@ -425,6 +437,16 @@ def main() -> int:
         "category": category,
         "direction": row["direction"],
         "experiment_id": row["experiment_id"],
+        "campaign_day": row["campaign_day"],
+        "content_lane": row["content_lane"],
+        "content_format": row["content_format"],
+        "hook_type": row["hook_type"],
+        "visual_type": row["visual_type"],
+        "reader_payoff_type": row["reader_payoff_type"],
+        "experiment_variable": row["experiment_variable"],
+        "experiment_treatment": row["experiment_treatment"],
+        "cycle_id": row["cycle_id"],
+        "cashtag": row["cashtag"],
         "reference_price": row["reference_price"],
         "trigger": row["trigger"],
         "invalidation": row["invalidation"],
@@ -454,6 +476,15 @@ def main() -> int:
         "id_verification": "verified" if post_id else "unavailable",
         "publication_proof": proof,
         "experiment_id": row["experiment_id"],
+        "campaign_day": row["campaign_day"],
+        "content_lane": row["content_lane"],
+        "content_format": row["content_format"],
+        "hook_type": row["hook_type"],
+        "visual_type": row["visual_type"],
+        "reader_payoff_type": row["reader_payoff_type"],
+        "experiment_variable": row["experiment_variable"],
+        "experiment_treatment": row["experiment_treatment"],
+        "cycle_id": row["cycle_id"],
         "cashtag": row["monetization"]["cashtag"],
     }
     LIVE.mkdir(parents=True, exist_ok=True)
