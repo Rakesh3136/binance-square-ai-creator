@@ -9,9 +9,10 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 LOG=ROOT/"analytics/publication_log.jsonl"; OUT=ROOT/"data/live/content_portfolio_plan.json"
-FOLLOW_UP=ROOT/"data/live/thesis_follow_up_opportunities.json"; MEMORY=ROOT/"data/live/thesis_memory.json"
-TREATMENTS=("market_setup","breaking_news","world_macro","research_lesson","education","nic_learning_note","follow_up")
-CATEGORY_MAP={"technical_setup":"market_setup","capital_flow_long":"market_setup","capital_flow_short":"market_setup","flow":"market_setup","top_gainers":"market_setup","top_losers":"market_setup","high_volatility":"market_setup","volume_leaders":"market_setup","breaking_news":"breaking_news","news_and_macro":"world_macro","research_insight":"research_lesson","data_surprise":"research_lesson","market_mechanism":"education","education":"education","creator_signal_outcome":"nic_learning_note","follow_up":"follow_up"}
+FOLLOW_UP=ROOT/"data/live/thesis_follow_up_opportunities.json"; MEMORY=ROOT/"data/live/thesis_memory.json"; NIC_OS=ROOT/"data/live/nic_monetization_contract.json"
+TREATMENTS=("market_setup","data_investigation","news_impact","asset_comparison","contrarian_thesis","outcome_accountability","weekly_synthesis")
+CATEGORY_MAP={"technical_setup":"market_setup","capital_flow_long":"market_setup","capital_flow_short":"market_setup","flow":"market_setup","top_gainers":"market_setup","top_losers":"market_setup","high_volatility":"market_setup","volume_leaders":"data_investigation","data_surprise":"data_investigation","comparison":"asset_comparison","breaking_news":"news_impact","news_and_macro":"news_impact","research_insight":"data_investigation","market_mechanism":"data_investigation","education":"data_investigation","creator_signal_outcome":"outcome_accountability","follow_up":"outcome_accountability"}
+NIC_LANE_CONTRACTS={"market_setup":"Chart-first conditional setup: evidence -> decision level -> confirmation -> invalidation; never force a trade call.","data_investigation":"Investigate one unusual relationship/anomaly using supplied evidence and explain the practical reader takeaway.","news_impact":"Use one fresh verified event, explain the supplied market mechanism, then identify what observable response would validate the interpretation.","asset_comparison":"Compare only evidence-supported assets; explain a concrete trade-off or relative-strength difference without inventing the second asset.","contrarian_thesis":"Challenge the obvious interpretation with supplied contrary evidence and define exactly what would falsify the thesis.","outcome_accountability":"Follow a prior thesis only when fresh evidence exists; state what changed, what held, and the next measurable test.","weekly_synthesis":"Synthesize verified observations from the week, separate knowns from unknowns, and define one next test."}
 
 def refresh_thesis_bridge():
     """Refresh lightweight thesis telemetry from this cycle's ledger.
@@ -49,10 +50,28 @@ def category(row):
 def main():
     refresh_thesis_bridge()
     recent=load_recent(); follow_ups=load_follow_ups(); counts=Counter(CATEGORY_MAP.get(category(x),"") for x in recent)
-    unused=[x for x in TREATMENTS if x not in counts]
-    selected="follow_up" if follow_ups else (unused[0] if unused else min(TREATMENTS,key=lambda x:(counts[x],TREATMENTS.index(x))))
-    selected_follow_up=follow_ups[0] if follow_ups else None
-    plan={"version":"1.3","generated_at":datetime.now(timezone.utc).isoformat(),"status":"READY","selected_treatment":selected,"recent_verified_publications":len(recent),"recent_treatment_counts":dict(counts),"thesis_follow_up":selected_follow_up,"thesis_follow_up_candidates":len(follow_ups),"principles":{"asset_selection_unchanged":True,"evidence_unchanged":True,"signal_first_unchanged":True,"quality_gates_authoritative":True,"no_private_chain_of_thought":True,"nic_learning_notes_use_only_recorded_lessons":True,"world_news_requires_fresh_verified_source":True,"one_story_per_post":True,"thesis_follow_up_requires_fresh_evidence":True},"treatment_contracts":{"market_setup":"chart-first conditional setup with trigger/invalidation","breaking_news":"fresh event, source, market impact, one specific question","world_macro":"macro/world event plus verified crypto transmission mechanism","research_lesson":"original evidence, mechanism, why it matters","education":"one market concept taught through current evidence","nic_learning_note":"public learning note from recorded outcomes; never hidden reasoning","follow_up":"what changed since the previous verified publication"}}
-    OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(plan,indent=2,ensure_ascii=False)+"\n",encoding="utf-8"); print(json.dumps(plan,indent=2,ensure_ascii=False))
+    try:
+        value=json.loads(NIC_OS.read_text(encoding="utf-8"))
+        os_contract=value if isinstance(value,dict) else {}
+    except Exception:
+        os_contract={}
+    os_lane=str(os_contract.get("content_lane") or "").strip().lower()
+    selected=os_lane if os_lane in TREATMENTS else ("outcome_accountability" if follow_ups else min(TREATMENTS,key=lambda x:(counts[x],TREATMENTS.index(x))))
+    selected_follow_up=follow_ups[0] if follow_ups and selected=="outcome_accountability" else None
+    plan={"version":"2.0","generated_at":datetime.now(timezone.utc).isoformat(),"status":"READY","selected_treatment":selected,
+          "content_lane":selected,"campaign_day":os_contract.get("campaign_day"),"lane_goal":os_contract.get("lane_goal") or NIC_LANE_CONTRACTS.get(selected),
+          "content_format":os_contract.get("content_format"),"hook_type":os_contract.get("hook_type"),"visual_type":os_contract.get("visual_type"),
+          "reader_payoff_type":os_contract.get("reader_payoff_type"),"experiment_id":os_contract.get("experiment_id"),
+          "experiment_variable":os_contract.get("experiment_variable"),"experiment_treatment":os_contract.get("experiment_treatment"),
+          "cycle_id":os_contract.get("cycle_id"),"recent_verified_publications":len(recent),"recent_treatment_counts":dict(counts),
+          "thesis_follow_up":selected_follow_up,"thesis_follow_up_candidates":len(follow_ups),
+          "principles":{"asset_selection_unchanged":True,"evidence_unchanged":True,"signal_first_unchanged":True,"quality_gates_authoritative":True,
+                        "no_private_chain_of_thought":True,"world_news_requires_fresh_verified_source":True,"one_story_per_post":True,
+                        "thesis_follow_up_requires_fresh_evidence":True,"nic_os_lane_is_editorial_only":True,
+                        "experiment_lineage_must_survive_fallback":True},
+          "treatment_contracts":NIC_LANE_CONTRACTS}
+    OUT.parent.mkdir(parents=True,exist_ok=True)
+    OUT.write_text(json.dumps(plan,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+    print(json.dumps(plan,indent=2,ensure_ascii=False))
 
 if __name__=="__main__":main()
