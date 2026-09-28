@@ -4,7 +4,7 @@ from pathlib import Path
 
 STATUS=Path('data/live/creator_status.json'); USAGE=Path('analytics/ai_usage.json'); REPORT_DIR=Path('data/reports'); DAILY_LIMIT=int(os.getenv('GEMINI_DAILY_BUDGET','20'))
 PUBLICATION_LOG=Path('analytics/publication_log.jsonl')
-SIGNAL_ROUTING=Path('data/live/signal_first_routing.json')
+SIGNAL_ROUTING=Path('data/live/signal_first_routing.json'); MONETIZATION_OS=Path('data/live/nic_monetization_contract.json')
 
 
 def load(path,default):
@@ -166,8 +166,15 @@ def emergency_verified_draft(reason):
     """Dependency-free rescue that preserves the frozen asset and varies prose.
     It never invents news, trade levels, outcomes or a replacement asset.
     """
-    pre=load(Path('data/live/editorial_preflight.json'),{}); market=load(Path('data/live/market_snapshot.json'),{}); news=load(Path('data/live/news_snapshot.json'),{})
+    pre=load(Path('data/live/editorial_preflight.json'),{}); market=load(Path('data/live/market_snapshot.json'),{}); news=load(Path('data/live/news_snapshot.json'),{}); monetization_os=load(MONETIZATION_OS,{})
     selected=pre.get('selected_opportunity') or {}; selected=selected if isinstance(selected,dict) else {}
+    os_lane=str(monetization_os.get('content_lane') or '').strip()
+    os_format=str(monetization_os.get('content_format') or '').strip()
+    os_hook=str(monetization_os.get('hook_type') or '').strip()
+    os_payoff=str(monetization_os.get('reader_payoff_type') or '').strip()
+    os_experiment=str(monetization_os.get('experiment_id') or '').strip()
+    os_variable=str(monetization_os.get('experiment_variable') or '').strip()
+    os_treatment=str(monetization_os.get('experiment_treatment') or '').strip()
     wanted=str(selected.get('symbol') or '').upper().replace('USDT','').replace('$','').strip()
     if not wanted or not wanted.replace('_','').isalnum(): raise RuntimeError('Emergency fallback refused: frozen opportunity symbol is missing')
     items=[]
@@ -222,7 +229,7 @@ def emergency_verified_draft(reason):
               f'The current classification is {category}. That is a description of the setup, not a promise about the next candle.\n\n'
               f'I would rather wait for price to confirm the reaction than manufacture certainty from one move.\n\n'
               f'What specific reaction on ${symbol} would make you change your read?')
-    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':'deterministic-emergency-fallback','topic_instruction':selected.get('instruction',''),'selected_editorial_lane':selected,'engagement_strategy':pre.get('engagement_strategy') or {},'live_market_snapshot':market,'news_discovery_snapshot':news,'strategy_memory':load(Path('analytics/strategy_memory.json'),{}),'research':{'summary':'Emergency draft built only from the frozen asset and verified live market data.','strongest_signal':symbol,'source_mode':'deterministic_emergency_fallback','opportunity_score':float(selected.get('adjusted_score') or selected.get('raw_score') or 80)},'critique':{'summary':'AI generation unavailable; no unverified facts were added.','reason':str(reason)[-500:]},'draft':{'post':post,'text':post,'hook':post.split('\n\n')[0],'discussion_question':post.split('\n\n')[-1],'quality_score':84,'editorial_style':draft_style if special else ('verified_market_observation' if category!='crypto meme' else 'verified_market_meme'),'generation_mode':'LOCAL_FALLBACK','experiment_id':(pre.get('engagement_strategy') or {}).get('experiment_id') or 'A','experiment_format':((pre.get('engagement_strategy') or {}).get('experiment') or {}).get('format'),'symbol':symbol,'content_category':category,'publication_status':'DRAFT_ONLY_NOT_PUBLISHED'},'visual_plan':{'type':'candlestick_chart','use_visual':bool(candles),'title':f'{symbol}: verified 1H market data','data_points':[{'symbol':symbol}],'purpose':'TradingView chart is rendered separately from the frozen opportunity.'},'status':'DRAFT_ONLY_NOT_PUBLISHED','generation_mode':'LOCAL_FALLBACK','emergency_fallback':True}
+    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':'deterministic-emergency-fallback','topic_instruction':selected.get('instruction',''),'selected_editorial_lane':selected,'engagement_strategy':pre.get('engagement_strategy') or {},'live_market_snapshot':market,'news_discovery_snapshot':news,'strategy_memory':load(Path('analytics/strategy_memory.json'),{}),'research':{'summary':'Emergency draft built only from the frozen asset and verified live market data.','strongest_signal':symbol,'source_mode':'deterministic_emergency_fallback','opportunity_score':float(selected.get('adjusted_score') or selected.get('raw_score') or 80)},'critique':{'summary':'AI generation unavailable; no unverified facts were added.','reason':str(reason)[-500:]},'draft':{'post':post,'text':post,'hook':post.split('\n\n')[0],'discussion_question':post.split('\n\n')[-1],'quality_score':84,'editorial_style':draft_style if special else ('verified_market_observation' if category!='crypto meme' else 'verified_market_meme'),'generation_mode':'LOCAL_FALLBACK','experiment_id':os_experiment or (pre.get('engagement_strategy') or {}).get('experiment_id') or 'A','experiment_format':os_format or ((pre.get('engagement_strategy') or {}).get('experiment') or {}).get('format'),'content_lane':os_lane or category,'campaign_day':monetization_os.get('campaign_day'),'hook_type':os_hook,'reader_payoff_type':os_payoff,'experiment_variable':os_variable,'experiment_treatment':os_treatment,'cycle_id':str(monetization_os.get('cycle_id') or ''),'symbol':symbol,'content_category':category,'publication_status':'DRAFT_ONLY_NOT_PUBLISHED'},'visual_plan':{'type':'candlestick_chart','use_visual':bool(candles),'title':f'{symbol}: verified 1H market data','data_points':[{'symbol':symbol}],'purpose':'TradingView chart is rendered separately from the frozen opportunity.'},'status':'DRAFT_ONLY_NOT_PUBLISHED','generation_mode':'LOCAL_FALLBACK','emergency_fallback':True,'monetization_os_contract':monetization_os,'fallback_inherits_editorial_contract':bool(monetization_os)}
     REPORT_DIR.mkdir(parents=True,exist_ok=True); slug=''.join(c.lower() if c.isalnum() else '-' for c in symbol).strip('-') or 'market-opportunity'; path=REPORT_DIR/f'{slug}-emergency-multi-agent.json'; path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps({'status':'EMERGENCY_LOCAL_DRAFT','report':str(path),'symbol':symbol,'category':category},indent=2))
 
 
