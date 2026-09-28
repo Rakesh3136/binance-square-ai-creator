@@ -439,6 +439,12 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/production_manager.py
+      - name: Initialize 7-day Write-to-Earn campaign plan
+        run: |
+          python src/write_to_earn_7day_controller.py
+          python -m json.tool data/live/write_to_earn_7day_status.json >/dev/null
+          python -m json.tool data/live/write_to_earn_7day_plan.json >/dev/null
+          echo "WTE campaign plan initialized"
       - name: Build final publication payload and Write-to-Earn readiness
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
