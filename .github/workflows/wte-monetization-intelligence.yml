@@ -21,6 +21,9 @@ jobs:
           python -m compileall -q src
           python src/wte_monetization_attribution.py
           python -m json.tool data/live/wte_monetization_attribution.json >/dev/null
+          python src/nic_monetization_os.py post
+          python -m json.tool data/live/nic_monetization_dashboard.json >/dev/null
+          python -m json.tool data/intelligence/nic_monetization_os_report.json >/dev/null
           python -m json.tool data/intelligence/wte_monetization_attribution_report.json >/dev/null
           python src/creator_8_4_monetization_feedback.py
           python src/monetization_funnel_optimizer.py

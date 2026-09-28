@@ -22,16 +22,16 @@ STATE=LIVE/"write_to_earn_7day_status.json"
 PLAN=LIVE/"write_to_earn_7day_plan.json"
 HISTORY=AN/"write_to_earn_7day.jsonl"
 PUB=AN/"publication_log.jsonl"
-PERF=AN/"square_performance.jsonl"
+PERF=AN/"square_performance.jsonl"; REWARD_EVENTS=AN/"wte_reward_events.jsonl"
 
 LANES=[
-    ("market_setup","Market setup with one clear mechanism and invalidation."),
-    ("asset_deep_dive","Single-asset research: flows, structure, catalysts and risks."),
-    ("news_impact","Verified news -> mechanism -> affected asset(s), with uncertainty."),
-    ("data_investigation","Data-driven comparison or anomaly with a concrete reader takeaway."),
-    ("contrarian_thesis","Evidence-backed alternative interpretation with a falsification test."),
-    ("outcome_accountability","Follow-up on a previous thesis using newly verified evidence."),
-    ("weekly_synthesis","Seven-day synthesis: what changed, what held, what failed, next test."),
+    ("market_setup","Chart-first market setup with one clear mechanism, confirmation and invalidation."),
+    ("data_investigation","Investigate one unusual relationship or anomaly and explain why it matters."),
+    ("news_impact","Verified fresh event -> market mechanism -> observable response, with uncertainty."),
+    ("asset_comparison","Compare two evidence-supported assets or market paths and expose the trade-off."),
+    ("contrarian_thesis","Test the obvious interpretation against contrary evidence with a falsification condition."),
+    ("outcome_accountability","Revisit a prior thesis only with fresh evidence and state exactly what changed."),
+    ("weekly_synthesis","Synthesize verified weekly observations and define the next measurable test."),
 ]
 
 def load(path, default):
@@ -100,13 +100,10 @@ def main():
     days_completed=sum(1 for d in range(1,8) if by_day.get(d,0)>=daily_target)
     remaining_days=max(0,8-day)
     verified_rewards=[]
-    for row in rows(PERF):
-        stamp=dt(row.get("timestamp") or row.get("checked_at") or row.get("published_at"))
-        if stamp and stamp>=start:
-            for key in ("reward_amount_usdc","commission_usdc","verified_revenue_usdc"):
-                value=row.get(key)
-                if value is not None:
-                    verified_rewards.append(value); break
+    for row in rows(REWARD_EVENTS):
+        stamp=dt(row.get("observed_at") or row.get("timestamp") or row.get("checked_at"))
+        if stamp and stamp>=start and row.get("verified") is True and row.get("reward_amount_usdc") is not None:
+            verified_rewards.append(row.get("reward_amount_usdc"))
 
     status={
         "version":"WTE-7DAY-1.0",
@@ -125,7 +122,7 @@ def main():
             "source_of_truth":"Rewards Hub task shown to the account",
             "daily_target_is_configurable":True,
             "campaign_start_is_local_controller_start_unless_WTE_7DAY_START_UTC_is_set":True,
-            "revenue_only_from_explicit_verified_fields":True,
+            "revenue_only_from_explicit_verified_fields":True,"reward_source":"analytics/wte_reward_events.jsonl","performance_reward_fields_are_not_trusted":True,
         },
         "monetization_measurement":{
             "verified_reward_fields_seen":len(verified_rewards),

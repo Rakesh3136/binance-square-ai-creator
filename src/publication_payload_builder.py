@@ -17,6 +17,7 @@ LIVE = ROOT / "data" / "live"
 OUT = LIVE / "publication_payload.json"
 CONTEXT = LIVE / "publication_context.json"
 FROZEN = LIVE / "authoritative_opportunity.json"
+MONETIZATION_OS = LIVE / "nic_monetization_contract.json"
 
 
 def load(path: Path) -> dict:
@@ -46,6 +47,7 @@ def main() -> int:
     draft = report.get("draft") if isinstance(report.get("draft"), dict) else {}
     context = load(CONTEXT)
     frozen = load(FROZEN)
+    monetization_os = load(MONETIZATION_OS)
 
     text = str(draft.get("post") or draft.get("text") or "").strip()
     symbol = clean_symbol(
@@ -85,11 +87,22 @@ def main() -> int:
             or ""
         ).upper(),
         "experiment_id": str(
-            context.get("experiment_id")
+            monetization_os.get("experiment_id")
+            or context.get("experiment_id")
             or frozen.get("experiment_id")
             or draft.get("experiment_id")
             or ""
         ),
+        "campaign_day": monetization_os.get("campaign_day", context.get("campaign_day")),
+        "content_lane": str(monetization_os.get("content_lane") or context.get("content_lane") or category),
+        "content_format": str(monetization_os.get("content_format") or context.get("content_format") or draft.get("experiment_format") or ""),
+        "hook_type": str(monetization_os.get("hook_type") or context.get("hook_type") or ""),
+        "visual_type": str(monetization_os.get("visual_type") or context.get("visual_type") or ""),
+        "reader_payoff_type": str(monetization_os.get("reader_payoff_type") or context.get("reader_payoff_type") or ""),
+        "experiment_variable": str(monetization_os.get("experiment_variable") or context.get("experiment_variable") or ""),
+        "experiment_treatment": str(monetization_os.get("experiment_treatment") or context.get("experiment_treatment") or ""),
+        "cycle_id": str(monetization_os.get("cycle_id") or context.get("cycle_id") or ""),
+        "cashtag": str(monetization_os.get("cashtag") or ("$" + symbol if symbol else ""))
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

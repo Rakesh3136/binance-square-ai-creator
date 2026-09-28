@@ -73,7 +73,8 @@ def pid(row):
 
 def dimension_key(row):
     return (
-        str(row.get("format") or row.get("experiment_format") or "unknown"),
+        str(row.get("content_lane") or row.get("category") or "unknown"),
+        str(row.get("format") or row.get("content_format") or row.get("experiment_format") or "unknown"),
         str(row.get("hook_type") or "unknown"),
         str(row.get("category") or "unknown"),
         str(row.get("visual_type") or "unknown"),
@@ -160,7 +161,7 @@ def main():
         if g["samples"] < MIN_SAMPLES:
             continue
         observations.append({
-            "dimensions": {"format": key[0], "hook_type": key[1], "category": key[2], "visual_type": key[3], "experiment_id": key[4]},
+            "dimensions": {"content_lane": key[0], "format": key[1], "hook_type": key[2], "category": key[3], "visual_type": key[4], "experiment_id": key[5]},
             "samples": g["samples"],
             "avg_engagement_score": round(sum(g["engagement"]) / len(g["engagement"]), 6) if g["engagement"] else None,
             "avg_views": round(sum(g["views"]) / len(g["views"]), 2) if g["views"] else None,
@@ -201,7 +202,7 @@ def main():
 
     active = plan.get("current_experiment") if isinstance(plan, dict) else None
     feedback = {
-        "version": "8.4",
+        "version": "8.5",
         "generated_at": now,
         "status": "OK",
         "matched_publications": matched_posts,
