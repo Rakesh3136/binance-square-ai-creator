@@ -14,7 +14,6 @@ ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / "analytics/publication_log.jsonl"
 OUT = ROOT / "data/live/content_portfolio_plan.json"
 FOLLOW_UP = ROOT / "data/live/thesis_follow_up_opportunities.json"
-FOLLOW_UP = ROOT / "data/live/thesis_follow_up_opportunities.json"
 
 TREATMENTS = (
     "market_setup",
@@ -73,13 +72,11 @@ def main():
     follow_ups=load_follow_ups()
     mapped=[CATEGORY_MAP.get(category(x), "") for x in recent]
     counts=Counter(x for x in mapped if x)
-    # Prefer a treatment that has not appeared recently; otherwise choose the
-    # least-used treatment. This is a diversity preference, not a publish rule.
     unused=[x for x in TREATMENTS if x not in counts]
     selected="follow_up" if follow_ups else (unused[0] if unused else min(TREATMENTS,key=lambda x:(counts[x],TREATMENTS.index(x))))
     selected_follow_up=follow_ups[0] if follow_ups else None
     plan={
-        "version":"1.0",
+        "version":"1.1",
         "generated_at":datetime.now(timezone.utc).isoformat(),
         "status":"READY",
         "selected_treatment":selected,
@@ -88,14 +85,10 @@ def main():
         "thesis_follow_up":selected_follow_up,
         "thesis_follow_up_candidates":len(follow_ups),
         "principles":{
-            "asset_selection_unchanged":True,
-            "evidence_unchanged":True,
-            "signal_first_unchanged":True,
-            "quality_gates_authoritative":True,
-            "no_private_chain_of_thought":True,
-            "nic_learning_notes_use_only_recorded_lessons":True,
-            "world_news_requires_fresh_verified_source":True,
-            "one_story_per_post":True,
+            "asset_selection_unchanged":True,"evidence_unchanged":True,
+            "signal_first_unchanged":True,"quality_gates_authoritative":True,
+            "no_private_chain_of_thought":True,"nic_learning_notes_use_only_recorded_lessons":True,
+            "world_news_requires_fresh_verified_source":True,"one_story_per_post":True,
         },
         "treatment_contracts":{
             "market_setup":"chart-first conditional setup with trigger/invalidation",
@@ -111,5 +104,4 @@ def main():
     OUT.write_text(json.dumps(plan,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(plan,indent=2,ensure_ascii=False))
 
-if __name__=="__main__":
-    main()
+if __name__=="__main__":main()
