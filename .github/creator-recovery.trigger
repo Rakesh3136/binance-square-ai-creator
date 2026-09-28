@@ -48,3 +48,6 @@ Anti-clone WTE upgrade: hard-stop materially repetitive drafts, repair repeated 
 
 2026-09-28T14:50:00Z
 Repair: fix High-Level Intelligence Nemotron JSON parsing; revert malformed workflow edit and preserve known-good autonomous orchestrator before fresh validation.
+
+2026-09-28T16:20:00Z
+NIC Monetization Intelligence 2.0: validate durable lane/experiment lineage, verified-reward telemetry, fallback inheritance, and the autonomous publication loop after merge.
