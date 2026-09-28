@@ -455,6 +455,8 @@ jobs:
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
+          BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY }}
         run: python src/binance_square_publisher.py
       - name: Publish transparent NIC learning snapshot
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
