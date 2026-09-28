@@ -144,15 +144,15 @@ def main():
     original_question = original_questions[0].strip()
     body_without_question = original.replace(original_question, "").rstrip()
     symbol = extract_symbol(draft, original)
-    bridge = deterministic_bridge(symbol, body_without_question)
+    bridge = "" if mechanism_present(body_without_question) else deterministic_bridge(symbol, body_without_question)
 
     # The repair stage is deliberately not passed through broad deduplication.
     # Upstream stages already own repetition control. This exact candidate is the
     # artifact that is validated and persisted.
-    candidate = f"{body_without_question}\n\n{bridge}\n\n{original_question}".strip()
+    candidate = original if not bridge else f"{body_without_question}\n\n{bridge}\n\n{original_question}".strip()
 
     reasons = []
-    if "because" not in bridge.lower():
+    if bridge and "because" not in bridge.lower():
         reasons.append("BRIDGE_CAUSAL_TERM_MISSING")
     if not mechanism_present(candidate):
         reasons.append("MECHANISM_STILL_MISSING")
@@ -162,7 +162,7 @@ def main():
         reasons.append("ORIGINAL_QUESTION_NOT_PRESERVED")
     if explicit_facts(original) - explicit_facts(candidate):
         reasons.append("EXPLICIT_FACT_LOSS")
-    if recent_repetitions(bridge):
+    if bridge and recent_repetitions(bridge):
         reasons.append("REPAIR_SENTENCE_REPEATS_RECENT_PUBLICATION")
 
     if reasons:
