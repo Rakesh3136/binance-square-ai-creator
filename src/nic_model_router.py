@@ -7,8 +7,8 @@ available when all hosted providers are unavailable.
 Supported optional providers:
 - claude: Anthropic Messages API
 - gemini: existing Google Gemini client
-- openai: OpenAI Responses API (including GPT-6 Astra when enabled)
-- local: caller-provided deterministic fallback
+- openai: OpenAI Responses API
+- nemotron: NVIDIA Nemotron 3 Ultra via OpenAI-compatible endpoint
 
 No provider is allowed to override frozen market facts or publication gates.
 """
@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.error
 import urllib.request
 from typing import Callable
 
@@ -46,19 +45,13 @@ def _claude(prompt: str, system: str) -> str:
     model = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
     data = _post_json(
         "https://api.anthropic.com/v1/messages",
-        {
-            "model": model,
-            "max_tokens": int(os.getenv("CLAUDE_MAX_OUTPUT_TOKENS", "1800")),
-            "system": system,
-            "messages": [{"role": "user", "content": prompt}],
-        },
+        {"model": model, "max_tokens": int(os.getenv("CLAUDE_MAX_OUTPUT_TOKENS", "1800")), "system": system, "messages": [{"role": "user", "content": prompt}]},
         {"x-api-key": key, "anthropic-version": "2023-06-01"},
     )
-    blocks = data.get("content") or []
-    text = "".join(str(b.get("text", "")) for b in blocks if isinstance(b, dict))
-    if not text.strip():
+    text = "".join(str(b.get("text", "")) for b in data.get("content") or [] if isinstance(b, dict)).strip()
+    if not text:
         raise RuntimeError("Claude returned empty output")
-    return text.strip()
+    return text
 
 
 def _openai(prompt: str, system: str) -> str:
@@ -68,14 +61,7 @@ def _openai(prompt: str, system: str) -> str:
     model = os.getenv("OPENAI_MODEL", "gpt-6-astra")
     data = _post_json(
         "https://api.openai.com/v1/responses",
-        {
-            "model": model,
-            "reasoning": {"effort": os.getenv("OPENAI_REASONING_EFFORT", "medium")},
-            "input": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-        },
+        {"model": model, "reasoning": {"effort": os.getenv("OPENAI_REASONING_EFFORT", "medium")}, "input": [{"role": "system", "content": system}, {"role": "user", "content": prompt}]},
         {"Authorization": f"Bearer {key}"},
     )
     output_text = data.get("output_text")
@@ -98,12 +84,7 @@ def _gemini(prompt: str, system: str) -> str:
         raise RuntimeError("GEMINI_API_KEY unavailable")
     from google import genai
     model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
-    client = genai.Client(api_key=key)
-    response = client.interactions.create(
-        model=model,
-        input=prompt,
-        system_instruction=system,
-    )
+    response = genai.Client(api_key=key).interactions.create(model=model, input=prompt, system_instruction=system)
     text = (response.output_text or "").strip()
     if not text:
         raise RuntimeError("Gemini returned empty output")
@@ -111,30 +92,26 @@ def _gemini(prompt: str, system: str) -> str:
 
 
 def _nemotron(prompt: str, system: str) -> str:
-    """Optional OpenAI-compatible Nemotron reasoning endpoint."""
+    """Nemotron 3 Ultra deep-research specialist over an OpenAI-compatible API."""
     key = os.getenv("NEMOTRON_API_KEY", "").strip()
-    url = os.getenv("NEMOTRON_API_URL", "").strip()
-    model = os.getenv("NEMOTRON_MODEL", "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4")
+    url = os.getenv("NEMOTRON_API_URL", "https://integrate.api.nvidia.com/v1").strip()
+    model = os.getenv("NEMOTRON_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")
     if not key:
         raise RuntimeError("NEMOTRON_API_KEY unavailable")
-    if not url:
-        raise RuntimeError("NEMOTRON_API_URL unavailable")
     data = _post_json(
-        url.rstrip("/") + "/v1/chat/completions",
+        url.rstrip("/") + "/chat/completions",
         {
             "model": model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
             "chat_template_kwargs": {
                 "enable_thinking": os.getenv("NEMOTRON_ENABLE_THINKING", "true").strip().lower() in {"1", "true", "yes", "on"},
                 "force_nonempty_content": True,
             },
             "temperature": float(os.getenv("NEMOTRON_TEMPERATURE", "0.2")),
+            "max_tokens": int(os.getenv("NEMOTRON_MAX_TOKENS", "12000")),
         },
         {"Authorization": f"Bearer {key}"},
-        timeout=int(os.getenv("NEMOTRON_TIMEOUT", "120")),
+        timeout=int(os.getenv("NEMOTRON_TIMEOUT", "180")),
     )
     choices = data.get("choices") or []
     message = choices[0].get("message") if choices and isinstance(choices[0], dict) else {}
@@ -157,11 +134,24 @@ def external_models_enabled() -> bool:
 
 
 def generate(prompt: str, system: str) -> tuple[str, dict]:
-    """Optional hosted-model bridge. NIC Core remains the default path."""
     if not external_models_enabled():
         raise RuntimeError(json.dumps({"nic": "external_models_disabled", "attempts": []}))
+    return _generate_from_order(prompt, system, provider_order())
+
+
+def generate_specialist(prompt: str, system: str, provider: str) -> tuple[str, dict]:
+    """Run one named specialist without changing the global provider order."""
+    if not external_models_enabled():
+        raise RuntimeError(json.dumps({"nic": "external_models_disabled", "attempts": []}))
+    provider = provider.strip().lower()
+    if provider not in CALLERS:
+        raise RuntimeError(json.dumps({"nic": "unsupported_specialist", "provider": provider}))
+    return _generate_from_order(prompt, system, [provider])
+
+
+def _generate_from_order(prompt: str, system: str, order: list[str]) -> tuple[str, dict]:
     attempts = []
-    for provider in provider_order():
+    for provider in order:
         fn = CALLERS.get(provider)
         if fn is None:
             attempts.append({"provider": provider, "status": "unsupported"})
@@ -176,35 +166,30 @@ def generate(prompt: str, system: str) -> tuple[str, dict]:
                     "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
                     "gemini": os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
                     "openai": os.getenv("OPENAI_MODEL", "gpt-6-astra"),
-                    "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4"),
+                    "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"),
                 }.get(provider),
             }
         except Exception as exc:
-            # Never expose credentials or full provider payloads in logs.
-            attempts.append({
-                "provider": provider,
-                "status": "unavailable",
-                "error": type(exc).__name__,
-            })
+            attempts.append({"provider": provider, "status": "unavailable", "error": type(exc).__name__})
     raise RuntimeError(json.dumps({"nic": "all_hosted_providers_unavailable", "attempts": attempts}))
 
 
 def status() -> dict:
     return {
-        "nic_version": "1.0-provider-independent",
+        "nic_version": "1.1-provider-independent-specialists",
         "external_models_enabled": external_models_enabled(),
         "provider_order": provider_order(),
         "configured": {
             "claude": bool(os.getenv("ANTHROPIC_API_KEY")),
             "gemini": bool(os.getenv("GEMINI_API_KEY")),
             "openai": bool(os.getenv("OPENAI_API_KEY")),
-            "nemotron": bool(os.getenv("NEMOTRON_API_KEY") and os.getenv("NEMOTRON_API_URL")),
+            "nemotron": bool(os.getenv("NEMOTRON_API_KEY")),
         },
         "models": {
             "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
             "gemini": os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
             "openai": os.getenv("OPENAI_MODEL", "gpt-6-astra"),
-            "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4"),
+            "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"),
         },
         "authority": "deterministic_market_contract_and_quality_gates",
     }
