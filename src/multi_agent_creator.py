@@ -2,7 +2,7 @@ from __future__ import annotations
 import json, os, re
 from datetime import datetime, timezone
 from pathlib import Path
-from nic_model_router import generate as nic_generate
+from nic_model_router import generate as nic_generate, generate_specialist as nic_specialist
 
 ROOT=Path(__file__).resolve().parents[1]
 OUTPUT_DIR=ROOT/"data/reports"; OUTPUT_DIR.mkdir(parents=True,exist_ok=True)
@@ -16,33 +16,55 @@ def load(name):
 def normalize(v): return v if isinstance(v,dict) else ({"summary":v} if isinstance(v,str) else {})
 
 def parse(text):
-    text=re.sub(r"^```(?:json)?\s*|\s*```$","",str(text or "").strip())
+    text=re.sub(r"^\`\`\`(?:json)?\s*|\s*\`\`\`$","",str(text or "").strip())
     v=json.loads(text)
     if not isinstance(v,dict): raise ValueError("non-object response")
     return v
 
 def decision_contract(preflight,publication,research,critique,draft,visual):
     selected=preflight.get("selected_opportunity") or {}
-    return {"schema_version":"nic-decision-contract-1.1","created_at":datetime.now(timezone.utc).isoformat(),"authority":"AUTHORITATIVE_DOWNSTREAM_GATES","evidence":{"selected_symbol":publication.get("symbol") or selected.get("symbol"),"selected_lane":selected.get("category") or selected.get("reason")},"thesis":{"summary":research.get("summary"),"strongest_signal":research.get("strongest_signal"),"opportunity_score":research.get("opportunity_score"),"counterpoint":critique.get("summary")},"editorial":{"category":draft.get("content_category"),"experiment_id":draft.get("experiment_id"),"generation_mode":draft.get("generation_mode")},"visual":{"type":visual.get("type","none"),"use_visual":bool(visual.get("use_visual")),"provider":visual.get("provider"),"purpose":visual.get("purpose")},"quality":{"draft_quality_score":draft.get("quality_score"),"private_reasoning_exposed":False,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"hard_invariants":["verified_evidence_only","no_private_chain_of_thought_publication","no_unsupported_claims","no_duplicate_thesis","no_gate_bypass"]}
+    return {"schema_version":"nic-decision-contract-1.2","created_at":datetime.now(timezone.utc).isoformat(),"authority":"AUTHORITATIVE_DOWNSTREAM_GATES","evidence":{"selected_symbol":publication.get("symbol") or selected.get("symbol"),"selected_lane":selected.get("category") or selected.get("reason")},"thesis":{"summary":research.get("summary"),"strongest_signal":research.get("strongest_signal"),"opportunity_score":research.get("opportunity_score"),"counterpoint":critique.get("summary")},"editorial":{"category":draft.get("content_category"),"experiment_id":draft.get("experiment_id"),"generation_mode":draft.get("generation_mode")},"visual":{"type":visual.get("type","none"),"use_visual":bool(visual.get("use_visual")),"provider":visual.get("provider"),"purpose":visual.get("purpose")},"quality":{"draft_quality_score":draft.get("quality_score"),"private_reasoning_exposed":False,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"hard_invariants":["verified_evidence_only","no_private_chain_of_thought_publication","no_unsupported_claims","no_duplicate_thesis","no_gate_bypass"]}
 
 def main():
     preflight=load("data/live/editorial_preflight.json"); publication=load("data/live/publication_context.json")
     context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json")}
     selected=preflight.get("selected_opportunity") or {}; instruction=os.getenv("TOPIC","").strip() or selected.get("instruction") or "Find the strongest evidence-based opportunity."
-    prompt="Return ONLY JSON with research, critique, draft and visual_plan. Use only supplied evidence. Do not invent facts. The draft must be finished publication copy and include one story-specific question.\n"+instruction+"\n"+json.dumps(context,ensure_ascii=False)[:50000]
+    base_prompt="Return ONLY JSON with research, critique, draft and visual_plan. Use only supplied evidence. Do not invent facts. The draft must be finished publication copy and include one story-specific question.\n"+instruction+"\n"+json.dumps(context,ensure_ascii=False)[:50000]
+    deep_research={}; research_meta={}
     try:
-        raw,meta=nic_generate(prompt,"You are a senior evidence-based editorial system. Never invent facts. Return valid JSON.")
+        deep_prompt="""Act as the NIC deep-research specialist. Analyze the supplied market/news/editorial evidence before another model writes the post.
+Return ONLY JSON with: verified_observations, cross_asset_links, causal_mechanisms, contradictions, missing_evidence, alternative_hypotheses, disconfirming_tests, research_priority, synthesis.
+Do not invent facts, prices, events, sources, or certainty. Treat every hypothesis as a hypothesis. Focus on what can be verified from the supplied evidence and what would falsify the leading interpretation.
+Do not reveal private chain-of-thought; provide concise public-safe evidence and conclusions only.
+""" + "\nTASK:\n" + instruction + "\nEVIDENCE:\n" + json.dumps(context,ensure_ascii=False)[:50000]
+        raw_research,research_meta=nic_specialist(deep_prompt,"You are NIC's deep-research specialist. Be rigorous, evidence-first, adversarial, and explicit about uncertainty.","nemotron")
+        deep_research=parse(raw_research)
+    except Exception as exc:
+        research_meta={"provider":"nemotron","status":"unavailable","error":type(exc).__name__}
+    enriched_context=dict(context)
+    if deep_research:
+        enriched_context["nemotron_deep_research"]=deep_research
+    prompt=base_prompt+"\nNEMOTRON DEEP-RESEARCH (use as analysis input, never as permission to invent facts):\n"+json.dumps(deep_research,ensure_ascii=False)[:30000]
+    try:
+        raw,meta=nic_generate(prompt,"You are a senior evidence-based editorial system. Use the supplied deep research as an input, verify it against the frozen evidence, never invent facts, and return valid JSON.")
         result=parse(raw); mode="NIC"
     except Exception as exc:
         result={"research":{"summary":"Generation failed; downstream gates must block publication."},"critique":{"summary":str(exc)},"draft":{"post":"","quality_score":0,"editorial_style":"blocked"},"visual_plan":{"type":"none","use_visual":False}}; meta={}; mode="BLOCKED"
     research=normalize(result.get("research")); critique=normalize(result.get("critique")); draft=normalize(result.get("draft")); visual=normalize(result.get("visual_plan"))
+    if deep_research:
+        research["deep_research_provider"]="nemotron"
+        research["deep_research_status"]="success"
+        research["deep_research_summary"]=deep_research.get("synthesis") or deep_research.get("research_priority")
+    else:
+        research["deep_research_provider"]="nemotron"
+        research["deep_research_status"]=research_meta.get("status","unavailable")
     draft["generation_mode"]=mode; draft["publication_status"]="DRAFT_ONLY_NOT_PUBLISHED"; draft.setdefault("quality_score",0); draft.setdefault("content_category",selected.get("category") or "market_opportunity")
     if not draft.get("post") and draft.get("text"): draft["post"]=str(draft["text"]).strip()
     allowed={"candlestick_chart","market_bar_chart","market_comparison","market_range_chart","news_timeline","text_card","none"}
     if visual.get("type") not in allowed: visual={"type":"none","use_visual":False}
-    report={"generated_at":datetime.now(timezone.utc).isoformat(),"model":meta.get("model"),"provider":meta.get("provider"),"research":research,"critique":critique,"draft":draft,"visual_plan":visual,"nic_decision_contract":decision_contract(preflight,publication,research,critique,draft,visual),"status":"DRAFT_ONLY_NOT_PUBLISHED","generation_mode":mode}
+    report={"generated_at":datetime.now(timezone.utc).isoformat(),"model":meta.get("model"),"provider":meta.get("provider"),"research":research,"deep_research":deep_research,"deep_research_meta":research_meta,"critique":critique,"draft":draft,"visual_plan":visual,"nic_decision_contract":decision_contract(preflight,publication,research,critique,draft,visual),"status":"DRAFT_ONLY_NOT_PUBLISHED","generation_mode":mode}
     slug=re.sub(r"[^a-z0-9]+","-",str(research.get("strongest_signal") or selected.get("category") or "market-opportunity").lower()).strip("-")[:80] or "market-opportunity"
     out=OUTPUT_DIR/f"{slug}-multi-agent.json"; out.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    print(json.dumps({"status":report["status"],"report":str(out.relative_to(ROOT)),"quality_score":draft.get("quality_score",0),"generation_mode":mode,"visual_type":visual.get("type","none")},indent=2))
+    print(json.dumps({"status":report["status"],"report":str(out.relative_to(ROOT)),"quality_score":draft.get("quality_score",0),"generation_mode":mode,"visual_type":visual.get("type","none"),"deep_research_provider":"nemotron","deep_research_status":research.get("deep_research_status")},indent=2))
 
 if __name__=="__main__": main()
