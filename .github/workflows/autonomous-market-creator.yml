@@ -188,7 +188,6 @@ jobs:
           if Path(files[0]).exists():
               s=json.loads(Path(files[0]).read_text())
               print("NIC_TELEMETRY_STATE", json.dumps({"symbol":s.get("symbol"),"direction":s.get("direction"),"evidence_score":s.get("evidence_score"),"hook_family":s.get("hook_family")}))
-          PY
       - name: NIC Live Activity Snapshot
         run: |
           python - <<'PY'
@@ -455,8 +454,7 @@ jobs:
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY }}
-          BINANCE_SQUARE_API_KEY: ${{ secrets.BINANCE_SQUARE_API_KEY }}
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
         run: python src/binance_square_publisher.py
       - name: Publish transparent NIC learning snapshot
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
