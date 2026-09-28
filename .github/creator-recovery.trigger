@@ -30,3 +30,6 @@ Nemotron deep-research activation: NIC now runs an optional Nemotron 3 Ultra res
 
 2026-09-28T07:10:00Z
 Repair validation: restored required editorial prompt contract while retaining Nemotron deep-research specialist.
+
+2026-09-28T07:12:00Z
+Publisher repair: wire Binance Square OpenAPI/API secrets into the final submission step.
