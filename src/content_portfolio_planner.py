@@ -1,11 +1,8 @@
-"""Bounded editorial portfolio planner.
-
-Selects a *treatment* for the next eligible post from recent publication
-metadata. It never selects an asset, invents evidence, overrides Signal-First,
-or bypasses any quality/production gate.
-"""
+"""Bounded editorial portfolio planner with thesis follow-up integration."""
 from __future__ import annotations
 import json
+import subprocess
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,15 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / "analytics/publication_log.jsonl"
 OUT = ROOT / "data/live/content_portfolio_plan.json"
 FOLLOW_UP = ROOT / "data/live/thesis_follow_up_opportunities.json"
+MEMORY = ROOT / "data/live/thesis_memory.json"
 
 TREATMENTS = (
-    "market_setup",
-    "breaking_news",
-    "world_macro",
-    "research_lesson",
-    "education",
-    "nic_learning_note",
-    "follow_up",
+    "market_setup", "breaking_news", "world_macro", "research_lesson",
+    "education", "nic_learning_note", "follow_up",
 )
 
 CATEGORY_MAP = {
@@ -36,9 +29,27 @@ CATEGORY_MAP = {
     "creator_signal_outcome": "nic_learning_note", "follow_up": "follow_up",
 }
 
+def run_upstream_memory():
+    """Ensure the lightweight thesis-memory bridge exists for this cycle.
+
+    These modules only create learning telemetry; they do not publish, trade, or
+    bypass Signal-First or production gates. Running them here makes the planner
+    resilient when the orchestrator has not yet wired the optional bridge steps.
+    """
+    commands = []
+    if not MEMORY.exists():
+        commands.append("src/thesis_memory_engine.py")
+    if not FOLLOW_UP.exists():
+        commands.append("src/thesis_follow_up_engine.py")
+    for script in commands:
+        result = subprocess.run([sys.executable, str(ROOT / script)], cwd=ROOT, text=True, capture_output=True)
+        if result.returncode != 0:
+            print(result.stdout)
+            print(result.stderr)
+            raise RuntimeError(f"NIC thesis bridge failed: {script}")
+
 def load_recent():
-    if not LOG.exists():
-        return []
+    if not LOG.exists(): return []
     rows=[]
     for line in LOG.read_text(encoding="utf-8").splitlines()[-40:]:
         try:
@@ -46,10 +57,8 @@ def load_recent():
             if isinstance(x,dict) and str(x.get("status") or "").upper() in {
                 "PUBLISHED_AUTONOMOUSLY","PUBLISHED_VERIFIED_BY_API_RESPONSE",
                 "VERIFIED_PUBLISHED","PUBLISHED_SUBMITTED_504"
-            }:
-                rows.append(x)
-        except Exception:
-            pass
+            }: rows.append(x)
+        except Exception: pass
     return rows[-20:]
 
 def load_follow_ups():
@@ -57,38 +66,32 @@ def load_follow_ups():
         data=json.loads(FOLLOW_UP.read_text(encoding="utf-8")) if FOLLOW_UP.exists() else {}
         rows=data.get("opportunities",[]) if isinstance(data,dict) else []
         return [x for x in rows if isinstance(x,dict) and x.get("eligibility")=="REQUIRES_NEW_VERIFIED_EVIDENCE_AND_MATERIALLY_NEW_PAYOFF"]
-    except Exception:
-        return []
+    except Exception: return []
 
 def category(row):
     for k in ("category","story_lane","lane","content_category"):
         v=str(row.get(k) or "").strip().lower()
-        if v:
-            return v
+        if v: return v
     return ""
 
 def main():
-    recent=load_recent()
-    follow_ups=load_follow_ups()
+    run_upstream_memory()
+    recent=load_recent(); follow_ups=load_follow_ups()
     mapped=[CATEGORY_MAP.get(category(x), "") for x in recent]
     counts=Counter(x for x in mapped if x)
     unused=[x for x in TREATMENTS if x not in counts]
     selected="follow_up" if follow_ups else (unused[0] if unused else min(TREATMENTS,key=lambda x:(counts[x],TREATMENTS.index(x))))
     selected_follow_up=follow_ups[0] if follow_ups else None
     plan={
-        "version":"1.1",
-        "generated_at":datetime.now(timezone.utc).isoformat(),
-        "status":"READY",
-        "selected_treatment":selected,
-        "recent_verified_publications":len(recent),
-        "recent_treatment_counts":dict(counts),
-        "thesis_follow_up":selected_follow_up,
+        "version":"1.2","generated_at":datetime.now(timezone.utc).isoformat(),"status":"READY",
+        "selected_treatment":selected,"recent_verified_publications":len(recent),
+        "recent_treatment_counts":dict(counts),"thesis_follow_up":selected_follow_up,
         "thesis_follow_up_candidates":len(follow_ups),
         "principles":{
-            "asset_selection_unchanged":True,"evidence_unchanged":True,
-            "signal_first_unchanged":True,"quality_gates_authoritative":True,
-            "no_private_chain_of_thought":True,"nic_learning_notes_use_only_recorded_lessons":True,
-            "world_news_requires_fresh_verified_source":True,"one_story_per_post":True,
+            "asset_selection_unchanged":True,"evidence_unchanged":True,"signal_first_unchanged":True,
+            "quality_gates_authoritative":True,"no_private_chain_of_thought":True,
+            "nic_learning_notes_use_only_recorded_lessons":True,"world_news_requires_fresh_verified_source":True,
+            "one_story_per_post":True,"thesis_follow_up_requires_fresh_evidence":True,
         },
         "treatment_contracts":{
             "market_setup":"chart-first conditional setup with trigger/invalidation",
@@ -104,4 +107,4 @@ def main():
     OUT.write_text(json.dumps(plan,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(plan,indent=2,ensure_ascii=False))
 
-if __name__=="__main__":main()
+if __name__=="__main__": main()
