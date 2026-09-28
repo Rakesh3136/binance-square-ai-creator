@@ -381,6 +381,14 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/mechanism_value_rewriter.py
+      - name: NIC Editorial Quality 3.0 reader-facing gate
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/nic_editorial_quality_gate.py
+          python -m json.tool data/live/nic_editorial_quality_gate.json >/dev/null
+
       - name: Activate Jev second-opinion gate
         id: jev
         continue-on-error: true
