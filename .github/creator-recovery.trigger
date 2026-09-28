@@ -21,3 +21,6 @@ Fix validator regex escaping: detect actual workflow Python commands and validat
 
 2026-09-28T01:20:00Z
 Repair validation: current main contains fixed self-training controller, multi-agent creator, thesis memory, thesis follow-up, and portfolio wiring; trigger a fresh autonomous end-to-end validation cycle.
+
+2026-09-28T06:35:00Z
+Nemotron integration validation: optional Nemotron 3 Ultra provider added to NIC router; keep disabled unless endpoint and key are configured, then validate full pipeline.
