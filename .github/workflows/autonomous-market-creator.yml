@@ -462,6 +462,12 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
         run: python src/binance_square_publisher.py
+      - name: Record 7-day Write-to-Earn publication outcome
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        run: |
+          python src/write_to_earn_7day_controller.py
+          python -m json.tool data/live/write_to_earn_7day_status.json >/dev/null
+          echo "WTE campaign status refreshed after publication attempt"
       - name: Publish transparent NIC learning snapshot
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         run: python src/nic_transparency_journal.py
