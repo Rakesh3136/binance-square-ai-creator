@@ -63,7 +63,9 @@ jobs:
           python -m pip install --no-cache-dir -r requirements.txt
       - name: Early code integrity check
         run: |
+          set -euo pipefail
           python -m compileall -q src
+          python -m py_compile src/thesis_memory_engine.py src/thesis_follow_up_engine.py src/content_portfolio_planner.py
           python src/pipeline_contract_validator.py
           python src/test_publisher_duplicate_telemetry.py
           python -m py_compile src/content_director_4.py src/signal_first_router.py src/discovery_queue.py src/content_portfolio_guard.py src/autonomous_cadence_6.py src/technical_enricher.py src/nic_transparency_journal.py src/content_portfolio_planner.py
@@ -156,6 +158,11 @@ jobs:
           python src/deep_coin_research_reporter.py
           python src/research_intelligence_layer.py
           python src/thesis_ledger.py
+          python -m json.tool data/intelligence/thesis_ledger.json >/dev/null
+          python src/thesis_memory_engine.py
+          python -m json.tool data/live/thesis_memory.json >/dev/null
+          python src/thesis_follow_up_engine.py
+          python -m json.tool data/live/thesis_follow_up_opportunities.json >/dev/null
           python src/creator_18_0_value_allocator.py
           python src/creator_19_0_self_improvement_v2.py
           python src/creator_portfolio_intelligence.py
