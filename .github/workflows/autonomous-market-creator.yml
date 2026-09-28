@@ -306,8 +306,13 @@ jobs:
           GEMINI_MODEL: gemini-3.6-flash
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-6-astra
-          NIC_EXTERNAL_MODELS: 'false'
-          NIC_PROVIDER_ORDER: ''
+          NEMOTRON_API_KEY: ${{ secrets.NEMOTRON_API_KEY }}
+          NEMOTRON_API_URL: https://integrate.api.nvidia.com/v1
+          NEMOTRON_MODEL: nvidia/nemotron-3-ultra-550b-a55b
+          NEMOTRON_ENABLE_THINKING: 'true'
+          NEMOTRON_MAX_TOKENS: '12000'
+          NIC_EXTERNAL_MODELS: 'true'
+          NIC_PROVIDER_ORDER: 'nemotron,gemini,openai,claude'
           TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           python src/script_director_4.py
