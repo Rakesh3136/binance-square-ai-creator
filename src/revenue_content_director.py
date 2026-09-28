@@ -24,6 +24,7 @@ OUTCOMES = ANALYTICS / "creator_7_2_outcomes.jsonl"
 EXPERIMENT = ANALYTICS / "creator_7_4_experiment_plan.json"
 FEEDBACK = LIVE / "creator_8_4_monetization_feedback.json"
 REVENUE = ANALYTICS / "creator_8_0_monetization_engine.json"
+REWARD_EVENTS = ANALYTICS / "wte_reward_events.jsonl"
 OUT = LIVE / "revenue_content_director.json"
 REPORT = INTEL / "revenue_content_director_report.json"
 
@@ -104,6 +105,11 @@ def engagement(row):
 def merge_rows():
     attr = {pid(x): x for x in load_jsonl(ATTRIBUTION) if pid(x)}
     perf = load_jsonl(PERFORMANCE)
+    rewards = {}
+    for event in load_jsonl(REWARD_EVENTS):
+        post_id = pid(event)
+        if post_id and event.get("verified") is True and event.get("reward_amount_usdc") is not None:
+            rewards[post_id] = event
     outcomes = defaultdict(list)
     for x in load_jsonl(OUTCOMES):
         if pid(x):
@@ -115,6 +121,12 @@ def merge_rows():
         if not post or post not in attr:
             continue
         merged_row = {**attr[post], **row}
+        reward = rewards.get(post)
+        if reward is not None:
+            merged_row["revenue_verified"] = True
+            merged_row["verified_revenue"] = True
+            merged_row["verified_revenue_amount"] = reward.get("reward_amount_usdc")
+            merged_row["reward_event_source"] = reward.get("source")
         # Metadata must originate from publication attribution; performance can
         # update numeric observations without replacing identity.
         merged_row["_post_id"] = post
@@ -240,7 +252,7 @@ def main():
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(director, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     REPORT.write_text(json.dumps({
-        "version": "1.0",
+        "version": "2.0",
         "status": director["status"],
         "attributed_performance_rows": len(rows),
         "repeated_observations": len(observations),
@@ -249,7 +261,7 @@ def main():
     }, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({
         "status": director["status"],
-        "version": "1.0",
+        "version": "2.0",
         "attributed_performance_rows": len(rows),
         "repeated_observations": len(observations),
         "monetized_observation_groups": len(monetized),
