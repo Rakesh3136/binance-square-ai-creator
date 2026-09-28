@@ -33,3 +33,6 @@ Repair validation: restored required editorial prompt contract while retaining N
 
 2026-09-28T07:12:00Z
 Publisher repair: wire Binance Square OpenAPI/API secrets into the final submission step.
+
+2026-09-28T13:15:00+05:30
+Final publisher validation: normalize Binance Square credential fallback and verify end-to-end authenticated submission without exposing secret values.
