@@ -7,6 +7,35 @@ from nic_model_router import generate as nic_generate, generate_specialist as ni
 ROOT=Path(__file__).resolve().parents[1]
 OUTPUT_DIR=ROOT/"data/reports"; OUTPUT_DIR.mkdir(parents=True,exist_ok=True)
 
+EDITORIAL_RULES = r"""
+NEWS MODE:
+- If the selected lane is news-driven, distinguish the reported event from NIC's interpretation.
+- Never turn an unverified headline, rumor, or social claim into a fact.
+- Prefer primary/frozen evidence supplied in the context.
+
+TECHNICAL MODE:
+- Any technical claim must be tied to supplied market evidence such as price structure, volume, range, levels, trend, momentum, or other explicitly provided measurements.
+- Do not invent indicators, support/resistance levels, targets, or numerical values.
+
+EXACTLY ONE QUESTION RULE:
+- The finished post must contain exactly ONE story-specific question.
+- The question must arise from the actual thesis or uncertainty, not be generic engagement bait.
+
+ANTI-SLOP PHRASES TO AVOID:
+- Avoid generic filler, motivational clichés, empty market commentary, repeated hooks, unsupported certainty, fake urgency, and generic calls to action.
+- Every paragraph must add concrete information or interpretation.
+
+Return ONLY valid JSON:
+- The model response must be one JSON object with research, critique, draft, and visual_plan.
+- No markdown fence, preamble, or commentary outside the JSON object.
+
+FINISHED-POST CONTRACT:
+- draft.post must be finished publication copy, not notes or instructions.
+- Use only supplied evidence and preserve uncertainty where evidence is incomplete.
+- The post should be concise, original, useful, and materially different from recent content.
+"""
+
+
 def load(name):
     p=ROOT/name
     try:
@@ -29,7 +58,7 @@ def main():
     preflight=load("data/live/editorial_preflight.json"); publication=load("data/live/publication_context.json")
     context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json")}
     selected=preflight.get("selected_opportunity") or {}; instruction=os.getenv("TOPIC","").strip() or selected.get("instruction") or "Find the strongest evidence-based opportunity."
-    base_prompt="Return ONLY JSON with research, critique, draft and visual_plan. Use only supplied evidence. Do not invent facts. The draft must be finished publication copy and include one story-specific question.\n"+instruction+"\n"+json.dumps(context,ensure_ascii=False)[:50000]
+    base_prompt=EDITORIAL_RULES+"\nTASK:\n"+instruction+"\nEVIDENCE:\n"+json.dumps(context,ensure_ascii=False)[:50000]
     deep_research={}; research_meta={}
     try:
         deep_prompt="""Act as the NIC deep-research specialist. Analyze the supplied market/news/editorial evidence before another model writes the post.
@@ -46,7 +75,7 @@ Do not reveal private chain-of-thought; provide concise public-safe evidence and
         enriched_context["nemotron_deep_research"]=deep_research
     prompt=base_prompt+"\nNEMOTRON DEEP-RESEARCH (use as analysis input, never as permission to invent facts):\n"+json.dumps(deep_research,ensure_ascii=False)[:30000]
     try:
-        raw,meta=nic_generate(prompt,"You are a senior evidence-based editorial system. Use the supplied deep research as an input, verify it against the frozen evidence, never invent facts, and return valid JSON.")
+        raw,meta=nic_generate(prompt,"You are a senior evidence-based editorial system. Apply every EDITORIAL_RULES requirement, use the supplied deep research as an input, verify it against the frozen evidence, never invent facts, and return valid JSON.")
         result=parse(raw); mode="NIC"
     except Exception as exc:
         result={"research":{"summary":"Generation failed; downstream gates must block publication."},"critique":{"summary":str(exc)},"draft":{"post":"","quality_score":0,"editorial_style":"blocked"},"visual_plan":{"type":"none","use_visual":False}}; meta={}; mode="BLOCKED"
