@@ -24,3 +24,6 @@ Repair validation: current main contains fixed self-training controller, multi-a
 
 2026-09-28T06:35:00Z
 Nemotron integration validation: optional Nemotron 3 Ultra provider added to NIC router; keep disabled unless endpoint and key are configured, then validate full pipeline.
+
+2026-09-28T07:00:00Z
+Nemotron deep-research activation: NIC now runs an optional Nemotron 3 Ultra research pass before editorial generation; provider fallback remains deterministic/gated.
