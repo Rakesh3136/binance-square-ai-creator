@@ -110,10 +110,45 @@ def _gemini(prompt: str, system: str) -> str:
     return text
 
 
+def _nemotron(prompt: str, system: str) -> str:
+    """Optional OpenAI-compatible Nemotron reasoning endpoint."""
+    key = os.getenv("NEMOTRON_API_KEY", "").strip()
+    url = os.getenv("NEMOTRON_API_URL", "").strip()
+    model = os.getenv("NEMOTRON_MODEL", "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4")
+    if not key:
+        raise RuntimeError("NEMOTRON_API_KEY unavailable")
+    if not url:
+        raise RuntimeError("NEMOTRON_API_URL unavailable")
+    data = _post_json(
+        url.rstrip("/") + "/v1/chat/completions",
+        {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+            "chat_template_kwargs": {
+                "enable_thinking": os.getenv("NEMOTRON_ENABLE_THINKING", "true").strip().lower() in {"1", "true", "yes", "on"},
+                "force_nonempty_content": True,
+            },
+            "temperature": float(os.getenv("NEMOTRON_TEMPERATURE", "0.2")),
+        },
+        {"Authorization": f"Bearer {key}"},
+        timeout=int(os.getenv("NEMOTRON_TIMEOUT", "120")),
+    )
+    choices = data.get("choices") or []
+    message = choices[0].get("message") if choices and isinstance(choices[0], dict) else {}
+    text = str((message or {}).get("content") or "").strip()
+    if not text:
+        raise RuntimeError("Nemotron returned empty output")
+    return text
+
+
 CALLERS: dict[str, Callable[[str, str], str]] = {
     "claude": _claude,
     "gemini": _gemini,
     "openai": _openai,
+    "nemotron": _nemotron,
 }
 
 
@@ -141,6 +176,7 @@ def generate(prompt: str, system: str) -> tuple[str, dict]:
                     "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
                     "gemini": os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
                     "openai": os.getenv("OPENAI_MODEL", "gpt-6-astra"),
+                    "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4"),
                 }.get(provider),
             }
         except Exception as exc:
@@ -162,11 +198,13 @@ def status() -> dict:
             "claude": bool(os.getenv("ANTHROPIC_API_KEY")),
             "gemini": bool(os.getenv("GEMINI_API_KEY")),
             "openai": bool(os.getenv("OPENAI_API_KEY")),
+            "nemotron": bool(os.getenv("NEMOTRON_API_KEY") and os.getenv("NEMOTRON_API_URL")),
         },
         "models": {
             "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
             "gemini": os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
             "openai": os.getenv("OPENAI_MODEL", "gpt-6-astra"),
+            "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4"),
         },
         "authority": "deterministic_market_contract_and_quality_gates",
     }
