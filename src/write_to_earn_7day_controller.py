@@ -25,13 +25,13 @@ PUB=AN/"publication_log.jsonl"
 PERF=AN/"square_performance.jsonl"
 
 LANES=[
-    ("market_setup","Market setup with one clear mechanism and invalidation."),
-    ("asset_deep_dive","Single-asset research: flows, structure, catalysts and risks."),
-    ("news_impact","Verified news -> mechanism -> affected asset(s), with uncertainty."),
-    ("data_investigation","Data-driven comparison or anomaly with a concrete reader takeaway."),
-    ("contrarian_thesis","Evidence-backed alternative interpretation with a falsification test."),
-    ("outcome_accountability","Follow-up on a previous thesis using newly verified evidence."),
-    ("weekly_synthesis","Seven-day synthesis: what changed, what held, what failed, next test."),
+    ("market_setup","Chart-first market setup with one clear mechanism, confirmation and invalidation."),
+    ("data_investigation","Investigate one unusual relationship or anomaly and explain why it matters."),
+    ("news_impact","Verified fresh event -> market mechanism -> observable response, with uncertainty."),
+    ("asset_comparison","Compare two evidence-supported assets or market paths and expose the trade-off."),
+    ("contrarian_thesis","Test the obvious interpretation against contrary evidence with a falsification condition."),
+    ("outcome_accountability","Revisit a prior thesis only with fresh evidence and state exactly what changed."),
+    ("weekly_synthesis","Synthesize verified weekly observations and define the next measurable test."),
 ]
 
 def load(path, default):
