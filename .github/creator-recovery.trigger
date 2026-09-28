@@ -27,3 +27,6 @@ Nemotron integration validation: optional Nemotron 3 Ultra provider added to NIC
 
 2026-09-28T07:00:00Z
 Nemotron deep-research activation: NIC now runs an optional Nemotron 3 Ultra research pass before editorial generation; provider fallback remains deterministic/gated.
+
+2026-09-28T07:10:00Z
+Repair validation: restored required editorial prompt contract while retaining Nemotron deep-research specialist.
