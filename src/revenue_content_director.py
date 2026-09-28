@@ -30,7 +30,7 @@ REPORT = INTEL / "revenue_content_director_report.json"
 REVENUE_FLAGS = ("revenue_verified", "verified_revenue", "earnings_verified", "verified_earnings")
 REVENUE_VALUES = ("revenue_amount", "verified_revenue_amount", "earnings_amount", "verified_earnings_amount", "revenue", "earnings")
 CONVERSION_KEYS = ("verified_conversions", "conversions_verified", "verified_conversion_count")
-DIMENSIONS = ("category", "format", "hook_type", "visual_type", "story_lane", "signal_type", "experiment_id")
+DIMENSIONS = ("content_lane", "format", "hook_type", "visual_type", "reader_payoff_type", "experiment_id")
 
 
 def load_json(path: Path, default):
@@ -185,7 +185,7 @@ def main():
     tested = observations[:8]
 
     director = {
-        "version": "1.0",
+        "version": "2.0",
         "generated_at": now,
         "status": "READY" if rows else "COLLECTING_DATA",
         "verified_data_policy": {
@@ -217,7 +217,7 @@ def main():
             ],
         },
         "monetization_content_contract": {
-            "preferred_lane": "signal_first_prediction_when_a_real_verified_setup_exists",
+            "preferred_lane": "use_the_nic_os_selected_lane_when_the_naturally_selected_opportunity_supports_it",
             "required_elements_for_trade_setup": ["symbol", "direction", "entry_or_trigger", "tp1", "tp2", "sl", "invalidation"],
             "cashtag_policy": "Use the exact asset cashtag/trading surface when supported by the publication contract; never fabricate a link or widget.",
             "cta_policy": "Invite readers to review the setup/evidence; never promise profit or pressure trading.",
@@ -226,7 +226,7 @@ def main():
         },
         "experiment_policy": {
             "one_primary_editorial_variable": True,
-            "reuse_existing_creator_7_4_experiment": True,
+            "reuse_existing_creator_7_4_experiment": True,"persist_nic_os_lineage": True,
             "replicate_before_promoting": True,
             "minimum_repeated_samples": 3,
             "revenue_is_secondary_evidence": True,
