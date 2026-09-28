@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]; AN=ROOT/"analytics"; LIVE=ROOT/"data/live"; INTEL=ROOT/"data/intelligence"
-ATTR=AN/"publication_attribution.jsonl"; PERF=AN/"square_performance.jsonl"; OUT=LIVE/"nic_revenue_pattern_lab.json"; REPORT=INTEL/"nic_revenue_pattern_lab_report.json"
+ATTR=AN/"publication_attribution.jsonl"; PERF=AN/"square_performance.jsonl"; REWARD_EVENTS=AN/"wte_reward_events.jsonl"; OUT=LIVE/"nic_revenue_pattern_lab.json"; REPORT=INTEL/"nic_revenue_pattern_lab_report.json"
 def rows(p):
     out=[]
     if p.exists():
@@ -27,12 +27,16 @@ def num(x,*ks):
     return 0.0
 def main():
     attrs={pid(x):x for x in rows(ATTR) if pid(x)}; perf={pid(x):x for x in rows(PERF) if pid(x)}
+    rewards={pid(x):x for x in rows(REWARD_EVENTS) if pid(x) and x.get("verified") is True and x.get("reward_amount_usdc") is not None}
     groups=defaultdict(lambda:{"posts":0,"views":0.0,"engagement":0.0,"verified_revenue":0.0,"verified_posts":0})
     for p,a in attrs.items():
         k=(str(a.get("content_lane") or a.get("category") or "unknown"),str(a.get("content_format") or a.get("format") or "unknown"),str(a.get("hook_type") or a.get("content_family") or "unknown"))
         g=groups[k]; g["posts"]+=1; r=perf.get(p,{})
         g["views"]+=num(r,"views","view_count","impressions"); g["engagement"]+=num(r,"likes","like_count")+2*num(r,"comments","reply_count")+3*num(r,"shares","share_count")
-        if a.get("revenue_verified") is True:
+        reward=rewards.get(p)
+        if reward is not None:
+            g["verified_posts"]+=1; g["verified_revenue"]+=max(0,num(reward,"reward_amount_usdc"))
+        elif a.get("revenue_verified") is True:
             g["verified_posts"]+=1; g["verified_revenue"]+=max(0,num(a,"revenue_amount","verified_revenue_amount","earnings_amount"))
     observations=[]
     for (cat,fmt,fam),g in groups.items():
