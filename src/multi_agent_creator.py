@@ -56,7 +56,7 @@ def decision_contract(preflight,publication,research,critique,draft,visual):
 
 def main():
     preflight=load("data/live/editorial_preflight.json"); publication=load("data/live/publication_context.json")
-    context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json")}
+    context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json"),"wte_strategy":load("data/live/wte_high_level_intelligence.json"),"wte_7day":load("data/live/write_to_earn_7day_status.json")}
     selected=preflight.get("selected_opportunity") or {}; instruction=os.getenv("TOPIC","").strip() or selected.get("instruction") or "Find the strongest evidence-based opportunity."
     base_prompt=EDITORIAL_RULES+"\nTASK:\n"+instruction+"\nEVIDENCE:\n"+json.dumps(context,ensure_ascii=False)[:50000]
     deep_research={}; research_meta={}
@@ -73,7 +73,7 @@ Do not reveal private chain-of-thought; provide concise public-safe evidence and
     enriched_context=dict(context)
     if deep_research:
         enriched_context["nemotron_deep_research"]=deep_research
-    prompt=base_prompt+"\nNEMOTRON DEEP-RESEARCH (use as analysis input, never as permission to invent facts):\n"+json.dumps(deep_research,ensure_ascii=False)[:30000]
+    prompt=base_prompt+"\nHIGH-LEVEL WTE STRATEGY (advisory only; deterministic gates remain authoritative):\n"+json.dumps(enriched_context.get("wte_strategy",{}),ensure_ascii=False)[:16000]+"\nWTE 7-DAY STATE:\n"+json.dumps(enriched_context.get("wte_7day",{}),ensure_ascii=False)[:8000]+"\nNEMOTRON DEEP-RESEARCH (use as analysis input, never as permission to invent facts):\n"+json.dumps(deep_research,ensure_ascii=False)[:30000]
     try:
         raw,meta=nic_generate(prompt,"You are a senior evidence-based editorial system. Apply every EDITORIAL_RULES requirement, use the supplied deep research as an input, verify it against the frozen evidence, never invent facts, and return valid JSON.")
         result=parse(raw); mode="NIC"
