@@ -36,3 +36,6 @@ Publisher repair: wire Binance Square OpenAPI/API secrets into the final submiss
 
 2026-09-28T13:15:00+05:30
 Final publisher validation: normalize Binance Square credential fallback and verify end-to-end authenticated submission without exposing secret values.
+
+2026-09-28T14:00:00Z
+WTE 7-day campaign controller activation: track verified daily publications, varied content lanes, and outcome learning without inferring revenue or bypassing quality gates.
