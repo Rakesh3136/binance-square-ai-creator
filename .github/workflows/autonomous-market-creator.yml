@@ -500,6 +500,14 @@ jobs:
           python -m json.tool data/live/nic_attribution_intelligence_7.json >/dev/null
           python -m json.tool data/intelligence/nic_attribution_intelligence_7_report.json >/dev/null
 
+      - name: Build NIC Adaptive Content Portfolio 8.0
+        run: |
+          python -m py_compile src/nic_adaptive_content_portfolio_8.py
+          python tests/test_nic_adaptive_content_portfolio_8.py
+          python src/nic_adaptive_content_portfolio_8.py
+          python -m json.tool data/live/nic_adaptive_content_portfolio_8.json >/dev/null
+          python -m json.tool data/intelligence/nic_adaptive_content_portfolio_8_report.json >/dev/null
+
       - name: Record NIC Monetization OS publication outcome
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         run: |
