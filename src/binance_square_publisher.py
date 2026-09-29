@@ -451,8 +451,6 @@ def main() -> int:
         "campaign_day": row["campaign_day"],
         "content_lane": row["content_lane"],
         "content_format": row["content_format"],
-        "craft_id": row["craft_id"],
-        "craft_pattern": row["craft_pattern"],
         "hook_type": row["hook_type"],
         "visual_type": row["visual_type"],
         "reader_payoff_type": row["reader_payoff_type"],
