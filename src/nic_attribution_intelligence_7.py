@@ -50,10 +50,15 @@ def reward_map():
     out={}
     for e in load_jsonl(REWARDS):
         p=pid(e)
-        if not p or e.get("verified") is not True or e.get("reward_amount_usdc") is None: continue
+        if not p or e.get("verified") is not True or e.get("reward_amount_usdc") is None:
+            continue
         amount=num(e,"reward_amount_usdc")
-        if amount is not None and amount>=0:
-            out[p]=e
+        if amount is None or amount < 0:
+            continue
+        bucket=out.setdefault(p, {"amount": 0.0, "events": 0, "last": e})
+        bucket["amount"] += amount
+        bucket["events"] += 1
+        bucket["last"] = e
     return out
 
 def stable_id(post_id, recorded_at):
@@ -68,9 +73,11 @@ def main():
     for post,a in attrs.items():
         p=perf.get(post,{})
         e=rewards.get(post)
-        reward=num(e,"reward_amount_usdc") if e else None
-        if e is not None:
+        reward=round(float(e["amount"]),8) if e else None
+        if e is not None and reward > 0:
             outcome="VERIFIED_REWARD"
+        elif e is not None and reward == 0:
+            outcome="VERIFIED_NO_REWARD"
         else:
             # Publication/performance can be known without any reward telemetry.
             # This is deliberately UNKNOWN, never VERIFIED_NO_REWARD.
@@ -101,8 +108,9 @@ def main():
             },
             "outcome_state":outcome,
             "verified_reward_usdc":reward,
-            "reward_source":e.get("source") if e else None,
-            "reward_event_verified_at":e.get("observed_at") if e else None,
+            "reward_source":e["last"].get("source") if e else None,
+            "reward_event_verified_at":e["last"].get("observed_at") if e else None,
+            "verified_reward_event_count":e["events"] if e else 0,
             "evidence_policy":"explicit_reward_only; missing_reward_is_unknown",
         })
     rows.sort(key=lambda x:str(x.get("published_at") or ""))
@@ -130,6 +138,7 @@ def main():
       "summary":{
         "attributed_posts":len(rows),
         "verified_reward_posts":sum(r["outcome_state"]=="VERIFIED_REWARD" for r in rows),
+        "verified_no_reward_posts":sum(r["outcome_state"]=="VERIFIED_NO_REWARD" for r in rows),
         "unknown_reward_posts":sum(r["outcome_state"]=="UNKNOWN" for r in rows),
         "verified_reward_total_usdc":round(sum(float(r["verified_reward_usdc"] or 0) for r in rows),8),
       },
