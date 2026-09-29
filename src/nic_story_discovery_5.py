@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data/live/nic_story_discovery.json"
+PORTFOLIO = ROOT / "data/live/nic_adaptive_content_portfolio_8.json"
 
 def load(name):
     p = ROOT / "data/live" / name
@@ -26,6 +27,7 @@ def main():
     monetization = load("nic_monetization_contract.json")
     portfolio = load("content_portfolio_plan.json")
     attribution = load("nic_attribution_intelligence_7.json")
+    portfolio8 = load("nic_adaptive_content_portfolio_8.json")
 
     symbol = text(context.get("symbol") or strategy.get("symbol")).upper().replace("USDT", "").replace("$", "")
     evidence = []
@@ -84,7 +86,7 @@ def main():
         score += min(2, verified_lanes.get(lane, 0))
         scored.append({"lane": lane, "score": score})
 
-    scored.sort(key=lambda item: (item["score"], item["lane"]), reverse=True)
+    portfolio_scores = {str(x.get("lane")): float(x.get("target_share") or 0) for x in portfolio8.get("allocations", []) or []}\n    for item in scored:\n        item["portfolio_target_share"] = portfolio_scores.get(item["lane"], 0.0)\n        item["score"] += min(0.5, item["portfolio_target_share"] * 5.0)\n    scored.sort(key=lambda item: (item["score"], item["lane"]), reverse=True)
     selected = scored[0]
     fingerprint = "|".join(x["text"] for x in evidence[:10])
     story_id = "story5-" + hashlib.sha256(f"{symbol}|{selected['lane']}|{fingerprint}".encode()).hexdigest()[:16]
@@ -105,6 +107,7 @@ def main():
         "attribution_learning": {
             "verified_reward_lane_count": verified_lanes.get(selected["lane"], 0),
             "bounded_tiebreaker": True,
+            "portfolio_8_target_share": portfolio_scores.get(selected["lane"], 0.0),
             "unknown_does_not_reduce_score": True,
         },
         "created_at": datetime.now(timezone.utc).isoformat(),
