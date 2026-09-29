@@ -20,6 +20,7 @@ CONTEXT_PATH = LIVE / "publication_context.json"
 FROZEN_PATH = LIVE / "authoritative_opportunity.json"
 WTE_PATH = LIVE / "write_to_earn_eligibility.json"
 MONETIZATION_OS_PATH = LIVE / "nic_monetization_contract.json"
+STORY_DISCOVERY_PATH = LIVE / "nic_story_discovery.json"
 ATTRIBUTION_LOG_PATH = ANALYTICS / "publication_attribution.jsonl"
 VISUAL = LIVE / "visual.png"
 ENDPOINT = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
@@ -224,6 +225,7 @@ def main() -> int:
         context = load(CONTEXT_PATH)
         frozen = load(FROZEN_PATH)
         monetization_os = load(MONETIZATION_OS_PATH)
+        story_discovery = load(STORY_DISCOVERY_PATH)
         symbol = clean_symbol(
             context.get("symbol")
             or context.get("primary_symbol")
@@ -394,8 +396,8 @@ def main() -> int:
             or (frozen.get("prediction") or {}).get("direction")
             or ""
         ).upper(),
-        "story_id": str(context.get("story_id") or (context.get("story_discovery") or {}).get("story_id") or monetization_os.get("story_id") or ""),
-        "story_type": str(context.get("story_type") or (context.get("story_discovery") or {}).get("story_kind") or context.get("story_kind") or ""),
+        "story_id": str(context.get("story_id") or (context.get("story_discovery") or {}).get("story_id") or story_discovery.get("story_id") or monetization_os.get("story_id") or ""),
+        "story_type": str(context.get("story_type") or (context.get("story_discovery") or {}).get("story_kind") or story_discovery.get("story_kind") or context.get("story_kind") or ""),
         "experiment_id": str(monetization_os.get("experiment_id") or context.get("experiment_id") or frozen.get("experiment_id") or ""),
         "campaign_day": monetization_os.get("campaign_day"),
         "content_lane": str(monetization_os.get("content_lane") or context.get("content_lane") or category),
