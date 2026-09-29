@@ -37,22 +37,31 @@ def main():
             "symbol":"HBAR","story_id":"story5-demo2","content_lane":"market_setup"
         }])
         write_jsonl(nia.PERF,[{"post_id":"abc_123","views":1000,"likes":10,"comments":2}])
-        write_jsonl(nia.REWARDS,[{"post_id":"abc_123","verified":True,"reward_amount_usdc":1.25,"source":"verified_test"}])
+        write_jsonl(nia.REWARDS,[{"post_id":"abc_123","verified":True,"reward_amount_usdc":1.25,"source":"verified_test"},{"post_id":"abc_123","verified":True,"reward_amount_usdc":0.25,"source":"verified_test_2"}])
         nia.main()
         state=json.loads(nia.OUT.read_text())
         rows={x["post_id"]:x for x in state["posts"]}
         assert rows["abc_123"]["outcome_state"]=="VERIFIED_REWARD"
-        assert rows["abc_123"]["verified_reward_usdc"]==1.25
+        assert rows["abc_123"]["verified_reward_usdc"]==1.5
+        assert rows["abc_123"]["verified_reward_event_count"]==2
         assert rows["abc_123"]["performance"]["views"]==1000
         assert rows["no_reward"]["outcome_state"]=="UNKNOWN"
         assert rows["no_reward"]["verified_reward_usdc"] is None
-        assert state["summary"]["verified_reward_total_usdc"]==1.25
+        assert state["summary"]["verified_reward_total_usdc"]==1.5
         # Running twice must not duplicate durable attribution events.
         nia.main()
         ledger=nia.LEDGER.read_text().splitlines()
         assert len(ledger)==2, ledger
 
-        # A reward-looking performance metric can never become revenue.
+        # An explicit verified zero is distinct from missing telemetry.
+        write_jsonl(nia.REWARDS,[{"post_id":"no_reward","verified":True,"reward_amount_usdc":0,"source":"verified_zero"}])
+        nia.main()
+        state=json.loads(nia.OUT.read_text())
+        rows={x["post_id"]:x for x in state["posts"]}
+        assert rows["no_reward"]["outcome_state"]=="VERIFIED_NO_REWARD"
+        assert rows["no_reward"]["verified_reward_usdc"]==0
+
+        # An unverified reward-looking event must remain UNKNOWN.
         write_jsonl(nia.REWARDS,[{"post_id":"no_reward","verified":False,"reward_amount_usdc":999}])
         nia.main()
         state=json.loads(nia.OUT.read_text())
