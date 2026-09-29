@@ -13,13 +13,13 @@ CONTRACT=ROOT/"data/live/nic_monetization_contract.json"
 OUT=ROOT/"data/live/nic_editorial_quality_gate.json"
 CONVERSION_OUT=ROOT/"data/live/nic_conversion_contract.json"
 INTERNAL_PATTERNS=[
-    r"(?im)^\\s*(?:attention|quality|engagement|opportunity|editorial)\\s+score\\s*[:=]\\s*[^\\n]+\\n?",
-    r"(?im)^\\s*(?:experiment|campaign|cycle)\\s*(?:id|day)?\\s*[:=]\\s*[^\\n]+\\n?",
-    r"(?im)^\\s*(?:generation_mode|content_lane|reader_payoff_type|hook_type)\\s*[:=]\\s*[^\\n]+\\n?",
+    r"(?im)^\s*(?:attention|quality|engagement|opportunity|editorial)\s+score\s*[:=]\s*[^\n]+\n?",
+    r"(?im)^\s*(?:experiment|campaign|cycle)\s*(?:id|day)?\s*[:=]\s*[^\n]+\n?",
+    r"(?im)^\s*(?:generation_mode|content_lane|reader_payoff_type|hook_type)\s*[:=]\s*[^\n]+\n?",
 ]
-GENERIC_OPENERS=[r"^For \\$?[A-Z0-9]{2,15}, that matters because",r"^\\$?[A-Z0-9]{2,15} is moving, but the useful signal is",r"^The \\$?[A-Z0-9]{2,15} move is easy to see\\."]
-TRADE_PRESSURE=re.compile(r"\\b(buy now|sell now|guaranteed|guarantee|100%|can't lose|must buy|must sell|urgent)\\b",re.I)
-ACTION_WORDS=re.compile(r"\\b(inspect|check|compare|watch|verify|track|review|monitor|see|look|test|confirm)\\b",re.I)
+GENERIC_OPENERS=[r"^For \$?[A-Z0-9]{2,15}, that matters because",r"^\$?[A-Z0-9]{2,15} is moving, but the useful signal is",r"^The \$?[A-Z0-9]{2,15} move is easy to see\."]
+TRADE_PRESSURE=re.compile(r"\b(buy now|sell now|guaranteed|guarantee|100%|can't lose|must buy|must sell|urgent)\b",re.I)
+ACTION_WORDS=re.compile(r"\b(inspect|check|compare|watch|verify|track|review|monitor|see|look|test|confirm)\b",re.I)
 def load_json(p):
     try:
         x=json.loads(p.read_text(encoding="utf-8")); return x if isinstance(x,dict) else {}
@@ -32,7 +32,7 @@ def resolve():
 def clean(text):
     text=str(text or "").strip()
     for pat in INTERNAL_PATTERNS: text=re.sub(pat,"",text)
-    return re.sub(r"\\n{3,}","\\n\\n",text).strip()
+    return re.sub(r"\n{3,}","\n\n",text).strip()
 def main():
     path=resolve(); report=load_json(path); draft=report.get("draft") if isinstance(report.get("draft"),dict) else {}
     text=str(draft.get("post") or draft.get("text") or "").strip()
@@ -41,8 +41,8 @@ def main():
     if not text: raise SystemExit("NIC editorial gate: internal-only draft")
     contract=load_json(CONTRACT); lane=str(contract.get("content_lane") or draft.get("content_lane") or "market_setup")
     asset=str(contract.get("asset") or draft.get("asset") or draft.get("symbol") or "").upper().replace("USDT","").replace("$","")
-    asset_ok=bool(asset and re.search(r"\\$"+re.escape(asset)+r"\\b",text,re.I))
-    opener=text.split("\\n\\n",1)[0]; generic=any(re.search(p,opener,re.I) for p in GENERIC_OPENERS)
+    asset_ok=bool(asset and re.search(r"\$"+re.escape(asset)+r"\b",text,re.I))
+    opener=text.split("\n\n",1)[0]; generic=any(re.search(p,opener,re.I) for p in GENERIC_OPENERS)
     if text.count("?")>1:
         last=text.rfind("?"); text=text[:last].replace("?"," .")+text[last:]
     action_signal=bool(ACTION_WORDS.search(text))
