@@ -495,6 +495,7 @@ jobs:
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         run: |
           python -m py_compile src/nic_attribution_intelligence_7.py
+          python tests/test_nic_attribution_intelligence_7.py
           python src/nic_attribution_intelligence_7.py
           python -m json.tool data/live/nic_attribution_intelligence_7.json >/dev/null
           python -m json.tool data/intelligence/nic_attribution_intelligence_7_report.json >/dev/null
