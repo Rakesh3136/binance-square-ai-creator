@@ -491,6 +491,14 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
         run: python src/binance_square_publisher.py
+      - name: Build NIC Adaptive Content Portfolio 8.0
+        run: |
+          python -m py_compile src/nic_adaptive_content_portfolio_8.py
+          python tests/test_nic_adaptive_content_portfolio_8.py
+          python src/nic_adaptive_content_portfolio_8.py
+          python -m json.tool data/live/nic_adaptive_content_portfolio_8.json >/dev/null
+          python -m json.tool data/intelligence/nic_adaptive_content_portfolio_8_report.json >/dev/null
+
       - name: Build NIC Attribution Intelligence 7.0
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         run: |
