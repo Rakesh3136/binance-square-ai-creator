@@ -19,6 +19,10 @@ jobs:
       - name: Validate and build monetization ledger
         run: |
           python -m compileall -q src
+          python tests/test_nic_attribution_intelligence_7.py
+          python src/nic_attribution_intelligence_7.py
+          python -m json.tool data/live/nic_attribution_intelligence_7.json >/dev/null
+          python -m json.tool data/intelligence/nic_attribution_intelligence_7_report.json >/dev/null
           python src/wte_monetization_attribution.py
           python -m json.tool data/live/wte_monetization_attribution.json >/dev/null
           python src/nic_monetization_os.py post
