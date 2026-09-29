@@ -1,6 +1,6 @@
 """NIC Story Discovery 5.0 — choose the information product before drafting."""
 from __future__ import annotations
-import json, re
+import json, re, hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 ROOT=Path(__file__).resolve().parents[1]
@@ -49,6 +49,8 @@ def main():
         scored.append({'lane':lane,'score':score})
     scored.sort(key=lambda x:(x['score'],x['lane']),reverse=True)
     selected=scored[0]
-    discovery={'version':'5.0','status':'DISCOVERED','asset':sym,'selected_lane':selected['lane'],'story_kind':selected['lane'],'story_question':'What is the most useful verified insight here that a reader would not get from a routine price-level post?','evidence_count':len(observations),'evidence':observations[:10],'ranked_story_types':scored,'selected_treatment':os.get('content_lane') or portfolio.get('selected_treatment'),'discovery_rule':'information-first; technical_setup is eligible only when the supplied evidence makes the setup itself the story','created_at':datetime.now(timezone.utc).isoformat()}
+    fingerprint='|'.join(x['text'] for x in observations[:10])
+    story_id='story5-'+hashlib.sha256(f'{sym}|{selected["lane"]}|{fingerprint}'.encode()).hexdigest()[:16]
+    discovery={'version':'5.0','status':'DISCOVERED','story_id':story_id,'asset':sym,'selected_lane':selected['lane'],'story_kind':selected['lane'],'story_question':'What is the most useful verified insight here that a reader would not get from a routine price-level post?','evidence_count':len(observations),'evidence':observations[:10],'ranked_story_types':scored,'selected_treatment':os.get('content_lane') or portfolio.get('selected_treatment'),'discovery_rule':'information-first; technical_setup is eligible only when the supplied evidence makes the setup itself the story','created_at':datetime.now(timezone.utc).isoformat()}
     OUT.write_text(json.dumps(discovery,indent=2,ensure_ascii=False)+'\n',encoding='utf-8'); print(json.dumps(discovery,indent=2))
 if __name__=='__main__': main()
