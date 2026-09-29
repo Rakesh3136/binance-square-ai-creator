@@ -394,6 +394,8 @@ def main() -> int:
             or (frozen.get("prediction") or {}).get("direction")
             or ""
         ).upper(),
+        "story_id": str(context.get("story_id") or (context.get("story_discovery") or {}).get("story_id") or monetization_os.get("story_id") or ""),
+        "story_type": str(context.get("story_type") or (context.get("story_discovery") or {}).get("story_kind") or context.get("story_kind") or ""),
         "experiment_id": str(monetization_os.get("experiment_id") or context.get("experiment_id") or frozen.get("experiment_id") or ""),
         "campaign_day": monetization_os.get("campaign_day"),
         "content_lane": str(monetization_os.get("content_lane") or context.get("content_lane") or category),
@@ -436,6 +438,10 @@ def main() -> int:
         "symbol": symbol,
         "category": category,
         "direction": row["direction"],
+        "story_id": row["story_id"],
+        "story_type": row["story_type"],
+        "story_id": row["story_id"],
+        "story_type": row["story_type"],
         "experiment_id": row["experiment_id"],
         "campaign_day": row["campaign_day"],
         "content_lane": row["content_lane"],
@@ -446,6 +452,8 @@ def main() -> int:
         "experiment_variable": row["experiment_variable"],
         "experiment_treatment": row["experiment_treatment"],
         "cycle_id": row["cycle_id"],
+        "story_id": row["story_id"],
+        "story_type": row["story_type"],
         "cashtag": row["monetization"]["cashtag"],
         "reference_price": row["reference_price"],
         "trigger": row["trigger"],
