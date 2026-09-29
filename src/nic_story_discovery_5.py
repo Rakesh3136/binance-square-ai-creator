@@ -86,7 +86,11 @@ def main():
         score += min(2, verified_lanes.get(lane, 0))
         scored.append({"lane": lane, "score": score})
 
-    portfolio_scores = {str(x.get("lane")): float(x.get("target_share") or 0) for x in portfolio8.get("allocations", []) or []}\n    for item in scored:\n        item["portfolio_target_share"] = portfolio_scores.get(item["lane"], 0.0)\n        item["score"] += min(0.5, item["portfolio_target_share"] * 5.0)\n    scored.sort(key=lambda item: (item["score"], item["lane"]), reverse=True)
+    portfolio_scores = {str(x.get("lane")): float(x.get("target_share") or 0) for x in portfolio8.get("allocations", []) or []}
+    for item in scored:
+        item["portfolio_target_share"] = portfolio_scores.get(item["lane"], 0.0)
+        item["score"] += min(0.5, item["portfolio_target_share"] * 5.0)
+    scored.sort(key=lambda item: (item["score"], item["lane"]), reverse=True)
     selected = scored[0]
     fingerprint = "|".join(x["text"] for x in evidence[:10])
     story_id = "story5-" + hashlib.sha256(f"{symbol}|{selected['lane']}|{fingerprint}".encode()).hexdigest()[:16]
