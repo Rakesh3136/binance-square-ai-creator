@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+MAX_READER_CHARS = 740
 REPORT_DIR = ROOT / "data/reports"
 OUT = ROOT / "data/live/mechanism_value_repair.json"
 PUBLICATION_LOG = ROOT / "analytics/publication_log.jsonl"
@@ -100,20 +101,23 @@ def extract_symbol(draft, original):
     match = re.search(r"\$([A-Z][A-Z0-9]{1,14})\b", original.upper())
     return "$" + match.group(1) if match else "$THIS-ASSET"
 
-def deterministic_bridge(symbol, original):
+def deterministic_bridge(symbol, original, remaining=None):
     pct = re.findall(r"\b[+-]?\d+(?:\.\d+)%", original)
     if pct:
         observed = pct[0]
-        return (
-            f"For {symbol}, that matters because the observed {observed} move is the "
-            "market fact behind the reaction, while the next response shows whether "
-            "the move gets follow-through or rejection."
-        )
-    return (
-        f"For {symbol}, that matters because the observed price reaction is the "
-        "market fact behind the setup, while the next response shows whether the "
-        "move gets follow-through or rejection."
-    )
+        options = [
+            f"For {symbol}, that matters because the {observed} reaction needs follow-through or rejection.",
+            f"For {symbol}, the {observed} reaction matters because the next response tests follow-through or rejection.",
+        ]
+    else:
+        options = [
+            f"For {symbol}, the reaction matters because the next response tests follow-through or rejection.",
+            f"For {symbol}, that matters because the next response tests follow-through or rejection.",
+        ]
+    if remaining is not None:
+        fitting = [x for x in options if len(x) <= max(0, remaining)]
+        return max(fitting, key=len) if fitting else ""
+    return options[0]
 
 def write_result(result):
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -144,7 +148,11 @@ def main():
     original_question = original_questions[0].strip()
     body_without_question = original.replace(original_question, "").rstrip()
     symbol = extract_symbol(draft, original)
-    bridge = "" if mechanism_present(body_without_question) else deterministic_bridge(symbol, body_without_question)
+    bridge = "" if mechanism_present(body_without_question) else deterministic_bridge(
+        symbol,
+        body_without_question,
+        remaining=MAX_READER_CHARS - len(body_without_question) - len(original_question) - 4,
+    )
 
     # The repair stage is deliberately not passed through broad deduplication.
     # Upstream stages already own repetition control. This exact candidate is the
@@ -154,6 +162,8 @@ def main():
     reasons = []
     if bridge and "because" not in bridge.lower():
         reasons.append("BRIDGE_CAUSAL_TERM_MISSING")
+    if len(candidate) > MAX_READER_CHARS:
+        reasons.append("FINAL_COPY_OVER_740")
     if not mechanism_present(candidate):
         reasons.append("MECHANISM_STILL_MISSING")
     if len(questions(candidate)) != 1:
@@ -184,6 +194,7 @@ def main():
         "exactly_one_question": True,
         "mechanism_present": True,
         "reader_value_floor_enabled": True,
+        "max_reader_characters": MAX_READER_CHARS,
     }
     draft["post"] = candidate
     draft["text"] = candidate
