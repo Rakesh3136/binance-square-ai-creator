@@ -70,11 +70,11 @@ def main():
     new,repairs=repair(text,symbol,old)
     # Hard originality stop: do not try to disguise a clone with cosmetic edits.
     clone=maxcos>=.82 or maxjac>=.62
-    thin=len(set(ct))<35 or len(ct)<55
+    thin=len(ct)<220 or len(set(ct))<25
     if repairs and not clone:
         draft['post']=new; draft['text']=new; data['draft']=draft; Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8'); text=new
     status='BLOCKED_CLONE' if clone else ('BLOCKED_THIN' if thin else ('REPAIRED' if repairs else 'PASS'))
-    result={'version':'DIFFERENTIATION-2.0','status':status,'passed':status in ('PASS','REPAIRED'),'similarity':{'max_cosine':round(maxcos,4),'max_shingle_jaccard':round(maxjac,4)},'recent_comparisons':len(comparisons),'repair_count':len(repairs),'reason':('Materially repetitive with recent content; publication hard-stopped.' if clone else ('Insufficient differentiated substance.' if thin else 'Draft is differentiated enough for downstream gates.')),'timestamp':datetime.now(timezone.utc).isoformat()}
+    result={'version':'DIFFERENTIATION-2.0','status':status,'passed':status in ('PASS','REPAIRED'),'similarity':{'max_cosine':round(maxcos,4),'max_shingle_jaccard':round(maxjac,4)},'recent_comparisons':len(comparisons),'repair_count':len(repairs),'reason':('Materially repetitive with recent content; publication hard-stopped.' if clone else ('Draft is too short to carry differentiated substance.' if thin else 'Draft is differentiated enough for downstream gates.')),'timestamp':datetime.now(timezone.utc).isoformat()}
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n',encoding='utf-8'); print(json.dumps(result,indent=2))
     if not result['passed']: raise SystemExit(2)
 if __name__=='__main__': raise SystemExit(main())

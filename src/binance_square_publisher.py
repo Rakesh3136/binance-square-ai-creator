@@ -226,6 +226,7 @@ def main() -> int:
         frozen = load(FROZEN_PATH)
         monetization_os = load(MONETIZATION_OS_PATH)
         story_discovery = load(STORY_DISCOVERY_PATH)
+        craft = load(CRAFT_PATH)
         symbol = clean_symbol(
             context.get("symbol")
             or context.get("primary_symbol")
@@ -398,6 +399,8 @@ def main() -> int:
         ).upper(),
         "story_id": str(context.get("story_id") or (context.get("story_discovery") or {}).get("story_id") or story_discovery.get("story_id") or monetization_os.get("story_id") or ""),
         "story_type": str(context.get("story_type") or (context.get("story_discovery") or {}).get("story_kind") or story_discovery.get("story_kind") or context.get("story_kind") or ""),
+        "craft_id": str(craft.get("craft_id") or context.get("craft_id") or ""),
+        "craft_pattern": str(craft.get("archetype") or ""),
         "experiment_id": str(monetization_os.get("experiment_id") or context.get("experiment_id") or frozen.get("experiment_id") or ""),
         "campaign_day": monetization_os.get("campaign_day"),
         "content_lane": str(monetization_os.get("content_lane") or context.get("content_lane") or category),
@@ -442,6 +445,8 @@ def main() -> int:
         "direction": row["direction"],
         "story_id": row["story_id"],
         "story_type": row["story_type"],
+        "craft_id": row["craft_id"],
+        "craft_pattern": row["craft_pattern"],
         "experiment_id": row["experiment_id"],
         "campaign_day": row["campaign_day"],
         "content_lane": row["content_lane"],

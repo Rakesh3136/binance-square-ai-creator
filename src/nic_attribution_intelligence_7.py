@@ -89,6 +89,8 @@ def main():
             "symbol":a.get("symbol"),
             "story_id":a.get("story_id"),
             "story_type":a.get("story_type") or a.get("story_kind"),
+            "craft_id":a.get("craft_id"),
+            "craft_pattern":a.get("craft_pattern"),
             "content_lane":a.get("content_lane") or a.get("story_lane"),
             "content_format":a.get("content_format") or a.get("format"),
             "hook_type":a.get("hook_type"),
