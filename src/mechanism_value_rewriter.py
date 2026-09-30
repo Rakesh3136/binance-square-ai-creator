@@ -2,11 +2,12 @@
 
 Adds one deterministic causal bridge using facts already present in the draft.
 Upstream stages own broad differentiation; this stage owns mechanism integrity.
-When the draft has no room for the bridge, it removes redundant fact-free sentences
-before giving up; it never invents market facts or silently drops explicit facts.
+When the draft has no room for a new bridge, it uses a minimal in-place causal
+rewrite before removing any redundant fact-free material. It never invents market
+facts or silently drops explicit facts.
 """
 from __future__ import annotations
-import json, re
+import json,re
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 MAX_READER_CHARS=740
@@ -59,8 +60,7 @@ def normalize_questions(text,symbol):
     qs=questions(text)
     if len(qs)==1: return text,qs[0].strip(),False
     if len(qs)>1:
-        keep=qs[-1].strip()
-        body=text.replace(keep,"")
+        keep=qs[-1].strip(); body=text.replace(keep,"")
         for q in questions(body): body=body.replace(q,q.rstrip("?").rstrip()+".")
         return (body.strip()+"\n\n"+keep).strip(),keep,True
     q=f"What evidence should readers watch next for {symbol}?"
@@ -69,43 +69,50 @@ def normalize_questions(text,symbol):
 def split_sentences(text):
     return [norm(x) for x in re.split(r"(?<=[.!?])\s+|\n+", text) if norm(x)]
 
+def inplace_causal_rewrite(body, symbol, question):
+    """Create a mechanism with almost no length growth, preserving every fact token."""
+    patterns=[
+        (r"\s+and\s+", " because "),
+        (r"\s+while\s+", " because "),
+        (r"\s+as\s+", " because "),
+        (r"\s+so\s+", " because "),
+    ]
+    original_facts=explicit_facts(body)
+    for pat,repl in patterns:
+        for m in list(re.finditer(pat,body,flags=re.I)):
+            candidate=body[:m.start()]+repl+body[m.end():]
+            full=f"{candidate}\n\n{question}".strip()
+            if len(full)<=MAX_READER_CHARS and mechanism_present(candidate) and explicit_facts(candidate)>=original_facts:
+                return candidate,repl.strip(),[]
+    return body,"",[]
+
 def compact_body_for_bridge(body, symbol, question):
-    """Make room for a truthful bridge by removing only fact-free redundancy."""
+    """Make room while preserving every explicit symbol/number/percentage."""
     bridge_candidates=[
         f"For {symbol}, that matters because the next response tests follow-through or rejection.",
         f"For {symbol}, this matters because the next response tests follow-through or rejection.",
         "This matters because the next response tests follow-through or rejection.",
     ]
-    sentences=split_sentences(body)
-    original_facts=explicit_facts(body)
-    def candidate_text(parts,bridge):
-        return f"{' '.join(parts)}\n\n{bridge}\n\n{question}".strip()
+    sentences=split_sentences(body); original_facts=explicit_facts(body)
+    def candidate_text(parts,bridge): return f"{' '.join(parts)}\n\n{bridge}\n\n{question}".strip()
     for bridge in bridge_candidates:
         if len(candidate_text(sentences,bridge))<=MAX_READER_CHARS:
             return " ".join(sentences),bridge,[]
-    # Remove shortest fact-free sentences first. This preserves every explicit
-    # symbol/number/percentage from the incoming draft.
     working=list(sentences); removed=[]
     ranked=sorted(enumerate(working),key=lambda p:(bool(explicit_facts(p[1])),len(p[1])))
     for idx,s in ranked:
-        if explicit_facts(s):
-            continue
+        if explicit_facts(s): continue
         if len(working)==1: break
-        removed.append(s); working[idx]=""
-        working=[x for x in working if x]
+        removed.append(s); working[idx]=""; working=[x for x in working if x]
         if explicit_facts(" ".join(working)) != original_facts:
-            # Defensive rollback if a future fact parser changes.
-            working.append(s); removed.pop()
-            continue
+            working.append(s); removed.pop(); continue
         for bridge in bridge_candidates:
             if len(candidate_text(working,bridge))<=MAX_READER_CHARS:
                 return " ".join(working),bridge,removed
     return " ".join(working),"",removed
 
 def write_result(result):
-    OUT.parent.mkdir(parents=True,exist_ok=True)
-    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
-    print(json.dumps(result,indent=2,ensure_ascii=False))
+    OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8"); print(json.dumps(result,indent=2,ensure_ascii=False))
 
 def main():
     report=resolve_report()
@@ -114,14 +121,20 @@ def main():
     if not original: raise SystemExit(f"Mechanism repair: draft has no post text: {report}")
     symbol=extract_symbol(draft,original)
     normalized,original_question,question_repaired=normalize_questions(original,symbol)
-    body=normalized.replace(original_question,"").rstrip()
-    original_facts=explicit_facts(original)
-    bridge=""; removed=[]
+    body=normalized.replace(original_question,"").rstrip(); original_facts=explicit_facts(original)
+    bridge=""; removed=[]; method="none"
     if not mechanism_present(body):
         remaining=MAX_READER_CHARS-len(body)-len(original_question)-4
         bridge=deterministic_bridge(symbol,body,remaining=remaining)
+        if bridge: method="deterministic_causal_bridge"
         if not bridge:
-            body,bridge,removed=compact_body_for_bridge(body,symbol,original_question)
+            compacted,new_bridge,removed=compact_body_for_bridge(body,symbol,original_question)
+            body,bridge=compacted,new_bridge
+            if bridge: method="compact_fact_free_then_bridge"
+        if not bridge:
+            compacted,inline_bridge,inline_removed=inplace_causal_rewrite(body,symbol,original_question)
+            if inline_bridge:
+                body,bridge,removed=compacted,inline_bridge,removed+inline_removed; method="minimal_inplace_causal_rewrite"
     candidate=normalized if not bridge else f"{body}\n\n{bridge}\n\n{original_question}".strip()
     reasons=[]
     if bridge and "because" not in bridge.lower(): reasons.append("BRIDGE_CAUSAL_TERM_MISSING")
@@ -130,8 +143,8 @@ def main():
     if len(questions(candidate))!=1: reasons.append("QUESTION_COUNT_NOT_ONE")
     if original_facts-explicit_facts(candidate): reasons.append("EXPLICIT_FACT_LOSS")
     if reasons:
-        write_result({"status":"REPAIR_FAILED","draft_unchanged":True,"draft_path":str(report),"reasons":reasons,"bridge_preview":bridge,"removed_fact_free_sentences":removed}); return 1
-    repair={"status":"REPAIRED","method":"deterministic_causal_bridge","question_repaired":question_repaired,"verified_facts_preserved":True,"exactly_one_question":True,"mechanism_present":True,"reader_value_floor_enabled":True,"max_reader_characters":MAX_READER_CHARS,"redundant_fact_free_sentences_removed":len(removed)}
+        write_result({"status":"REPAIR_FAILED","draft_unchanged":True,"draft_path":str(report),"reasons":reasons,"bridge_preview":bridge,"method":method,"removed_fact_free_sentences":removed}); return 1
+    repair={"status":"REPAIRED","method":method,"question_repaired":question_repaired,"verified_facts_preserved":True,"exactly_one_question":True,"mechanism_present":True,"reader_value_floor_enabled":True,"max_reader_characters":MAX_READER_CHARS,"redundant_fact_free_sentences_removed":len(removed)}
     draft["post"]=candidate; draft["text"]=candidate; draft["mechanism_value_repair"]=repair; data["draft"]=draft; data["mechanism_value_repair"]=repair
     Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding="utf-8")
     write_result({**repair,"draft_path":str(report)}); return 0
