@@ -1,7 +1,8 @@
-"""NIC Editorial Quality 3.1 + Conversion Intelligence 6.1.
-Removes internal telemetry, enforces concise reader-facing copy, and performs a
-bounded truthful conversion repair before blocking. It never simulates clicks,
-trades, urgency, or revenue.
+"""NIC Editorial Quality 3.2 + Conversion Intelligence 6.2.
+Reader-facing gate with bounded, evidence-derived conversion repair.
+The gate may recover an asset reference only from authoritative draft/contract
+metadata or an explicit cashtag already present in the draft; it never invents
+an asset. It never simulates clicks, trades, urgency, or revenue.
 """
 from __future__ import annotations
 import json, re, os
@@ -21,6 +22,7 @@ INTERNAL_PATTERNS=[
 GENERIC_OPENERS=[r"^For \$?[A-Z0-9]{2,15}, that matters because",r"^\$?[A-Z0-9]{2,15} is moving, but the useful signal is",r"^The \$?[A-Z0-9]{2,15} move is easy to see\."]
 TRADE_PRESSURE=re.compile(r"\b(buy now|sell now|guaranteed|guarantee|100%|can't lose|must buy|must sell|urgent)\b",re.I)
 ACTION_WORDS=re.compile(r"\b(inspect|check|compare|watch|verify|track|review|monitor|see|look|test|confirm|observe|follow)\b",re.I)
+TICKER=re.compile(r"\$([A-Z][A-Z0-9]{1,14})\b",re.I)
 def load_json(p):
     try:
         x=json.loads(p.read_text(encoding="utf-8")); return x if isinstance(x,dict) else {}
@@ -34,12 +36,20 @@ def clean(text):
     text=str(text or "").strip()
     for pat in INTERNAL_PATTERNS: text=re.sub(pat,"",text)
     return re.sub(r"\n{3,}","\n\n",text).strip()
+def normalize_asset(raw):
+    return re.sub(r"[^A-Z0-9]","",str(raw or "").upper().replace("USDT",""))
+def resolve_asset(contract,draft,text):
+    """Resolve only from explicit authoritative metadata or an existing cashtag."""
+    for raw in (contract.get("asset"),draft.get("asset"),draft.get("symbol"),draft.get("ticker")):
+        a=normalize_asset(raw)
+        if a: return a,"metadata"
+    m=TICKER.search(text.upper())
+    if m: return m.group(1).upper(),"draft_cashtag"
+    return "","unknown"
 def conversion_repair(text,asset):
-    """Add only a truthful asset-inspection bridge when upstream forgot it."""
-    asset=asset.strip().upper().replace("$","").replace("USDT","")
+    asset=normalize_asset(asset)
     if not asset: return text,[]
-    repairs=[]
-    cashtag="$"+asset
+    repairs=[]; cashtag="$"+asset
     if not re.search(r"\$"+re.escape(asset)+r"\b",text,re.I):
         additions=[f"Check {cashtag} against the evidence above and watch whether the stated checkpoint confirms or rejects the thesis.",f"Review {cashtag} against the evidence above; the next checkpoint should confirm or reject the thesis."]
         for add in additions:
@@ -59,7 +69,7 @@ def main():
     before=text; text=clean(text)
     if not text: raise SystemExit("NIC editorial gate: internal-only draft")
     contract=load_json(CONTRACT); lane=str(contract.get("content_lane") or draft.get("content_lane") or "market_setup")
-    asset=str(contract.get("asset") or draft.get("asset") or draft.get("symbol") or "").upper().replace("USDT","").replace("$","")
+    asset,asset_source=resolve_asset(contract,draft,text)
     text,conversion_repairs=conversion_repair(text,asset)
     asset_ok=bool(asset and re.search(r"\$"+re.escape(asset)+r"\b",text,re.I))
     opener=text.split("\n\n",1)[0]; generic=any(re.search(p,opener,re.I) for p in GENERIC_OPENERS)
@@ -68,10 +78,10 @@ def main():
     action_signal=bool(ACTION_WORDS.search(text))
     trade_pressure=bool(TRADE_PRESSURE.search(text))
     conversion_status="PASS" if asset_ok and action_signal and not trade_pressure else "BLOCK"
-    conversion={"version":"6.1","status":conversion_status,"checked_at":datetime.now(timezone.utc).isoformat(),"asset":asset,"cashtag":"$"+asset if asset else None,"content_lane":lane,"repair_count":len(conversion_repairs),"repairs":conversion_repairs,"reader_payoff_type":str(contract.get("reader_payoff_type") or draft.get("reader_payoff_type") or ""),"evidence":{"asset_reference_present":asset_ok,"reader_action_signal_present":action_signal,"trade_pressure_detected":trade_pressure,"reader_interaction_is_not_inferred":True,"views_are_not_revenue":True,"verified_reward_required":True},"contract":{"interaction_goal":"truthful inspection of the relevant asset surface","cashtag_is_contextual_bridge":True,"no_fake_urgency":True,"no_trade_guarantee":True,"no_synthetic_clicks_or_trades":True}}
-    draft.update({"text":text,"post":text,"content_lane":lane,"reader_facing_sanitized":True,"internal_telemetry_removed":before!=text,"template_opening_detected":generic,"question_count":text.count("?")})
+    conversion={"version":"6.2","status":conversion_status,"checked_at":datetime.now(timezone.utc).isoformat(),"asset":asset,"asset_source":asset_source,"cashtag":"$"+asset if asset else None,"content_lane":lane,"repair_count":len(conversion_repairs),"repairs":conversion_repairs,"reader_payoff_type":str(contract.get("reader_payoff_type") or draft.get("reader_payoff_type") or ""),"evidence":{"asset_reference_present":asset_ok,"reader_action_signal_present":action_signal,"trade_pressure_detected":trade_pressure,"reader_interaction_is_not_inferred":True,"views_are_not_revenue":True,"verified_reward_required":True},"contract":{"interaction_goal":"truthful inspection of the relevant asset surface","cashtag_is_contextual_bridge":True,"no_fake_urgency":True,"no_trade_guarantee":True,"no_synthetic_clicks_or_trades":True}}
+    draft.update({"text":text,"post":text,"content_lane":lane,"resolved_asset":asset,"reader_facing_sanitized":True,"internal_telemetry_removed":before!=text,"template_opening_detected":generic,"question_count":text.count("?")})
     ok=text.count("?")==1 and len(text)<=MAX_CHARS and conversion_status=="PASS"
-    report["nic_editorial_quality_gate"]={"version":"3.1+6.1","status":"PASS" if ok else "BLOCK","lane":lane,"template_opening_detected":generic,"internal_telemetry_removed":before!=text,"conversion_repairs":conversion_repairs,"checked_at":datetime.now(timezone.utc).isoformat(),"conversion_status":conversion_status,"rules":{"internal_telemetry_reader_hidden":True,"max_characters":MAX_CHARS,"exactly_one_question":True,"no_fact_invention":True,"truthful_reader_action_required":True,"no_trade_pressure":True}}
+    report["nic_editorial_quality_gate"]={"version":"3.2+6.2","status":"PASS" if ok else "BLOCK","lane":lane,"resolved_asset":asset,"asset_source":asset_source,"template_opening_detected":generic,"internal_telemetry_removed":before!=text,"conversion_repairs":conversion_repairs,"checked_at":datetime.now(timezone.utc).isoformat(),"conversion_status":conversion_status,"rules":{"internal_telemetry_reader_hidden":True,"max_characters":MAX_CHARS,"exactly_one_question":True,"no_fact_invention":True,"truthful_reader_action_required":True,"no_trade_pressure":True}}
     if len(text)>MAX_CHARS or text.count("?")!=1: raise SystemExit("NIC editorial gate: copy must be <=740 characters and contain exactly one question")
     if conversion_status!="PASS": raise SystemExit("NIC conversion gate: post needs a relevant asset reference and a truthful reader-action signal, with no trade pressure")
     report["draft"]=draft; path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
