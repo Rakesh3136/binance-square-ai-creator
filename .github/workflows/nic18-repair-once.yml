@@ -17,35 +17,28 @@ jobs:
         with:
           fetch-depth: 0
       - name: Restore canonical orchestrator and activate NIC18
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TARGET=.github/workflows/autonomous-market-creator.yml
           GOOD=6621fa6493bab82fb86d71434fe847e7c9cdb8c1
+          if grep -q 'Refresh full market universe, flow, news and core intelligence' "$TARGET"; then
+            echo 'Canonical orchestrator already restored; nothing to do.'
+            exit 0
+          fi
           git show "$GOOD:$TARGET" > "$TARGET"
           python - <<'PY'
           from pathlib import Path
           p=Path('.github/workflows/autonomous-market-creator.yml')
           s=p.read_text()
           anchor='          python src/technical_enricher.py\n'
-          insert=(anchor+""
-          "          python -m py_compile src/nic_pattern_visual_engine_18.py\n"
-          "          python tests/test_nic_pattern_visual_engine_18.py\n"
-          "          python src/nic_pattern_visual_engine_18.py\n"
-          "          python -m json.tool data/live/nic_pattern_visual_engine_18.json >/dev/null\n")
+          insert=anchor+'''          python -m py_compile src/nic_pattern_visual_engine_18.py\n          python tests/test_nic_pattern_visual_engine_18.py\n          python src/nic_pattern_visual_engine_18.py\n          python -m json.tool data/live/nic_pattern_visual_engine_18.json >/dev/null\n'''
           if 'python src/nic_pattern_visual_engine_18.py' not in s:
-              if anchor not in s:
-                  raise SystemExit('technical_enricher workflow anchor missing')
+              if anchor not in s: raise SystemExit('technical_enricher workflow anchor missing')
               s=s.replace(anchor,insert,1)
           p.write_text(s)
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add "$TARGET"
-          git commit -m 'Restore canonical orchestrator and activate NIC 18' || true
-          git push origin main
-          rm -f .github/workflows/nic18-repair-once.yml
-          git add .github/workflows/nic18-repair-once.yml
-          git commit -m 'Remove one-time workflow repair'
+          git commit -m 'Restore canonical orchestrator and activate NIC 18'
           git push origin main
