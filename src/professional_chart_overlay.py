@@ -63,6 +63,33 @@ def main():
     pred=selected.get('prediction') or frozen.get('prediction') or {}
     evidence=selected.get('evidence') or frozen.get('evidence') or {}
 
+    # Technical enricher is the authoritative fallback for technical/setup lanes
+    # when the frozen prediction contract is not present. Never invent levels:
+    # only consume values explicitly produced by technical_enricher.py.
+    reports=sorted((ROOT/'data/reports').glob('*-multi-agent.json'),
+                   key=lambda p:p.stat().st_mtime_ns, reverse=True)
+    if not (setup and pred) and reports:
+        report=load(reports[0])
+        draft=report.get('draft') if isinstance(report.get('draft'),dict) else {}
+        levels=draft.get('technical_levels') if isinstance(draft.get('technical_levels'),dict) else {}
+        if levels:
+            side=str(levels.get('direction') or '').upper().replace('_BIAS','')
+            setup={
+                'side': side,
+                'trigger': levels.get('current_price'),
+                'tp1': levels.get('tp1'),
+                'tp2': levels.get('target'),
+                'invalidation': levels.get('invalidation'),
+            }
+            pred={
+                'direction': side,
+                'entry_trigger': levels.get('current_price'),
+                'tp1': levels.get('tp1'),
+                'tp2': levels.get('target'),
+                'sl': levels.get('invalidation'),
+            }
+            evidence={'last_price': levels.get('current_price')}
+
     side=str(setup.get('side') or pred.get('direction') or '').upper()
     entry=num(setup.get('trigger',pred.get('entry_trigger')))
     tp1=num(setup.get('tp1',pred.get('tp1')))
