@@ -14,6 +14,7 @@ def run_script(name):
     if proc.stderr: print(proc.stderr,end='',file=sys.stderr)
     if proc.returncode: raise SystemExit(proc.returncode)
 def main():
+    run_script('nic_creative_experiment_16.py')
     run_script('original_research_engine.py'); run_script('creator_agent_supervisor.py'); run_script('agent_strategy_bridge.py'); run_script('nic_story_discovery_5.py'); run_script('nic_content_craft_intelligence_9.py')
     p=load(PREFLIGHT); d=p.get('content_director_4') or {}; s=p.get('script_director_4') or {}; news=load(NEWS); ctx=load(CONTEXT); core=load(CORE); research=load(RESEARCH); strategy=load(STRATEGY); portfolio=load(PORTFOLIO); monetization_os=load(ROOT/'data/live/nic_monetization_contract.json'); discovery=load(DISCOVERY); craft=load(CRAFT); master=load(MASTER); creative=load(CREATIVE); audience12=load(AUDIENCE12); learning15=load(LEARNING15); exp16=load(EXP16)
     fmt=str(d.get('recommended_format') or 'TOP MOVERS'); sym=str(ctx.get('symbol') or s.get('primary_symbol') or (d.get('primary_story') or {}).get('symbol','')).upper().replace('USDT','').replace('$','').strip(); selected=p.get('selected_opportunity') or {}; story=d.get('primary_story') or {}; treatment=str(monetization_os.get('content_lane') or portfolio.get('selected_treatment') or 'market_setup')
