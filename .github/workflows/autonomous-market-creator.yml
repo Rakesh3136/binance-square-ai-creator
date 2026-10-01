@@ -352,6 +352,10 @@ jobs:
           python -m json.tool data/live/nic_content_master_10.json >/dev/null
           python -m json.tool data/intelligence/nic_content_master_10_report.json >/dev/null
           python src/candidate_generation_4.py
+          python -m py_compile src/nic_creative_compiler_13.py
+          python tests/test_nic_creative_compiler_13.py
+          python src/nic_creative_compiler_13.py
+          python -m json.tool data/live/nic_creative_compiler_13.json >/dev/null
           python src/self_repair_agent.py
           python src/editorial_prompt_patch.py
           python src/safe_creator_runner.py
