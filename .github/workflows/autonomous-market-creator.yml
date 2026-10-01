@@ -341,10 +341,13 @@ jobs:
         run: |
           python src/script_director_4.py
           python src/publication_context.py
-          python -m py_compile src/nic_creative_evolution_11.py
+          python -m py_compile src/nic_creative_evolution_11.py src/nic_audience_response_12.py
           python tests/test_nic_creative_evolution_11.py
+          python tests/test_nic_audience_response_12.py
           python src/nic_creative_evolution_11.py
           python -m json.tool data/live/nic_creative_evolution_11.json >/dev/null
+          python src/nic_audience_response_12.py
+          python -m json.tool data/live/nic_audience_response_12.json >/dev/null
           python src/nic_content_master_10.py
           python -m json.tool data/live/nic_content_master_10.json >/dev/null
           python -m json.tool data/intelligence/nic_content_master_10_report.json >/dev/null
