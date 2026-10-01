@@ -79,8 +79,6 @@ def main():
         elif e is not None and reward == 0:
             outcome="VERIFIED_NO_REWARD"
         else:
-            # Publication/performance can be known without any reward telemetry.
-            # This is deliberately UNKNOWN, never VERIFIED_NO_REWARD.
             outcome="UNKNOWN"
         rows.append({
             "attribution_event_id":stable_id(post,str(a.get("published_at") or a.get("recorded_at") or "")),
@@ -162,19 +160,22 @@ def main():
       "unattributed_verified_rewards":[
         {"event_id":e.get("event_id"),"observed_at":e.get("observed_at"),"reward_amount_usdc":num(e,"reward_amount_usdc"),"source":e.get("source")}
         for e in load_jsonl(REWARDS) if e.get("verified") is True and e.get("reward_amount_usdc") is not None and not pid(e)
-    ],
+      ],
     }
     LIVE.mkdir(parents=True,exist_ok=True); INTEL.mkdir(parents=True,exist_ok=True); ANALYTICS.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(state,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    REPORT.write_text(json.dumps({"version":"7.0","status":"READY",**state["summary"],"output":str(OUT.relative_to(ROOT))},indent=2)+"\n",encoding="utf-8")
-    # Idempotent durable ledger: one event per post+published timestamp.
+    try:
+        output_ref=str(OUT.relative_to(ROOT))
+    except ValueError:
+        # Tests may redirect output into an isolated temporary root. Preserve
+        # the real output location instead of crashing on an unrelated path.
+        output_ref=str(OUT)
+    REPORT.write_text(json.dumps({"version":"7.0","status":"READY",**state["summary"],"output":output_ref},indent=2)+"\n",encoding="utf-8")
     existing={str(x.get("attribution_event_id")) for x in load_jsonl(LEDGER)}
     with LEDGER.open("a",encoding="utf-8") as h:
         for r in rows:
             if r["attribution_event_id"] in existing: continue
             h.write(json.dumps(r,ensure_ascii=False)+"\n")
-    # Story discovery may be absent on a non-publishing telemetry run; that is
-    # fine. When present, expose only bounded verified learning for its consumer.
     story= {}
     try:
         story=json.loads(STORY.read_text(encoding="utf-8")) if STORY.exists() else {}
