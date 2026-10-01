@@ -11,7 +11,7 @@ ns={}
 exec(compile(TREE,str(SRC),"exec"),ns)
 assert ns["MAX_DIM_REPEAT"]==3
 assert ns["N"]==6
-slots=ns["build_slots"]([],[],{"experiment_id":"x","primary_variable":"hook_type","directive":{"force_variable":"hook_type","selected_value":"data_contradiction"},"assignment":{"selected_value":"data_contradiction"}})
+ns["PLAN_ID"]="test-plan"\nslots=ns["build_slots"]([],[],{"experiment_id":"x","primary_variable":"hook_type","directive":{"force_variable":"hook_type","selected_value":"data_contradiction"},"assignment":{"selected_value":"data_contradiction"}})
 assert len(slots)==6
 assert all(x["lineage"]["portfolio_plan_id"]==ns["PLAN_ID"] for x in slots)
 assert all(x["lineage"]["slot_id"]==x["slot_id"] for x in slots)
