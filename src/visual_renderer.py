@@ -39,7 +39,17 @@ def main():
         checks={'direction':str(pred.get('direction') or '').upper()==str(frozen.get('direction') or frozen_pred.get('direction') or pred.get('direction') or '').upper(),'entry':pred.get('entry_trigger')==(frozen.get('entry_trigger') if frozen.get('entry_trigger') is not None else frozen_pred.get('entry_trigger',pred.get('entry_trigger'))),'tp1':pred.get('tp1')==(frozen.get('tp1') if frozen.get('tp1') is not None else frozen_pred.get('tp1',pred.get('tp1'))),'tp2':pred.get('tp2')==(frozen.get('tp2') if frozen.get('tp2') is not None else frozen_pred.get('tp2',pred.get('tp2'))),'sl':pred.get('sl')==(frozen.get('sl') if frozen.get('sl') is not None else frozen_pred.get('sl',pred.get('sl')))}
         if not all(checks.values()):raise SystemExit(f'historical chart setup mismatch with authoritative prediction: {checks}')
         rc=subprocess.run(['python',str(ANALYST)],cwd=ROOT,check=False).returncode
-        if rc==0:apply_chart_style()
+        if rc==0:
+            # The analyst renderer is also a setup visual. Apply the same
+            # authoritative trade overlay here; previously this branch skipped
+            # professional_chart_overlay.py, so the final posted image could be
+            # a clean chart even though the visual contract metadata looked valid.
+            overlay=SRC/'professional_chart_overlay.py'
+            if overlay.exists():
+                overlay_rc=subprocess.run(['python',str(overlay)],cwd=ROOT,check=False).returncode
+                if overlay_rc!=0:
+                    raise SystemExit('professional chart overlay failed; refusing unmarked setup visual')
+            apply_chart_style()
         return rc
     if cat=='crypto_meme':return subprocess.run(['python',str(MEME)],cwd=ROOT,check=False).returncode
     ensure_playwright(); rc=subprocess.run(['node',str(TRADINGVIEW)],cwd=ROOT,check=False).returncode
