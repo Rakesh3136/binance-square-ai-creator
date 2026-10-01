@@ -58,7 +58,34 @@ def main():
     preflight=load("data/live/editorial_preflight.json"); publication=load("data/live/publication_context.json")
     context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json"),"wte_strategy":load("data/live/wte_high_level_intelligence.json"),"wte_7day":load("data/live/write_to_earn_7day_status.json")}
     selected=preflight.get("selected_opportunity") or {}; instruction=os.getenv("TOPIC","").strip() or selected.get("instruction") or "Find the strongest evidence-based opportunity."
-    base_prompt=EDITORIAL_RULES+"\nTASK:\n"+instruction+"\nEVIDENCE:\n"+json.dumps(context,ensure_ascii=False)[:50000]
+    # Bind the actual editorial/craft contracts into the model prompt. Previously
+    # these were generated upstream but only partially visible through preflight,
+    # allowing the model to fall back to the older generic house style.
+    script_director=preflight.get("script_director_4") or {}
+    craft=load("data/live/nic_content_craft_9.json")
+    portfolio={
+        "lane": load("data/live/nic_monetization_contract.json").get("portfolio_lane"),
+        "format": load("data/live/nic_monetization_contract.json").get("portfolio_format"),
+        "hook_type": load("data/live/nic_monetization_contract.json").get("portfolio_hook_type"),
+        "visual_type": load("data/live/nic_monetization_contract.json").get("portfolio_visual_type"),
+        "reader_payoff_type": load("data/live/nic_monetization_contract.json").get("portfolio_reader_payoff_type"),
+    }
+    style_contract={
+        "creator_archetype": script_director.get("creator_archetype"),
+        "narrative_engine": script_director.get("narrative_engine"),
+        "recommended_format": script_director.get("format"),
+        "hook_candidates": script_director.get("hook_candidates",[]),
+        "question": script_director.get("recommended_question"),
+        "writing_contract": script_director.get("writing_contract",[]),
+        "anti_template_rules": script_director.get("anti_template_rules",[]),
+        "craft": craft.get("craft") or craft.get("contract") or craft.get("design") or {},
+        "portfolio_slot": portfolio,
+    }
+    base_prompt=(EDITORIAL_RULES+
+        "\nCURRENT EDITORIAL STYLE CONTRACT — THIS RUN:\n"+
+        json.dumps(style_contract,ensure_ascii=False)[:30000]+
+        "\nTASK:\n"+instruction+
+        "\nEVIDENCE:\n"+json.dumps(context,ensure_ascii=False)[:50000])
     deep_research={}; research_meta={}
     try:
         deep_prompt="""Act as the NIC deep-research specialist. Analyze the supplied market/news/editorial evidence before another model writes the post.
