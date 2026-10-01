@@ -9,13 +9,13 @@ def test_syntax():
     subprocess.run([sys.executable,"-m","py_compile",str(src)],check=True)
 
 def test_exact_pid_helper():
-    ns={}
+    ns={"__file__":str(src),"__name__":"nic_post_publication_outcome_14_test"}
     exec(src.read_text(encoding="utf-8"),ns)
     assert ns["pid"]({"post_id":"12345"})=="12345"
     assert ns["pid"]({"post_id":"https://www.binance.com/en/square/post/ABC_9"})=="abc_9"
 
 def test_numeric_unknown():
-    ns={}
+    ns={"__file__":str(src),"__name__":"nic_post_publication_outcome_14_test"}
     exec(src.read_text(encoding="utf-8"),ns)
     assert ns["num"]("12.5")==12.5
     assert ns["num"]("unknown") is None
