@@ -366,8 +366,8 @@ jobs:
           python src/normalize_draft.py
           python src/technical_enricher.py
           python src/creator_intelligence_2.py || true
-          # NIC 13 must compile the candidates after the creator has actually generated them.
-          # Running it before safe_creator_runner left editorial_preflight.candidate_scripts_4 empty.
+          # NIC 13 consumes the actual candidate scripts produced by safe_creator_runner.
+          # It must remain after generation; otherwise editorial_preflight.candidate_scripts_4 is empty.
           python -m py_compile src/nic_creative_compiler_13.py
           python tests/test_nic_creative_compiler_13.py
           python src/nic_creative_compiler_13.py
