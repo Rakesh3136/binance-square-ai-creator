@@ -54,3 +54,6 @@ NIC Monetization Intelligence 2.0: validate durable lane/experiment lineage, ver
 
 2026-09-28T16:23:00Z
 NIC Monetization Intelligence 2.0 final validation: run the autonomous pipeline against the final main-head telemetry and lineage patches.
+
+2026-10-01T02:25:00Z
+Publisher 1.7 validation: repair missing CRAFT_PATH and trigger a fresh end-to-end autonomous publication run on current main.
