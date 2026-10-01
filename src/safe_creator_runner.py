@@ -40,6 +40,34 @@ def run_creator():
     return after
 
 
+def reject_legacy_prose(report_path):
+    """Hard-stop the retired deterministic signal template.
+
+    The old signal_post_builder prose is no longer a valid publication style.
+    Facts and trade levels may still be used by the visual/attribution contract,
+    but the post itself must come from the current NIC editorial contract.
+    """
+    report=json.loads(report_path.read_text(encoding='utf-8'))
+    draft=report.get('draft') if isinstance(report.get('draft'),dict) else {}
+    post=str(draft.get('post') or draft.get('text') or '').strip()
+    fingerprints=(
+        'entry trigger:',
+        'tp1:',
+        'tp2:',
+        'sl / invalidation:',
+        'conditional setup only; no guarantee.',
+        'scenario to test, not certainty.',
+        'conditional map; let price prove it.',
+        'setup only; outcome remains unknown.',
+        'risk boundary first; outcome unknown.',
+        'not a promise of outcome.',
+    )
+    normalized=' '.join(post.lower().split())
+    hits=[x for x in fingerprints if x in normalized]
+    if hits:
+        raise RuntimeError('Retired signal prose detected; refusing publication of legacy template: '+', '.join(hits))
+    return {'legacy_prose_rejected':False,'fingerprints_checked':len(fingerprints)}
+
 def enforce_signal_first(report_path):
     """Validate the frozen signal contract without replacing the AI-written post.
 
@@ -199,18 +227,10 @@ def emergency_verified_draft(reason):
     recent=recent_published_sentences()
     seed=int(hashlib.sha256((symbol+datetime.now(timezone.utc).isoformat()).encode()).hexdigest()[:8],16)%4
     special = None
-    try:
-        from signal_post_builder import build_outcome_post, build_signal_post
-        if category in {'result followup','creator signal outcome','follow up'}:
-            special = build_outcome_post(selected)
-        if special is None:
-            special = build_signal_post(selected)
-    except Exception as exc:
-        print(f'Signal-first local composer unavailable; retaining generic verified fallback: {exc}')
-    if special:
-        post=special['post']
-        draft_style=special['style']
-    elif category=='crypto meme':
+    # Retired signal_post_builder prose is deliberately NOT used as a fallback.
+    # Emergency mode must also respect the new editorial system.
+    draft_style='NIC_LOCAL_EMERGENCY'
+    if category=='crypto meme':
         hook_options=[f'${symbol} chose chaos for today’s market update.',f'The ${symbol} chart has excellent timing and questionable manners.',f'Nobody ordered a ${symbol} plot twist, but the market delivered one.',f'${symbol} just volunteered for the trader patience test.']
         hook=choose_fresh(hook_options[seed:]+hook_options[:seed],recent)
         mechanism_options=[f'For ${symbol}, the punchline is also the test: the size of the move matters less because the next reaction shows whether traders are accepting it or giving it back.',f'The funny part is the headline; the useful part is ${symbol} itself, because the reaction afterward tells us whether this move is being absorbed or rejected.',f'${symbol} is interesting here because a large move creates attention first, while the reaction afterward tells us whether that attention has substance.',f'The market can make any candle look dramatic, but ${symbol} becomes more informative because the follow-through can separate a real change in behavior from a one-off move.']
@@ -228,7 +248,7 @@ def emergency_verified_draft(reason):
               f'The current classification is {category}. That is a description of the setup, not a promise about the next candle.\n\n'
               f'I would rather wait for price to confirm the reaction than manufacture certainty from one move.\n\n'
               f'What specific reaction on ${symbol} would make you change your read?')
-    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':'deterministic-emergency-fallback','topic_instruction':selected.get('instruction',''),'selected_editorial_lane':selected,'engagement_strategy':pre.get('engagement_strategy') or {},'live_market_snapshot':market,'news_discovery_snapshot':news,'strategy_memory':load(Path('analytics/strategy_memory.json'),{}),'research':{'summary':'Emergency draft built only from the frozen asset and verified live market data.','strongest_signal':symbol,'source_mode':'deterministic_emergency_fallback','opportunity_score':float(selected.get('adjusted_score') or selected.get('raw_score') or 80)},'critique':{'summary':'AI generation unavailable; no unverified facts were added.','reason':str(reason)[-500:]},'draft':{'post':post,'text':post,'hook':post.split('\n\n')[0],'discussion_question':post.split('\n\n')[-1],'quality_score':84,'editorial_style':draft_style if special else ('verified_market_observation' if category!='crypto meme' else 'verified_market_meme'),'generation_mode':'LOCAL_FALLBACK','experiment_id':os_experiment or (pre.get('engagement_strategy') or {}).get('experiment_id') or 'A','experiment_format':os_format or ((pre.get('engagement_strategy') or {}).get('experiment') or {}).get('format'),'content_lane':os_lane or category,'campaign_day':monetization_os.get('campaign_day'),'hook_type':os_hook,'reader_payoff_type':os_payoff,'experiment_variable':os_variable,'experiment_treatment':os_treatment,'cycle_id':str(monetization_os.get('cycle_id') or ''),'symbol':symbol,'content_category':category,'publication_status':'DRAFT_ONLY_NOT_PUBLISHED'},'visual_plan':{'type':'candlestick_chart','use_visual':bool(candles),'title':f'{symbol}: verified 1H market data','data_points':[{'symbol':symbol}],'purpose':'TradingView chart is rendered separately from the frozen opportunity.'},'status':'DRAFT_ONLY_NOT_PUBLISHED','generation_mode':'LOCAL_FALLBACK','emergency_fallback':True,'monetization_os_contract':monetization_os,'fallback_inherits_editorial_contract':bool(monetization_os)}
+    report={'generated_at':datetime.now(timezone.utc).isoformat(),'model':'deterministic-emergency-fallback','topic_instruction':selected.get('instruction',''),'selected_editorial_lane':selected,'engagement_strategy':pre.get('engagement_strategy') or {},'live_market_snapshot':market,'news_discovery_snapshot':news,'strategy_memory':load(Path('analytics/strategy_memory.json'),{}),'research':{'summary':'Emergency draft built only from the frozen asset and verified live market data.','strongest_signal':symbol,'source_mode':'deterministic_emergency_fallback','opportunity_score':float(selected.get('adjusted_score') or selected.get('raw_score') or 80)},'critique':{'summary':'AI generation unavailable; no unverified facts were added.','reason':str(reason)[-500:]},'draft':{'post':post,'text':post,'hook':post.split('\n\n')[0],'discussion_question':post.split('\n\n')[-1],'quality_score':84,'editorial_style':draft_style if category!='crypto meme' else 'verified_market_meme','generation_mode':'LOCAL_FALLBACK','experiment_id':os_experiment or (pre.get('engagement_strategy') or {}).get('experiment_id') or 'A','experiment_format':os_format or ((pre.get('engagement_strategy') or {}).get('experiment') or {}).get('format'),'content_lane':os_lane or category,'campaign_day':monetization_os.get('campaign_day'),'hook_type':os_hook,'reader_payoff_type':os_payoff,'experiment_variable':os_variable,'experiment_treatment':os_treatment,'cycle_id':str(monetization_os.get('cycle_id') or ''),'symbol':symbol,'content_category':category,'publication_status':'DRAFT_ONLY_NOT_PUBLISHED'},'visual_plan':{'type':'candlestick_chart','use_visual':bool(candles),'title':f'{symbol}: verified 1H market data','data_points':[{'symbol':symbol}],'purpose':'TradingView chart is rendered separately from the frozen opportunity.'},'status':'DRAFT_ONLY_NOT_PUBLISHED','generation_mode':'LOCAL_FALLBACK','emergency_fallback':True,'monetization_os_contract':monetization_os,'fallback_inherits_editorial_contract':bool(monetization_os)}
     REPORT_DIR.mkdir(parents=True,exist_ok=True); slug=''.join(c.lower() if c.isalnum() else '-' for c in symbol).strip('-') or 'market-opportunity'; path=REPORT_DIR/f'{slug}-emergency-multi-agent.json'; path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps({'status':'EMERGENCY_LOCAL_DRAFT','report':str(path),'symbol':symbol,'category':category},indent=2))
 
 
@@ -245,8 +265,9 @@ def main():
     usage['requests']=requests+1; USAGE.parent.mkdir(parents=True,exist_ok=True); USAGE.write_text(json.dumps(usage,indent=2),encoding='utf-8')
     try:
         report_path=run_creator()
+        legacy_guard=reject_legacy_prose(report_path)
         binding=enforce_signal_first(report_path)
-        print(json.dumps({'signal_first_binding':binding},indent=2))
+        print(json.dumps({'legacy_prose_guard':legacy_guard,'signal_first_binding':binding},indent=2))
     except Exception as exc:
         message=str(exc); print(f'Gemini creator failed; switching immediately to verified local creator. Original error: {message}'); fallback_status=local_or_emergency(message); save_status('AI_SUCCESS','Gemini creator failed; verified local creator preserved the cycle',error=message,requests=usage['requests'],daily_limit=DAILY_LIMIT,generation_mode='LOCAL_FALLBACK',fallback_status=fallback_status); return 0
     save_status('AI_SUCCESS','Fresh creator draft generated; Signal-First contract validated without prose override',requests=usage['requests'],daily_limit=DAILY_LIMIT,generation_mode='GEMINI_EDITORIAL_CONTRACT' if binding.get('applied') else 'GEMINI',signal_first_binding=binding); return 0
