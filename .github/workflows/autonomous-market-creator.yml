@@ -352,10 +352,6 @@ jobs:
           python -m json.tool data/live/nic_content_master_10.json >/dev/null
           python -m json.tool data/intelligence/nic_content_master_10_report.json >/dev/null
           python src/candidate_generation_4.py
-          python -m py_compile src/nic_creative_compiler_13.py
-          python tests/test_nic_creative_compiler_13.py
-          python src/nic_creative_compiler_13.py
-          python -m json.tool data/live/nic_creative_compiler_13.json >/dev/null
           python -m py_compile src/nic_post_publication_outcome_14.py
           python tests/test_nic_post_publication_outcome_14.py
           python src/nic_post_publication_outcome_14.py
@@ -370,6 +366,12 @@ jobs:
           python src/normalize_draft.py
           python src/technical_enricher.py
           python src/creator_intelligence_2.py || true
+          # NIC 13 must compile the candidates after the creator has actually generated them.
+          # Running it before safe_creator_runner left editorial_preflight.candidate_scripts_4 empty.
+          python -m py_compile src/nic_creative_compiler_13.py
+          python tests/test_nic_creative_compiler_13.py
+          python src/nic_creative_compiler_13.py
+          python -m json.tool data/live/nic_creative_compiler_13.json >/dev/null
       - name: Score scripts and apply human editorial pass
         id: editorial
         if: ${{ steps.cadence.outputs.publish == 'true' }}
