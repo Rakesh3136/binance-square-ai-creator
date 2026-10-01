@@ -36,7 +36,7 @@ jobs:
           set -euo pipefail
           found=""
           for i in $(seq 1 30); do
-            found="$(gh run list --repo "$REPO" --workflow 'autonomous-market-creator.yml' --limit 10 --json databaseId,headSha,status,event,createdAt --jq '[.[] | select(.headSha=="main")] | .[0].databaseId' 2>/dev/null || true)"
+            found="$(gh run list --repo "$REPO" --workflow 'autonomous-market-creator.yml' --limit 20 --json databaseId,headSha,status,event,createdAt --jq '[.[] | select(.headSha=="'$DISPATCH_SHA'")] | .[0].databaseId' 2>/dev/null || true)"
             if [ -n "$found" ] && [ "$found" != "null" ]; then
               echo "Canonical orchestrator run detected: $found"
               echo "run_id=$found" >> "$GITHUB_OUTPUT"
