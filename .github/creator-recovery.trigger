@@ -1,3 +1,1 @@
-NIC13 candidate handoff repair 2026-10-01T11:29:01.164Z
-
-visual overlay repair 2026-10-01T12:41:02.105Z
+Canonical orchestrator restored; NIC18 repair workflow removed 2026-10-01T17:00:00Z
