@@ -3,7 +3,7 @@ from __future__ import annotations
 import json,re
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; CONTEXT=ROOT/'data/live/publication_context.json'; OUT=ROOT/'data/live/script_scorecard_4.json'
+PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; CONTEXT=ROOT/'data/live/publication_context.json'; COMPILER=ROOT/'data/live/nic_creative_compiler_13.json'; OUT=ROOT/'data/live/script_scorecard_4.json'
 REPORTS=ROOT/'data/reports'
 GENERIC=('fresh check','quick market check','the headline is only half the story','here is what matters','here’s what matters','this is the crypto story')
 BAD=('use verified current data','generate a post','write a post','you are the editor','placeholder','insert data','fill in')
@@ -59,7 +59,7 @@ def complete(t,ctx):
     if any(x in low for x in CTA):r.append('generic_engagement_bait')
     return r
 def main():
-    p=load(PREFLIGHT);ctx=load(CONTEXT);ctx={**(p.get('selected_opportunity') or {}),**ctx};candidates=p.get('candidate_scripts_4') or []
+    p=load(PREFLIGHT);ctx=load(CONTEXT);ctx={**(p.get('selected_opportunity') or {}),**ctx}; compiler=load(COMPILER); compiled=compiler.get('candidates') or []; candidates=[{'script':x.get('text',''),'compiler_score':x.get('base_score',0),'compiler_source_index':x.get('source_index')} for x in compiled if isinstance(x,dict) and x.get('text')] if compiled else (p.get('candidate_scripts_4') or [])
     raw=[c.get('script','') if isinstance(c,dict) else str(c) for c in candidates if c]
     raw += latest_drafts()
     if not raw:raw=[local_draft(ctx)]
@@ -71,6 +71,6 @@ def main():
         if miss:total=max(0,total-25)
         scored.append({'index':len(scored),'script':t,'total':total,'breakdown':b,'completeness_failures':miss,'eligible':eligible,'word_count':len(words(t))})
     scored.sort(key=lambda x:(x['eligible'],x['total']),reverse=True);winner=next((x for x in scored if x['eligible']),None)
-    result={'version':'5.8-local','format':(p.get('script_director_4') or {}).get('format',''),'story_engine':ctx.get('story_engine',''),'candidate_count':len(scored),'winner':winner,'candidates':scored,'minimum_publish_score':72,'evidence_gate':True,'external_model_required':False,'policy':['Local deterministic fallback is authoritative when no model output exists.','Reject instruction-like and generic engagement bait.','Require primary cashtag and one specific question for trade/editorial drafts.']}
+    result={'version':'5.8-local','format':(p.get('script_director_4') or {}).get('format',''),'story_engine':ctx.get('story_engine',''),'candidate_count':len(scored),'winner':winner,'candidates':scored,'minimum_publish_score':72,'evidence_gate':True,'external_model_required':False,'creative_compiler_13_authoritative':bool(compiled),'policy':['NIC 13 compiled candidates are authoritative when present.','Local deterministic fallback is authoritative when no model output exists.','Reject instruction-like and generic engagement bait.','Require primary cashtag and one specific question for trade/editorial drafts.']}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8');p['script_scorecard_4']=result;PREFLIGHT.write_text(json.dumps(p,indent=2,ensure_ascii=False),encoding='utf-8');print(json.dumps({'status':'OK','version':'5.8-local','winner_score':winner['total'] if winner else 0,'candidates':len(scored),'winner_eligible':bool(winner)},indent=2))
 if __name__=='__main__':main()
