@@ -83,7 +83,7 @@ def _gemini(prompt: str, system: str) -> str:
     if not key:
         raise RuntimeError("GEMINI_API_KEY unavailable")
     from google import genai
-    model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
     response = genai.Client(api_key=key).interactions.create(model=model, input=prompt, system_instruction=system)
     text = (response.output_text or "").strip()
     if not text:
@@ -164,7 +164,7 @@ def _generate_from_order(prompt: str, system: str, order: list[str]) -> tuple[st
                 "attempts": attempts,
                 "model": {
                     "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
-                    "gemini": os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
+                    "gemini": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
                     "openai": os.getenv("OPENAI_MODEL", "gpt-6-astra"),
                     "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"),
                 }.get(provider),
@@ -187,7 +187,7 @@ def status() -> dict:
         },
         "models": {
             "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
-            "gemini": os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
+            "gemini": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
             "openai": os.getenv("OPENAI_MODEL", "gpt-6-astra"),
             "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"),
         },
