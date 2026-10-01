@@ -1,9 +1,9 @@
 name: NIC18 workflow repair (one-time)
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,17 +16,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Restore canonical orchestrator and activate NIC18
+      - name: Restore canonical orchestrator atomically
         run: |
           set -euo pipefail
           TARGET=.github/workflows/autonomous-market-creator.yml
           GOOD=6621fa6493bab82fb86d71434fe847e7c9cdb8c1
-          if grep -q 'Refresh full market universe, flow, news and core intelligence' "$TARGET"; then
-            echo 'Canonical orchestrator already restored; nothing to do.'
-            exit 0
-          fi
-          git show "$GOOD:$TARGET" > "$TARGET"
-          python - <<'PY'
+          git fetch origin main --prune
+          BASE=$(git rev-parse origin/main)
+          git reset --hard "$BASE"
+          if grep -q 'Refresh full market universe, flow, news and core intelligence' "$TARGET" && grep -q 'python src/visual_renderer.py' "$TARGET"; then
+            echo 'Canonical orchestrator is already complete; removing repair workflow.'
+          else
+            git show "$GOOD:$TARGET" > "$TARGET"
+            python - <<'PY'
           from pathlib import Path
           p=Path('.github/workflows/autonomous-market-creator.yml')
           s=p.read_text()
@@ -37,8 +39,13 @@ jobs:
               s=s.replace(anchor,insert,1)
           p.write_text(s)
           PY
+            echo 'Canonical orchestrator restored and NIC18 activated.'
+          fi
+          rm -f .github/workflows/nic18-repair-once.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "$TARGET"
-          git commit -m 'Restore canonical orchestrator and activate NIC 18'
-          git push origin main
+          git add .github/workflows/autonomous-market-creator.yml .github/workflows/nic18-repair-once.yml
+          git commit -m 'Restore full autonomous orchestrator and remove repair workflow' || true
+          git fetch origin main --prune
+          REMOTE=$(git rev-parse origin/main)
+          git push --force-with-lease=refs/heads/main:$REMOTE origin HEAD:main
