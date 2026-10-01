@@ -43,6 +43,15 @@ def main():
         return rc
     if cat=='crypto_meme':return subprocess.run(['python',str(MEME)],cwd=ROOT,check=False).returncode
     ensure_playwright(); rc=subprocess.run(['node',str(TRADINGVIEW)],cwd=ROOT,check=False).returncode
-    if rc==0:apply_chart_style()
+    if rc==0:
+        # TradingView is the base market-data layer. Always apply the
+        # deterministic trade-level overlay after rendering so a plain
+        # screenshot can never silently become the final setup visual.
+        overlay=SRC/'professional_chart_overlay.py'
+        if overlay.exists():
+            overlay_rc=subprocess.run(['python',str(overlay)],cwd=ROOT,check=False).returncode
+            if overlay_rc!=0:
+                raise SystemExit('professional chart overlay failed; refusing unmarked setup visual')
+        apply_chart_style()
     return rc
 if __name__=='__main__':raise SystemExit(main())
