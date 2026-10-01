@@ -15,28 +15,6 @@ on:
         required: false
         default: false
         type: boolean
-  schedule:
-    - cron: '*/20 * * * *'
-  workflow_dispatch:
-    inputs:
-      topic:
-        description: Optional topic; leave blank for autonomous selection
-        required: false
-        default: ''
-        type: string
-      run_self_engineering:
-        description: Run the guarded self-engineering diagnostic during a manual run
-        required: false
-        default: false
-        type: boolean
-
-env:
-  PYTHONUNBUFFERED: '1'
-
-concurrency:
-  group: unified-binance-square-creator-v5
-  cancel-in-progress: false
-
 jobs:
   creator:
     runs-on: ubuntu-latest
