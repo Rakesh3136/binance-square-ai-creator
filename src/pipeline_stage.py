@@ -8,13 +8,13 @@ LIVE=Path("data/live")
 
 STAGES=[
     "creator_benchmark","intelligence","scan","select","freeze",
-    "creator_brain","ai_draft","visual","visual_symbol","visual_content",
+    "creator_brain","ai_draft","nic21_originality","nic21_visual_truth",
+    "nic21_publication_lock","visual","visual_symbol","visual_content",
     "quality_gate","publish","verify","record","learn","complete","finalize","diagnostics",
 ]
 
 
 def now(): return datetime.now(timezone.utc).isoformat()
-
 
 def load():
     if not OUT.exists(): return {"run_started_at":now(),"stages":{}}
@@ -22,20 +22,14 @@ def load():
         d=json.loads(OUT.read_text(encoding="utf-8")); return d if isinstance(d,dict) else {"run_started_at":now(),"stages":{}}
     except Exception: return {"run_started_at":now(),"stages":{}}
 
-
 def save(d): OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(d,indent=2,ensure_ascii=False),encoding="utf-8")
 
-
 def reset_run(reason="New autonomous production cycle"):
-    # Remove only ephemeral artifacts from the previous run. Durable publication logs
-    # and analytics are deliberately preserved, but the current visual/snapshot package
-    # must never leak into the next production cycle.
-    for name in ("publication_result.json", "creator_20_0_publication_truth.json", "historical_setup_snapshot.json", "visual_metadata.json", "visual.png", "tradingview_capture.html"):
+    for name in ("publication_result.json","creator_20_0_publication_truth.json","historical_setup_snapshot.json","visual_metadata.json","visual.png","tradingview_capture.html","nic21_gate.json","nic21_publication.lock"):
         path=LIVE/name
         try: path.unlink()
         except FileNotFoundError: pass
     d={"run_started_at":now(),"last_updated_at":now(),"current_stage":"start","last_successful_stage":None,"blocked_at":None,"stages":{},"reason":reason}; save(d); print(json.dumps(d,indent=2)); return d
-
 
 def set_stage(stage,status,reason="",**details):
     if stage not in STAGES: raise SystemExit(f"Unknown pipeline stage: {stage}")
@@ -45,14 +39,12 @@ def set_stage(stage,status,reason="",**details):
     if stage=="finalize": d["run_finished_at"]=now()
     save(d); print(json.dumps(d,indent=2,ensure_ascii=False)); return d
 
-
 def verify_publish():
     p=Path("/tmp/publish-result.txt")
     if not p.exists(): set_stage("verify","failed","publish result file missing"); return 1
     result=p.read_text(encoding="utf-8",errors="replace"); post_id=re.search(r"ID:\s*(\S+)",result); link=next((x.split("Link:",1)[1].strip() for x in result.splitlines() if x.startswith("Link:")),None)
     if not post_id or not link: set_stage("verify","failed","publisher did not return a Binance post ID and link",result_tail=result[-1200:]); return 1
     set_stage("verify","success","Binance publisher returned post ID and link",post_id=post_id.group(1),link=link); return 0
-
 
 def main():
     if len(sys.argv)>=2 and sys.argv[1]=="reset": reset_run(" ".join(sys.argv[2:]) or "New autonomous production cycle"); return 0
