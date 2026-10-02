@@ -34,13 +34,15 @@ jobs:
           python src/nic_capability_benchmark.py
           python src/nic_role_intelligence.py
           for f in data/live/nic_role_contract.json data/live/nic_task_plan.json data/live/nic_question_understanding.json data/live/nic_research_raw.json data/live/nic_evidence_registry.json data/live/nic_verified_evidence.json data/live/nic_capability_gap.json data/live/nic_capability_benchmark.json data/live/nic_role_intelligence.json; do python -m json.tool "$f" >/dev/null; done
-      - name: Persist NIC state
+      - name: Persist only NIC 20.2-owned artifacts
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/live data/intelligence
-          if git diff --cached --quiet; then echo "No NIC state changes."; exit 0; fi
+          git fetch origin main
+          git reset --mixed origin/main
+          git add data/live/nic_verified_evidence.json data/live/nic_capability_benchmark.json data/intelligence/nic_evidence_verification_report.json data/intelligence/nic_capability_benchmark_report.json
+          if git diff --cached --quiet; then echo "No NIC 20.2-owned state changes."; exit 0; fi
           git commit -m 'Run NIC 20.2 evidence and capability verification cycle'
           git pull --rebase --autostash origin main
-          git push origin main
+          git push origin HEAD:main
