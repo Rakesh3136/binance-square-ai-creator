@@ -396,6 +396,16 @@ jobs:
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/hook_diversity_rewriter.py
+      - name: NIC 21.2 Hook Diversity + Anti-Bot Preflight
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python -m py_compile src/nic21_2_hook_preflight.py
+          python tests/test_nic21_2_hook_preflight.py
+          python src/nic21_2_hook_preflight.py
+          python -m json.tool data/live/nic21_2_hook_preflight.json >/dev/null
+          python src/pipeline_stage.py nic21_originality success 'NIC 21.2 hook diversity preflight passed'
       - name: Automatic mechanism and reader-value repair
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
