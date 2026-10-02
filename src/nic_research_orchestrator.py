@@ -46,16 +46,14 @@ def main():
     task=load(TASK,{}); role=load(ROLE,{}); cfg=load(CFG,{"feeds":[]})
     q=str(task.get("task") or role.get("mission") or "Binance Square crypto market analysis")
     # Keep search bounded and deterministic. The RSS endpoint is a discovery layer, not proof.
-    google_url="https://news.google.com/rss/search?"+urllib.parse.urlencode({"q":q,"hl":"en-US","gl":"US","ceid":"US:en"})
-    records=[]; errors=[]
-    targets=[(google_url,"search")]
+    queries=[q, "site:binance.com/en/support/announcement "+q, "Binance Square creator content "+q]\n    records=[]; errors=[]\n    targets=[("https://news.google.com/rss/search?"+urllib.parse.urlencode({"q":qq,"hl":"en-US","gl":"US","ceid":"US:en"}),"search") for qq in queries]
     for f in cfg.get("feeds",[]):
         if isinstance(f,dict) and f.get("url"): targets.append((str(f["url"]),str(f.get("source_type") or "unknown")))
     for url,stype in targets[:8]:
         try:
             body=fetch(url)
             parsed=rss_records(body,url,stype)
-            if parsed: records.extend(parsed)
+            if parsed:\n                for item in parsed:\n                    host=urllib.parse.urlparse(item.get("url","")).netloc.lower()\n                    if "binance.com" in host: item["source_type"]="official"\n                records.extend(parsed)
             else: records.append({"url":url,"title":"Feed fetched without parseable entries","text":body[:2000],"source_type":stype,
                                   "limitations":["Feed format was not parsed into individual entries."]})
         except Exception as e:
@@ -73,6 +71,6 @@ def main():
          "research_policy":["discovery is not proof","cross-check before publication","creator patterns are observations","unknown stays unknown"]}
     OUT.parent.mkdir(parents=True,exist_ok=True); REPORT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(out,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    REPORT.write_text(json.dumps({"version":"20.1","status":out["status"],"query":q,"records":len(uniq),"errors":len(errors),"sources":["Google News RSS"]+[x[1] for x in targets[1:]]},indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+    REPORT.write_text(json.dumps({"version":"20.1","status":out["status"],"query":q,"records":len(uniq),"errors":len(errors),"sources":["Google News RSS"]+[x[1] for x in targets[len(queries):]]},indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps({"status":out["status"],"records":len(uniq),"errors":len(errors)},ensure_ascii=False))
 if __name__=="__main__": main()
