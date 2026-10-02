@@ -67,11 +67,16 @@ def run_nic19_guard():
         routing={}
     upstream=bool(routing.get("publish",False))
     allowed=bool(guard.get("publish",False))
+    # NIC 19 is the final editorial-cadence authority. The signal-first
+    # router remains an upstream qualification/input layer, not the publisher
+    # gate. A valid NIC 19 selection may therefore proceed even when the
+    # earlier router had no publish decision.
     routing["upstream_publish_decision"]=upstream
     routing["nic19_editorial_memory"]=guard
-    routing["publish"]=bool(upstream and allowed)
-    routing["decision_source"]="NIC19_EDITORIAL_MEMORY" if upstream else routing.get("decision_source","SIGNAL_FIRST")
-    routing["decision_reason"]=guard.get("reason") if upstream else routing.get("decision_reason")
+    routing["publish"]=allowed
+    routing["decision_source"]="NIC19_EDITORIAL_MEMORY"
+    routing["decision_reason"]=guard.get("reason")
+    routing["nic19_authoritative_publish_decision"]=allowed
     ROUTING.write_text(json.dumps(routing,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     return guard
 
