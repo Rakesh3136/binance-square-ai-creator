@@ -14,7 +14,7 @@ ROLE=ROOT/"data/live/nic_role_contract.json"
 CFG=ROOT/"data/live/nic_research_sources.json"
 OUT=ROOT/"data/live/nic_research_raw.json"
 REPORT=ROOT/"data/intelligence/nic_research_report.json"
-UA="NIC-Research/20.1 (+https://github.com/Rakesh3136/binance-square-ai-creator)"
+UA="NIC-Research/20.1.2 (+https://github.com/Rakesh3136/binance-square-ai-creator)"
 
 def load(p,d):
     try:
