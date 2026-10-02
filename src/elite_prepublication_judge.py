@@ -105,13 +105,25 @@ def template_artifacts(text):
     phrase_hits=sum(1 for p in ('reaction matters','bear case:','bull case:','reclaims the range','keep control below support','keep control above support') if p in low)
     return hits,phrase_hits
 
+REUSABLE_DISCLAIMER_SENTENCES={
+    'levels are chart derived scenarios not guarantees',
+}
+
+def normalized_sentences(text):
+    return {
+        re.sub(r'[^a-z0-9 ]','',s.lower()).strip()
+        for s in re.split(r'[.!?]+',text)
+        if len(s.split())>=6
+        and re.sub(r'[^a-z0-9 ]','',s.lower()).strip() not in REUSABLE_DISCLAIMER_SENTENCES
+    }
+
 def recent_similarity(text):
     """Lightweight phrase-overlap check against recent published posts.
-    It is intentionally conservative: only exact normalized sentence matches are
-    treated as a hard repetition signal.
+    Exact repeated editorial sentences are a hard signal, but approved
+    safety/disclaimer language is excluded because it is intentionally reusable.
     """
     if not PUBLICATION_LOG.exists(): return []
-    current={re.sub(r'[^a-z0-9 ]','',s.lower()).strip() for s in re.split(r'[.!?]+',text) if len(s.split())>=6}
+    current=normalized_sentences(text)
     if not current: return []
     matches=[]
     try:
@@ -120,12 +132,10 @@ def recent_similarity(text):
             try:o=json.loads(row)
             except Exception:continue
             old=str(o.get('text') or o.get('post') or o.get('content') or '')
-            oldset={re.sub(r'[^a-z0-9 ]','',s.lower()).strip() for s in re.split(r'[.!?]+',old) if len(s.split())>=6}
-            common=current & oldset
+            common=current & normalized_sentences(old)
             if common: matches.extend(sorted(common))
     except Exception: pass
     return matches[:6]
-
 def main():
     p=resolve_report()
     if not p: raise SystemExit('Judge: no draft found')
