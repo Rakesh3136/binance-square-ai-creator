@@ -19,14 +19,14 @@ GENERIC={
 MIN_HOOK_WORDS=8
 MAX_SIMILARITY=.78
 
-def norm(s): return re.sub(r"\\s+"," ",str(s or "").strip())
+def norm(s): return re.sub(r"\s+"," ",str(s or "").strip())
 def words(s): return re.findall(r"[A-Za-z0-9$%'.+-]+",str(s))
 def toks(s): return {x.lower() for x in words(s) if len(x)>2}
 def jac(a,b):
     a,b=toks(a),toks(b)
     return len(a&b)/len(a|b) if a|b else 0.0
 def sentences(text):
-    return [norm(x) for x in re.split(r"(?<=[.!?])\\s+|\\n+",text) if len(words(x))>=4]
+    return [norm(x) for x in re.split(r"(?<=[.!?])\s+|\n+",text) if len(words(x))>=4]
 def load(p,default):
     try:
         v=json.loads(Path(p).read_text(encoding="utf-8"))
@@ -69,7 +69,7 @@ def main():
     for i,s in enumerate(ss[:8]):
         if len(words(s))<MIN_HOOK_WORDS: continue
         similarity=max((jac(s,r) for r in recent),default=0)
-        numeric=bool(re.search(r"(\\$\\d|\\d+(?:\\.\\d+)?%|\\$?[A-Z]{2,12}\\b)",s))
+        numeric=bool(re.search(r"(\$\d|\d+(?:\.\d+)?%|\$?[A-Z]{2,12}\b)",s))
         candidates.append((similarity,not numeric,i,s))
     candidates.sort(key=lambda x:(x[0],x[1],x[2]))
     chosen=None
@@ -82,17 +82,17 @@ def main():
     if generic or weak or (chosen and jac(old_hook,chosen)<1 and max((jac(old_hook,r) for r in recent),default=0)>=MAX_SIMILARITY):
         if chosen and chosen != old_hook:
             body=ss[1:]
-            newtext="\\n\\n".join([chosen]+body)
+            newtext="\n\n".join([chosen]+body)
             draft["post"]=newtext; draft["text"]=newtext; data["draft"]=draft
-            Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+            Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
             changed=True; reason="selected_existing_evidence_bound_hook"
         elif len(ss)>=2:
             combined=norm(ss[0]+" "+ss[1])
             if len(words(combined))>=MIN_HOOK_WORDS:
                 body=ss[2:]
-                newtext="\\n\\n".join([combined]+body)
+                newtext="\n\n".join([combined]+body)
                 draft["post"]=newtext; draft["text"]=newtext; data["draft"]=draft
-                Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+                Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
                 changed=True; reason="combined_existing_sentences_for_hook"
             else:
                 reason="no_safe_hook_repair_available"
@@ -114,7 +114,7 @@ def main():
         "policy":{"pre_judge_only":True,"no_fact_invention":True,"no_gate_bypass":True,"authoritative_judge_remains_final":True},
     }
     OUT.parent.mkdir(parents=True,exist_ok=True)
-    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2,ensure_ascii=False))
     return 0 if passed else 1
 
