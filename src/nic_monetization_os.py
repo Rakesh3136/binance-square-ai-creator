@@ -457,7 +457,34 @@ def main() -> int:
 
     current = load_json(CONTRACT, {})
     if not current:
-        print("NIC Monetization OS: no prepublication contract; nothing to join.")
+        # Post-publication intelligence can run independently of a current
+        # prepublication contract. Always emit the canonical dashboard/report
+        # so the workflow's artifact contract remains valid.
+        now = datetime.now(timezone.utc).isoformat()
+        dashboard = {
+            "version": "2.1",
+            "generated_at": now,
+            "status": "NO_PREPUBLICATION_CONTRACT",
+            "cycle_id": None,
+            "post_id": None,
+            "verified_reward_usdc": None,
+            "learning": build_learning_summary(),
+            "events_added_this_refresh": 0,
+            "explicit_unknowns": [
+                "No active prepublication contract was available for this refresh.",
+                "Reader trade activity is UNKNOWN unless an explicit verified reward event is present.",
+                "Revenue is UNKNOWN unless an explicit verified reward amount is present.",
+            ],
+        }
+        DASHBOARD.write_text(json.dumps(dashboard, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        REPORT.write_text(json.dumps({
+            "version": "2.1",
+            "status": dashboard["status"],
+            "generated_at": now,
+            "post_id": None,
+            "verified_reward_usdc": None,
+        }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print("NIC Monetization OS: no prepublication contract; emitted empty postpublication intelligence snapshot.")
         return 0
     updated = dashboard_post_phase(current)
     events_added = post_events(updated)
