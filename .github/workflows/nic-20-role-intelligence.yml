@@ -6,7 +6,7 @@ on:
     paths:
       - 'src/nic_role_*.py'
       - 'src/nic_task_compiler.py'
-      - 'src/nic_capability_gap.py'
+      - 'src/nic_capability_gap.py'\n      - 'src/nic_question_understanding.py'\n      - 'src/nic_research_orchestrator.py'\n      - 'src/nic_evidence_registry.py'\n      - 'data/live/nic_research_sources.json'
       - '.github/workflows/nic-20-role-intelligence.yml'
   workflow_dispatch:
   schedule:
@@ -33,7 +33,7 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           set -euo pipefail
-          python -m compileall -q src/nic_role_contract.py src/nic_task_compiler.py src/nic_capability_gap.py src/nic_role_intelligence.py
+          python -m compileall -q src/nic_role_contract.py src/nic_task_compiler.py src/nic_capability_gap.py src/nic_question_understanding.py src/nic_research_orchestrator.py src/nic_evidence_registry.py src/nic_role_intelligence.py
           python src/nic_role_contract.py
           python src/nic_task_compiler.py
           python src/nic_capability_gap.py
