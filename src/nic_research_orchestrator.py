@@ -46,14 +46,33 @@ def main():
     task=load(TASK,{}); role=load(ROLE,{}); cfg=load(CFG,{"feeds":[]})
     q=str(task.get("task") or role.get("mission") or "Binance Square crypto market analysis")
     # Keep search bounded and deterministic. The RSS endpoint is a discovery layer, not proof.
-    queries=[q, "site:binance.com/en/support/announcement "+q, "Binance Square creator content "+q]\n    records=[]; errors=[]\n    targets=[("https://news.google.com/rss/search?"+urllib.parse.urlencode({"q":qq,"hl":"en-US","gl":"US","ceid":"US:en"}),"search") for qq in queries]
+    queries = [
+        q,
+        "site:binance.com/en/support/announcement " + q,
+        "Binance Square creator content " + q,
+    ]
+    records = []
+    errors = []
+    targets = [
+        (
+            "https://news.google.com/rss/search?"
+            + urllib.parse.urlencode({"q": qq, "hl": "en-US", "gl": "US", "ceid": "US:en"}),
+            "search",
+        )
+        for qq in queries
+    ]
     for f in cfg.get("feeds",[]):
         if isinstance(f,dict) and f.get("url"): targets.append((str(f["url"]),str(f.get("source_type") or "unknown")))
     for url,stype in targets[:8]:
         try:
             body=fetch(url)
             parsed=rss_records(body,url,stype)
-            if parsed:\n                for item in parsed:\n                    host=urllib.parse.urlparse(item.get("url","")).netloc.lower()\n                    if "binance.com" in host: item["source_type"]="official"\n                records.extend(parsed)
+            if parsed:
+                for item in parsed:
+                    host = urllib.parse.urlparse(item.get("url", "")).netloc.lower()
+                    if "binance.com" in host:
+                        item["source_type"] = "official"
+                records.extend(parsed)
             else: records.append({"url":url,"title":"Feed fetched without parseable entries","text":body[:2000],"source_type":stype,
                                   "limitations":["Feed format was not parsed into individual entries."]})
         except Exception as e:
