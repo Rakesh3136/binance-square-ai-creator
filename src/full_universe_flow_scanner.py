@@ -68,7 +68,7 @@ def klines(symbol):
             continue
     if len(rows)<8:return None
     prior=[x['quote_volume'] for x in rows[:-1] if x['quote_volume']>0];last=rows[-1]
-    baseline=sum(x['quote_volume'] for x in prior[-6:])/max(1,len(prior[-6:]));median=sorted(prior)[len(prior)//2] if prior else 0
+    # `prior` contains numeric quote-volume values, not candle dictionaries.\n    # Keep this normalization explicit so an API response can never make the\n    # evidence layer subscript a float and kill the entire intelligence stage.\n    prior= [num(v) for v in prior if num(v)>0]\n    baseline=sum(prior[-6:])/max(1,len(prior[-6:]));median=sorted(prior)[len(prior)//2] if prior else 0
     base=rows[-7]['close'] or last['close'];high=max(x['high'] for x in rows[-7:]);low=min(x['low'] for x in rows[-7:])
     return {'last_1h_quote_volume':last['quote_volume'],'avg_prior_6h_quote_volume':baseline,'volume_acceleration':round(last['quote_volume']/baseline,3) if baseline else 0,'volume_vs_24h_median':round(last['quote_volume']/median,3) if median else 0,'price_change_6h_pct':round((last['close']-base)/base*100,3) if base else 0,'range_6h_pct':round((high-low)/last['close']*100,3) if last['close'] else 0,'close_position_6h':round((last['close']-low)/(high-low),3) if high>low else .5,'breakout_distance_pct':round((high-last['close'])/last['close']*100,3) if last['close'] else 0}
 
