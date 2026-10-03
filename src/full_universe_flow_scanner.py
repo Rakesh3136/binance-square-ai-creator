@@ -6,7 +6,7 @@ CONFIRMED/LATE/EXHAUSTED so the publisher can refuse to turn an unconfirmed
 observation into a prediction. No future move is guaranteed.
 """
 from __future__ import annotations
-import json, math, urllib.parse, urllib.request
+import json, math, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'data/live/full_universe_flow.json'
 STATE=ROOT/'data/live/full_universe_flow_state.json'
 BASES=['https://data-api.binance.vision','https://api-gcp.binance.com','https://api1.binance.com','https://api2.binance.com']
-QUOTE='USDT'; ENRICH_N=240; DERIV_N=120; WORKERS=12
+QUOTE='USDT'; ENRICH_N=240; DERIV_N=120; WORKERS=6
 
 def get_json(path,params=None,futures=False):
     bases=['https://fapi.binance.com'] if futures else BASES
@@ -48,7 +48,15 @@ def spot_tickers():
     return {str(x.get('symbol')):x for x in raw if isinstance(x,dict)}
 
 def klines(symbol):
-    raw=get_json('/api/v3/klines',{'symbol':symbol,'interval':'1h','limit':25}) or []
+    raw=[]
+    # GitHub-hosted runners can briefly hit Binance public-data rate limits.
+    # Retry the evidence request before treating a symbol as un-enriched.
+    for attempt in range(3):
+        raw=get_json('/api/v3/klines',{'symbol':symbol,'interval':'1h','limit':25}) or []
+        if raw:
+            break
+        if attempt<2:
+            time.sleep(0.25*(attempt+1))
     now_ms=int(datetime.now(timezone.utc).timestamp()*1000)
     rows=[]
     for r in raw:
@@ -128,7 +136,18 @@ def main():
                 k=f.result()
                 if k:futs[f].update(k)
             except Exception:pass
-    for x in enrich:x['discovery_score']=score(x)
+    enriched_1h=[x for x in enrich if 'volume_acceleration' in x and 'price_change_6h_pct' in x]
+    # Never call a symbol "fully enriched" when the 1h evidence request failed.
+    # A bounded second pass recovers transient public-API failures without
+    # weakening the downstream evidence/confirmation gates.
+    if len(enriched_1h) < min(ENRICH_N, 120):
+        missing=[x for x in enrich if x not in enriched_1h][:ENRICH_N-len(enriched_1h)]
+        for x in missing:
+            k=klines(x['symbol_usdt'])
+            if k:x.update(k)
+    enriched_1h=[x for x in enrich if 'volume_acceleration' in x and 'price_change_6h_pct' in x]
+    for x in enriched_1h:x['discovery_score']=score(x)
+    enrich=enriched_1h
     enrich.sort(key=lambda x:x['discovery_score'],reverse=True);deriv=enrich[:DERIV_N]
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         futs={ex.submit(derivatives,x['symbol_usdt']):x for x in deriv}
@@ -143,7 +162,7 @@ def main():
     for x in enrich:
         state,hist=classify(x,old);x['flow_state']=state;x['state_history']=hist;x['early_mover']=state in {'EARLY','DEVELOPING'};x['confirmation_required']=state in {'EARLY','DEVELOPING'};x['evidence']=[k for k in ('volume_acceleration','volume_vs_24h_median','relative_strength_24h','oi_change_3h_pct','funding_rate','breakout_distance_pct') if k in x]
         if x['early_mover'] and x['discovery_score']>=45:early.append(x)
-    payload={'version':'2.0','generated_at':datetime.now(timezone.utc).isoformat(),'status':'OK','universe':{'spot_usdt_symbols':len(rows),'exchange_info_symbols':len(universe),'fully_enriched':len(enrich),'derivatives_enriched':len(deriv)},'market_breadth':{'average_24h_change':round(avg,4)},'early_movers':early[:40],'top_flow_candidates':enrich[:60],'all_live_symbols':[x['symbol'] for x in rows],'state_definitions':{'EARLY':'participation is abnormal but price is not yet extended; hypothesis only; downstream confirmation required','DEVELOPING':'multiple independent participation/structure signals are strengthening','CONFIRMED':'strong participation plus structure/derivatives evidence; still conditional','LATE':'move is already advanced or breakout is too close to current price','EXHAUSTED':'parabolic/overextended conditions; do not chase','WATCH':'insufficient evidence'},'method':['Full Binance USDT spot universe from exchangeInfo','24h ticker breadth for every live symbol','1h volume acceleration and short-term structure for top 120 unusual/liquid assets','funding and open-interest context for top 80','relative strength versus market average','extension penalty to reduce late pump chasing'],'policy':['Discovery is not a prediction guarantee.','Only EARLY/DEVELOPING candidates may enter the early-discovery lane.','CONFIRMED still requires a verified trigger/invalidation before directional publishing.','LATE and EXHAUSTED candidates are excluded from early-mover publishing.','Order flow/funding/OI are context, not proof of whale activity or future direction.']}
+    payload={'version':'2.0','generated_at':datetime.now(timezone.utc).isoformat(),'status':'OK','universe':{'spot_usdt_symbols':len(rows),'exchange_info_symbols':len(universe),'fully_enriched':len(enriched_1h),'derivatives_enriched':len(deriv),'one_hour_evidence_failures':max(0,ENRICH_N-len(enriched_1h))},'market_breadth':{'average_24h_change':round(avg,4)},'early_movers':early[:40],'top_flow_candidates':enrich[:60],'all_live_symbols':[x['symbol'] for x in rows],'state_definitions':{'EARLY':'participation is abnormal but price is not yet extended; hypothesis only; downstream confirmation required','DEVELOPING':'multiple independent participation/structure signals are strengthening','CONFIRMED':'strong participation plus structure/derivatives evidence; still conditional','LATE':'move is already advanced or breakout is too close to current price','EXHAUSTED':'parabolic/overextended conditions; do not chase','WATCH':'insufficient evidence'},'method':['Full Binance USDT spot universe from exchangeInfo','24h ticker breadth for every live symbol','1h volume acceleration and short-term structure for a diversified 240-symbol evidence pool','funding and open-interest context for up to 120 evidence-qualified symbols','relative strength versus market average','extension penalty to reduce late pump chasing'],'policy':['Discovery is not a prediction guarantee.','Only EARLY/DEVELOPING candidates may enter the early-discovery lane.','CONFIRMED still requires a verified trigger/invalidation before directional publishing.','LATE and EXHAUSTED candidates are excluded from early-mover publishing.','Order flow/funding/OI are context, not proof of whale activity or future direction.']}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(payload,indent=2,ensure_ascii=False),encoding='utf-8');STATE.write_text(json.dumps({'version':'2.0','updated_at':payload['generated_at'],'symbols':{x['symbol']: {'state':x['flow_state'],'states':x.get('state_history',[]),'discovery_score':x.get('discovery_score',0)} for x in enrich}},indent=2,ensure_ascii=False),encoding='utf-8')
     print(json.dumps({'status':'OK','spot_usdt_universe':len(rows),'fully_enriched':len(enrich),'derivatives_enriched':len(deriv),'early_movers':len(early),'states':{s:sum(1 for x in enrich if x.get('flow_state')==s) for s in ('EARLY','DEVELOPING','CONFIRMED','LATE','EXHAUSTED','WATCH')},'top_candidate':early[0] if early else None},indent=2))
 if __name__=='__main__':main()
