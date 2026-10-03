@@ -21,14 +21,17 @@ def test_extended_move_is_not_confirmed_early():
     assert abs(float(c["price_change_percent"])) > n.MAX_PRICE_MOVE
 
 def test_near_miss_contract():
+    # Deliberately calibrated to 49? No: this fixture must exercise the
+    # WATCH_ONLY 50-59.99 band without changing the production threshold.
     c={"price_change_percent":2,"volume_acceleration":1.5,"volume_vs_24h_median":1.2,
-       "relative_strength_24h":0.5,"oi_change_3h_pct":0,"breakout_distance_pct":5,
+       "relative_strength_24h":0.5,"oi_change_3h_pct":1,"breakout_distance_pct":5,
        "discovery_score":50}
     score,signals,breakdown=n.confirm_score(c)
     assert 50 <= score < n.MIN_SCORE
     assert len(signals) >= n.MIN_SIGNALS
     assert n.NEAR_MISS_MIN_SCORE == 50.0
     assert sum(breakdown.values()) == score
+    assert score == 56.0
 
 def test_contracts():
     assert n.MIN_SCORE == 60.0
