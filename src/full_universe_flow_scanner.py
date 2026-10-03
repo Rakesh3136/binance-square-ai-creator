@@ -102,8 +102,25 @@ def main():
         rows.append({'symbol':u['asset'],'symbol_usdt':u['symbol'],'last_price':last,'price_change_percent':pct,'quote_volume_usdt':qv,'intraday_range_percent':round((hi-lo)/last*100,3) if last else 0})
     avg=sum(x['price_change_percent'] for x in rows)/max(1,len(rows))
     for x in rows:x['relative_strength_24h']=round(x['price_change_percent']-avg,3)
-    rows.sort(key=lambda x:(abs(x['relative_strength_24h']),math.log10(max(1,x['quote_volume_usdt']))),reverse=True)
-    enrich=rows[:ENRICH_N]
+    # Diversify the enrichment pool so moderate participation can reach
+    # the 1h evidence layer instead of selecting mostly already-moving assets.
+    def pre_rank(x):
+        move=abs(num(x.get('price_change_percent')))
+        liq=math.log10(max(1,x.get('quote_volume_usdt',0)))
+        participation=min(6.0,liq)+min(6.0,abs(x.get('relative_strength_24h',0)))
+        extension_penalty=max(0.0,move-3.0)*1.8
+        return participation-extension_penalty
+    by_score=sorted(rows,key=pre_rank,reverse=True)
+    by_relative=sorted(rows,key=lambda x:abs(x.get('relative_strength_24h',0)),reverse=True)
+    by_volume=sorted(rows,key=lambda x:x.get('quote_volume_usdt',0),reverse=True)
+    by_moderate=sorted(rows,key=lambda x:(abs(abs(x.get('price_change_percent',0))-2.5),-x.get('quote_volume_usdt',0)))
+    pool=[]
+    for group in (by_score,by_relative,by_volume,by_moderate):
+        for x in group:
+            if x not in pool: pool.append(x)
+            if len(pool)>=ENRICH_N: break
+        if len(pool)>=ENRICH_N: break
+    enrich=pool[:ENRICH_N]
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         futs={ex.submit(klines,x['symbol_usdt']):x for x in enrich}
         for f in as_completed(futs):
