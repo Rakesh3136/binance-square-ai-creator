@@ -14,6 +14,7 @@ from pathlib import Path
 PREFLIGHT=Path('data/live/editorial_preflight.json')
 PUBLICATIONS=Path('analytics/publication_log.jsonl')
 OUT=Path('data/live/nic22_opportunity_diversity.json')
+SELECTION_OUT=Path('data/live/nic22_opportunity_selection.json')
 ASSET_COOLDOWN_HOURS=72
 ASSET_HARD_BLOCK_COUNT=2
 
@@ -30,7 +31,6 @@ STORY_TYPES={
 CHART_PROFILES={
     'breakout_retest':'breakout_retest_zones','rejection_invalidation':'rejection_and_invalidation','range_structure':'range_boundaries_midpoint','trend_continuation':'market_structure_swings','momentum_volume':'price_volume_relationship','relative_strength':'relative_strength_comparison','research_edge':'evidence_annotated_chart','post_mortem_lesson':'annotated_lesson_chart',
 }
-
 
 def load(path,default):
     try:
@@ -68,10 +68,8 @@ def story_history(rows):
     return assets,types,charts
 
 def choose_story(candidate, recent_types, recent_charts):
-    symbol=norm(candidate.get('topic') or candidate.get('symbol'))
     lane=str(candidate.get('category') or candidate.get('type') or '').lower()
     move=float(candidate.get('price_change_percent') or 0)
-    rng=float(candidate.get('intraday_range_percent') or 0)
     flow=bool(candidate.get('flow_side'))
     if flow or abs(move)>=8: preferred=['momentum_volume','breakout_retest','rejection_invalidation','range_structure']
     elif 'news' in lane: preferred=['research_edge','trend_continuation','rejection_invalidation','relative_strength']
@@ -101,9 +99,7 @@ def main():
         eligible.append((score+diversity,c))
     eligible.sort(key=lambda x:x[0],reverse=True)
     chosen=eligible[0][1] if eligible else None
-    reason='rotated_to_unused_or_underused_asset'
-    if chosen is None:
-        reason='no_diverse_eligible_asset'
+    reason='rotated_to_unused_or_underused_asset' if chosen else 'no_diverse_eligible_asset'
     selected=None
     if chosen:
         story=choose_story(chosen,types,charts)
@@ -111,17 +107,16 @@ def main():
         for k in ('news_title','news_url','news_source','news_published_at','news_score','news_symbols','flow_side','flow_confidence','trade_setup','relative_strength_to_btc','flow_proxy_score','flow_notes'):
             if k in chosen:selected[k]=chosen[k]
     result={'version':'22.1-opportunity-rotation','generated_at':datetime.now(timezone.utc).isoformat(),'status':'SELECTED' if selected else 'BLOCKED','reason':reason,'selected_opportunity':selected,'recent_asset_counts':dict(assets),'recent_story_types':dict(types),'recent_chart_profiles':dict(charts),'candidate_count':len(candidates),'eligible_count':len(eligible),'rules':{'asset_cooldown_hours':ASSET_COOLDOWN_HOURS,'asset_hard_block_count':ASSET_HARD_BLOCK_COUNT,'no_diverse_asset_fallback':True,'no_fact_invention':True,'no_publish_bypass':True}}
-    if selected:
-        pre['selected_opportunity']=selected
-        pre['run_ai']=True
-        pre['reason']='nic22_diverse_opportunity_selected'
-        pre['nic22']=result
-        PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    else:
-        pre['selected_opportunity']=None;pre['run_ai']=False;pre['reason']=reason;pre['nic22']=result
-        PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
-    print(json.dumps(result,indent=2,ensure_ascii=False))
+    pre['selected_opportunity']=selected
+    pre['run_ai']=bool(selected)
+    pre['reason']='nic22_diverse_opportunity_selected' if selected else reason
+    pre['nic22']=result
+    PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
+    OUT.parent.mkdir(parents=True,exist_ok=True)
+    payload=json.dumps(result,indent=2,ensure_ascii=False)
+    OUT.write_text(payload,encoding='utf-8')
+    SELECTION_OUT.write_text(payload,encoding='utf-8')
+    print(payload)
     return 0 if selected else 1
 
 if __name__=='__main__':raise SystemExit(main())
