@@ -83,13 +83,27 @@ jobs:
           python src/run_creator_intelligence.py
           python src/editorial_preflight.py
 
+      - name: NIC 22.2 early opportunity gate
+        id: early_opportunity
+        run: |
+          set +e
+          python src/nic22_2_early_opportunity_engine.py
+          eligible=$(python -c 'import json; print(str(json.load(open("data/live/nic22_2_early_selection.json")).get("status") == "SELECTED").lower())')
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+          if [ "$eligible" != "true" ]; then
+            echo "No EARLY/DEVELOPING setup passed the extension and participation gate; publication will stop safely."
+          fi
+          exit 0
+
       - name: NIC 22.1 opportunity rotation
+        if: ${{ steps.early_opportunity.outputs.eligible == 'true' }}
         run: |
           python src/nic22_opportunity_diversity_engine.py
           test -s data/live/nic22_opportunity_selection.json
           python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
 
       - name: Measure previous publications and learning state
+        if: ${{ steps.early_opportunity.outputs.eligible == 'true' }}
         run: |
           python src/square_performance_collector.py
           python src/square_post_detail_collector.py
@@ -100,6 +114,7 @@ jobs:
 
       - name: Adaptive cadence and publication decision
         id: cadence
+        if: ${{ steps.early_opportunity.outputs.eligible == 'true' }}
         run: |
           python src/revenue_content_director.py
           python src/content_director_4.py
