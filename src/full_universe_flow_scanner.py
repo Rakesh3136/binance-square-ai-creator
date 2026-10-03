@@ -15,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'data/live/full_universe_flow.json'
 STATE=ROOT/'data/live/full_universe_flow_state.json'
 BASES=['https://data-api.binance.vision','https://api-gcp.binance.com','https://api1.binance.com','https://api2.binance.com']
-QUOTE='USDT'; ENRICH_N=120; DERIV_N=80; WORKERS=12
+QUOTE='USDT'; ENRICH_N=240; DERIV_N=120; WORKERS=12
 
 def get_json(path,params=None,futures=False):
     bases=['https://fapi.binance.com'] if futures else BASES
