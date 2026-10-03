@@ -57,8 +57,10 @@ jobs:
         run: |
           set -euo pipefail
           python -m compileall -q src
-          python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py
+          python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py
           python tests/test_nic22_opportunity_diversity_engine.py
+          python tests/test_nic22_2_early_opportunity_engine.py
+          python tests/test_nic22_3_early_confirmation_engine.py
           python tests/test_nic21_2_hook_preflight.py
           python src/pipeline_contract_validator.py
 
@@ -95,15 +97,28 @@ jobs:
           fi
           exit 0
 
-      - name: NIC 22.1 opportunity rotation
+      - name: NIC 22.3 early signal confirmation
+        id: early_confirmation
         if: ${{ steps.early_opportunity.outputs.eligible == 'true' }}
+        run: |
+          set +e
+          python src/nic22_3_early_confirmation_engine.py
+          confirmed=$(python -c 'import json; print(str(json.load(open("data/live/nic22_3_confirmation_selection.json")).get("status") == "CONFIRMED").lower())')
+          echo "confirmed=$confirmed" >> "$GITHUB_OUTPUT"
+          if [ "$confirmed" != "true" ]; then
+            echo "No early setup has enough independent confirmation; publication will stop safely."
+          fi
+          exit 0
+
+      - name: NIC 22.1 opportunity rotation
+        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' }}
         run: |
           python src/nic22_opportunity_diversity_engine.py
           test -s data/live/nic22_opportunity_selection.json
           python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
 
       - name: Measure previous publications and learning state
-        if: ${{ steps.early_opportunity.outputs.eligible == 'true' }}
+        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' }}
         run: |
           python src/square_performance_collector.py
           python src/square_post_detail_collector.py
@@ -114,7 +129,7 @@ jobs:
 
       - name: Adaptive cadence and publication decision
         id: cadence
-        if: ${{ steps.early_opportunity.outputs.eligible == 'true' }}
+        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' }}
         run: |
           python src/revenue_content_director.py
           python src/content_director_4.py
@@ -130,7 +145,8 @@ jobs:
       - name: Freeze selected opportunity
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         run: |
-          python src/nic22_opportunity_diversity_engine.py
+          test -s data/live/nic22_opportunity_selection.json
+          python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
           python src/freeze_opportunity.py
           python src/early_setup_gate.py
           python src/opportunity_contract_gate.py
