@@ -68,22 +68,75 @@ jobs:
         run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
 
       - name: Refresh market and research intelligence
+        id: intelligence
         env:
           TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
-          python src/live_market_scanner.py
-          python src/full_universe_flow_scanner.py
-          python src/full_universe_ranker_bridge.py
-          python src/capital_flow_intelligence.py
-          python src/nic_prediction_engine.py
-          python -m json.tool data/live/nic_prediction_engine.json >/dev/null
-          python src/nic_prediction_contract_validator.py
-          python -m json.tool data/live/nic_prediction_contract_validation.json >/dev/null
-          python src/news_scanner.py
-          python src/global_macro_intelligence.py
-          python src/cross_asset_impact_engine.py
-          python src/run_creator_intelligence.py
-          python src/editorial_preflight.py
+          set +e
+          mkdir -p data/live/intelligence_diagnostics
+          failures=0
+          : > data/live/intelligence_diagnostics/summary.txt
+
+          run_component() {
+            name="$1"
+            shift
+            log="data/live/intelligence_diagnostics/${name}.log"
+            echo "===== ${name} =====" | tee "$log"
+            "$@" 2>&1 | tee -a "$log"
+            rc="${PIPESTATUS[0]}"
+            if [ "$rc" -ne 0 ]; then
+              echo "FAILED ${name} exit=$rc" | tee -a "$log" | tee -a data/live/intelligence_diagnostics/summary.txt
+              failures=$((failures+1))
+            else
+              echo "OK ${name}" | tee -a "$log" | tee -a data/live/intelligence_diagnostics/summary.txt
+            fi
+          }
+
+          run_component live_market_scanner python src/live_market_scanner.py
+          run_component full_universe_flow_scanner python src/full_universe_flow_scanner.py
+          run_component full_universe_ranker_bridge python src/full_universe_ranker_bridge.py
+          run_component capital_flow_intelligence python src/capital_flow_intelligence.py
+          run_component nic_prediction_engine python src/nic_prediction_engine.py
+
+          if [ -s data/live/nic_prediction_engine.json ]; then
+            python -m json.tool data/live/nic_prediction_engine.json >/dev/null
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "FAILED nic_prediction_engine_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt
+              failures=$((failures+1))
+            fi
+          else
+            echo "FAILED nic_prediction_engine_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt
+            failures=$((failures+1))
+          fi
+
+          run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py
+
+          if [ -s data/live/nic_prediction_contract_validation.json ]; then
+            python -m json.tool data/live/nic_prediction_contract_validation.json >/dev/null
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "FAILED nic_prediction_contract_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt
+              failures=$((failures+1))
+            fi
+          else
+            echo "FAILED nic_prediction_contract_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt
+            failures=$((failures+1))
+          fi
+
+          run_component news_scanner python src/news_scanner.py
+          run_component global_macro_intelligence python src/global_macro_intelligence.py
+          run_component cross_asset_impact_engine python src/cross_asset_impact_engine.py
+          run_component run_creator_intelligence python src/run_creator_intelligence.py
+          run_component editorial_preflight python src/editorial_preflight.py
+
+          echo "===== INTELLIGENCE SUMMARY ====="
+          cat data/live/intelligence_diagnostics/summary.txt
+
+          if [ "$failures" -ne 0 ]; then
+            echo "Intelligence refresh failed in $failures component(s). Publication remains blocked; inspect data/live/intelligence_diagnostics/*.log."
+            exit 1
+          fi
 
       - name: NIC 22.2 early opportunity gate
         id: early_opportunity
