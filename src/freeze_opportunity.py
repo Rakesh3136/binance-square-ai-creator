@@ -9,6 +9,7 @@ ENGAGEMENT = ROOT / 'data/live/engagement_strategy.json'
 MARKET = ROOT / 'data/live/market_snapshot.json'
 CADENCE = ROOT / 'data/live/autonomous_cadence_6.json'
 SIGNAL = ROOT / 'data/live/signal_first_routing.json'
+NIC22_SELECTION = ROOT / 'data/live/nic22_opportunity_selection.json'
 PORTFOLIO = ROOT / 'data/live/content_portfolio_guard.json'
 OUT = ROOT / 'data/live/authoritative_opportunity.json'
 BASES = ['https://data-api.binance.vision', 'https://api-gcp.binance.com', 'https://api1.binance.com', 'https://api2.binance.com']
@@ -116,6 +117,16 @@ def signal_candidate(signal):
     return candidate
 
 def candidate_pool(portfolio,pre,engagement,market,signal,stale_portfolio=False):
+    # Once NIC 22.1 has selected and NIC 22.3 has confirmed an opportunity,
+    # that selection is immutable. Downstream routing may decide whether to
+    # publish, but it must not replace the frozen asset/story.
+    nic22=load(NIC22_SELECTION)
+    nic22_selected=nic22.get('selected_opportunity') if str(nic22.get('status') or '').upper() == 'SELECTED' else None
+    if isinstance(nic22_selected,dict) and symbol(nic22_selected):
+        item=dict(nic22_selected)
+        item['selection_source']='nic22_authoritative_selection'
+        item['_freeze_source']='nic22_authoritative_selection'
+        return [item]
     pool,seen=[],set()
     selected_signal=signal_candidate(signal)
     if selected_signal: add_candidate(pool,seen,selected_signal,'signal_first_router')
