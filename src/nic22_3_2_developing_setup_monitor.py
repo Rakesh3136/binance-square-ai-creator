@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 CONFIRMATION=Path("data/live/nic22_3_early_confirmation.json")
+EARLY=Path("data/live/nic22_2_early_selection.json")
 WATCH=Path("data/live/nic22_3_developing_watch.json")
 HISTORY=Path("data/live/nic22_3_developing_history.json")
 MIN_SCORE=45.0
@@ -21,8 +22,11 @@ def load(path, default):
 def main():
     now=datetime.now(timezone.utc).isoformat()
     confirmation=load(CONFIRMATION,{})
+    early=load(EARLY,{})
     score=float(confirmation.get("confirmation_score",0.0) or 0.0)
     candidate=confirmation.get("selected_opportunity")
+    if not isinstance(candidate,dict):
+        candidate=early.get("selected_opportunity") if isinstance(early.get("selected_opportunity"),dict) else None
     signals=confirmation.get("observed_signals",[])
     breakdown=confirmation.get("score_breakdown",{})
     symbol=str((candidate or {}).get("symbol","")).upper()
@@ -30,7 +34,7 @@ def main():
     watch=load(WATCH,{})
     history=load(HISTORY,[])
     if not isinstance(history,list): history=[]
-    eligible=(not candidate and bool(symbol) and MIN_SCORE<=score<=MAX_SCORE and len(set(signals))>=4 and move<=MAX_PRICE_MOVE)
+    eligible=(not bool(confirmation.get("selected_opportunity")) and bool(symbol) and MIN_SCORE<=score<=MAX_SCORE and len(set(signals))>=4 and move<=MAX_PRICE_MOVE)
     if eligible:
         previous=int(watch.get("cycles_observed",0) or 0) if watch.get("symbol")==symbol and watch.get("status")=="WATCH_ONLY" else 0
         cycles=previous+1
