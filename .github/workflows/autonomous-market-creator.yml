@@ -1,3 +1,132 @@
+name: Binance Square AI Creator — Single Autonomous Orchestrator
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: Optional topic; leave blank for autonomous selection
+        required: false
+        default: ''
+        type: string
+      run_self_engineering:
+        description: Run guarded self-engineering diagnostics
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  creator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Reject stale queued creator run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          current_main=$(git rev-parse origin/main)
+          if [ "$GITHUB_SHA" != "$current_main" ]; then
+            echo "Stale creator run detected: event=$GITHUB_SHA current_main=$current_main"
+            gh run cancel "$GITHUB_RUN_ID" --repo "${{ github.repository }}" || true
+            exit 0
+          fi
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir -r requirements.txt
+
+      - name: Early code integrity check
+        run: |
+          set -euo pipefail
+          python -m compileall -q src
+          python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py
+          python tests/test_nic22_opportunity_diversity_engine.py
+          python tests/test_nic22_2_early_opportunity_engine.py
+          python tests/test_nic22_3_early_confirmation_engine.py
+          python tests/test_nic21_2_hook_preflight.py
+          python src/pipeline_contract_validator.py
+
+      - name: Reset creator cycle
+        run: python src/pipeline_stage.py reset 'Single-orchestrator autonomous creator cycle'
+
+      - name: Refresh market and research intelligence
+        id: intelligence
+        env:
+          TOPIC: ${{ github.event.inputs.topic || '' }}
+        run: |
+          set +e
+          mkdir -p data/live/intelligence_diagnostics
+          failures=0
+          : > data/live/intelligence_diagnostics/summary.txt
+
+          run_component() {
+            name="$1"
+            shift
+            log="data/live/intelligence_diagnostics/${name}.log"
+            echo "===== ${name} =====" | tee "$log"
+            "$@" 2>&1 | tee -a "$log"
+            rc="${PIPESTATUS[0]}"
+            if [ "$rc" -ne 0 ]; then
+              echo "FAILED ${name} exit=$rc" | tee -a "$log" | tee -a data/live/intelligence_diagnostics/summary.txt
+              failures=$((failures+1))
+            else
+              echo "OK ${name}" | tee -a "$log" | tee -a data/live/intelligence_diagnostics/summary.txt
+            fi
+          }
+
+          run_component live_market_scanner python src/live_market_scanner.py
+          run_component full_universe_flow_scanner python src/full_universe_flow_scanner.py
+          run_component full_universe_ranker_bridge python src/full_universe_ranker_bridge.py
+          run_component capital_flow_intelligence python src/capital_flow_intelligence.py
+          run_component nic_prediction_engine python src/nic_prediction_engine.py
+
+          if [ -s data/live/nic_prediction_engine.json ]; then
+            python -m json.tool data/live/nic_prediction_engine.json >/dev/null
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "FAILED nic_prediction_engine_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt
+              failures=$((failures+1))
+            fi
+          else
+            echo "FAILED nic_prediction_engine_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt
+            failures=$((failures+1))
+          fi
+
+          run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py
+
+          if [ -s data/live/nic_prediction_contract_validation.json ]; then
+            python -m json.tool data/live/nic_prediction_contract_validation.json >/dev/null
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "FAILED nic_prediction_contract_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt
+              failures=$((failures+1))
+            fi
+          else
+            echo "FAILED nic_prediction_contract_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt
+            failures=$((failures+1))
+          fi
+
+          run_component news_scanner python src/news_scanner.py
+          run_component global_macro_intelligence python src/global_macro_intelligence.py
+          run_component cross_asset_impact_engine python src/cross_asset_impact_engine.py
           run_component run_creator_intelligence python src/run_creator_intelligence.py
           run_component editorial_preflight python src/editorial_preflight.py
 
@@ -78,3 +207,166 @@
           python src/nic_strategy_calibrator.py
           python src/learning_engine.py || true
           python src/nic_transparency_journal.py || true
+
+      - name: Adaptive cadence and publication decision
+        id: cadence
+        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' }}
+        run: |
+          python src/revenue_content_director.py
+          python src/content_director_4.py
+          python src/opportunity_ranker_6.py
+          python src/discovery_queue.py
+          python src/autonomous_cadence_6.py
+          python src/signal_first_router.py
+          python src/content_portfolio_planner.py
+          publish=$(python -c 'import json; print(str(json.load(open("data/live/signal_first_routing.json")).get("publish", False)).lower())')
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Signal-first publication decision: $publish"
+
+      - name: Freeze selected opportunity
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        run: |
+          test -s data/live/nic22_opportunity_selection.json
+          python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
+          python src/freeze_opportunity.py
+          python src/early_setup_gate.py
+          python src/opportunity_contract_gate.py
+          python src/adversarial_brain.py
+          python src/decision_ensemble_gate.py
+          python src/creator_brain.py
+          python src/creator_brain_gate.py
+          python src/pipeline_stage.py creator_brain success 'Authoritative creator brain completed'
+
+      - name: Build and refine publishable content
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: claude-sonnet-5
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-6-astra
+          NEMOTRON_API_KEY: ${{ secrets.NEMOTRON_API_KEY }}
+          NEMOTRON_API_URL: https://integrate.api.nvidia.com/v1
+          NEMOTRON_MODEL: nvidia/nemotron-3-ultra-550b-a55b
+          NIC_EXTERNAL_MODELS: 'true'
+          NIC_PROVIDER_ORDER: 'nemotron,gemini,openai,claude'
+          TOPIC: ${{ github.event.inputs.topic || '' }}
+        run: |
+          python src/script_director_4.py
+          python src/publication_context.py
+          python src/candidate_generation_4.py
+          python src/safe_creator_runner.py
+          python src/normalize_draft.py
+          python src/technical_enricher.py
+          python src/nic_candidate_handoff_4.py
+          python src/nic_creative_compiler_13.py
+
+      - name: Score and apply human editorial pass
+        id: editorial
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
+          GEMINI_DAILY_BUDGET: '20'
+        run: |
+          python src/candidate_script_scorer_4.py
+          DRAFT_PATH=$(python src/resolve_publish_draft.py)
+          test -s "$DRAFT_PATH"
+          echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
+          DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
+          python -m json.tool "$DRAFT_PATH" >/dev/null
+          blocked=$(python -c 'import json; print(str(json.load(open("data/live/editorial_polish.json")).get("status", "")).upper()=="BLOCKED")')
+          echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
+
+      - name: NIC 21.2 Hook Diversity + Anti-Bot Preflight
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/news_headline_integrity_repair.py
+          python src/hook_diversity_rewriter.py
+          python src/nic21_2_hook_preflight.py
+          python -m json.tool data/live/nic21_2_hook_preflight.json >/dev/null
+
+      - name: NIC 21 Originality and Visual Truth
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/nic21_originality_visual_truth.py
+          python -m json.tool data/live/nic21_gate.json >/dev/null
+
+      - name: Reader value and authoritative quality gates
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/mechanism_value_rewriter.py
+          python src/nic_editorial_quality_gate.py
+          python src/jev_runtime_gate.py
+          python src/elite_prepublication_judge.py
+          python src/elite_prepublication_gate.py
+          python src/content_integrity_gate_4.py
+          python src/pipeline_stage.py quality_gate success 'Draft passed authoritative content gates'
+
+      - name: Decide whether visual is required
+        id: visual_decision
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/visual_decision.py
+          need=$(python -c 'import json; print(str(json.load(open("data/live/visual_decision.json")).get("need_visual", False)).lower())')
+          echo "need_visual=$need" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node and Chromium
+        if: ${{ steps.visual_decision.outputs.need_visual == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Render and validate professional visual
+        if: ${{ steps.visual_decision.outputs.need_visual == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+          VISUAL_PROVIDER: tradingview
+          TRADINGVIEW_SYMBOL: auto
+        run: |
+          python src/visual_renderer.py
+          test -s data/live/visual.png
+          python src/validate_visual.py
+          python src/validate_tradingview_visual.py data/live/visual.png
+          python src/validate_trade_visual_contract.py
+          python src/pipeline_stage.py visual success 'Visual package rendered and validated'
+
+      - name: Final production gate
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: python src/production_manager.py
+
+      - name: Build final publication payload
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          python src/publication_payload_builder.py
+          python src/write_to_earn_eligibility_gate.py
+          python src/write_to_earn_master.py
+
+      - name: Extract publication and submit to Binance Square
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
+        run: python src/binance_square_publisher.py
+
+      - name: Record outcome and learning
+        if: always()
+        run: |
+          python src/nic_monetization_os.py post || true
+          python src/write_to_earn_7day_controller.py || true
+          python src/nic_transparency_journal.py || true
+          python src/pipeline_state.py || true
+          python src/diagnostics_report.py || true
