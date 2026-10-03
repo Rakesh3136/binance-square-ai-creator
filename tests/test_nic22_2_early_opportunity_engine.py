@@ -51,3 +51,19 @@ def test_scanner_still_rejects_extended_move_as_early():
 
 if __name__=="__main__":
     test_extension_penalty();test_contracts();test_scanner_keeps_moderate_participation_early();test_scanner_still_rejects_extended_move_as_early();print("NIC22.2 tests passed")
+
+
+def test_scanner_klines_normalizes_numeric_quote_volume(monkeypatch):
+    scanner_path=Path("src/full_universe_flow_scanner.py")
+    sspec=importlib.util.spec_from_file_location("full_scanner_klines",scanner_path)
+    scanner=importlib.util.module_from_spec(sspec);sspec.loader.exec_module(scanner)
+    base=1700000000000
+    rows=[]
+    for i in range(9):
+        t=base+i*3600000
+        rows.append([t,"1","2","0.5","1.5","10",t+3599000,"100"])
+    monkeypatch.setattr(scanner,"get_json",lambda *a,**k: rows)
+    result=scanner.klines("TESTUSDT")
+    assert result is not None
+    assert result["avg_prior_6h_quote_volume"] == 100.0
+    assert result["volume_acceleration"] == 1.0
