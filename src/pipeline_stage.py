@@ -7,7 +7,7 @@ OUT=Path("data/live/pipeline_status.json")
 LIVE=Path("data/live")
 
 STAGES=[
-    "creator_benchmark","intelligence","scan","select","freeze",
+    "creator_benchmark","intelligence","scan","select","nic22_2_early_opportunity","nic22_3_confirmation","nic22_opportunity_rotation","freeze",
     "creator_brain","ai_draft","nic21_originality","nic21_visual_truth",
     "nic21_publication_lock","visual","visual_symbol","visual_content",
     "quality_gate","publish","verify","record","learn","complete","finalize","diagnostics",
@@ -25,7 +25,7 @@ def load():
 def save(d): OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(d,indent=2,ensure_ascii=False),encoding="utf-8")
 
 def reset_run(reason="New autonomous production cycle"):
-    for name in ("publication_result.json","creator_20_0_publication_truth.json","historical_setup_snapshot.json","visual_metadata.json","visual.png","tradingview_capture.html","nic21_gate.json","nic21_publication.lock"):
+    for name in ("publication_result.json","creator_20_0_publication_truth.json","historical_setup_snapshot.json","visual_metadata.json","visual.png","tradingview_capture.html","nic21_gate.json","nic21_publication.lock","nic22_2_early_opportunities.json","nic22_2_early_selection.json","nic22_3_early_confirmation.json","nic22_3_confirmation_selection.json","nic22_opportunity_diversity.json","nic22_opportunity_selection.json"):
         path=LIVE/name
         try: path.unlink()
         except FileNotFoundError: pass
