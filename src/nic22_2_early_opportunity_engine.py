@@ -92,21 +92,16 @@ def main():
     candidates.sort(key=lambda x:(x["adjusted_score"], -abs(num(x["price_change_percent"]))), reverse=True)
     candidates=candidates[:MAX_CANDIDATES]
 
-    # Replace only the market candidate pool with the early-stage subset. This
-    # prevents NIC 22.1 from falling back to top-gainer/late-mover candidates.
+    # The full-universe scanner is authoritative for early discovery. Do not
+    # intersect it with the older editorial preflight pool: an early asset may
+    # legitimately be absent from top-gainer/volume/news lists. Enrich when a
+    # matching preflight candidate exists, but never discard a valid early setup.
     pre=load(PREFLIGHT,{})
     original=list(pre.get("candidate_pool") or [])
-    selected_symbols={str(x.get("symbol") or "").upper() for x in candidates}
-    compatible=[]
-    for c in original:
-        sym=str(c.get("topic") or c.get("symbol") or "").upper()
-        if sym in selected_symbols:
-            compatible.append(c)
     merged=[]
     for e in candidates:
-        match=next((c for c in compatible if str(c.get("topic") or c.get("symbol") or "").upper()==e["symbol"]), None)
+        match=next((c for c in original if str(c.get("topic") or c.get("symbol") or "").upper()==e["symbol"]), None)
         merged.append({**(match or {}), **e})
-    pre["candidate_pool"]=merged
     pre["nic22_2"]={
         "version":"22.2-early-opportunity-detection",
         "status":"SELECTED" if merged else "BLOCKED",
