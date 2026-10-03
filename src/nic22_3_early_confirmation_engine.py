@@ -118,6 +118,13 @@ def main():
         pre=load(PRE,{})
         # Confirmation becomes authoritative for the existing candidate; do not
         # reopen the universe or select a replacement after this point.
+        confirmed_symbol=str(selected.get("symbol") or selected.get("topic") or "").upper()
+        pool=pre.get("candidate_pool") if isinstance(pre.get("candidate_pool"),list) else []
+        # Make confirmation authoritative: only the confirmed candidate remains
+        # eligible for NIC 22.1 rotation. Do not allow a different asset to win.
+        pre["candidate_pool"]=[dict(x, **selected) for x in pool if str(x.get("symbol") or x.get("topic") or "").upper() == confirmed_symbol]
+        if not pre["candidate_pool"]:
+            pre["candidate_pool"]=[selected]
         pre["selected_opportunity"]=selected
         pre["nic22_3_confirmation"]=payload
         pre["run_ai"]=True
