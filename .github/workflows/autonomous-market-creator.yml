@@ -57,11 +57,12 @@ jobs:
         run: |
           set -euo pipefail
           python -m compileall -q src
-          python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py src/nic22_4_adaptive_confirmation.py
+          python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py src/nic22_4_adaptive_confirmation.py src/nic22_5_publication_eligibility.py
           python tests/test_nic22_opportunity_diversity_engine.py
           python tests/test_nic22_2_early_opportunity_engine.py
           python tests/test_nic22_3_early_confirmation_engine.py
           python tests/test_nic22_4_adaptive_confirmation.py
+          python tests/test_nic22_5_publication_eligibility.py
           python tests/test_nic21_2_hook_preflight.py
           python tests/test_nic_adaptive_experience.py
           python tests/test_nic_probability_calibration.py
@@ -232,8 +233,21 @@ jobs:
           echo "confirmed=$confirmed" >> "$GITHUB_OUTPUT"
           echo "NIC 22.4 fresh-evidence confirmation: $confirmed"
           exit 0
+      - name: NIC 22.5 Unified publication eligibility
+        id: publication_eligibility
+        if: always()
+        run: |
+          set +e
+          python src/nic22_5_publication_eligibility.py
+          eligible=$(python -c 'import json; print(str(json.load(open("data/live/nic22_5_publication_eligibility.json")).get("eligible", False)).lower())')
+          mode=$(python -c 'import json; print(json.load(open("data/live/nic22_5_publication_eligibility.json")).get("publication_mode", "BLOCKED"))')
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "NIC 22.5 publication eligibility: eligible=$eligible mode=$mode"
+          exit 0
+
       - name: NIC 22.1 opportunity rotation
-        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' || steps.adaptive_confirmation.outputs.confirmed == 'true' }}
+        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' }}
         run: |
           python src/nic22_opportunity_diversity_engine.py
           test -s data/live/nic22_opportunity_selection.json
