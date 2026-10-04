@@ -254,7 +254,7 @@ jobs:
           python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
 
       - name: Measure previous publications and learning state
-        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' || steps.adaptive_confirmation.outputs.confirmed == 'true' }}
+        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' }}
         run: |
           python src/square_performance_collector.py
           python src/square_post_detail_collector.py
@@ -269,7 +269,7 @@ jobs:
 
       - name: Adaptive cadence and publication decision
         id: cadence
-        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' || steps.adaptive_confirmation.outputs.confirmed == 'true' }}
+        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' }}
         run: |
           python src/revenue_content_director.py
           python src/content_director_4.py
