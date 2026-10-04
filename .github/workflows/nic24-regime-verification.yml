@@ -1,6 +1,11 @@
 name: NIC 24 — Regime-Aware Strategy Verification
 
 on:
+  push:
+    paths:
+      - 'src/nic24_*.py'
+      - 'tests/test_nic24_*.py'
+      - '.github/workflows/nic24-regime-verification.yml'
   workflow_run:
     workflows: ["Binance Square AI Creator — Single Autonomous Orchestrator"]
     types: [completed]
@@ -11,7 +16,7 @@ permissions:
 
 jobs:
   verify-regime-router:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,13 +38,18 @@ jobs:
         run: python -m py_compile src/nic24_regime_aware_strategy_router.py
 
       - name: Run NIC 24 regression tests
-        run: python tests/test_nic24_regime_aware_strategy_router.py
+        run: |
+          python tests/test_nic24_regime_aware_strategy_router.py
+          python tests/test_nic24_1_strategy_content_router.py
 
-      - name: Run NIC 24 router in safe verification mode
+      - name: Run NIC 24 routers in safe verification mode
         run: |
           python src/nic24_regime_aware_strategy_router.py
-          test -s data/live/nic24_regime_strategy.json
-          python -m json.tool data/live/nic24_regime_strategy.json >/dev/null
+          python src/nic24_1_strategy_content_router.py
+          test -s data/live/nic24_regime_strategy_router.json
+          test -s data/live/nic24_1_strategy_content_plan.json
+          python -m json.tool data/live/nic24_regime_strategy_router.json >/dev/null
+          python -m json.tool data/live/nic24_1_strategy_content_plan.json >/dev/null
 
       - name: Preserve NIC 24 telemetry
         if: ${{ always() }}
@@ -49,5 +59,6 @@ jobs:
           path: |
             data/live/nic24_regime_strategy.json
             data/live/nic24_regime_strategy_history.json
+            data/live/nic24_1_strategy_content_plan.json
           if-no-files-found: warn
           retention-days: 30
