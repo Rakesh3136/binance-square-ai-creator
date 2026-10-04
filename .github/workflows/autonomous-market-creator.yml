@@ -247,14 +247,14 @@ jobs:
           exit 0
 
       - name: NIC 22.1 opportunity rotation
-        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' }}
+        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
         run: |
           python src/nic22_opportunity_diversity_engine.py
           test -s data/live/nic22_opportunity_selection.json
           python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
 
       - name: Measure previous publications and learning state
-        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' }}
+        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
         run: |
           python src/square_performance_collector.py
           python src/square_post_detail_collector.py
