@@ -1,0 +1,53 @@
+name: NIC 24 — Regime-Aware Strategy Verification
+
+on:
+  workflow_run:
+    workflows: ["Binance Square AI Creator — Single Autonomous Orchestrator"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-regime-router:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir -r requirements.txt
+
+      - name: Compile NIC 24 router
+        run: python -m py_compile src/nic24_regime_aware_strategy_router.py
+
+      - name: Run NIC 24 regression tests
+        run: python tests/test_nic24_regime_aware_strategy_router.py
+
+      - name: Run NIC 24 router in safe verification mode
+        run: |
+          python src/nic24_regime_aware_strategy_router.py
+          test -s data/live/nic24_regime_strategy.json
+          python -m json.tool data/live/nic24_regime_strategy.json >/dev/null
+
+      - name: Preserve NIC 24 telemetry
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic24-regime-verification-${{ github.run_id }}
+          path: |
+            data/live/nic24_regime_strategy.json
+            data/live/nic24_regime_strategy_history.json
+          if-no-files-found: warn
+          retention-days: 30
