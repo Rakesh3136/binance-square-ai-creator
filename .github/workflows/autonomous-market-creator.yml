@@ -205,15 +205,41 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: NIC 22.4 Adaptive confirmation recovery decision
+        id: adaptive_recheck
+        if: ${{ steps.early_opportunity.outputs.eligible == 'true' }}
+        run: |
+          python src/nic22_4_adaptive_confirmation.py
+          recheck=$(python -c 'import json; print(str(json.load(open("data/live/nic22_4_adaptive_confirmation.json")).get("status") == "RECHECK_AUTHORIZED").lower())')
+          echo "recheck=$recheck" >> "$GITHUB_OUTPUT"
+
+      - name: NIC 22.4 Fresh-evidence recheck
+        id: adaptive_confirmation
+        if: ${{ steps.adaptive_recheck.outputs.recheck == 'true' }}
+        run: |
+          set +e
+          echo "Near-miss detected. Waiting for a fresh market observation before reconsidering publication."
+          sleep 45
+          python src/live_market_scanner.py
+          python src/full_universe_flow_scanner.py
+          python src/full_universe_ranker_bridge.py
+          python src/capital_flow_intelligence.py
+          python src/nic_prediction_engine.py
+          python src/nic22_2_early_opportunity_engine.py
+          python src/nic22_3_early_confirmation_engine.py
+          confirmed=$(python -c 'import json; print(str(json.load(open("data/live/nic22_3_confirmation_selection.json")).get("status") == "CONFIRMED").lower())')
+          echo "confirmed=$confirmed" >> "$GITHUB_OUTPUT"
+          echo "NIC 22.4 fresh-evidence confirmation: $confirmed"
+          exit 0
       - name: NIC 22.1 opportunity rotation
-        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' }}
+        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' || steps.adaptive_confirmation.outputs.confirmed == 'true' }}
         run: |
           python src/nic22_opportunity_diversity_engine.py
           test -s data/live/nic22_opportunity_selection.json
           python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
 
       - name: Measure previous publications and learning state
-        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' }}
+        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' || steps.adaptive_confirmation.outputs.confirmed == 'true' }}
         run: |
           python src/square_performance_collector.py
           python src/square_post_detail_collector.py
@@ -228,7 +254,7 @@ jobs:
 
       - name: Adaptive cadence and publication decision
         id: cadence
-        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' }}
+        if: ${{ steps.early_confirmation.outputs.confirmed == 'true' || steps.adaptive_confirmation.outputs.confirmed == 'true' }}
         run: |
           python src/revenue_content_director.py
           python src/content_director_4.py
