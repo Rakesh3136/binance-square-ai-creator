@@ -63,7 +63,9 @@ jobs:
           python tests/test_nic22_3_early_confirmation_engine.py
           python tests/test_nic21_2_hook_preflight.py
           python tests/test_nic_adaptive_experience.py
+          python tests/test_nic_probability_calibration.py
           python src/nic_adaptive_experience.py
+          python src/nic_probability_calibration.py
           python src/pipeline_contract_validator.py
 
       - name: Reset creator cycle
@@ -208,7 +210,9 @@ jobs:
           python src/nic_outcome_learner.py
           python src/nic_strategy_calibrator.py
           python src/nic_adaptive_experience.py
+          python src/nic_probability_calibration.py
           python -m json.tool data/live/nic_adaptive_experience.json >/dev/null
+          python -m json.tool data/live/nic_probability_calibration.json >/dev/null
           python src/learning_engine.py || true
           python src/nic_transparency_journal.py || true
 
