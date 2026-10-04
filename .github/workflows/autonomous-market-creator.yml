@@ -235,7 +235,7 @@ jobs:
           exit 0
       - name: NIC 22.5 Unified publication eligibility
         id: publication_eligibility
-        if: always()
+        if: ${{ steps.intelligence.outcome == 'success' }}
         run: |
           set +e
           python src/nic22_5_publication_eligibility.py
