@@ -108,6 +108,44 @@ def extract_labeled_numbers(text):
 
 def equivalent_number(a,b): return abs(a-b)<=max(1e-9,abs(b)*0.002)
 
+def tokens(text):
+    return set(x for x in re.findall(r"[a-z0-9$]+",str(text).lower()) if len(x)>2)
+
+def text_similarity(a,b):
+    aa=tokens(a); bb=tokens(b)
+    return len(aa&bb)/len(aa|bb) if aa|bb else 0.0
+
+def recent_posts():
+    p=ROOT/"analytics/publication_log.jsonl"
+    if not p.exists(): return []
+    out=[]
+    for line in p.read_text(encoding="utf-8").splitlines()[-30:]:
+        try:
+            row=json.loads(line)
+            if isinstance(row,dict):
+                post=str(row.get("post") or row.get("text") or row.get("draft") or "").strip()
+                if post: out.append(post)
+        except Exception: pass
+    return out[-8:]
+
+def extract_percent_claims(text,symbol):
+    if not symbol: return []
+    pattern=r"(?i)\$?"+re.escape(symbol)+r"[^\n%]{0,120}([+-]\d+(?:\.\d+)?)%"
+    return [float(m.group(1)) for m in re.finditer(pattern,text)]
+
+def regime_contradictions(regime,text):
+    r=str(regime or "").upper()
+    low=str(text).lower()
+    rules={
+        "BREAKOUT_EXPANSION":(["range-bound","range bound","mean reversion","reversal confirmed"],["breakout confirmed","breakout","expansion"]),
+        "TREND_CONTINUATION":(["trend reversal confirmed","mean reversion"],["trend","continuation","pullback"]),
+        "MEAN_REVERSION":(["breakout confirmed","trend continuation confirmed"],["reversion","oversold","overbought"]),
+        "MOMENTUM":(["range-bound","range bound"],["momentum","acceleration","impulse"]),
+        "RANGE":(["breakout confirmed","trend continuation confirmed"],["range","sideways","consolidation"]),
+    }
+    forbidden,_=rules.get(r,([],[]))
+    return [x for x in forbidden if x in low]
+
 def main():
     path=report_path()
     data,draft,text=draft_text(path)
@@ -164,6 +202,9 @@ def main():
     if mismatches: failures.append("trade_or_market_number_mismatch")
 
     direction_hits=sorted({w for w in DIRECTION_WORDS if re.search(r"(?i)\b"+re.escape(w)+r"\b",text)})
+    contradictions=regime_contradictions(contract["regime"],text)
+    checks["regime_language_contradictions"]={"regime":contract["regime"],"contradictions":contradictions}
+    if contradictions: failures.append("regime_language_contradiction:"+",".join(contradictions))
     expected=contract["direction"].replace("_BIAS","")
     contradictory={"LONG":{"SHORT","BEARISH","DOWNSIDE"},"SHORT":{"LONG","BULLISH","UPSIDE"}}.get(expected,set())
     bad=sorted(set(direction_hits)&contradictory)
@@ -203,6 +244,26 @@ def main():
         if norm_symbol(p.get("symbol"))==sym and contract["regime"] and str(p.get("regime") or "").upper()!=contract["regime"]:
             failures.append("regime_content_plan_mismatch")
 
+    pct_claims=extract_percent_claims(text,sym)
+    market_move=None
+    for group in ("top_content_signals","top_gainers","top_losers","highest_volume","new_listing_market"):
+        for item in market.get(group) or []:
+            if isinstance(item,dict) and norm_symbol(item.get("symbol"))==sym:
+                try: market_move=float(item.get("price_change_percent"))
+                except (TypeError,ValueError): market_move=None
+                break
+        if market_move is not None: break
+    checks["market_percent_claims"]={"claims":pct_claims,"authoritative":market_move}
+    if market_move is not None and pct_claims:
+        bad=[x for x in pct_claims if abs(x-market_move)>max(2.0,abs(market_move)*0.25)]
+        if bad: failures.append("market_percent_claim_mismatch")
+    
+    recent=recent_posts()
+    similarities=[round(text_similarity(text,p),4) for p in recent]
+    max_similarity=max(similarities,default=0.0)
+    checks["recent_post_similarity"]={"max":max_similarity,"threshold":0.86}
+    if max_similarity>=0.86: failures.append("draft_too_similar_to_recent_post")
+
     if visual:
         vsyms={norm_symbol(x) for x in (visual.get("post_tickers") or visual.get("chart_symbols") or []) if norm_symbol(x)}
         if vsyms and sym not in vsyms: failures.append("chart_symbol_mismatch")
@@ -216,7 +277,7 @@ def main():
     thesis_key=str(frozen.get("signal_thesis_key") or frozen.get("thesis_key") or "").strip()
     if thesis_key and thesis_key.lower() not in text.lower(): warnings.append("thesis_key_not_literal_in_draft")
 
-    result={"schema":"NIC-24.2-EVIDENCE-TO-CONTENT-INTEGRITY","version":"24.2.0",
+    result={"schema":"NIC-24.2-EVIDENCE-TO-CONTENT-INTEGRITY","version":"24.2.1",
             "generated_at":datetime.now(timezone.utc).isoformat(),
             "mode":"enforce" if os.getenv("NIC24_2_ENFORCE","false").lower()=="true" else "shadow",
             "passed":not failures,"publish":not failures,"draft_path":str(path),
