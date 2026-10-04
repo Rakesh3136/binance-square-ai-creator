@@ -1,7 +1,15 @@
 import json
 import tempfile
 import unittest
+import sys
 from pathlib import Path
+
+# GitHub Actions invokes this file as `python tests/...`; make repository-root
+# imports deterministic instead of relying on the current Python path.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import src.nic_trade_experience_ledger as ledger
 
 class LedgerTests(unittest.TestCase):
