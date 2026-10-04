@@ -1,0 +1,40 @@
+name: NIC 24.2 — Evidence-to-Content Integrity Verification
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/nic24_2_evidence_content_integrity_gate.py'
+      - 'tests/test_nic24_2_evidence_content_integrity_gate.py'
+      - 'src/nic24_1_strategy_content_router.py'
+      - 'src/nic24_regime_aware_strategy_router.py'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            python -m pip install --no-cache-dir -r requirements.txt
+          fi
+      - name: Compile NIC 24.2
+        run: python -m py_compile src/nic24_2_evidence_content_integrity_gate.py
+      - name: Run NIC 24.2 adversarial verification
+        run: python tests/test_nic24_2_evidence_content_integrity_gate.py
+      - name: Validate gate artifact when present
+        if: always()
+        run: |
+          if [ -f data/live/nic24_2_evidence_content_integrity.json ]; then
+            python -m json.tool data/live/nic24_2_evidence_content_integrity.json >/dev/null
+          fi
