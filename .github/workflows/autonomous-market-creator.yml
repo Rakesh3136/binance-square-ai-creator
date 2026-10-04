@@ -123,6 +123,8 @@ jobs:
           fi
 
           run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py
+          run_component nic24_regime_router python src/nic24_regime_aware_strategy_router.py
+          run_component nic24_1_strategy_content_router python src/nic24_1_strategy_content_router.py
 
           if [ -s data/live/nic_prediction_contract_validation.json ]; then
             python -m json.tool data/live/nic_prediction_contract_validation.json >/dev/null
