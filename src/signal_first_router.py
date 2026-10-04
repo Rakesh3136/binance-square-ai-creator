@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
+PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; NIC24_1=ROOT/'data/live/nic24_1_strategy_content_plan.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
 PRIMARY_LANES={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up'}
 EDITORIAL_LANES={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','comparison','education','research_insight','market_mechanism','data_surprise','watchlist','crypto_meme'}
@@ -61,6 +61,23 @@ def editorial_complete(x):
         if not str(x.get('published_at') or x.get('news_published_at') or '').strip():return False
     if category=='crypto_meme' and str(x.get('meme_source_type') or '').strip() not in {'market_move','news','existing_evidence'}:return False
     return True
+def content_plan_for(x):
+    plan=load(NIC24_1).get('plans') or []
+    sym=str(x.get('symbol') or '').upper().replace('USDT','').strip()
+    matches=[p for p in plan if isinstance(p,dict) and str(p.get('symbol') or '').upper().replace('USDT','').strip()==sym]
+    return min(matches,key=lambda p:num(p.get('repeat_penalty'))) if matches else {}
+
+def apply_content_plan(x):
+    e=dict(x); p=content_plan_for(e)
+    if p:
+        e['nic24_strategy']=p.get('strategy','')
+        e['content_format']=p.get('content_format','')
+        e['chart_style']=p.get('chart_style','')
+        e['content_rotation_state']=p.get('rotation_state','')
+        e['content_repeat_penalty']=num(p.get('repeat_penalty'))
+        e['reader_value_focus']=p.get('reader_value_focus','')
+    return e
+
 def prediction_quality_for(x):
     predictions=load(PREDICTION).get('candidates') or []
     symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip(); _,_,side,_,_,_,_,_=setup_parts(x)
@@ -152,9 +169,11 @@ def candidates(brief,pre,cad,market,flow_data,full_flow,ranking,pre_router):
 def choose(xs,rows,market,live_symbols,allow_editorial=False):
     blocked_rows=[]
     def order_key(x):
-        pq=prediction_quality_for(x); return (str(pq.get('status') or '').upper()=='PASS',num(pq.get('quality_score')),num(pq.get('calibrated_confidence')),num(x.get('flow_confidence')),num(x.get('score')))
+        pq=prediction_quality_for(x); p=content_plan_for(x)
+        return (str(pq.get('status') or '').upper()=='PASS',-num(p.get('repeat_penalty')),num(pq.get('quality_score')),num(pq.get('calibrated_confidence')),num(x.get('flow_confidence')),num(x.get('score')))
     xs=sorted(xs,key=order_key,reverse=True)
     for x in xs:
+        x=apply_content_plan(x)
         raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
         if raw_symbol not in live_symbols:blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'});continue
         category=str(x.get('category') or lane(x)).lower()
@@ -199,6 +218,6 @@ def main():
     else:
         pre.pop('selected_opportunity',None); pre['signal_first_routing']={'decision':'NO_ELIGIBLE_OPPORTUNITY','primary':False,'bound_symbol':'','bound_category':'','prediction_contract_complete':False,'prediction':{}}
     PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True,'nic24_1_strategy_content_routing':True,'content_format_rotation_advisory':True}}
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
