@@ -15,3 +15,5 @@ if __name__=="__main__":
     test_compiles()
     test_contract()
     print("NIC 24.1 tests passed")
+
+# Trigger NIC 24 verification on the next push after the runtime wiring refresh.
