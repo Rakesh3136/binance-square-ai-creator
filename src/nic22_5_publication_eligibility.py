@@ -18,6 +18,7 @@ CONFIRMATION=LIVE/"nic22_3_confirmation_selection.json"
 ADAPTIVE=LIVE/"nic22_4_adaptive_confirmation.json"
 RESEARCH=LIVE/"original_research.json"
 DIRECTOR=LIVE/"content_director_brief.json"
+SIGNAL=LIVE/"signal_first_routing.json"
 OUT=LIVE/"nic22_5_publication_eligibility.json"
 
 MAX_AGE_MINUTES=30.0
@@ -71,6 +72,16 @@ def main():
     adaptive=load(ADAPTIVE)
     research=load(RESEARCH)
     director=load(DIRECTOR)
+    signal=load(SIGNAL)
+
+    # In the live creator lifecycle, Signal-First is the current-cycle
+    # decision authority. NIC 22.5 validates that decision; it must not
+    # reconstruct a different candidate from older upstream artifacts.
+    signal_time=signal.get("generated_at")
+    signal_fresh=fresh(signal_time)
+    signal_selected=signal.get("selected") if isinstance(signal.get("selected"),dict) else {}
+    signal_publish=bool(signal.get("publish")) and signal_fresh
+    signal_decision=str(signal.get("decision") or "").upper()
 
     trade_confirmed=str(confirmation.get("status") or "").upper()=="CONFIRMED"
     adaptive_confirmed=bool(adaptive.get("fresh_confirmation")) and str(adaptive.get("status") or "").upper()=="CONFIRMED"
@@ -82,29 +93,53 @@ def main():
     )
     candidate=research_candidate(research)
     research_fresh=fresh(research.get("generated_at"))
-    director_fresh=fresh(director.get("generated_at"))
-    editorial_available=bool(candidate) and research_fresh and director_fresh
 
-    if trade_confirmed:
-        mode="TRADE"
-        eligible=True
-        reason="NIC 22.3 produced a confirmed trade opportunity."
-        selected=confirmation.get("selected_opportunity") or {}
-    elif adaptive_confirmed:
-        mode="TRADE"
-        eligible=True
-        reason="NIC 22.4 fresh evidence promoted the opportunity to confirmed."
-        selected=confirmation.get("selected_opportunity") or {}
-    elif editorial_available:
+    if signal_publish and signal_decision == "PRIMARY_SIGNAL":
+        contract_ok=bool(signal.get("prediction_contract_complete")) and bool(signal_selected)
+        if contract_ok:
+            mode="TRADE"
+            eligible=True
+            reason="Current-cycle Signal-First trade decision passed the publication eligibility handoff."
+            selected=signal_selected
+        else:
+            mode="BLOCKED"
+            eligible=False
+            reason="Current-cycle Signal-First trade decision lacks a complete authoritative prediction contract."
+            selected={}
+    elif signal_publish and signal_decision == "EDITORIAL_SIGNAL":
         mode="EDITORIAL"
         eligible=True
-        reason="No validated trade was confirmed, but fresh research evidence supports an editorial lane."
-        selected=candidate
-    else:
+        reason="Current-cycle Signal-First editorial decision passed the publication eligibility handoff."
+        selected=signal_selected
+    elif signal and signal_fresh:
         mode="BLOCKED"
         eligible=False
+        reason="Current-cycle Signal-First decision did not authorize publication."
         selected={}
-        reason="Neither a validated trade nor a fresh evidence-backed editorial opportunity is available."
+    else:
+        director_fresh=fresh(director.get("generated_at"))
+        editorial_available=bool(candidate) and research_fresh and director_fresh
+
+        if trade_confirmed:
+            mode="TRADE"
+            eligible=True
+            reason="NIC 22.3 produced a confirmed trade opportunity."
+            selected=confirmation.get("selected_opportunity") or {}
+        elif adaptive_confirmed:
+            mode="TRADE"
+            eligible=True
+            reason="NIC 22.4 fresh evidence promoted the opportunity to confirmed."
+            selected=confirmation.get("selected_opportunity") or {}
+        elif editorial_available:
+            mode="EDITORIAL"
+            eligible=True
+            reason="No validated trade was confirmed, but fresh research evidence supports an editorial lane."
+            selected=candidate
+        else:
+            mode="BLOCKED"
+            eligible=False
+            selected={}
+            reason="Neither a validated trade nor a fresh evidence-backed editorial opportunity is available."
 
     result={
         "version":"22.5-unified-publication-eligibility",
