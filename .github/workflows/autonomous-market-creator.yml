@@ -1,6 +1,9 @@
 name: Binance Square AI Creator — Single Autonomous Orchestrator
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '*/20 * * * *'
   workflow_dispatch:
@@ -305,13 +308,6 @@ jobs:
       - name: Build and refine publishable content
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CLAUDE_MODEL: claude-sonnet-5
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: gpt-6-astra
-          NEMOTRON_API_KEY: ${{ secrets.NEMOTRON_API_KEY }}
-          NEMOTRON_API_URL: https://integrate.api.nvidia.com/v1
-          NEMOTRON_MODEL: nvidia/nemotron-3-ultra-550b-a55b
           NIC_EXTERNAL_MODELS: 'false'
           NIC_PROVIDER_ORDER: ''
           TOPIC: ${{ github.event.inputs.topic || '' }}
