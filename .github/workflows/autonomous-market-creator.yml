@@ -72,6 +72,8 @@ jobs:
           python tests/test_nic_adaptive_experience.py
           python tests/test_nic_probability_calibration.py
           python tests/test_nic_trade_experience_ledger.py
+          python tests/test_nic_market_experience.py
+          python -m py_compile src/nic_native_writer.py src/multi_agent_creator.py src/safe_creator_runner.py
           python src/nic_trade_experience_ledger.py
           python src/nic_adaptive_experience.py
           python src/nic_probability_calibration.py
@@ -106,6 +108,10 @@ jobs:
           run_component full_universe_flow_scanner python src/full_universe_flow_scanner.py
           run_component full_universe_ranker_bridge python src/full_universe_ranker_bridge.py
           run_component capital_flow_intelligence python src/capital_flow_intelligence.py
+          run_component nic_trade_experience_ledger python src/nic_trade_experience_ledger.py
+          run_component nic_adaptive_experience python src/nic_adaptive_experience.py
+          run_component nic_probability_calibration python src/nic_probability_calibration.py
+          run_component nic_market_experience python src/nic_market_experience.py
           run_component nic_prediction_engine python src/nic_prediction_engine.py
           if [ -s data/live/nic_prediction_engine.json ]; then python -m json.tool data/live/nic_prediction_engine.json >/dev/null || { echo "FAILED nic_prediction_engine_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_prediction_engine_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
           run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py
