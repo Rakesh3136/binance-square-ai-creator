@@ -301,15 +301,13 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_MODEL: claude-sonnet-5
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-3.8-flash
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-6-astra
           NEMOTRON_API_KEY: ${{ secrets.NEMOTRON_API_KEY }}
           NEMOTRON_API_URL: https://integrate.api.nvidia.com/v1
           NEMOTRON_MODEL: nvidia/nemotron-3-ultra-550b-a55b
-          NIC_EXTERNAL_MODELS: 'true'
-          NIC_PROVIDER_ORDER: 'nemotron,gemini,openai,claude'
+          NIC_EXTERNAL_MODELS: 'false'
+          NIC_PROVIDER_ORDER: ''
           TOPIC: ${{ github.event.inputs.topic || '' }}
         run: |
           python src/script_director_4.py
@@ -325,9 +323,6 @@ jobs:
         id: editorial
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-3.8-flash
-          GEMINI_DAILY_BUDGET: '20'
         run: |
           python src/candidate_script_scorer_4.py
           DRAFT_PATH=$(python src/resolve_publish_draft.py)
