@@ -72,6 +72,7 @@ def main():
         return
 
     decision=str(d.get("decision") or d.get("status") or "UNKNOWN").upper()
+    decision_id=str(d.get("decision_id") or ((d.get("signal_first_routing") or {}).get("decision_id") if isinstance(d.get("signal_first_routing"),dict) else "") or "")
     direction=str(d.get("direction") or d.get("primary_direction") or ((d.get("selected") or {}).get("direction") or "")).upper()
     bull=num(d.get("bull_case",d.get("bull_score",d.get("confidence",0))))
     if not bull and isinstance(d.get("selected"),dict):
@@ -104,12 +105,13 @@ def main():
         final="TRADE"; authorized=True
         reason="Counterfactual challenge passed all material tests."
     else:
-        final=decision if decision in {"WATCH","RESEARCH","EDITORIAL","NO_TRADE","BLOCKED"} else "WATCH"
+        final=decision if decision in {"WATCH","RESEARCH","EDITORIAL","EDITORIAL_SIGNAL","NO_TRADE","BLOCKED"} else "WATCH"
         authorized=False
         reason="Verification cannot promote a non-trade decision."
 
     result={
         "version":"23.5.1","generated_at":now.isoformat(),
+        "decision_id":decision_id,
         "status":"VERIFIED","source":str(source.relative_to(ROOT)),
         "source_generated_at":source_time,
         "input_decision":decision,"primary_direction":direction,
