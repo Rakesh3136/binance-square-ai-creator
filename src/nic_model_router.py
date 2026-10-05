@@ -6,7 +6,6 @@ available when all hosted providers are unavailable.
 
 Supported optional providers:
 - claude: Anthropic Messages API
-- gemini: existing Google Gemini client
 - openai: OpenAI Responses API
 - nemotron: NVIDIA Nemotron 3 Ultra via OpenAI-compatible endpoint
 
@@ -78,19 +77,6 @@ def _openai(prompt: str, system: str) -> str:
     return text
 
 
-def _gemini(prompt: str, system: str) -> str:
-    key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not key:
-        raise RuntimeError("GEMINI_API_KEY unavailable")
-    from google import genai
-    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-    response = genai.Client(api_key=key).interactions.create(model=model, input=prompt, system_instruction=system)
-    text = (response.output_text or "").strip()
-    if not text:
-        raise RuntimeError("Gemini returned empty output")
-    return text
-
-
 def _nemotron(prompt: str, system: str) -> str:
     """Nemotron 3 Ultra deep-research specialist over an OpenAI-compatible API."""
     key = os.getenv("NEMOTRON_API_KEY", "").strip()
@@ -123,7 +109,6 @@ def _nemotron(prompt: str, system: str) -> str:
 
 CALLERS: dict[str, Callable[[str, str], str]] = {
     "claude": _claude,
-    "gemini": _gemini,
     "openai": _openai,
     "nemotron": _nemotron,
 }
@@ -164,7 +149,6 @@ def _generate_from_order(prompt: str, system: str, order: list[str]) -> tuple[st
                 "attempts": attempts,
                 "model": {
                     "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
-                    "gemini": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
                     "openai": os.getenv("OPENAI_MODEL", "gpt-6-astra"),
                     "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"),
                 }.get(provider),
@@ -176,18 +160,16 @@ def _generate_from_order(prompt: str, system: str, order: list[str]) -> tuple[st
 
 def status() -> dict:
     return {
-        "nic_version": "1.1-provider-independent-specialists",
+        "nic_version": "1.2-gemini-free-provider-independent",
         "external_models_enabled": external_models_enabled(),
         "provider_order": provider_order(),
         "configured": {
             "claude": bool(os.getenv("ANTHROPIC_API_KEY")),
-            "gemini": bool(os.getenv("GEMINI_API_KEY")),
             "openai": bool(os.getenv("OPENAI_API_KEY")),
             "nemotron": bool(os.getenv("NEMOTRON_API_KEY")),
         },
         "models": {
             "claude": os.getenv("CLAUDE_MODEL", "claude-sonnet-5"),
-            "gemini": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
             "openai": os.getenv("OPENAI_MODEL", "gpt-6-astra"),
             "nemotron": os.getenv("NEMOTRON_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"),
         },
