@@ -93,6 +93,28 @@ def build(ctx):
         middle=fresh(mechanisms[seed:]+mechanisms[:seed],used)
         close="The decision point is therefore the next measurable reaction, not a guess about where the next candle must go."
         question=f"Which specific reaction on {dollar} would make you change your read?"
-    post="\n\n".join([hook,body if "body" in locals() else structure,middle,close,question])
-    if post.count("?")!=1 or dollar not in post or not 280<=len(post)<=900:raise RuntimeError("NIC Native Writer failed local publication contract")
+    def compact_post(parts, question_text, limit=700):
+        kept=list(parts)
+        # Keep hook/evidence first; remove lower-priority prose before evidence.
+        for drop in (3, 2):
+            if len("\n\n".join(kept + [question_text])) <= limit:
+                break
+            if 0 <= drop < len(kept):
+                kept.pop(drop)
+        if len("\n\n".join(kept + [question_text])) > limit:
+            while len("\n\n".join(kept + [question_text])) > limit and len(kept) > 2:
+                kept.pop(-1)
+        post="\n\n".join(kept + [question_text]).strip()
+        if len(post) > limit:
+            base=[hook]
+            for block in parts[1:]:
+                for sentence in re.split(r"(?<=[.!?])\\s+", str(block)):
+                    sentence=sentence.strip()
+                    candidate="\n\n".join(base + [sentence, question_text])
+                    if len(candidate) <= limit:
+                        base.append(sentence)
+            post="\n\n".join(base + [question_text]).strip()
+        return post
+    post=compact_post([hook,body if "body" in locals() else structure,middle,close],question)
+    if post.count("?")!=1 or dollar not in post or not 280<=len(post)<=700:raise RuntimeError("NIC Native Writer failed local publication contract")
     return {"research":{"summary":f"NIC verified {dollar} using the frozen opportunity and supplied market evidence.","strongest_signal":s,"opportunity_score":num(sel.get("adjusted_score") or sel.get("raw_score") or 0),"source_mode":"NIC_NATIVE_EVIDENCE_SYNTHESIS"},"critique":{"summary":"Native NIC review bounds claims by supplied evidence and keeps uncertainty explicit.","alternative_hypothesis":"The observed move may be temporary rather than structural.","disconfirming_test":"A materially different next reaction or failed evidence condition weakens the thesis."},"draft":{"post":post,"text":post,"hook":hook,"discussion_question":question,"quality_score":84,"editorial_style":"NIC_NATIVE_WRITER","generation_mode":"NIC_NATIVE","symbol":s,"content_category":cat,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"visual_plan":{"type":"candlestick_chart" if cat not in {"crypto_meme","community","commentary","education"} else "none","use_visual":bool(it.get("candles_1h")),"purpose":"Show only the frozen asset and supplied evidence."},"native_writer":{"version":"1.0","provider":"NIC","external_text_model":False,"evidence_bound":True,"generated_at":datetime.now(timezone.utc).isoformat()}}
