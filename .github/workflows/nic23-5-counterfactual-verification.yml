@@ -1,0 +1,35 @@
+name: NIC 23.5 Counterfactual Decision Verification
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/nic23_5_counterfactual_challenge.py'
+      - 'tests/test_nic23_5_counterfactual_challenge.py'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify NIC 23.5
+        run: |
+          python -m py_compile src/nic23_5_counterfactual_challenge.py
+          python tests/test_nic23_5_counterfactual_challenge.py
+      - name: Execute challenge against repository artifacts
+        run: |
+          python src/nic23_5_counterfactual_challenge.py
+          python -m json.tool data/live/nic23_5_counterfactual_challenge.json >/dev/null
+      - name: Preserve NIC 23.5 result
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic23-5-counterfactual-${{ github.run_id }}
+          path: data/live/nic23_5_counterfactual_challenge.json
+          retention-days: 30
