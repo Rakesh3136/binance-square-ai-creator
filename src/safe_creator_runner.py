@@ -2,7 +2,7 @@ import json, os, hashlib, re
 from datetime import datetime, timezone
 from pathlib import Path
 
-STATUS=Path('data/live/creator_status.json'); USAGE=Path('analytics/ai_usage.json'); REPORT_DIR=Path('data/reports'); DAILY_LIMIT=int(os.getenv('GEMINI_DAILY_BUDGET','20'))
+STATUS=Path('data/live/creator_status.json'); USAGE=Path('analytics/ai_usage.json'); REPORT_DIR=Path('data/reports'); DAILY_LIMIT=0
 PUBLICATION_LOG=Path('analytics/publication_log.jsonl')
 SIGNAL_ROUTING=Path('data/live/signal_first_routing.json'); MONETIZATION_OS=Path('data/live/nic_monetization_contract.json')
 
@@ -36,7 +36,7 @@ def run_creator():
     import multi_agent_creator
     multi_agent_creator.main()
     after=latest_report()
-    if not after or after.stat().st_mtime <= before_mtime or not report_has_publishable_text(after): raise RuntimeError('Gemini creator completed without producing a fresh publishable draft')
+    if not after or after.stat().st_mtime <= before_mtime or not report_has_publishable_text(after): raise RuntimeError('NIC native creator completed without producing a fresh publishable draft')
     return after
 
 
@@ -253,23 +253,24 @@ def emergency_verified_draft(reason):
 
 
 def local_or_emergency(original_error):
-    """Never retry Gemini after a quota/error. The fallback is genuinely local."""
-    print('Gemini unavailable or budget exhausted; using dependency-free verified creator')
+    """Use the dependency-free NIC emergency writer when the native path fails."""
+    print('NIC native writer unavailable; using dependency-free verified creator')
     emergency_verified_draft(original_error); return 'EMERGENCY_SUCCESS'
 
 
 def main():
-    today=datetime.now(timezone.utc).date().isoformat(); usage=load(USAGE,{'date':today,'requests':0}); usage=usage if usage.get('date')==today else {'date':today,'requests':0}; requests=int(usage.get('requests',0))
-    if requests>=DAILY_LIMIT:
-        fallback_status=local_or_emergency('Gemini daily budget exhausted'); save_status('AI_SUCCESS','Gemini budget exhausted; verified local creator used',requests=requests,daily_limit=DAILY_LIMIT,generation_mode='LOCAL_FALLBACK',fallback_status=fallback_status); return 0
-    usage['requests']=requests+1; USAGE.parent.mkdir(parents=True,exist_ok=True); USAGE.write_text(json.dumps(usage,indent=2),encoding='utf-8')
     try:
         report_path=run_creator()
         legacy_guard=reject_legacy_prose(report_path)
         binding=enforce_signal_first(report_path)
         print(json.dumps({'legacy_prose_guard':legacy_guard,'signal_first_binding':binding},indent=2))
+        save_status('AI_SUCCESS','NIC native draft generated; Signal-First contract validated without prose override',requests=0,daily_limit=0,generation_mode='NIC_NATIVE',signal_first_binding=binding)
+        return 0
     except Exception as exc:
-        message=str(exc); print(f'Gemini creator failed; switching immediately to verified local creator. Original error: {message}'); fallback_status=local_or_emergency(message); save_status('AI_SUCCESS','Gemini creator failed; verified local creator preserved the cycle',error=message,requests=usage['requests'],daily_limit=DAILY_LIMIT,generation_mode='LOCAL_FALLBACK',fallback_status=fallback_status); return 0
-    save_status('AI_SUCCESS','Fresh creator draft generated; Signal-First contract validated without prose override',requests=usage['requests'],daily_limit=DAILY_LIMIT,generation_mode='GEMINI_EDITORIAL_CONTRACT' if binding.get('applied') else 'GEMINI',signal_first_binding=binding); return 0
+        message=str(exc)
+        print(f'NIC native creator failed; switching to dependency-free verified creator. Original error: {message}')
+        fallback_status=local_or_emergency(message)
+        save_status('AI_SUCCESS','NIC native creator failed; verified local creator preserved the cycle',error=message,requests=0,daily_limit=0,generation_mode='LOCAL_FALLBACK',fallback_status=fallback_status)
+        return 0
 
 if __name__=='__main__':raise SystemExit(main())
