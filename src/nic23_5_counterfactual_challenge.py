@@ -16,6 +16,7 @@ INPUTS=[
     LIVE/"nic23_4_evidence_fusion.json",
     LIVE/"nic23_4_decision_fusion.json",
     LIVE/"nic23_3_confirmation_selection.json",
+    LIVE/"signal_first_routing.json",
 ]
 MAX_INPUT_AGE_SECONDS=45*60
 
@@ -63,7 +64,7 @@ def main():
             "challenge_passed":False,
             "reason":"No fresh NIC 23 decision artifact was available for this cycle; stale artifacts were ignored.",
             "source":None,
-            "policy":["Verification only.","Never reuse stale decision artifacts.","Never create trade authorization."]
+            "policy":["Verification only.","Never reuse stale decision artifacts.","Never create trade authorization.","Signal-first input is treated as a decision source, not a new market-data authority."]
         }
         OUT.parent.mkdir(parents=True,exist_ok=True)
         OUT.write_text(json.dumps(result,indent=2)+"\n")
@@ -71,9 +72,17 @@ def main():
         return
 
     decision=str(d.get("decision") or d.get("status") or "UNKNOWN").upper()
-    direction=str(d.get("direction") or d.get("primary_direction") or "").upper()
+    direction=str(d.get("direction") or d.get("primary_direction") or ((d.get("selected") or {}).get("direction") or "")).upper()
     bull=num(d.get("bull_case",d.get("bull_score",d.get("confidence",0))))
+    if not bull and isinstance(d.get("selected"),dict):
+        research=d["selected"].get("research") or {}
+        scenario=research.get("scenario") or {}
+        bull=num(scenario.get("bull_score",0))
     bear=num(d.get("bear_case",d.get("bear_score",d.get("opposing_score",d.get("counter_case",0)))))
+    if not bear and isinstance(d.get("selected"),dict):
+        research=d["selected"].get("research") or {}
+        scenario=research.get("scenario") or {}
+        bear=num(scenario.get("bear_risk_score",0))
     conflict=str(d.get("conflict_level") or "UNKNOWN").upper()
     robustness=num(d.get("thesis_robustness",d.get("robustness",100)))
     dependency=num(d.get("single_signal_dependency",0))
@@ -87,7 +96,7 @@ def main():
         {"name":"conflict","passed":conflict not in {"HIGH","SEVERE"},"level":conflict},
     ]
     failures=[t["name"] for t in tests if not t["passed"]]
-    challenged_trade=decision in {"TRADE","CONFIRMED","LONG","SHORT"}
+    challenged_trade=decision in {"TRADE","CONFIRMED","LONG","SHORT"} or bool(d.get("primary_signal"))
     if challenged_trade and failures:
         final="WATCH"; authorized=False
         reason="Counterfactual challenge found material weaknesses: "+", ".join(failures)
@@ -113,7 +122,8 @@ def main():
                   "Never invent direction, entry, stop, or target.",
                   "A counterfactual failure can downgrade TRADE to WATCH.",
                   "A verification layer can never promote WATCH to TRADE.",
-                  "Stale inputs are ignored rather than reused."]
+                  "Stale inputs are ignored rather than reused.",
+                  "A fresh signal-first artifact may be challenged, but this layer never creates a trade decision."]
     }
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(result,indent=2)+"\n")
