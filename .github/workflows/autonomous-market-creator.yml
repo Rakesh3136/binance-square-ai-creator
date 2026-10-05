@@ -285,8 +285,8 @@ jobs:
       - name: Freeze selected opportunity
         if: ${{ steps.verified_publication.outputs.publish == 'true' }}
         run: |
-          test -s data/live/nic22_opportunity_selection.json
-          python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
+          python -m json.tool data/live/signal_first_routing.json >/dev/null
+          python -m json.tool data/live/nic23_5_counterfactual_challenge.json >/dev/null
           python src/freeze_opportunity.py
           python src/early_setup_gate.py
           python src/opportunity_contract_gate.py
