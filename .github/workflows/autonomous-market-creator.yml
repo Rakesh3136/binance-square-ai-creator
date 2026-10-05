@@ -26,6 +26,8 @@ concurrency:
 jobs:
   creator:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     timeout-minutes: 75
     permissions:
       contents: write
