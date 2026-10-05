@@ -1,8 +1,8 @@
-"""NIC 23.5 — Counterfactual and adversarial decision challenge.
+"""NIC 23.5 — Counterfactual and adversarial decision verification.
 
-The engine attempts to disprove an actionable thesis before allowing a trade.
-It never creates a direction or levels; it only downgrades/blocks decisions
-when the opposing case or robustness tests are too strong.
+Verification-only layer. It challenges the current cycle's decision but does not
+control publication. Stale or missing inputs produce NOT_APPLICABLE rather than
+silently reusing an older cycle's decision.
 """
 from __future__ import annotations
 import json
@@ -17,7 +17,7 @@ INPUTS=[
     LIVE/"nic23_4_decision_fusion.json",
     LIVE/"nic23_3_confirmation_selection.json",
 ]
-
+MAX_INPUT_AGE_SECONDS=45*60
 
 def load(p):
     try:
@@ -26,82 +26,98 @@ def load(p):
     except Exception:
         return {}
 
-
 def num(v, default=0.0):
     try: return float(v)
     except Exception: return default
 
+def parse_time(v):
+    try: return datetime.fromisoformat(str(v).replace("Z","+00:00"))
+    except Exception: return None
 
-def first_data():
+def first_fresh_data(now):
+    candidates=[]
     for p in INPUTS:
         d=load(p)
-        if d: return d
-    return {}
-
+        if not d: continue
+        ts=parse_time(d.get("generated_at") or d.get("timestamp") or d.get("updated_at"))
+        if ts is None: continue
+        age=(now-ts).total_seconds()
+        if 0 <= age <= MAX_INPUT_AGE_SECONDS:
+            candidates.append((ts,p,d))
+    if not candidates:
+        return None,None,{}
+    candidates.sort(reverse=True,key=lambda x:x[0])
+    _,p,d=candidates[0]
+    return p,d.get("generated_at"),d
 
 def main():
-    d=first_data()
+    now=datetime.now(timezone.utc)
+    source,source_time,d=first_fresh_data(now)
+    if not d:
+        result={
+            "version":"23.5.1",
+            "generated_at":now.isoformat(),
+            "status":"NOT_APPLICABLE",
+            "decision":"NOT_APPLICABLE",
+            "trade_authorized":False,
+            "challenge_passed":False,
+            "reason":"No fresh NIC 23 decision artifact was available for this cycle; stale artifacts were ignored.",
+            "source":None,
+            "policy":["Verification only.","Never reuse stale decision artifacts.","Never create trade authorization."]
+        }
+        OUT.parent.mkdir(parents=True,exist_ok=True)
+        OUT.write_text(json.dumps(result,indent=2)+"\n")
+        print(json.dumps(result,indent=2))
+        return
+
     decision=str(d.get("decision") or d.get("status") or "UNKNOWN").upper()
     direction=str(d.get("direction") or d.get("primary_direction") or "").upper()
-    bull=num(d.get("bull_case", d.get("bull_score", d.get("confidence",0))))
-    bear=num(d.get("bear_case", d.get("bear_score", 0)))
-    if not bear:
-        bear=num(d.get("opposing_score", d.get("counter_case",0)))
+    bull=num(d.get("bull_case",d.get("bull_score",d.get("confidence",0))))
+    bear=num(d.get("bear_case",d.get("bear_score",d.get("opposing_score",d.get("counter_case",0)))))
     conflict=str(d.get("conflict_level") or "UNKNOWN").upper()
-    robustness=num(d.get("thesis_robustness", d.get("robustness", 100)))
-    dependency=num(d.get("single_signal_dependency", 0))
-    invalidation=bool(d.get("invalidation_defined", d.get("invalidation")))
+    robustness=num(d.get("thesis_robustness",d.get("robustness",100)))
+    dependency=num(d.get("single_signal_dependency",0))
+    invalidation=bool(d.get("invalidation_defined",d.get("invalidation")))
 
-    tests=[]
-    if bear:
-        tests.append({"name":"opposite_thesis","passed":bull > bear+5,"bull_case":bull,"bear_case":bear})
-    else:
-        tests.append({"name":"opposite_thesis","passed":False,"reason":"opposing_case_not_measured"})
-    tests.append({"name":"thesis_robustness","passed":robustness>=60,"score":robustness})
-    tests.append({"name":"single_signal_dependency","passed":dependency<=0.35,"dependency":dependency})
-    tests.append({"name":"invalidation_defined","passed":invalidation})
-    tests.append({"name":"conflict","passed":conflict not in {"HIGH","SEVERE"},"level":conflict})
-
+    tests=[
+        {"name":"opposite_thesis","passed":bool(bear) and bull>bear+5,"bull_case":bull,"bear_case":bear},
+        {"name":"thesis_robustness","passed":robustness>=60,"score":robustness},
+        {"name":"single_signal_dependency","passed":dependency<=0.35,"dependency":dependency},
+        {"name":"invalidation_defined","passed":invalidation},
+        {"name":"conflict","passed":conflict not in {"HIGH","SEVERE"},"level":conflict},
+    ]
     failures=[t["name"] for t in tests if not t["passed"]]
-    pass_count=sum(1 for t in tests if t["passed"])
-    # Counterfactual challenge can never turn a non-trade into a trade.
     challenged_trade=decision in {"TRADE","CONFIRMED","LONG","SHORT"}
     if challenged_trade and failures:
-        final="WATCH"
-        trade_authorized=False
+        final="WATCH"; authorized=False
         reason="Counterfactual challenge found material weaknesses: "+", ".join(failures)
     elif challenged_trade:
-        final="TRADE"
-        trade_authorized=True
+        final="TRADE"; authorized=True
         reason="Counterfactual challenge passed all material tests."
     else:
         final=decision if decision in {"WATCH","RESEARCH","EDITORIAL","NO_TRADE","BLOCKED"} else "WATCH"
-        trade_authorized=False
-        reason="No trade authorization is created by the adversarial layer."
+        authorized=False
+        reason="Verification cannot promote a non-trade decision."
 
     result={
-        "version":"23.5.0",
-        "generated_at":datetime.now(timezone.utc).isoformat(),
-        "input_decision":decision,
-        "primary_direction":direction,
-        "decision":final,
-        "trade_authorized":trade_authorized,
-        "challenge_passed":not failures,
-        "tests":tests,
-        "failed_tests":failures,
-        "pass_count":pass_count,
-        "test_count":len(tests),
-        "reason":reason,
-        "policy":[
-            "Never lower confirmation thresholds.",
-            "Never invent a direction, entry, stop, or target.",
-            "A counterfactual failure can downgrade a trade to WATCH but cannot promote WATCH to TRADE.",
-            "A thesis dependent on one dominant signal is not robust enough for automatic trade authorization.",
-        ],
+        "version":"23.5.1","generated_at":now.isoformat(),
+        "status":"VERIFIED","source":str(source.relative_to(ROOT)),
+        "source_generated_at":source_time,
+        "input_decision":decision,"primary_direction":direction,
+        "decision":final,"trade_authorized":authorized,
+        "challenge_passed":not failures,"tests":tests,
+        "failed_tests":failures,"pass_count":sum(t["passed"] for t in tests),
+        "test_count":len(tests),"reason":reason,
+        "policy":["Verification only; publication is unaffected.",
+                  "Never lower confirmation thresholds.",
+                  "Never invent direction, entry, stop, or target.",
+                  "A counterfactual failure can downgrade TRADE to WATCH.",
+                  "A verification layer can never promote WATCH to TRADE.",
+                  "Stale inputs are ignored rather than reused."]
     }
     OUT.parent.mkdir(parents=True,exist_ok=True)
-    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
-    print(json.dumps(result,indent=2,ensure_ascii=False))
+    OUT.write_text(json.dumps(result,indent=2)+"\n")
+    print(json.dumps(result,indent=2))
 
 if __name__=="__main__":
     main()
