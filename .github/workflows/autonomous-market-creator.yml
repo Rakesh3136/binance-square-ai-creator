@@ -196,25 +196,12 @@ jobs:
           echo "NIC 22.4 fresh-evidence confirmation: $confirmed"
           exit 0
 
-      - name: NIC 22.5 Unified publication eligibility
-        id: publication_eligibility
-        if: ${{ steps.intelligence.outcome == 'success' }}
-        run: |
-          set +e
-          python src/nic22_5_publication_eligibility.py
-          eligible=$(python -c 'import json; print(str(json.load(open("data/live/nic22_5_publication_eligibility.json")).get("eligible", False)).lower())')
-          mode=$(python -c 'import json; print(json.load(open("data/live/nic22_5_publication_eligibility.json")).get("publication_mode", "BLOCKED"))')
-          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "NIC 22.5 publication eligibility: eligible=$eligible mode=$mode"
-          exit 0
-
       - name: NIC 22.1 opportunity rotation
-        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
+        if: ${{ steps.intelligence.outcome == 'success' }}
         run: python src/nic22_opportunity_diversity_engine.py
 
       - name: Measure previous publications and learning state
-        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
+        if: ${{ steps.intelligence.outcome == 'success' }}
         run: |
           python src/square_performance_collector.py
           python src/square_post_detail_collector.py
@@ -227,9 +214,9 @@ jobs:
           python src/learning_engine.py || true
           python src/nic_transparency_journal.py || true
 
-      - name: Adaptive cadence and publication decision
+      - name: Adaptive cadence and Signal-First decision
         id: cadence
-        if: ${{ steps.publication_eligibility.outputs.eligible == 'true' }}
+        if: ${{ steps.intelligence.outcome == 'success' }}
         run: |
           set -euo pipefail
           python src/revenue_content_director.py
@@ -261,6 +248,18 @@ jobs:
           test -s data/live/nic23_6_decision_ledger.jsonl
           echo "NIC 23.6 is SHADOW-only; historical records are immutable and live weights/gates are unchanged."
 
+      - name: NIC 22.5 Final publication eligibility
+        id: publication_eligibility
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        run: |
+          set -euo pipefail
+          python src/nic22_5_publication_eligibility.py
+          eligible=$(python -c 'import json; print(str(json.load(open("data/live/nic22_5_publication_eligibility.json")).get("eligible", False)).lower())')
+          mode=$(python -c 'import json; print(json.load(open("data/live/nic22_5_publication_eligibility.json")).get("publication_mode", "BLOCKED"))')
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "NIC 22.5 final publication eligibility: eligible=$eligible mode=$mode"
+
       - name: Final evidence-to-publication verification gate
         id: verified_publication
         if: ${{ steps.cadence.outputs.publish == 'true' }}
@@ -270,9 +269,12 @@ jobs:
           import json
           routing=json.load(open("data/live/signal_first_routing.json"))
           challenge=json.load(open("data/live/nic23_5_counterfactual_challenge.json"))
+          eligibility=json.load(open("data/live/nic22_5_publication_eligibility.json"))
           decision=str(challenge.get("decision"," ")).upper()
           passed=bool(challenge.get("challenge_passed"))
-          safe=bool(routing.get("publish")) and ((decision == "TRADE" and passed) or decision in {"EDITORIAL_SIGNAL","EDITORIAL","RESEARCH","NO_TRADE"})
+          eligible=bool(eligibility.get("eligible"))
+          mode=str(eligibility.get("publication_mode","BLOCKED")).upper()
+          safe=bool(routing.get("publish")) and eligible and ((decision == "TRADE" and passed and mode == "TRADE") or (decision in {"EDITORIAL_SIGNAL","EDITORIAL","RESEARCH","NO_TRADE"} and mode in {"EDITORIAL","TRADE"}))
           print("true" if safe else "false")
           PY
           )
