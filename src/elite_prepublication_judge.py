@@ -109,12 +109,23 @@ REUSABLE_DISCLAIMER_SENTENCES={
     'levels are chart derived scenarios not guarantees',
 }
 
+def normalize_sentence(sentence):
+    value=re.sub(r'[^a-z0-9 ]','',sentence.lower()).strip()
+    # Treat punctuation/spacing variants of approved safety language as the
+    # same reusable disclaimer, so a required risk disclaimer never creates
+    # a false originality failure.
+    value=re.sub(r'\\s+',' ',value)
+    return value
+
+_REUSABLE_NORMALIZED={normalize_sentence(s) for s in REUSABLE_DISCLAIMER_SENTENCES}
+
 def normalized_sentences(text):
     return {
-        re.sub(r'[^a-z0-9 ]','',s.lower()).strip()
+        normalized
         for s in re.split(r'[.!?]+',text)
         if len(s.split())>=6
-        and re.sub(r'[^a-z0-9 ]','',s.lower()).strip() not in REUSABLE_DISCLAIMER_SENTENCES
+        for normalized in [normalize_sentence(s)]
+        if normalized and normalized not in _REUSABLE_NORMALIZED
     }
 
 def recent_similarity(text):
