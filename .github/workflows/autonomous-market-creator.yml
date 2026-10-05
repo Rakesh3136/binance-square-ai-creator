@@ -16,6 +16,10 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   creator:
     runs-on: ubuntu-latest
@@ -205,38 +209,6 @@ jobs:
           echo "NIC 22.5 publication eligibility: eligible=$eligible mode=$mode"
           exit 0
 
-      - name: NIC 23.5 Counterfactual decision verification
-        id: counterfactual_verification
-        if: ${{ steps.intelligence.outcome == 'success' }}
-        run: |
-          set -euo pipefail
-          python src/nic23_5_counterfactual_challenge.py
-          python -m json.tool data/live/nic23_5_counterfactual_challenge.json >/dev/null
-          echo "NIC 23.5 verification result:"
-          python -c 'import json; x=json.load(open("data/live/nic23_5_counterfactual_challenge.json")); print("status=",x.get("status"),"decision=",x.get("decision"),"challenge_passed=",x.get("challenge_passed"),"trade_authorized=",x.get("trade_authorized"))'
-
-      - name: NIC 23.6 Shadow decision calibration
-        id: decision_calibration
-        if: ${{ steps.intelligence.outcome == 'success' }}
-        run: |
-          set -euo pipefail
-          python src/nic23_6_decision_calibration.py
-          python -m json.tool data/live/nic23_6_calibration_report.json >/dev/null
-          test -s data/live/nic23_6_decision_ledger.jsonl
-          echo "NIC 23.6 calibration remains SHADOW-only; live weights and publication gates are unchanged."
-
-      - name: Preserve decision verification and calibration artifacts
-        if: ${{ always() && steps.intelligence.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nic23-decision-verification-${{ github.run_id }}
-          path: |
-            data/live/nic23_5_counterfactual_challenge.json
-            data/live/nic23_6_calibration_report.json
-            data/live/nic23_6_decision_ledger.jsonl
-          if-no-files-found: warn
-          retention-days: 30
-
       - name: NIC 22.1 opportunity rotation
         if: ${{ steps.publication_eligibility.outputs.eligible == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
         run: python src/nic22_opportunity_diversity_engine.py
@@ -259,21 +231,59 @@ jobs:
         id: cadence
         if: ${{ steps.publication_eligibility.outputs.eligible == 'true' }}
         run: |
+          set -euo pipefail
           python src/revenue_content_director.py
           python src/content_director_4.py
           python src/opportunity_ranker_6.py
           python src/discovery_queue.py
           python src/autonomous_cadence_6.py
           python src/signal_first_router.py
-          python src/nic23_5_counterfactual_challenge.py
-          python src/nic23_6_decision_calibration.py
-          python src/content_portfolio_planner.py
           publish=$(python -c 'import json; print(str(json.load(open("data/live/signal_first_routing.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "Signal-first publication decision: $publish"
 
-      - name: Freeze selected opportunity
+      - name: NIC 23.5 Final counterfactual verification
+        id: final_counterfactual
         if: ${{ steps.cadence.outputs.publish == 'true' }}
+        run: |
+          set -euo pipefail
+          python src/nic23_5_counterfactual_challenge.py
+          python -m json.tool data/live/nic23_5_counterfactual_challenge.json >/dev/null
+          python -c 'import json; x=json.load(open("data/live/nic23_5_counterfactual_challenge.json")); print("NIC 23.5 final:", x.get("status"), x.get("decision"), "passed=", x.get("challenge_passed"))'
+
+      - name: NIC 23.6 Shadow decision calibration
+        id: final_calibration
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        run: |
+          set -euo pipefail
+          python src/nic23_6_decision_calibration.py
+          python -m json.tool data/live/nic23_6_calibration_report.json >/dev/null
+          test -s data/live/nic23_6_decision_ledger.jsonl
+          echo "NIC 23.6 is SHADOW-only; historical records are immutable and live weights/gates are unchanged."
+
+      - name: Final evidence-to-publication verification gate
+        id: verified_publication
+        if: ${{ steps.cadence.outputs.publish == 'true' }}
+        run: |
+          set -euo pipefail
+          publish=$(python - <<'PY'
+          import json
+          routing=json.load(open("data/live/signal_first_routing.json"))
+          challenge=json.load(open("data/live/nic23_5_counterfactual_challenge.json"))
+          decision=str(challenge.get("decision"," ")).upper()
+          passed=bool(challenge.get("challenge_passed"))
+          safe=bool(routing.get("publish")) and ((decision == "TRADE" and passed) or decision in {"EDITORIAL_SIGNAL","EDITORIAL","RESEARCH","NO_TRADE"})
+          print("true" if safe else "false")
+          PY
+          )
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Final verified publication decision: $publish"
+
+      - name: Content portfolio planning
+        if: ${{ steps.verified_publication.outputs.publish == 'true' }}
+        run: python src/content_portfolio_planner.py
+      - name: Freeze selected opportunity
+        if: ${{ steps.verified_publication.outputs.publish == 'true' }}
         run: |
           test -s data/live/nic22_opportunity_selection.json
           python -m json.tool data/live/nic22_opportunity_selection.json >/dev/null
