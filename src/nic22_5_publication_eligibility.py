@@ -93,6 +93,7 @@ def main():
     )
     candidate=research_candidate(research)
     research_fresh=fresh(research.get("generated_at"))
+    director_fresh=fresh(director.get("generated_at"))
 
     if signal_publish and signal_decision == "PRIMARY_SIGNAL":
         contract_ok=bool(signal.get("prediction_contract_complete")) and bool(signal_selected)
@@ -117,7 +118,6 @@ def main():
         reason="Current-cycle Signal-First decision did not authorize publication."
         selected={}
     else:
-        director_fresh=fresh(director.get("generated_at"))
         editorial_available=bool(candidate) and research_fresh and director_fresh
 
         if trade_confirmed:
