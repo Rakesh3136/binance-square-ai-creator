@@ -22,7 +22,7 @@ def main():
     decision_id=str(d.get("decision_id") or "").strip()
     if not decision_id:
         report={"version":"23.6.0","generated_at":now.isoformat(),"status":"NOT_APPLICABLE","decision_records":0,"resolved_records":0,"calibration_buckets":[],"live_weights_changed":False,"publication_gate_changed":False,"reason":"No immutable decision_id was supplied by the current verified decision; no ledger record was created.","policy":["Immutable decision records.","Never invent lifecycle identity for missing decisions.","Only resolved outcomes enter calibration."]}
-        REPORT.write_text(json.dumps(report,indent=2)+"\\n",encoding="utf-8"); print(json.dumps(report,indent=2)); return
+        REPORT.write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8"); print(json.dumps(report,indent=2)); return
     outcome=d.get("outcome")
     record={"decision_id":decision_id,"recorded_at":now.isoformat(),"symbol":d.get("symbol"),"decision":d.get("decision"),"direction":d.get("primary_direction"),"confidence":d.get("fusion_score",d.get("confidence")),"regime":d.get("regime"),"outcome":outcome,"source_generated_at":d.get("generated_at"),"source":"nic23_5_counterfactual_challenge.json","immutable":True}
     LIVE.mkdir(parents=True,exist_ok=True)
