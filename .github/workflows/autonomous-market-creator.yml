@@ -328,7 +328,6 @@ jobs:
       - name: Score and apply human editorial pass
         id: editorial
         if: ${{ steps.cadence.outputs.publish == 'true' }}
-        env:
         run: |
           python src/candidate_script_scorer_4.py
           DRAFT_PATH=$(python src/resolve_publish_draft.py)
