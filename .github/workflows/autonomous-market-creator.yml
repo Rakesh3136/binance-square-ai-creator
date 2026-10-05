@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m compileall -q src
-          python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py src/nic22_4_adaptive_confirmation.py src/nic22_5_publication_eligibility.py
+          python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py src/nic22_4_adaptive_confirmation.py src/nic22_5_publication_eligibility.py src/nic23_5_counterfactual_challenge.py
           python tests/test_nic22_opportunity_diversity_engine.py
           python tests/test_nic22_2_early_opportunity_engine.py
           python tests/test_nic22_3_early_confirmation_engine.py
@@ -246,6 +246,25 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "NIC 22.5 publication eligibility: eligible=$eligible mode=$mode"
           exit 0
+
+      - name: NIC 23.5 Counterfactual decision verification
+        id: counterfactual_verification
+        if: ${{ steps.intelligence.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          python src/nic23_5_counterfactual_challenge.py
+          python -m json.tool data/live/nic23_5_counterfactual_challenge.json >/dev/null
+          echo "NIC 23.5 verification result:"
+          python -c 'import json; x=json.load(open("data/live/nic23_5_counterfactual_challenge.json")); print("status=",x.get("status"),"decision=",x.get("decision"),"challenge_passed=",x.get("challenge_passed"),"trade_authorized=",x.get("trade_authorized"))'
+
+      - name: Preserve NIC 23.5 verification artifact
+        if: ${{ always() && steps.intelligence.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic23-5-counterfactual-verification-${{ github.run_id }}
+          path: data/live/nic23_5_counterfactual_challenge.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: NIC 22.1 opportunity rotation
         if: ${{ steps.publication_eligibility.outputs.eligible == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
