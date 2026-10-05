@@ -120,13 +120,7 @@ def candidate_pool(portfolio,pre,engagement,market,signal,stale_portfolio=False)
     # Once NIC 22.1 has selected and NIC 22.3 has confirmed an opportunity,
     # that selection is immutable. Downstream routing may decide whether to
     # publish, but it must not replace the frozen asset/story.
-    nic22=load(NIC22_SELECTION)
-    nic22_selected=nic22.get('selected_opportunity') if str(nic22.get('status') or '').upper() == 'SELECTED' else None
-    if isinstance(nic22_selected,dict) and symbol(nic22_selected):
-        item=dict(nic22_selected)
-        item['selection_source']='nic22_authoritative_selection'
-        item['_freeze_source']='nic22_authoritative_selection'
-        return [item]
+    # Signal-First is authoritative for the final downstream decision. NIC 22.1 remains an upstream candidate source and cannot overwrite a newer router selection.
     pool,seen=[],set()
     selected_signal=signal_candidate(signal)
     if selected_signal: add_candidate(pool,seen,selected_signal,'signal_first_router')
