@@ -91,6 +91,30 @@ def main():
     if not mechanism_present(candidate):reasons.append("MECHANISM_STILL_MISSING")
     if len(questions(candidate))!=1:reasons.append("QUESTION_COUNT_NOT_ONE")
     if original_facts-explicit_facts(candidate):reasons.append("EXPLICIT_FACT_LOSS")
+    if reasons and "FINAL_COPY_OVER_740" in reasons:
+        # Hard-cap repair: preserve explicit facts, retain the reader question,
+        # and rebuild from complete sentences without inventing market claims.
+        q=original_question
+        fact_sentences=[s for s in split_sentences(body) if explicit_facts(s)]
+        other_sentences=[s for s in split_sentences(body) if not explicit_facts(s)]
+        if not bridge:
+            bridge=deterministic_bridge(symbol,body,remaining=MAX_READER_CHARS-len(q)-4)
+        chosen=[]
+        for s in fact_sentences + other_sentences:
+            candidate=" ".join(chosen+[s])
+            if bridge: candidate += f"\n\n{bridge}"
+            candidate += f"\n\n{q}"
+            if len(candidate)<=MAX_READER_CHARS: chosen.append(s)
+        candidate=" ".join(chosen)
+        if bridge: candidate += f"\n\n{bridge}"
+        candidate += f"\n\n{q}"
+        if len(candidate)<=MAX_READER_CHARS and mechanism_present(candidate) and len(questions(candidate))==1 and not (original_facts-explicit_facts(candidate)):
+            repair={"status":"REPAIRED","method":"hard_cap_fact_preserving_compaction","verified_facts_preserved":True,"exactly_one_question":True,"mechanism_present":True,"reader_value_floor_enabled":True,"max_reader_characters":MAX_READER_CHARS}
+            draft["post"]=candidate;draft["text"]=candidate;draft["mechanism_value_repair"]=repair
+            data["draft"]=draft;data["mechanism_value_repair"]=repair
+            Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+            write_result({**repair,"draft_path":str(report)})
+            return 0
     if reasons:write_result({"status":"REPAIR_FAILED","draft_unchanged":True,"draft_path":str(report),"reasons":reasons,"bridge_preview":bridge,"method":method});return 1
     repair={"status":"REPAIRED","method":method,"question_repaired":question_repaired,"verified_facts_preserved":True,"exactly_one_question":True,"mechanism_present":True,"reader_value_floor_enabled":True,"max_reader_characters":MAX_READER_CHARS,"redundant_fact_free_sentences_removed":len(removed)}
     draft["post"]=candidate;draft["text"]=candidate;draft["mechanism_value_repair"]=repair;data["draft"]=draft;data["mechanism_value_repair"]=repair;Path(report).write_text(json.dumps(data,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");write_result({**repair,"draft_path":str(report)});return 0
