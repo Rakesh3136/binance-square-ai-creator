@@ -22,6 +22,7 @@ FULL_FLOW = LIVE / "full_universe_flow.json"
 MARKET = LIVE / "market_snapshot.json"
 REGIME = LIVE / "market_regime_intelligence.json"
 POSTMORTEM = LIVE / "nic_prediction_postmortem.json"
+EXPERIENCE = LIVE / "nic_market_experience.json"
 OUT = LIVE / "nic_prediction_engine.json"
 REPORT = ROOT / "data" / "intelligence" / "nic_prediction_engine_report.json"
 
@@ -338,11 +339,24 @@ def candidate_symbols(flow: dict, full_flow: dict) -> list[tuple[str, str]]:
     return final
 
 
+def experience_for(doc: dict, setup_type: str, side: str, timeframe: str, regime: str) -> dict:
+    profiles = doc.get("profiles") if isinstance(doc.get("profiles"), list) else []
+    for p in profiles:
+        if not isinstance(p, dict):
+            continue
+        if (str(p.get("setup_type") or "").upper() == setup_type.upper()
+            and str(p.get("side") or "").upper() == side.upper()
+            and str(p.get("timeframe") or "").upper() == timeframe.upper()
+            and str(p.get("market_regime") or "").upper() == regime.upper()):
+            return p
+    return {}
+
 def build():
     flow = load(FLOW, {})
     full_flow = load(FULL_FLOW, {})
     market = load(MARKET, {})
     postmortem = load(POSTMORTEM, {})
+    experience = load(EXPERIENCE, {})
     candidates = candidate_symbols(flow, full_flow)
     btc_frames = {}
     try:
@@ -401,8 +415,19 @@ def build():
             quality += (smoothed - 0.5) * 60.0
             quality += (alignment - 0.5) * 28.0
 
-            # Repeated post-fix failure contexts receive a bounded penalty.
+            # Accumulated NIC experience is outcome-derived evidence. Only an
+            # established exact profile can influence live quality.
             current_regime = fresh_regime
+            setup_type = "BREAKOUT" if side == "LONG" else "BREAKDOWN"
+            experience_profile = experience_for(experience, setup_type, side, "1H", current_regime)
+            experience_samples = int(experience_profile.get("samples") or 0)
+            experience_win_rate = num(experience_profile.get("empirical_win_rate"))
+            experience_status = str(experience_profile.get("status") or "UNSEEN")
+            if experience_status == "ESTABLISHED" and experience_win_rate is not None:
+                quality += max(-6.0, min(6.0, (experience_win_rate - 0.5) * 20.0))
+            elif experience_status == "DEVELOPING":
+                quality -= 1.0
+
             quality_band = (
                 "LT70" if quality < 70 else
                 "70_79" if quality < 80 else
@@ -526,7 +551,18 @@ def build():
                 "status": status,
                 "quality_score": quality,
                 "confidence_ceiling": 85.0,
-                "calibrated_confidence": min(85.0, quality),
+                "calibrated_confidence": min(85.0, max(0.0, quality + (
+                    float(experience.get("probability_calibration", {}).get("recommended_adjustment") or 0.0) * 100.0
+                    if experience.get("probability_calibration", {}).get("state") == "CALIBRATED" else 0.0
+                ))),
+                "experience": {
+                    "setup_type": setup_type,
+                    "status": experience_status,
+                    "samples": experience_samples,
+                    "empirical_win_rate": experience_win_rate,
+                    "used_for_quality_adjustment": experience_status == "ESTABLISHED",
+                    "policy": "Historical experience is evidence, not a guarantee.",
+                },
                 "current_alignment": round(alignment, 4),
                 "relative_strength_to_btc": round(relative_strength, 4) if relative_strength is not None else None,
                 "current_timeframes": {
@@ -595,6 +631,9 @@ def build():
             "No setup is accepted from a single 1H observation.",
             "Historical outcomes are tested with the trigger-first state machine.",
             "Confidence is shrunk toward neutral when historical sample size is small.",
+            "Resolved NIC experience adjusts quality only for established exact profiles.",
+            "Qualified probability calibration can adjust confidence within a bounded range.",
+            "No historical profile is treated as knowledge of the future.",
             "Multi-timeframe disagreement lowers quality.",
             "BTC-relative strength is supporting context, not a causal law.",
             "This engine cannot override safety/publication gates or fabricate a market outcome.",
