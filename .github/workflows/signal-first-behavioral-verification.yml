@@ -1,0 +1,37 @@
+name: Signal-First Behavioral Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/signal_first_router.py'
+      - 'tests/verify_signal_first_behavior.py'
+      - '.github/workflows/signal-first-behavioral-verification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Syntax check
+        run: python -m py_compile src/signal_first_router.py tests/verify_signal_first_behavior.py
+
+      - name: Verify asset cooldown behavior
+        run: python tests/verify_signal_first_behavior.py
+
+      - name: Verify router contains authoritative cooldown gate
+        run: |
+          grep -q "SIGNAL_FIRST_ASSET_COOLDOWN_HOURS" src/signal_first_router.py
+          grep -q "same_asset_cooldown_requires_new_evidence_or_follow_up" src/signal_first_router.py
+          grep -q "reason=blocked(x,rows)" src/signal_first_router.py
