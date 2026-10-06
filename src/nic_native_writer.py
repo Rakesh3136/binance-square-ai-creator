@@ -77,13 +77,23 @@ def build(ctx):
         close="The useful test is whether price and participation keep validating the same interpretation; if they diverge, the thesis weakens."
         question=f"What new evidence would make you change your view on {dollar}?"
     elif cat in {"capital_flow_long","capital_flow_short","flow","technical_setup","creator_signal_outcome","follow_up"} and side in {"LONG","SHORT"} and trigger is not None and inv is not None:
-        hook=f"{dollar} has a {side.lower()} case, but the level is the thesis — not the prediction."
-        body=f"The frozen setup uses {side} only if the trigger at {trigger} is met. A move toward the level is not confirmation, and a failure through {inv} is the predefined invalidation."
-        middle=f"TP1 is {tp1} and TP2 is {tp2} when reached, but those are scenario levels, not promises. The current tape is around {obs}, with {voltext} in the supplied snapshot."
-        close="The reason to wait is simple: price has to prove the setup at the trigger while participation remains consistent with the thesis."
-        question=f"What is the first evidence on {dollar} that would confirm or invalidate this {side} setup?"
+        trade_styles=[
+            (f"${dollar}: the setup is conditional, not a call to chase.",f"The ${side} thesis only activates at ${trigger}. Until price reaches and holds that area, the signal is incomplete.",f"If it triggers, TP1 is ${tp1} and TP2 is ${tp2}. If ${inv} fails, the thesis is invalidated. Current price is ${obs}; the snapshot shows ${voltext} of quote volume.","The useful edge here is waiting for confirmation instead of paying for the move before the market proves it."),
+            (f"The interesting question on ${dollar} is not 'up or down?' It is whether the market can prove this level.",f"For a ${side} scenario, ${trigger} is the decision point. A move near it is only preparation; acceptance beyond it is the confirmation condition.",f"The risk boundary is ${inv}. TP1/TP2 sit at ${tp1} and ${tp2}. Those levels describe the scenario, not a guaranteed path. Price is currently ${obs}.","That makes the invalidation more important than the target: it tells us when the thesis stops making sense."),
+            (f"I would not chase ${dollar} here. I would wait for the market to answer one specific question.",f"Can price establish the ${side} setup through ${trigger}? If not, there is no reason to force the signal.",f"The predefined failure point is ${inv}; the scenario targets are ${tp1} and ${tp2}. The current snapshot has price near ${obs} with ${voltext} in quote volume.","Waiting is part of the setup. A missed trade is cheaper than inventing confirmation."),
+            (f"${dollar} has a clean conditional setup, but the condition comes first.",f"The evidence is actionable only if ${trigger} is reached and the ${side.lower()} case holds there.",f"Invalidation sits at ${inv}; TP1 is ${tp1} and TP2 is ${tp2}. Current price is ${obs}, so the distance to the decision point still matters.","If the trigger never confirms, the correct outcome is no trade — not a rewritten signal.")
+        ]
+        hook,body,middle,close=trade_styles[seed % len(trade_styles)]
+        question=f"What would you need to see on ${dollar} before you would consider this ${side} scenario confirmed?"
     else:
-        hooks=[f"{dollar} moved {move:+.1f}%, but the useful story is what the move is doing to market structure.",f"The {dollar} move is obvious; the evidence underneath it is more useful.",f"{dollar} has enough movement to attract attention. The next reaction decides whether that attention is justified.",f"The interesting part of {dollar} is not the headline move. It is the relationship between price and participation."]
+        hooks=[
+            f"${dollar} moved ${move:+.1f}%. The percentage gets attention; the structure tells us whether it deserves it.",
+            f"The headline move in ${dollar} is easy to see. The useful part is what happened underneath it.",
+            f"${dollar} is moving, but movement alone is not the thesis. The next reaction is the evidence.",
+            f"I would separate the ${dollar} headline from the actual market question: did participation confirm the move?",
+            f"The interesting thing about ${dollar} is not the candle that already happened. It is what traders do next.",
+            f"Before calling ${dollar} strong or weak, I would look at how price behaves after this impulse."
+        ]
         hook=fresh(hooks[seed:]+hooks[:seed],used)
         if lo is not None and hi is not None:
             structure=f"The recent 1H window spans roughly $" + price(lo) + " to $" + price(hi) + f". Price is around {obs}, with {voltext} in quote volume and a {ir:.1f}% intraday range."
