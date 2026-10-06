@@ -14,6 +14,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from opportunity_timing_gate import evaluate as evaluate_timing
+from nic_forecast_evidence_adapter import evidence as forecast_evidence
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; NIC24_1=ROOT/'data/live/nic24_1_strategy_content_plan.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
 ASSET_COOLDOWN_HOURS=float(os.getenv('SIGNAL_FIRST_ASSET_COOLDOWN_HOURS','72'))
@@ -88,6 +89,10 @@ def apply_content_plan(x):
         e['content_repeat_penalty']=num(p.get('repeat_penalty'))
         e['reader_value_focus']=p.get('reader_value_focus','')
     return e
+
+def forecast_evidence_for(x):
+    _,_,side,_,_,_,_,_=setup_parts(x)
+    return {**x,'forecast_evidence':forecast_evidence(x.get('symbol'),side)}
 
 def prediction_quality_for(x):
     predictions=load(PREDICTION).get('candidates') or []
@@ -211,9 +216,10 @@ def choose(xs,rows,market,full_flow,live_symbols,allow_editorial=False):
     blocked_rows=[]
     def order_key(x):
         pq=prediction_quality_for(x); p=content_plan_for(x)
-        return (str(pq.get('status') or '').upper()=='PASS',-num(p.get('repeat_penalty')),num(pq.get('quality_score')),num(pq.get('calibrated_confidence')),num(x.get('flow_confidence')),num(x.get('score')))
+        return (str(pq.get('status') or '').upper()=='PASS',-num(p.get('repeat_penalty')),num(pq.get('quality_score')),num(pq.get('calibrated_confidence')),num((x.get('forecast_evidence') or {}).get('evidence_score')),num(x.get('flow_confidence')),num(x.get('score')))
     for x in sorted(xs,key=order_key,reverse=True):
         x=apply_content_plan(x)
+        x=forecast_evidence_for(x)
         raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
         if not raw_symbol:
             blocked_rows.append({'symbol':'','reason':'missing_symbol'}); continue
