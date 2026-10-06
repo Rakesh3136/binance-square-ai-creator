@@ -11,6 +11,8 @@ MONETIZATION_OS_PATH=LIVE/"nic_monetization_contract.json"; STORY_DISCOVERY_PATH
 ATTRIBUTION_LOG_PATH=ANALYTICS/"publication_attribution.jsonl"; VISUAL=LIVE/"visual.png"
 ENDPOINT="https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
 NO_IMAGE_LANES={"education","commentary","community","text_only"}; DUPLICATE_HOURS=float(os.getenv("PUBLISH_DUPLICATE_HOURS","6"))
+ASSET_COOLDOWN_HOURS=float(os.getenv("PUBLISH_ASSET_COOLDOWN_HOURS","72"))
+ALLOW_ASSET_FOLLOWUP_CATEGORIES={"creator_signal_outcome","follow_up","outcome_accountability"}
 
 def now(): return datetime.now(timezone.utc).isoformat()
 def load(path):
@@ -43,6 +45,18 @@ def recent_rows():
         except Exception: continue
         if isinstance(r,dict) and str(r.get("status") or "") in accepted: rows.append(r)
     return rows
+def asset_cooldown_match(symbol,category):
+    target=clean_symbol(symbol); now_dt=datetime.now(timezone.utc)
+    if not target: return None
+    for row in reversed(recent_rows()):
+        if clean_symbol(row.get("symbol") or row.get("selected_lane_symbol")) != target: continue
+        try: age=now_dt-datetime.fromisoformat(str(row.get("published_at") or row.get("timestamp") or "").replace("Z","+00:00"))
+        except Exception: continue
+        if age>timedelta(hours=ASSET_COOLDOWN_HOURS): continue
+        if str(category or "").lower() in ALLOW_ASSET_FOLLOWUP_CATEGORIES and str(row.get("category") or row.get("content_category") or "").lower() in ALLOW_ASSET_FOLLOWUP_CATEGORIES: continue
+        return row
+    return None
+
 def duplicate_match(text,symbol,category,context,frozen):
     target=clean_symbol(symbol); direction=str(context.get("direction") or (context.get("prediction") or {}).get("direction") or frozen.get("direction") or (frozen.get("prediction") or {}).get("direction") or "").upper(); trigger=context.get("entry_trigger") or frozen.get("entry_trigger") or frozen.get("trigger") or frozen.get("entry"); invalidation=context.get("sl") or frozen.get("sl") or frozen.get("invalidation"); now_dt=datetime.now(timezone.utc)
     for row in reversed(recent_rows()):
@@ -78,6 +92,12 @@ def main():
         wte=load(WTE_PATH)
         if wte and wte.get("eligible") is False:
             reason=str(wte.get("reason") or "w2e eligibility gate rejected publication"); append({"timestamp":now(),"status":"PUBLISH_SKIPPED_WTE_INELIGIBLE","post_id":None,"link":None,"symbol":symbol,"category":category,"reason":reason,"publication_proof":"none"}); return skip(f"Publication skipped by W2E eligibility gate: {reason}","PUBLISH_SKIPPED_WTE_INELIGIBLE",symbol,category)
+        cooldown_existing=asset_cooldown_match(symbol,category)
+        if cooldown_existing:
+            eid=canonical_post_id(cooldown_existing.get("canonical_post_id") or cooldown_existing.get("post_id") or cooldown_existing.get("link"))
+            elink=str(cooldown_existing.get("link") or "").strip() or (f"https://www.binance.com/square/post/{eid}" if eid else None)
+            append({"timestamp":now(),"status":"PUBLISH_BLOCKED_ASSET_COOLDOWN","post_id":None,"link":None,"existing_post_id":eid or None,"existing_post_link":elink,"symbol":symbol,"category":category,"reason":f"same_asset_within_{ASSET_COOLDOWN_HOURS:g}h_requires_new_evidence_or_follow_up","publication_proof":"existing_verified_publication_log"})
+            return skip(f"Asset rotation blocked: {symbol} was already covered within {ASSET_COOLDOWN_HOURS:g}h; reuse/follow-up requires verified new evidence.","PUBLISH_BLOCKED_ASSET_COOLDOWN",symbol,category,cooldown_existing)
         dup,existing=duplicate_match(text,symbol,category,context,frozen)
         if dup:
             eid=canonical_post_id(existing.get("canonical_post_id") or existing.get("post_id") or existing.get("link")); elink=str(existing.get("link") or "").strip() or (f"https://www.binance.com/square/post/{eid}" if eid else None)
