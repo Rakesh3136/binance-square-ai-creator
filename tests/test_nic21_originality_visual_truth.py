@@ -39,4 +39,5 @@ def test_structure_detects_question_shape():
     from src.nic21_originality_visual_truth import structure
     assert structure("Short line.\n\nWhat happens next?") == ("S", "Q")
 
-\ndef test_symbols_in_recognizes_btc():\n    from src.nic21_originality_visual_truth import symbols_in\n    assert "BTC" in symbols_in("$BTC setup is forming")\n
+
+def test_symbols_in_recognizes_btc():\n    from src.nic21_originality_visual_truth import symbols_in\n    assert "BTC" in symbols_in("$BTC setup is forming")\n
