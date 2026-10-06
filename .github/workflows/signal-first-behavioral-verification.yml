@@ -33,6 +33,19 @@ jobs:
       - name: Syntax check
         run: python -m py_compile src/signal_first_router.py src/opportunity_timing_gate.py src/freeze_opportunity.py tests/verify_signal_first_behavior.py tests/verify_freeze_signal_recovery.py tests/test_opportunity_timing_gate.py
 
+      - name: Verify standalone Signal-First import
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          root = Path.cwd()
+          spec = importlib.util.spec_from_file_location("signal_first_router", root / "src" / "signal_first_router.py")
+          router = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(router)
+          assert callable(router.evaluate_timing)
+          print("standalone Signal-First import: PASS")
+          PY
+
       - name: Verify Signal-First asset cooldown behavior
         run: python tests/verify_signal_first_behavior.py
 
@@ -53,3 +66,4 @@ jobs:
           grep -q "SIGNAL_FIRST_ASSET_COOLDOWN_HOURS" src/signal_first_router.py
           grep -q "same_asset_cooldown_requires_new_evidence_or_follow_up" src/signal_first_router.py
           grep -q "reason=blocked(x,rows)" src/signal_first_router.py
+          grep -q "opportunity_timing_" src/signal_first_router.py
