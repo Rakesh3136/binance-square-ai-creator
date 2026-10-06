@@ -55,8 +55,11 @@ def asset_cooldown_match(symbol,category):
         if age>timedelta(hours=ASSET_COOLDOWN_HOURS): continue
         # The hard cooldown remains authoritative. A follow-up/outcome can
         # reopen an asset only when the caller supplies explicit new evidence.
+        followup_context=load(CONTEXT_PATH)
         explicit_followup = str(category or "").lower() in ALLOW_ASSET_FOLLOWUP_CATEGORIES and bool(
-            os.getenv("PUBLICATION_FOLLOWUP_EVIDENCE", "").strip()
+            followup_context.get("follow_up") or followup_context.get("outcome") or
+            followup_context.get("new_evidence") or followup_context.get("outcome_evidence") or
+            followup_context.get("evidence_update")
         )
         if explicit_followup:
             continue
