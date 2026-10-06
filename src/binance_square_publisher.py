@@ -53,7 +53,13 @@ def asset_cooldown_match(symbol,category):
         try: age=now_dt-datetime.fromisoformat(str(row.get("published_at") or row.get("timestamp") or "").replace("Z","+00:00"))
         except Exception: continue
         if age>timedelta(hours=ASSET_COOLDOWN_HOURS): continue
-        if str(category or "").lower() in ALLOW_ASSET_FOLLOWUP_CATEGORIES and str(row.get("category") or row.get("content_category") or "").lower() in ALLOW_ASSET_FOLLOWUP_CATEGORIES: continue
+        # The hard cooldown remains authoritative. A follow-up/outcome can
+        # reopen an asset only when the caller supplies explicit new evidence.
+        explicit_followup = str(category or "").lower() in ALLOW_ASSET_FOLLOWUP_CATEGORIES and bool(
+            os.getenv("PUBLICATION_FOLLOWUP_EVIDENCE", "").strip()
+        )
+        if explicit_followup:
+            continue
         return row
     return None
 
