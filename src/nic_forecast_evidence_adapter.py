@@ -1,4 +1,4 @@
-""""NIC Forecast evidence adapter: resolved predictive edge plus regime stability."""
+"""NIC Forecast evidence adapter: resolved predictive edge plus regime stability."""
 from __future__ import annotations
 import json
 from pathlib import Path
