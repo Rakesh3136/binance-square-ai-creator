@@ -177,11 +177,120 @@ def choose(xs,rows,market,live_symbols,allow_editorial=False):
         raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
         if raw_symbol not in live_symbols:blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'});continue
         category=str(x.get('category') or lane(x)).lower()
+        # Apply anti-repetition before the editorial fast path. The old code
+        # returned editorial candidates before the recent-publication check,
+        # allowing the same asset to bypass NIC19 and appear as a fresh story.
+        recent_reason=blocked(x,rows)
+        if recent_reason:
+            blocked_rows.append({'symbol':raw_symbol,'reason':recent_reason})
+            continue
+        # Hard asset portfolio rule: a normal signal/editorial is not a new
+        # story merely because its price changed. Re-open an asset only for a
+        # material follow-up/new event or verified outcome.
+        same_asset_recent=False
+        material_followup=category in {'creator_signal_outcome','follow_up','outcome_accountability'}
+        for r in rows[-20:]:
+            rs=str(r.get('symbol') or r.get('selected_lane_symbol') or '').upper().replace('USDT','').replace('
+        try:e=derive(x,market)
+        except Exception as exc:blocked_rows.append({'symbol':raw_symbol,'reason':f'prediction_validation_failed:{type(exc).__name__}'});continue
+        reason=blocked(e,rows)
+        if reason:blocked_rows.append({'symbol':e.get('symbol'),'reason':reason});continue
+        if flow_complete(e):return e,blocked_rows
+        blocked_rows.append({'symbol':e.get('symbol'),'reason':'NIC_prediction_not_verified_or_accuracy_gate_wait'})
+    return None,blocked_rows
+def main():
+    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); macro=load(ROOT/'data/live/global_macro_intelligence.json'); rows=recent()
+    live_symbols=trading_symbols(); primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
+    for event in (macro.get('events') or [])[:30]:
+        title=str(event.get('title') or '').strip(); source=str(event.get('source') or '').strip(); published=str(event.get('published_at') or '').strip(); themes=event.get('themes') if isinstance(event.get('themes'),list) else []; score=min(100,64+len(themes)*5+(4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
+        for raw in (event.get('asset_symbols') or [])[:2]:
+            s=str(raw).upper().replace('USDT','').strip()
+            if s and title and source and published:markets.append({'type':'news','category':'news_and_macro','lane':'news_and_macro','symbol':s,'score':score,'title':title,'source':source,'published_at':published,'reason':'verified macro event explicitly anchored to this asset','content_intent':'event_to_cross_asset_crypto_impact'})
+    primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]; markets=[x for x in markets if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
+    chosen,blocks=choose(primary,rows,market,live_symbols,allow_editorial=True)
+    if chosen is None:chosen,more=choose(markets,rows,market,live_symbols,allow_editorial=True);blocks+=more
+    current_allowed=bool(cad.get('publish')); selected=None; decision='NO_PUBLISH'; reason='NO_ELIGIBLE_OPPORTUNITY'; primary_signal=False; cadence_override=False
+    if chosen:
+        contract_ok=flow_complete(chosen)
+        primary_signal=contract_ok
+        if primary_signal:
+            side=setup_parts(chosen)[2]; chosen['type']='flow'; chosen['lane']='capital_flow_long' if side=='LONG' else 'capital_flow_short'; chosen['category']=chosen.get('category') if chosen.get('category') in PRIMARY_LANES else ('capital_flow_long' if side=='LONG' else 'capital_flow_short')
+            decision='PRIMARY_SIGNAL'; reason='qualified_conditional_signal_selected'; selected=dict(chosen)
+        elif bool(chosen.get('editorial_only')):
+            decision='EDITORIAL_SIGNAL'; reason='qualified_editorial_story_selected'; selected=dict(chosen)
+        else:
+            blocks.append({'symbol':chosen.get('symbol'),'reason':'selected_candidate_lacks_authoritative_prediction_contract'}); reason='NO_ELIGIBLE_OPPORTUNITY'
+    cadence_override=bool(selected and not current_allowed)
+    if selected:
+        _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected); contract_ok=bool(flow_complete(selected)); selected['signal_first_primary']=primary_signal; selected['prediction_contract_complete']=contract_ok; selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"; selected['decision_id']=hashlib.sha256(f"{os.getenv('GITHUB_RUN_ID','local')}|{selected['thesis_key']}".encode()).hexdigest()[:24]; pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':contract_ok,'prediction':pred,'decision_id':selected.get('decision_id')}
+    else:
+        pre.pop('selected_opportunity',None); pre['signal_first_routing']={'decision':'NO_ELIGIBLE_OPPORTUNITY','primary':False,'bound_symbol':'','bound_category':'','prediction_contract_complete':False,'prediction':{}}
+    PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'decision_id':(selected or {}).get('decision_id'),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True,'nic24_1_strategy_content_routing':True,'content_format_rotation_advisory':True}}
+    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
+if __name__=='__main__':main()
+,'').strip()
+            if rs!=raw_symbol: continue
+            try:
+                dt=datetime.fromisoformat(str(r.get('published_at') or r.get('timestamp') or '').replace('Z','+00:00'))
+                if datetime.now(timezone.utc)-dt <= timedelta(hours=24):
+                    same_asset_recent=True
+                    break
+            except Exception:
+                continue
+        if same_asset_recent and not material_followup:
+            # A new verified news event is allowed only when its event/title is
+            # materially different; technical/signal lanes always wait.
+            new_event = category in {'breaking_news','news_and_macro'} and bool(
+                x.get('news_event_id') or x.get('event_id') or x.get('news_title') or x.get('title')
+            )
+            if not new_event or category not in {'breaking_news','news_and_macro'}:
+                blocked_rows.append({'symbol':raw_symbol,'reason':'NIC_PORTFOLIO_SAME_ASSET_24H_WAIT_FOR_NEW_STORY'})
+                continue
         if category in EDITORIAL_LANES and allow_editorial and editorial_complete(x):
             e=dict(x); e['type']=e.get('type') or 'editorial'; e['editorial_only']=True; e['signal_first_primary']=False
             if category in {'breaking_news','news_and_macro'}:
                 e['news_title']=e.get('news_title') or e.get('title') or ''; e['news_source']=e.get('news_source') or e.get('source') or ''; e['news_published_at']=e.get('news_published_at') or e.get('published_at') or ''
-                s=str(e.get('symbol') or '').upper().replace('USDT','').replace('$','').strip(); e['news_symbols']=list(dict.fromkeys([*(e.get('news_symbols') or []),s])) if s else list(e.get('news_symbols') or [])
+                s=str(e.get('symbol') or '').upper().replace('USDT','').replace('
+        try:e=derive(x,market)
+        except Exception as exc:blocked_rows.append({'symbol':raw_symbol,'reason':f'prediction_validation_failed:{type(exc).__name__}'});continue
+        reason=blocked(e,rows)
+        if reason:blocked_rows.append({'symbol':e.get('symbol'),'reason':reason});continue
+        if flow_complete(e):return e,blocked_rows
+        blocked_rows.append({'symbol':e.get('symbol'),'reason':'NIC_prediction_not_verified_or_accuracy_gate_wait'})
+    return None,blocked_rows
+def main():
+    pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); macro=load(ROOT/'data/live/global_macro_intelligence.json'); rows=recent()
+    live_symbols=trading_symbols(); primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
+    for event in (macro.get('events') or [])[:30]:
+        title=str(event.get('title') or '').strip(); source=str(event.get('source') or '').strip(); published=str(event.get('published_at') or '').strip(); themes=event.get('themes') if isinstance(event.get('themes'),list) else []; score=min(100,64+len(themes)*5+(4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
+        for raw in (event.get('asset_symbols') or [])[:2]:
+            s=str(raw).upper().replace('USDT','').strip()
+            if s and title and source and published:markets.append({'type':'news','category':'news_and_macro','lane':'news_and_macro','symbol':s,'score':score,'title':title,'source':source,'published_at':published,'reason':'verified macro event explicitly anchored to this asset','content_intent':'event_to_cross_asset_crypto_impact'})
+    primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]; markets=[x for x in markets if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
+    chosen,blocks=choose(primary,rows,market,live_symbols,allow_editorial=True)
+    if chosen is None:chosen,more=choose(markets,rows,market,live_symbols,allow_editorial=True);blocks+=more
+    current_allowed=bool(cad.get('publish')); selected=None; decision='NO_PUBLISH'; reason='NO_ELIGIBLE_OPPORTUNITY'; primary_signal=False; cadence_override=False
+    if chosen:
+        contract_ok=flow_complete(chosen)
+        primary_signal=contract_ok
+        if primary_signal:
+            side=setup_parts(chosen)[2]; chosen['type']='flow'; chosen['lane']='capital_flow_long' if side=='LONG' else 'capital_flow_short'; chosen['category']=chosen.get('category') if chosen.get('category') in PRIMARY_LANES else ('capital_flow_long' if side=='LONG' else 'capital_flow_short')
+            decision='PRIMARY_SIGNAL'; reason='qualified_conditional_signal_selected'; selected=dict(chosen)
+        elif bool(chosen.get('editorial_only')):
+            decision='EDITORIAL_SIGNAL'; reason='qualified_editorial_story_selected'; selected=dict(chosen)
+        else:
+            blocks.append({'symbol':chosen.get('symbol'),'reason':'selected_candidate_lacks_authoritative_prediction_contract'}); reason='NO_ELIGIBLE_OPPORTUNITY'
+    cadence_override=bool(selected and not current_allowed)
+    if selected:
+        _,pred,side,tr,tp1,tp2,sl,conf=setup_parts(selected); contract_ok=bool(flow_complete(selected)); selected['signal_first_primary']=primary_signal; selected['prediction_contract_complete']=contract_ok; selected['thesis_key']=f"{selected.get('symbol','')}|{side}|{selected.get('category',lane(selected))}|{tr}|{sl}"; selected['decision_id']=hashlib.sha256(f"{os.getenv('GITHUB_RUN_ID','local')}|{selected['thesis_key']}".encode()).hexdigest()[:24]; pre['selected_opportunity']=selected; pre['signal_first_routing']={'decision':decision,'primary':primary_signal,'bound_symbol':str(selected.get('symbol') or '').upper(),'bound_category':selected.get('category') or lane(selected),'prediction_contract_complete':contract_ok,'prediction':pred,'decision_id':selected.get('decision_id')}
+    else:
+        pre.pop('selected_opportunity',None); pre['signal_first_routing']={'decision':'NO_ELIGIBLE_OPPORTUNITY','primary':False,'bound_symbol':'','bound_category':'','prediction_contract_complete':False,'prediction':{}}
+    PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'decision_id':(selected or {}).get('decision_id'),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True,'nic24_1_strategy_content_routing':True,'content_format_rotation_advisory':True}}
+    OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
+if __name__=='__main__':main()
+,'').strip(); e['news_symbols']=list(dict.fromkeys([*(e.get('news_symbols') or []),s])) if s else list(e.get('news_symbols') or [])
             return e,blocked_rows
         try:e=derive(x,market)
         except Exception as exc:blocked_rows.append({'symbol':raw_symbol,'reason':f'prediction_validation_failed:{type(exc).__name__}'});continue
