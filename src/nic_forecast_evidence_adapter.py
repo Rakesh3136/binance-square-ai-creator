@@ -1,4 +1,4 @@
-"""NIC Forecast evidence adapter: exposes only resolved, regime-matched predictive edge to downstream ranking."""
+""""NIC Forecast evidence adapter: resolved predictive edge plus regime stability."""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -10,8 +10,7 @@ def load(p):
     try:
         v=json.loads(p.read_text())
         return v if isinstance(v,dict) else {}
-    except Exception:
-        return {}
+    except Exception: return {}
 def evidence(symbol, side):
     s=str(symbol or "").upper().replace("USDT","").strip()
     fs={"LONG":"BULLISH","SHORT":"BEARISH"}.get(str(side or "").upper(),"")
@@ -21,9 +20,26 @@ def evidence(symbol, side):
     matrix=load(MATRIX).get("matrix") or {}
     cells=[r for r in matrix.values() if isinstance(r,dict) and str(r.get("side")).upper()==fs and str(r.get("regime"))==regime and r.get("trusted")]
     lifts=[float(r.get("lift") or 0) for r in cells]
+    cal=load(CALIB).get("cells") or {}
+    probs=[r for r in cal.values() if isinstance(r,dict) and str(r.get("side")).upper()==fs and str(r.get("regime"))==regime and r.get("trusted")]
+    probability=(sum(float(r.get("calibrated_probability") or .5) for r in probs)/len(probs)) if probs else .5
+    probability_trusted=bool(probs)
+    try:
+        from nic_regime_transition import evaluate
+        transition=evaluate(s)
+    except Exception:
+        transition={"transition_state":"UNKNOWN","regime_stability":0.0,"edge_decay_penalty":0.0,"usable":False}
+    raw_score=min(12.0,4.0*len(cells)+max(0.0,max(lifts or [0]))*100)
+    decay=float(transition.get("edge_decay_penalty") or 0)
     return {"symbol":s,"side":fs,"regime":regime,"trusted_cells":len(cells),
             "max_lift":round(max(lifts or [0]),4),
-            "evidence_score":round(min(12.0,4.0*len(cells)+max(0.0,max(lifts or [0]))*100),2),"calibrated_probability":probability,"probability_trusted":bool(probs),
+            "evidence_score":round(raw_score*(1.0-decay),2),
+            "raw_evidence_score":round(raw_score,2),
+            "calibrated_probability":round(probability,4),
+            "probability_trusted":probability_trusted,
+            "regime_transition_state":transition.get("transition_state"),
+            "regime_stability":transition.get("regime_stability",0.0),
+            "edge_decay_penalty":decay,
             "advisory_only":True,"publish_gate_unchanged":True}
 if __name__=="__main__":
-    print(json.dumps({"schema":"NIC-FORECAST-EVIDENCE-1.0","status":"READY","policy":"Resolved predictive evidence may rank candidates but cannot override timing, diversity, cooldown, or publication gates."},indent=2))
+    print(json.dumps({"schema":"NIC-FORECAST-EVIDENCE-2.0","status":"READY","policy":"Resolved predictive evidence is regime-aware and decay-adjusted; it cannot override timing, diversity, cooldown, or publication gates."},indent=2))
