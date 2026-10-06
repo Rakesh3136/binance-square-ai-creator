@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 LAB=ROOT/"data/live/nic_forecast_laboratory.json"
 MATRIX=ROOT/"data/intelligence/nic_signal_predictivity_matrix.json"
+CALIB=ROOT/"data/intelligence/nic_forecast_calibration.json"
 def load(p):
     try:
         v=json.loads(p.read_text())
@@ -22,7 +23,7 @@ def evidence(symbol, side):
     lifts=[float(r.get("lift") or 0) for r in cells]
     return {"symbol":s,"side":fs,"regime":regime,"trusted_cells":len(cells),
             "max_lift":round(max(lifts or [0]),4),
-            "evidence_score":round(min(12.0,4.0*len(cells)+max(0.0,max(lifts or [0]))*100),2),
+            "evidence_score":round(min(12.0,4.0*len(cells)+max(0.0,max(lifts or [0]))*100),2),"calibrated_probability":probability,"probability_trusted":bool(probs),
             "advisory_only":True,"publish_gate_unchanged":True}
 if __name__=="__main__":
     print(json.dumps({"schema":"NIC-FORECAST-EVIDENCE-1.0","status":"READY","policy":"Resolved predictive evidence may rank candidates but cannot override timing, diversity, cooldown, or publication gates."},indent=2))
