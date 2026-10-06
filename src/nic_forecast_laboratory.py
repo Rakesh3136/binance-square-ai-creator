@@ -127,7 +127,7 @@ def main():
                 for side,hyp in out["hypotheses"].items():
                     for a in hyp["forward"]["predictivity"]["audits"]:
                         for horizon in H:
-                            new.append({"forecast_id":f"{sym(c.get('symbol'))}|{ts}|{side}|{a['feature']}|{horizon}","timestamp":ts,"symbol":sym(c.get("symbol")),"side":side,"regime":reg,"feature":a["feature"],"horizon_hours":horizon,"entry_price":cur["price"],"resolved":False})
+                            new.append({"forecast_id":f"{sym(c.get('symbol'))}|{ts}|{side}|{a['feature']}|{horizon}","timestamp":ts,"symbol":sym(c.get("symbol")),"side":side,"regime":reg,"feature":a["feature"],"horizon_hours":horizon,"entry_price":out["current_features"]["price"],"resolved":False})
                 append_jsonl(REGH,[{"timestamp":ts,"symbol":out["symbol"],"regime":reg,"features":out["current_features"]}])
         except Exception as e:fails.append({"symbol":sym(c.get("symbol")),"error":type(e).__name__+":"+str(e)})
         time.sleep(.05)
