@@ -207,7 +207,7 @@ def candidates(brief,pre,cad,market,flow_data,full_flow,ranking,pre_router):
     story=brief.get('primary_story')
     if isinstance(story,dict):add(primary if lane(story) in PRIMARY_LANES or story.get('type')=='flow' else market_candidates,story,allow_complete_flow=True)
     return (sorted(primary,key=lambda x:(1 if flow_complete(x) else 0,num(x.get('flow_confidence'),0),num(x.get('score')),),reverse=True),sorted(market_candidates,key=lambda x:num(x.get('score')),reverse=True))
-def choose(xs,rows,market,live_symbols,allow_editorial=False):
+def choose(xs,rows,market,full_flow,live_symbols,allow_editorial=False):
     blocked_rows=[]
     def order_key(x):
         pq=prediction_quality_for(x); p=content_plan_for(x)
@@ -264,8 +264,8 @@ def main():
             s=str(raw).upper().replace('USDT','').strip()
             if s and title and source and published:markets.append({'type':'news','category':'news_and_macro','lane':'news_and_macro','symbol':s,'score':score,'title':title,'source':source,'published_at':published,'reason':'verified macro event explicitly anchored to this asset','content_intent':'event_to_cross_asset_crypto_impact'})
     primary=[x for x in primary if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]; markets=[x for x in markets if str(x.get('symbol') or '').upper().replace('USDT','').strip() in live_symbols]
-    chosen,blocks=choose(primary,rows,market,live_symbols,allow_editorial=True)
-    if chosen is None:chosen,more=choose(markets,rows,market,live_symbols,allow_editorial=True);blocks+=more
+    chosen,blocks=choose(primary,rows,market,full_flow,live_symbols,allow_editorial=True)
+    if chosen is None:chosen,more=choose(markets,rows,market,full_flow,live_symbols,allow_editorial=True);blocks+=more
     current_allowed=bool(cad.get('publish')); selected=None; decision='NO_PUBLISH'; reason='NO_ELIGIBLE_OPPORTUNITY'; primary_signal=False; cadence_override=False
     if chosen:
         contract_ok=flow_complete(chosen)
