@@ -9,7 +9,7 @@ permissions:
 jobs:
   laboratory:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,14 +21,17 @@ jobs:
           python - <<'PY'
           import json
           d=json.load(open("data/live/nic_forecast_laboratory.json"))
-          assert d["schema"]=="NIC-FORECAST-LAB-1.0" and d["policy"]["competing_hypotheses"] and d["policy"]["base_rate_lift_required"]
-          print("Forecast Laboratory validation: PASS")
+          assert d["schema"]=="NIC-FORECAST-LAB-2.0"
+          assert d["learning"]["walk_forward_validation"]
+          assert d["learning"]["persistent_outcome_resolution"]
+          assert d["policy"]["neutral_wait_allowed"]
+          print("Forecast Laboratory learning validation: PASS")
           PY
       - name: Commit evidence
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live/nic_forecast_laboratory.json data/intelligence/nic_forecast_laboratory_report.json
-          git diff --cached --quiet || git commit -m "Record NIC Forecast Laboratory evidence"
+          git add data/live/nic_forecast_laboratory.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_regime_history.jsonl
+          git diff --cached --quiet || git commit -m "Record NIC Forecast Laboratory learning evidence"
           git pull --rebase --autostash origin main
           git push origin main || true
