@@ -2,7 +2,7 @@ name: NIC Forecast Laboratory
 on:
   push:
     branches: [main]
-    paths: ["src/nic_forecast_laboratory.py","src/nic_forecast_outcome_resolver.py","tests/test_nic_forecast_laboratory.py","tests/test_nic_forecast_outcome_resolver.py",".github/workflows/nic-forecast-laboratory.yml","data/live/nic_prediction_engine.json"]
+    paths: ["src/nic_forecast_laboratory.py","src/nic_forecast_outcome_resolver.py","tests/test_nic_forecast_laboratory.py","tests/test_nic_forecast_outcome_resolver.py","src/nic_forecast_evidence_adapter.py","tests/test_nic_forecast_evidence_adapter.py",".github/workflows/nic-forecast-laboratory.yml","data/live/nic_prediction_engine.json"]
   workflow_dispatch:
 concurrency:
   group: nic-forecast-laboratory-main
@@ -20,6 +20,7 @@ jobs:
       - run: python -m py_compile src/nic_forecast_laboratory.py src/nic_forecast_outcome_resolver.py tests/test_nic_forecast_laboratory.py tests/test_nic_forecast_outcome_resolver.py
       - run: python tests/test_nic_forecast_laboratory.py
       - run: python tests/test_nic_forecast_outcome_resolver.py
+      - run: python tests/test_nic_forecast_evidence_adapter.py
       - run: python src/nic_forecast_laboratory.py
       - run: python src/nic_forecast_outcome_resolver.py
       - run: |
