@@ -104,7 +104,14 @@ def blocked(x,rows):
             continue
         if age>timedelta(hours=ASSET_COOLDOWN_HOURS): continue
         oldcat=str(r.get('category') or r.get('content_category') or '').lower()
-        if category in FOLLOWUP_CATEGORIES and oldcat in FOLLOWUP_CATEGORIES:
+        # A same-asset follow-up/outcome may reopen the asset only when the
+        # candidate carries explicit new evidence. Direction/category changes
+        # alone never bypass the hard cooldown.
+        explicit_followup = category in FOLLOWUP_CATEGORIES and bool(
+            x.get('follow_up') or x.get('outcome') or x.get('new_evidence') or
+            x.get('outcome_evidence') or x.get('evidence_update')
+        )
+        if explicit_followup:
             continue
         return 'same_asset_cooldown_requires_new_evidence_or_follow_up'
     for r in rows[-20:]:
