@@ -124,7 +124,7 @@ def selected_symbol(draft: dict) -> str:
 def symbols_in(text: str) -> set[str]:
     found = set()
     for x in re.findall(r"\$?([A-Z][A-Z0-9]{1,11})(?:USDT)?\b", text.upper()):
-        if x not in {"THE", "AND", "FOR", "THIS", "WITH", "FROM", "WHAT", "WHEN", "JUST", "ONE", "BTC"}:
+        if x not in {"THE", "AND", "FOR", "THIS", "WITH", "FROM", "WHAT", "WHEN", "JUST", "ONE"}:
             found.add(x)
     return found
 
