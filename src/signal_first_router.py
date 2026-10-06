@@ -1,7 +1,7 @@
 """Final signal-first router: preserve strong candidates and derive evidence-backed conditional setups."""
 from __future__ import annotations
 import json, os, re, hashlib, urllib.error, urllib.parse, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from difflib import SequenceMatcher
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
@@ -188,33 +188,44 @@ def choose(xs,rows,market,live_symbols,allow_editorial=False):
     def order_key(x):
         pq=prediction_quality_for(x); p=content_plan_for(x)
         return (str(pq.get('status') or '').upper()=='PASS',-num(p.get('repeat_penalty')),num(pq.get('quality_score')),num(pq.get('calibrated_confidence')),num(x.get('flow_confidence')),num(x.get('score')))
-    xs=sorted(xs,key=order_key,reverse=True)
-    for x in xs:
+    for x in sorted(xs,key=order_key,reverse=True):
         x=apply_content_plan(x)
         raw_symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
-        if raw_symbol not in live_symbols:blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'});continue
+        if not raw_symbol:
+            blocked_rows.append({'symbol':'','reason':'missing_symbol'}); continue
+        if raw_symbol not in live_symbols:
+            blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'}); continue
         category=str(x.get('category') or lane(x)).lower()
-        # Apply anti-repetition before the editorial fast path. The old code
-        # returned editorial candidates before the recent-publication check,
-        # allowing the same asset to bypass NIC19 and appear as a fresh story.
-        recent_reason=blocked(x,rows)
-        if recent_reason:
-            blocked_rows.append({'symbol':raw_symbol,'reason':recent_reason})
+
+        # Hard asset cooldown is authoritative before any editorial or signal path.
+        reason=blocked(x,rows)
+        if reason:
+            blocked_rows.append({'symbol':raw_symbol,'reason':reason}); continue
+
+        if category in EDITORIAL_LANES and allow_editorial and editorial_complete(x):
+            e=dict(x)
+            e['type']=e.get('type') or 'editorial'
+            e['editorial_only']=True
+            e['signal_first_primary']=False
+            if category in {'breaking_news','news_and_macro'}:
+                e['news_title']=e.get('news_title') or e.get('title') or ''
+                e['news_source']=e.get('news_source') or e.get('source') or ''
+                e['news_published_at']=e.get('news_published_at') or e.get('published_at') or ''
+            return e,blocked_rows
+
+        try:
+            e=derive(x,market)
+        except Exception as exc:
+            blocked_rows.append({'symbol':raw_symbol,'reason':f'prediction_validation_failed:{type(exc).__name__}'})
             continue
-        # Hard asset portfolio rule: a normal signal/editorial is not a new
-        # story merely because its price changed. Re-open an asset only for a
-        # material follow-up/new event or verified outcome.
-        same_asset_recent=False
-        material_followup=category in {'creator_signal_outcome','follow_up','outcome_accountability'}
-        for r in rows[-20:]:
-            rs=str(r.get('symbol') or r.get('selected_lane_symbol') or '').upper().replace('USDT','').replace('
-        try:e=derive(x,market)
-        except Exception as exc:blocked_rows.append({'symbol':raw_symbol,'reason':f'prediction_validation_failed:{type(exc).__name__}'});continue
         reason=blocked(e,rows)
-        if reason:blocked_rows.append({'symbol':e.get('symbol'),'reason':reason});continue
-        if flow_complete(e):return e,blocked_rows
-        blocked_rows.append({'symbol':e.get('symbol'),'reason':'NIC_prediction_not_verified_or_accuracy_gate_wait'})
+        if reason:
+            blocked_rows.append({'symbol':str(e.get('symbol') or raw_symbol),'reason':reason}); continue
+        if flow_complete(e):
+            return e,blocked_rows
+        blocked_rows.append({'symbol':str(e.get('symbol') or raw_symbol),'reason':'NIC_prediction_not_verified_or_accuracy_gate_wait'})
     return None,blocked_rows
+
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); macro=load(ROOT/'data/live/global_macro_intelligence.json'); rows=recent()
     live_symbols=trading_symbols(); primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
