@@ -12,3 +12,12 @@ def test_small_samples_are_shrunk():
     assert c["trusted"] is False
     m.LEDGER.unlink(missing_ok=True)
     m.OUT.unlink(missing_ok=True)
+
+
+def test_probability_metrics_are_computed():
+    rows=[{"forecast_probability":0.8,"hit":True},{"forecast_probability":0.2,"hit":False}]
+    m=__import__("nic_forecast_calibrator") if False else None
+    metrics=globals()["m"].metrics(rows)
+    assert metrics["samples"]==2
+    assert metrics["brier_score"]==0.04
+    assert metrics["log_loss"]>0
