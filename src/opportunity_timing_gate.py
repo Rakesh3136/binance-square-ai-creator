@@ -28,7 +28,7 @@ def evaluate(candidate, flow_row=None, market_row=None):
     vol=max(num(f.get("volume_acceleration")), num(c.get("volume_acceleration")))
     dist=num(f.get("breakout_distance_pct"), num(c.get("breakout_distance_pct"), 99))
     category=str(c.get("category") or c.get("lane") or "").lower()
-    if state=="EXHAUSTED" or move>=12 or (move>=8 and dist<=1 and vol>=2.5):
+    if state=="EXHAUSTED" or move>=12:
         timing="EXHAUSTED"
         reason="move is statistically/structurally too extended for a fresh trade entry"
     elif state=="LATE" or move>=6 or (move>=8 and intraday>=10):
