@@ -74,8 +74,26 @@ def portfolio_candidates(portfolio):
             out.append(('content_portfolio_guard_ranked_fallback',candidate))
     return out
 
-def signal_candidate(signal):
+def signal_candidate(signal, portfolio=None):
     if not isinstance(signal,dict) or signal.get('publish') is not True: return None
+    # Signal-First selects the thesis; NIC19 owns publication diversity. A signal
+    # may not bypass the portfolio guard and resurrect an asset that was blocked
+    # for recent repetition. If the guard explicitly says WAIT, this cycle waits.
+    if isinstance(portfolio,dict):
+        if portfolio.get('publish') is False:
+            return None
+        allowed_symbols=set()
+        selected_portfolio=portfolio.get('selected')
+        if isinstance(selected_portfolio,dict):
+            allowed_symbols.add(base_symbol(selected_portfolio))
+        for row in portfolio.get('top_allowed_candidates') or []:
+            candidate=row.get('candidate') if isinstance(row,dict) and isinstance(row.get('candidate'),dict) else row
+            if isinstance(candidate,dict):
+                allowed_symbols.add(base_symbol(candidate))
+        signal_selected=signal.get('selected') if isinstance(signal.get('selected'),dict) else {}
+        signal_symbol=base_symbol(signal_selected)
+        if allowed_symbols and signal_symbol not in allowed_symbols:
+            return None
     selected=signal.get('selected')
     if not isinstance(selected,dict) or not symbol(selected): return None
 
@@ -122,7 +140,11 @@ def candidate_pool(portfolio,pre,engagement,market,signal,stale_portfolio=False)
     # publish, but it must not replace the frozen asset/story.
     # Signal-First is authoritative for the final downstream decision. NIC 22.1 remains an upstream candidate source and cannot overwrite a newer router selection.
     pool,seen=[],set()
-    selected_signal=signal_candidate(signal)
+    # A deliberate portfolio WAIT is authoritative: do not publish a different
+    # asset just because Signal-First has a stale/competing selection.
+    if isinstance(portfolio,dict) and portfolio.get('publish') is False:
+        return pool
+    selected_signal=signal_candidate(signal, portfolio)
     if selected_signal: add_candidate(pool,seen,selected_signal,'signal_first_router')
     # Do not let a generic portfolio candidate outrank an authoritative router
     # selection. Portfolio recovery is only a fallback when the router found no
