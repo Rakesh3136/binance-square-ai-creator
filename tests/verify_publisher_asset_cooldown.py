@@ -1,7 +1,6 @@
 import importlib.util
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import os
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("publisher", ROOT / "src" / "binance_square_publisher.py")
@@ -19,10 +18,10 @@ publisher.recent_rows = lambda: [{
 assert publisher.asset_cooldown_match("BTC", "capital_flow_short") is not None
 assert publisher.asset_cooldown_match("BTC", "top_gainers") is not None
 
-os.environ.pop("PUBLICATION_FOLLOWUP_EVIDENCE", None)
+publisher.load = lambda path: {}
 assert publisher.asset_cooldown_match("BTC", "follow_up") is not None
 
-os.environ["PUBLICATION_FOLLOWUP_EVIDENCE"] = "verified outcome evidence"
+publisher.load = lambda path: {"new_evidence": "verified outcome evidence"}
 assert publisher.asset_cooldown_match("BTC", "follow_up") is None
 
 publisher.recent_rows = lambda: [{
@@ -31,7 +30,6 @@ publisher.recent_rows = lambda: [{
     "category": "capital_flow_long",
     "published_at": (now - timedelta(hours=73)).isoformat(),
 }]
-os.environ.pop("PUBLICATION_FOLLOWUP_EVIDENCE", None)
 assert publisher.asset_cooldown_match("BTC", "capital_flow_short") is None
 
 print("PUBLISHER_ASSET_COOLDOWN_VERIFICATION=PASS")
