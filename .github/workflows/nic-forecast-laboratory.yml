@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths: ["src/nic_forecast_laboratory.py","src/nic_forecast_outcome_resolver.py","tests/test_nic_forecast_laboratory.py","tests/test_nic_forecast_outcome_resolver.py",".github/workflows/nic-forecast-laboratory.yml","data/live/nic_prediction_engine.json"]
   workflow_dispatch:
+concurrency:
+  group: nic-forecast-laboratory-main
+  cancel-in-progress: false
 permissions:
   contents: write
 jobs:
