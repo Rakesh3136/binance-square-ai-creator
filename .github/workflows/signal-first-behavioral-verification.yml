@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'src/signal_first_router.py'
+      - 'src/opportunity_timing_gate.py'
+      - 'tests/test_opportunity_timing_gate.py'
       - 'src/binance_square_publisher.py'
       - 'src/freeze_opportunity.py'
       - 'tests/verify_signal_first_behavior.py'
@@ -29,10 +31,13 @@ jobs:
           python-version: '3.12'
 
       - name: Syntax check
-        run: python -m py_compile src/signal_first_router.py src/freeze_opportunity.py tests/verify_signal_first_behavior.py tests/verify_freeze_signal_recovery.py
+        run: python -m py_compile src/signal_first_router.py src/opportunity_timing_gate.py src/freeze_opportunity.py tests/verify_signal_first_behavior.py tests/verify_freeze_signal_recovery.py tests/test_opportunity_timing_gate.py
 
       - name: Verify Signal-First asset cooldown behavior
         run: python tests/verify_signal_first_behavior.py
+
+      - name: Verify opportunity timing behavior
+        run: python tests/test_opportunity_timing_gate.py
 
       - name: Verify final publisher asset cooldown behavior
         run: python tests/verify_publisher_asset_cooldown.py
