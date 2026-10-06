@@ -7,6 +7,8 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; NIC24_1=ROOT/'data/live/nic24_1_strategy_content_plan.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
+ASSET_COOLDOWN_HOURS=float(os.getenv('SIGNAL_FIRST_ASSET_COOLDOWN_HOURS','72'))
+FOLLOWUP_CATEGORIES={'creator_signal_outcome','follow_up','outcome_accountability'}
 PRIMARY_LANES={'flow','capital_flow_long','capital_flow_short','creator_signal_outcome','follow_up'}
 EDITORIAL_LANES={'breaking_news','news_and_macro','top_gainers','top_losers','high_volatility','volume_leaders','new_listings','comparison','education','research_insight','market_mechanism','data_surprise','watchlist','crypto_meme'}
 
@@ -89,13 +91,28 @@ def flow_complete(x):
 def norm(v):
     v=re.sub(r'\$?[0-9]+(?:\.[0-9]+)?',' ',str(v or '').lower()); return re.sub(r'\s+',' ',re.sub(r'[^a-z0-9 ]+',' ',v)).strip()
 def blocked(x,rows):
-    sym=str(x.get('symbol') or '').upper(); _,_,side,_,_,_,_,_=setup_parts(x)
-    for r in rows[-5:]:
-        rs=str(r.get('symbol') or '').upper(); rside=str(r.get('direction') or r.get('side') or r.get('flow_side') or '').upper()
-        if sym and rs==sym and side and rside==side:return 'same_symbol_and_direction_recent'
+    sym=str(x.get('symbol') or '').upper().replace('USDT','').strip()
+    _,_,side,_,_,_,_,_=setup_parts(x)
+    category=str(x.get('category') or lane(x)).lower()
+    now_dt=datetime.now(timezone.utc)
+    for r in rows[-40:]:
+        rs=str(r.get('symbol') or r.get('selected_lane_symbol') or '').upper().replace('USDT','').strip()
+        if not sym or rs!=sym: continue
+        try:
+            age=now_dt-datetime.fromisoformat(str(r.get('published_at') or r.get('timestamp') or '').replace('Z','+00:00'))
+        except Exception:
+            continue
+        if age>timedelta(hours=ASSET_COOLDOWN_HOURS): continue
+        oldcat=str(r.get('category') or r.get('content_category') or '').lower()
+        if category in FOLLOWUP_CATEGORIES and oldcat in FOLLOWUP_CATEGORIES:
+            continue
+        return 'same_asset_cooldown_requires_new_evidence_or_follow_up'
+    for r in rows[-20:]:
         old=norm(text(r)); new=norm(text(x))
-        if new and old and SequenceMatcher(None,new,old).ratio()>=SIM:return 'high_text_similarity_recent'
+        if new and old and SequenceMatcher(None,new,old).ratio()>=SIM:
+            return 'high_text_similarity_recent'
     return ''
+
 def trading_symbols():
     bases=('https://data-api.binance.vision','https://api-gcp.binance.com','https://api1.binance.com','https://api2.binance.com'); last=None
     for api in bases:
