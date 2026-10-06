@@ -216,7 +216,10 @@ def choose(xs,rows,market,full_flow,live_symbols,allow_editorial=False):
     blocked_rows=[]
     def order_key(x):
         pq=prediction_quality_for(x); p=content_plan_for(x)
-        return (str(pq.get('status') or '').upper()=='PASS',-num(p.get('repeat_penalty')),num(pq.get('quality_score')),num(pq.get('calibrated_confidence')),num((x.get('forecast_evidence') or {}).get('evidence_score')),num((x.get('forecast_evidence') or {}).get('calibrated_probability')),num(x.get('flow_confidence')),num(x.get('score')))
+        fe=x.get('forecast_evidence') or {}
+        stability=num(fe.get('regime_stability'),0)
+        decay=num(fe.get('edge_decay_penalty'),1)
+        return (str(pq.get('status') or '').upper()=='PASS',-num(p.get('repeat_penalty')),num(pq.get('quality_score')),num(pq.get('calibrated_confidence')),num(fe.get('evidence_score')),stability,-decay,num(fe.get('calibrated_probability')),num(x.get('flow_confidence')),num(x.get('score')))
     for x in sorted(xs,key=order_key,reverse=True):
         x=apply_content_plan(x)
         x=forecast_evidence_for(x)
