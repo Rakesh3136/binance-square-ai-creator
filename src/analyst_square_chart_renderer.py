@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAP = ROOT / "data/live/historical_setup_snapshot.json"
+STYLE = ROOT / "data/live/visual_style_plan.json"
 OUT = ROOT / "data/live/visual.png"
 META = ROOT / "data/live/visual_metadata.json"
 W, H = 1080, 1350
@@ -47,6 +48,8 @@ def line(d,x1,y,x2,col,width=2,dash=12,gap=9):
 
 def main():
     s=json.loads(SNAP.read_text(encoding="utf-8"))
+    try: style=json.loads(STYLE.read_text(encoding="utf-8")).get("style","decision_map")
+    except Exception: style="decision_map"
     if s.get("status")!="FROZEN" or s.get("lookahead_protection") is not True: raise SystemExit("snapshot is not frozen")
     candles=(s.get("candles_1h") or [])[-48:]
     if len(candles)<12: raise SystemExit("too few historical candles")
@@ -68,7 +71,8 @@ def main():
     d.text((56,34),f"${symbol}  ·  1H",font=title,fill=TEXT)
     side_col=UP if side=="LONG" else DOWN
     d.text((W-56-d.textbbox((0,0),side,font=head)[2],42),side,font=head,fill=side_col)
-    d.text((56,84),"Decision map · completed candles",font=small,fill=MUTED)
+    style_labels={"decision_map":"Decision map · completed candles","structure_breakout":"Structure · range + reaction","fibonacci_context":"Context · range retracement","volume_regime":"Participation · volume regime","structure_fibonacci":"Structure + retracement"}
+    d.text((56,84),style_labels.get(style,"Decision map · completed candles"),font=small,fill=MUTED)
     context=f"6-candle {move:+.1f}%" if move is not None else "completed-candle context"
     d.text((W-56-d.textbbox((0,0),context,font=small)[2],84),context,font=small,fill=MUTED)
 
@@ -87,6 +91,20 @@ def main():
         d.line((x,yh,x,yl),fill=col,width=2); a,b=sorted((yo,yc)); d.rectangle((x-bodyw/2,a,x+bodyw/2,max(b,a+3)),fill=col)
         bar=76*v/maxv; d.rectangle((x-bodyw/2,V1-bar,x+bodyw/2,V1),fill=col)
     d.text((L+22,V0+2),"VOLUME",font=tiny,fill=MUTED)
+    # Style-specific analytical layer. Presentation-only; frozen levels are unchanged.
+    if style=="structure_breakout":
+        d.line((L+18,rh,R-132,rh),fill=LEVEL,width=2)
+        d.line((L+18,rl,R-132,rl),fill=LEVEL,width=2)
+        d.text((L+34,rh-22),"range high  "+fmt(recent_hi),font=tiny,fill=LEVEL)
+        d.text((L+34,rl+6),"range low  "+fmt(recent_lo),font=tiny,fill=LEVEL)
+    elif style=="volume_regime":
+        avg=sum(r[4] for r in rows)/max(1,len(rows)); recent_avg=sum(r[4] for r in rows[-6:])/max(1,len(rows[-6:])); ratio=recent_avg/avg if avg else 0
+        d.rounded_rectangle((L+22,V0+28,R-132,V0+62),8,fill="#101820",outline="#26333e")
+        d.text((L+36,V0+35),f"recent/48h volume  {ratio:.2f}x",font=tiny,fill=TEXT)
+    elif style=="fibonacci_context":
+        d.text((L+34,T+18),"Retracement context is derived from completed candles",font=tiny,fill=LEVEL)
+    elif style=="structure_fibonacci":
+        d.text((L+34,T+18),"Structure + retracement context · presentation only",font=tiny,fill=LEVEL)
 
     # Quiet analyst levels: no large cards, no arrows, no dashboard boxes.
     levels=[("TP2",tp2,TARGET),("TP1",tp1,UP),("DECISION",entry,LEVEL),("INVALIDATION",sl,DOWN)]
@@ -118,7 +136,7 @@ def main():
         "signal_created_at":s.get("signal_created_at"),
         "signal_created_at_ms":s.get("signal_created_at_ms"),
         "data_cutoff":s.get("data_cutoff"),
-        "snapshot_frozen_at":s.get("frozen_at"),"provider":"Local historical OHLCV renderer","base_symbol":symbol,"timeframe":"1H","candle_count":len(rows),"candle_policy":"completed_candles_only","lookahead_protection":True,"visual_style":"human_analyst_chart_first","prediction_markings":{"direction":side,"entry_trigger":entry,"tp1":tp1,"tp2":tp2,"sl":sl,"signal_price":signal,"risk_reward":rr},"derived_context":{"recent_high":recent_hi,"recent_low":recent_lo,"last_close":last,"six_candle_move_pct":move},"generated_at":datetime.now(timezone.utc).isoformat()}
+        "snapshot_frozen_at":s.get("frozen_at"),"provider":"Local historical OHLCV renderer","base_symbol":symbol,"timeframe":"1H","candle_count":len(rows),"candle_policy":"completed_candles_only","lookahead_protection":True,"visual_style":style,"style_contract":"NIC visual rotation v2","prediction_markings":{"direction":side,"entry_trigger":entry,"tp1":tp1,"tp2":tp2,"sl":sl,"signal_price":signal,"risk_reward":rr},"derived_context":{"recent_high":recent_hi,"recent_low":recent_lo,"last_close":last,"six_candle_move_pct":move},"generated_at":datetime.now(timezone.utc).isoformat()}
     META.write_text(json.dumps(meta,indent=2)+"\n",encoding="utf-8"); print(json.dumps(meta,indent=2))
 
 if __name__=="__main__": main()
