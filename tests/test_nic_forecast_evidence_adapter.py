@@ -7,4 +7,11 @@ def test_unknown_side_is_neutral():
     e=mod.evidence("BTC","")
     assert e["side"]==""
     assert e["evidence_score"]==0
+    assert e["calibrated_probability"]==0.5
+    assert e["probability_trusted"] is False
     assert e["advisory_only"] is True
+def test_evidence_exposes_regime_controls():
+    e=mod.evidence("BTC","LONG")
+    assert "regime_stability" in e
+    assert "edge_decay_penalty" in e
+    assert "regime_transition_state" in e
