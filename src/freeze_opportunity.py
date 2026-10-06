@@ -74,12 +74,12 @@ def portfolio_candidates(portfolio):
             out.append(('content_portfolio_guard_ranked_fallback',candidate))
     return out
 
-def signal_candidate(signal, portfolio=None):
+def signal_candidate(signal, portfolio=None, ignore_portfolio_allowlist=False):
     if not isinstance(signal,dict) or signal.get('publish') is not True: return None
     # Signal-First selects the thesis; NIC19 owns publication diversity. A signal
     # may not bypass the portfolio guard and resurrect an asset that was blocked
     # for recent repetition. If the guard explicitly says WAIT, this cycle waits.
-    if isinstance(portfolio,dict):
+    if isinstance(portfolio,dict) and not ignore_portfolio_allowlist:
         if portfolio.get('publish') is False:
             return None
         allowed_symbols=set()
@@ -144,7 +144,7 @@ def candidate_pool(portfolio,pre,engagement,market,signal,stale_portfolio=False)
     # asset just because Signal-First has a stale/competing selection.
     if isinstance(portfolio,dict) and portfolio.get('publish') is False:
         return pool
-    selected_signal=signal_candidate(signal, portfolio)
+    selected_signal=signal_candidate(signal, portfolio, ignore_portfolio_allowlist=stale_portfolio)
     if selected_signal: add_candidate(pool,seen,selected_signal,'signal_first_router')
     # Do not let a generic portfolio candidate outrank an authoritative router
     # selection. Portfolio recovery is only a fallback when the router found no
