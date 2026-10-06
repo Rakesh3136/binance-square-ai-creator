@@ -38,7 +38,7 @@ def rsi(v,p=14):
 def feat(rows,i):
     if i<60:return None
     c=[x["c"] for x in rows[:i+1]]; e20=ema(c[-40:],20);e50=ema(c[-60:],50);av=sum(x["v"] for x in rows[i-20:i])/20
-    return {"trend":1 if e20>e50 else -1,"momentum":(c[-1]/c[-7]-1)*100,"rsi":rsi(c),"volume_ratio":rows[i]["v"]/av if av else 1,"distance_ema20":(c[-1]/e20-1)*100,"range_position":(c[-1]-min(x["l"] for x in rows[i-20:i+1]))/max(max(x["h"] for x in rows[i-20:i+1])-min(x["l"] for x in rows[i-20:i+1]),1e-12)}
+    return {"trend":1 if e20>e50 else -1,"momentum":(c[-1]/c[-7]-1)*100,"rsi":rsi(c),"volume_ratio":rows[i]["v"]/av if av else 1,"distance_ema20":(c[-1]/e20-1)*100,"range_position":(c[-1]-min(x["l"] for x in rows[i-20:i+1]))/max(max(x["h"] for x in rows[i-20:i+1])-min(x["l"] for x in rows[i-20:i+1]),1e-12),"price":c[-1]}
 def regime(f):
     if not f:return "UNKNOWN"
     if f["rsi"]>=70 and f["momentum"]>=5:return "TREND_UP_EXTENDED"
@@ -126,8 +126,8 @@ def main():
                 ts=out["as_of"];reg=out["regime"]
                 for side,hyp in out["hypotheses"].items():
                     for a in hyp["forward"]["predictivity"]["audits"]:
-                        # One current snapshot per feature is logged; future runs resolve historical records from the same asset/time.
-                        new.append({"forecast_id":f"{sym(c.get('symbol'))}|{ts}|{side}|{a['feature']}","timestamp":ts,"symbol":sym(c.get("symbol")),"side":side,"regime":reg,"feature":a["feature"],"resolved":False})
+                        for horizon in H:
+                            new.append({"forecast_id":f"{sym(c.get('symbol'))}|{ts}|{side}|{a['feature']}|{horizon}","timestamp":ts,"symbol":sym(c.get("symbol")),"side":side,"regime":reg,"feature":a["feature"],"horizon_hours":horizon,"entry_price":cur["price"],"resolved":False})
                 append_jsonl(REGH,[{"timestamp":ts,"symbol":out["symbol"],"regime":reg,"features":out["current_features"]}])
         except Exception as e:fails.append({"symbol":sym(c.get("symbol")),"error":type(e).__name__+":"+str(e)})
         time.sleep(.05)
