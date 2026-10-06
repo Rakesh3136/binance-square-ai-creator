@@ -4,10 +4,16 @@ import json, os, re, hashlib, sys, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone, timedelta
 from difflib import SequenceMatcher
 from pathlib import Path
-from opportunity_timing_gate import evaluate as evaluate_timing
+
+# Standalone-import bootstrap: this module is loaded directly by CI behavioral
+# tests (importlib) as well as executed as a script. Resolve src before any
+# sibling-module import so both execution modes use the same import path.
 ROOT=Path(__file__).resolve().parents[1]
-SRC=ROOT/'src'
-if str(SRC) not in sys.path: sys.path.insert(0,str(SRC))
+SRC=ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from opportunity_timing_gate import evaluate as evaluate_timing
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; NIC24_1=ROOT/'data/live/nic24_1_strategy_content_plan.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
 ASSET_COOLDOWN_HOURS=float(os.getenv('SIGNAL_FIRST_ASSET_COOLDOWN_HOURS','72'))
