@@ -104,19 +104,33 @@ def read_jsonl(path):
     return out
 def build_learning():
     rows=read_jsonl(LEDGER); now=datetime.now(timezone.utc)
-    resolved=[r for r in rows if r.get("resolved") and r.get("horizon_hours") in H]
+    resolved=[r for r in rows if r.get("resolved") and int(r.get("horizon_hours") or 0) in H]
+    base={}
     groups={}
     for r in resolved:
-        k=(r.get("side"),r.get("feature"),r.get("regime"));g=groups.setdefault(k,{"samples":0,"wins":0,"returns":[]})
-        g["samples"]+=1;g["wins"]+=int(r.get("signed_return",0)>0);g["returns"].append(n(r.get("signed_return")))
+        side=str(r.get("side") or "").upper(); reg=str(r.get("regime") or "UNKNOWN"); h=int(r.get("horizon_hours") or 0)
+        signed=n(r.get("signed_return")); bk=(side,reg,h); base.setdefault(bk,[]).append(signed)
+        k=(side,str(r.get("feature") or ""),reg,h); g=groups.setdefault(k,{"returns":[]}); g["returns"].append(signed)
     matrix={}
-    for (side,feature,reg),g in groups.items():
-        rate=g["wins"]/g["samples"] if g["samples"] else 0; key=f"{side}|{feature}|{reg}"
-        matrix[key]={"side":side,"feature":feature,"regime":reg,"samples":g["samples"],"hit_rate":round(rate,4),
-                     "mean_signed_return":round(sum(g["returns"])/len(g["returns"]),4) if g["returns"] else None,
-                     "trusted":g["samples"]>=MIN and rate>.55}
-    MATRIX.write_text(json.dumps({"schema":"NIC-SIGNAL-PREDICTIVITY-1.0","generated_at":now.isoformat(),"minimum_events":MIN,"matrix":matrix,"policy":"Trust only persistent, sufficiently sampled edge; pooled correlation is not predictive proof."},indent=2))
+    for (side,feature,reg,h),g in groups.items():
+        vals=g["returns"]; base_vals=base.get((side,reg,h),[])
+        rate=sum(x>0 for x in vals)/len(vals) if vals else 0
+        base_rate=sum(x>0 for x in base_vals)/len(base_vals) if base_vals else 0
+        midpoint=max(1,len(vals)//2); recent=vals[midpoint:]
+        recent_rate=sum(x>0 for x in recent)/len(recent) if recent else rate
+        lift=rate-base_rate; recent_lift=recent_rate-base_rate
+        key=f"{side}|{feature}|{reg}|{h}h"
+        matrix[key]={"side":side,"feature":feature,"regime":reg,"horizon_hours":h,
+                     "samples":len(vals),"base_samples":len(base_vals),
+                     "hit_rate":round(rate,4),"base_hit_rate":round(base_rate,4),
+                     "lift":round(lift,4),"recent_lift":round(recent_lift,4),
+                     "mean_signed_return":round(sum(vals)/len(vals),4) if vals else None,
+                     "trusted":len(vals)>=MIN and lift>.05 and recent_lift>=0}
+    MATRIX.write_text(json.dumps({"schema":"NIC-SIGNAL-PREDICTIVITY-2.0","generated_at":now.isoformat(),
+        "minimum_events":MIN,"minimum_lift":0.05,"matrix":matrix,
+        "policy":"Trust only sufficiently sampled edge with positive lift versus same-side/regime/horizon base rate and no recent edge collapse."},indent=2))
     return matrix
+
 def main():
     INT.mkdir(parents=True,exist_ok=True);cs=load(PRED).get("candidates") or [];res=[];fails=[];new=[]
     for c in cs[:12]:
