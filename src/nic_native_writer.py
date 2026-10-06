@@ -86,23 +86,61 @@ def build(ctx):
         hook,body,middle,close=trade_styles[seed % len(trade_styles)]
         question=f"What would you need to see on ${dollar} before you would consider this ${side} scenario confirmed?"
     else:
-        hooks=[
-            f"${dollar} moved ${move:+.1f}%. The percentage gets attention; the structure tells us whether it deserves it.",
-            f"The headline move in ${dollar} is easy to see. The useful part is what happened underneath it.",
-            f"${dollar} is moving, but movement alone is not the thesis. The next reaction is the evidence.",
-            f"I would separate the ${dollar} headline from the actual market question: did participation confirm the move?",
-            f"The interesting thing about ${dollar} is not the candle that already happened. It is what traders do next.",
-            f"Before calling ${dollar} strong or weak, I would look at how price behaves after this impulse."
-        ]
+        story_templates={
+            "breakout_retest": (
+                [f"${s} is interesting only if the breakout can survive its first retest.",f"The real ${s} test is not the breakout candle; it is what happens when price comes back to the level."],
+                "The useful evidence is whether the old ceiling turns into support while participation remains healthy.",
+                f"What would make you treat the ${s} retest as a failed breakout?"
+            ),
+            "rejection_invalidation": (
+                [f"${s} has moved far enough to make the rejection level more important than the headline move.",f"The ${s} setup becomes clearer when you define where the market proves the idea wrong."],
+                "A rejection is useful information only when price fails at the level and the next reaction confirms that weakness.",
+                f"Which reaction would make you abandon the ${s} thesis?"
+            ),
+            "range_structure": (
+                [f"${s} is giving us a range to read, not a direction to assume.",f"The useful ${s} question is which side of the recent range actually gets accepted."],
+                "A clean break matters more when price holds outside the range instead of immediately returning inside it.",
+                f"Which side of the ${s} range would you trust only after a retest?"
+            ),
+            "trend_continuation": (
+                [f"The ${s} trend is easier to judge from what holds than from what has already moved.",f"With ${s}, continuation needs evidence after the impulse, not another reason to chase it."],
+                "Watch whether the next pullback protects the recent structure; losing that structure changes the read.",
+                f"What would convince you that ${s} is still in continuation rather than exhaustion?"
+            ),
+            "momentum_volume": (
+                [f"${s} is moving, but price alone cannot explain whether the move deserves attention.",f"The useful ${s} signal is the relationship between the move and the participation behind it."],
+                "If volume expands with the move and remains present on the next reaction, the evidence is stronger; if participation disappears, the story weakens.",
+                f"What volume-and-price reaction would change your view on ${s}?"
+            ),
+            "relative_strength": (
+                [f"${s} deserves a closer look if it keeps behaving differently from the broader market.",f"The ${s} signal is more useful when its move is compared with the market around it."],
+                "Relative strength is evidence, not a forecast: the difference should persist across the next measurable reaction.",
+                f"What would make you conclude ${s} is losing its relative strength?"
+            ),
+            "research_edge": (
+                [f"The interesting ${s} detail is easy to miss when everyone is watching the percentage move.",f"There is a more useful ${s} question than simply asking whether price will rise next."],
+                "The supplied evidence points to a specific market behavior worth testing rather than a prediction worth repeating.",
+                f"Which new evidence would change your interpretation of ${s}?"
+            ),
+            "post_mortem_lesson": (
+                [f"The ${s} lesson is not whether the last move was right; it is what the reaction taught us.",f"Looking at ${s}, the useful takeaway is the condition that separated confirmation from noise."],
+                "That lesson can be reused: define the evidence first, then decide what reaction would invalidate it.",
+                f"What would you carry forward from the ${s} setup into the next trade?"
+            ),
+        }
+        default=([f"The useful ${s} question is what the next reaction can actually prove."],
+                 "The available evidence supports a scenario to test, not certainty about the next candle.",
+                 f"What new evidence would change your view on ${s}?")
+        hooks,mechanism,question=story_templates.get(story_type,default)
         hook=fresh(hooks[seed:]+hooks[:seed],used)
         if lo is not None and hi is not None:
             structure=f"The recent 1H window spans roughly $" + price(lo) + " to $" + price(hi) + f". Price is around {obs}, with {voltext} in quote volume and a {ir:.1f}% intraday range."
         else:
-            structure=f"Price is around {obs}, with {voltext} in quote volume. The available 1H evidence is not strong enough to manufacture a cleaner range."
-        mechanisms=[f"That combination matters because a price move without confirming participation can fade, while sustained participation makes the move more informative.",f"The relationship matters more than the percentage alone: participation tells us whether the move has broader support or is simply attracting short-term attention.","This is why I would read the move as evidence, not certainty. The next reaction can confirm the interpretation or expose the weakness in it."]
-        middle=fresh(mechanisms[seed:]+mechanisms[:seed],used)
-        close="The decision point is therefore the next measurable reaction, not a guess about where the next candle must go."
-        question=f"Which specific reaction on {dollar} would make you change your read?"
+            structure=f"Price is around {obs}, with {voltext} in quote volume; the available 1H evidence does not justify inventing a cleaner range."
+        middle=f"{mechanism} The current snapshot puts {dollar} around {obs}, with {voltext} in quoted volume."
+        body=structure
+        close="That keeps the read falsifiable: the next measurable reaction either supports the structure or weakens it."
+        question=question
     def compact_post(parts, question_text, limit=700):
         kept=list(parts)
         # Keep hook/evidence first; remove lower-priority prose before evidence.
