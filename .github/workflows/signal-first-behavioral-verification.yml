@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - 'src/signal_first_router.py'
+      - 'src/binance_square_publisher.py'
       - 'tests/verify_signal_first_behavior.py'
+      - 'tests/verify_publisher_asset_cooldown.py'
       - '.github/workflows/signal-first-behavioral-verification.yml'
   workflow_dispatch:
 
@@ -27,8 +29,14 @@ jobs:
       - name: Syntax check
         run: python -m py_compile src/signal_first_router.py tests/verify_signal_first_behavior.py
 
-      - name: Verify asset cooldown behavior
+      - name: Verify Signal-First asset cooldown behavior
         run: python tests/verify_signal_first_behavior.py
+
+      - name: Verify final publisher asset cooldown behavior
+        run: python tests/verify_publisher_asset_cooldown.py
+
+      - name: Verify final asset lock syntax
+        run: python -m py_compile src/final_asset_lock.py src/binance_square_publisher.py
 
       - name: Verify router contains authoritative cooldown gate
         run: |
