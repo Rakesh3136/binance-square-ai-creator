@@ -60,10 +60,25 @@ def clean_symbol(v: object) -> str:
     return s if re.fullmatch(r"[A-Z0-9]{1,15}", s) else ""
 
 
-def choose_profile(category: str) -> dict:
+def choose_profile(category: str, requested: str = "") -> dict:
     previous = load(PREVIOUS)
     previous_profile = str(previous.get("chart_profile") or "")
     candidates = [CHART_PROFILES[i] for i in CATEGORY_PROFILE.get(category, range(len(CHART_PROFILES)))]
+    aliases = {
+        "breakout_retest_zones": "candles_volume",
+        "rejection_and_invalidation": "clean_structure",
+        "range_boundaries_midpoint": "higher_timeframe",
+        "market_structure_swings": "clean_structure",
+        "price_volume_relationship": "candles_volume",
+        "relative_strength_comparison": "line_context",
+        "evidence_annotated_chart": "higher_timeframe",
+        "annotated_lesson_chart": "line_context",
+    }
+    requested_name = aliases.get(str(requested or "").strip().lower(), str(requested or "").strip().lower())
+    if requested_name:
+        for profile in candidates:
+            if profile["name"] == requested_name and profile["name"] != previous_profile:
+                return profile
     for profile in candidates:
         if profile["name"] != previous_profile:
             return profile
@@ -87,6 +102,11 @@ def main() -> int:
         or draft.get("content_category")
         or ""
     ).lower().strip()
+    selected = data.get("selected_opportunity") if isinstance(data.get("selected_opportunity"), dict) else {}
+    if not selected:
+        preflight = load(LIVE / "editorial_preflight.json")
+        selected = preflight.get("selected_opportunity") if isinstance(preflight.get("selected_opportunity"), dict) else {}
+    requested_chart = str(selected.get("chart_profile") or "").strip()
     symbol = clean_symbol(
         context.get("symbol")
         or data.get("selected_editorial_lane", {}).get("symbol")
@@ -100,7 +120,7 @@ def main() -> int:
     )
     setup_lane = category not in NO_VISUAL_LANES
     need_visual = bool(requested or setup_lane)
-    profile = choose_profile(category) if need_visual else {"name": "none", "style": None, "timeframe": None, "label": "No visual"}
+    profile = choose_profile(category, requested_chart) if need_visual else {"name": "none", "style": None, "timeframe": None, "label": "No visual"}
     decision = {
         "version": "2.0-differentiated-visual-routing",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -124,6 +144,7 @@ def main() -> int:
             "Never invent chart levels.",
             "Visual is evidence, not a guarantee.",
             "Avoid repeating the immediately previous chart treatment when another valid treatment exists.",
+            "Honor the frozen NIC story/chart profile when it is compatible with the lane."
         ],
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
