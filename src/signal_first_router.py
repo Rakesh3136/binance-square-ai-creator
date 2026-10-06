@@ -4,6 +4,7 @@ import json, os, re, hashlib, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone, timedelta
 from difflib import SequenceMatcher
 from pathlib import Path
+from opportunity_timing_gate import evaluate as evaluate_timing
 ROOT=Path(__file__).resolve().parents[1]
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; NIC24_1=ROOT/'data/live/nic24_1_strategy_content_plan.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
@@ -153,6 +154,14 @@ def add(target,x,allow_complete_flow=False):
     if not isinstance(x,dict) or not x.get('symbol'):return
     score=num(x.get('score'),num(x.get('ranker_score'),num(x.get('discovery_score')))); complete=flow_complete(x)
     if score>=MIN_SCORE or (allow_complete_flow and complete):target.append({**x,'score':score})
+def timing_for(x, full_flow, market):
+    symbol=str(x.get('symbol') or '').upper().replace('USDT','').strip()
+    rows=full_flow.get('top_flow_candidates') or []
+    flow_row=next((r for r in rows if isinstance(r,dict) and str(r.get('symbol') or r.get('symbol_usdt') or '').upper().replace('USDT','').strip()==symbol),{})
+    market_rows=[]
+    for group in ('top_content_signals','top_gainers','top_losers','highest_volume'): market_rows.extend(market.get(group) or [])
+    market_row=next((r for r in market_rows if isinstance(r,dict) and str(r.get('symbol') or '').upper().replace('USDT','').strip()==symbol),{})
+    return evaluate_timing(x,flow_row,market_row)
 def candidates(brief,pre,cad,market,flow_data,full_flow,ranking,pre_router):
     primary=[]; market_candidates=[]
     for source in (brief.get('ranked_stories'),pre.get('ranked_stories')):
@@ -203,6 +212,11 @@ def choose(xs,rows,market,live_symbols,allow_editorial=False):
         if raw_symbol not in live_symbols:
             blocked_rows.append({'symbol':raw_symbol,'reason':'not_currently_live_on_binance'}); continue
         category=str(x.get('category') or lane(x)).lower()
+        timing=timing_for(x, full_flow, market)
+        if not timing.get('allowed') and category not in EDITORIAL_LANES:
+            blocked_rows.append({'symbol':raw_symbol,'reason':'opportunity_timing_'+str(timing.get('timing_state','WATCH')).lower(),'timing':timing})
+            continue
+        x=dict(x); x['timing_state']=timing.get('timing_state'); x['timing_reason']=timing.get('timing_reason');
 
         # Hard asset cooldown is authoritative before any editorial or signal path.
         reason=blocked(x,rows)
