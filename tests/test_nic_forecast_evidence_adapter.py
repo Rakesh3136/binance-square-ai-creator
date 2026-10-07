@@ -10,8 +10,9 @@ def test_unknown_side_is_neutral():
     assert e["calibrated_probability"]==0.5
     assert e["probability_trusted"] is False
     assert e["advisory_only"] is True
-def test_evidence_exposes_regime_controls():
+def test_evidence_exposes_governance_controls():
     e=mod.evidence("BTC","LONG")
     assert "regime_stability" in e
     assert "edge_decay_penalty" in e
-    assert "regime_transition_state" in e
+    assert "signal_family_trust_multiplier" in e
+    assert "suspended_cells" in e
