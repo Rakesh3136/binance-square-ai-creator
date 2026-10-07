@@ -48,6 +48,11 @@ def evidence(symbol, side):
         transforms={"CONSERVATIVE":0.75,"CALIBRATED_SHRINK":0.60,"CONFIDENT":1.15}
         probability=0.5+(probability-0.5)*transforms.get(champion,1.0)
     probability=max(0.000001,min(0.999999,probability))
+    try:
+        from nic_forecast_decision_policy import evaluate as evaluate_decision
+        decision=evaluate_decision({"calibrated_probability":probability,"probability_trusted":probability_trusted,"evidence_score":raw_score*(1.0-decay)*trust_multiplier*family_mult,"regime_stability":transition.get("regime_stability",0.0),"edge_decay_penalty":decay,"side":fs})
+    except Exception:
+        decision={"decision":"WAIT","direction":"","confidence":0.0,"reasons":["decision_policy_unavailable"],"advisory_only":True,"publish_gate_unchanged":True}
     governance=[]; gov=load(GOV).get("cells") or {}
     for key,row in gov.items():
         if isinstance(row,dict) and str(row.get("side")).upper()==fs and str(row.get("regime"))==regime:
@@ -68,7 +73,7 @@ def evidence(symbol, side):
     return {"symbol":s,"side":fs,"regime":regime,"trusted_cells":len(governed),"suspended_cells":len(cells)-len(governed),
             "max_lift":round(max(lifts or [0]),4),"evidence_score":round(raw_score*(1.0-decay)*trust_multiplier*family_mult,2),
             "raw_evidence_score":round(raw_score,2),"signal_family_trust_multiplier":round(family_mult,2),
-            "calibrated_probability":round(probability,4),"probability_trusted":probability_trusted,"forecast_champion":champion or "NONE",
+            "calibrated_probability":round(probability,4),"probability_trusted":probability_trusted,"forecast_champion":champion or "NONE","decision_policy":decision,
             "regime_transition_state":transition.get("transition_state"),"regime_stability":transition.get("regime_stability",0.0),
             "edge_decay_penalty":decay,"governance_state":governance_state,"governance_trust_multiplier":round(trust_multiplier,2),
             "advisory_only":True,"publish_gate_unchanged":True}
