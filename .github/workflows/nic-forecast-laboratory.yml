@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
-      - run: python -m py_compile src/nic_forecast_laboratory.py src/nic_forecast_outcome_resolver.py src/nic_forecast_calibrator.py src/nic_forecast_governance.py src/nic_forecast_evidence_adapter.py src/nic_regime_transition.py tests/test_nic_forecast_laboratory.py tests/test_nic_forecast_outcome_resolver.py tests/test_nic_forecast_calibrator.py tests/test_nic_forecast_governance.py tests/test_nic_forecast_evidence_adapter.py tests/test_nic_regime_transition.py
+      - run: python -m py_compile src/nic_forecast_laboratory.py src/nic_forecast_outcome_resolver.py src/nic_forecast_calibrator.py src/nic_forecast_governance.py src/nic_signal_family_governance.py src/nic_forecast_evidence_adapter.py src/nic_regime_transition.py tests/test_nic_forecast_laboratory.py tests/test_nic_forecast_outcome_resolver.py tests/test_nic_forecast_calibrator.py tests/test_nic_forecast_governance.py tests/test_nic_signal_family_governance.py tests/test_nic_forecast_evidence_adapter.py tests/test_nic_regime_transition.py
       - run: python tests/test_nic_forecast_laboratory.py
       - run: python tests/test_nic_forecast_outcome_resolver.py
       - run: python tests/test_nic_forecast_evidence_adapter.py
@@ -27,6 +27,7 @@ jobs:
       - run: python src/nic_forecast_outcome_resolver.py
       - run: python src/nic_forecast_calibrator.py
       - run: python src/nic_forecast_governance.py
+      - run: python src/nic_signal_family_governance.py
       - run: |
           python - <<'PY'
           import json
@@ -49,6 +50,7 @@ jobs:
           cp data/intelligence/nic_regime_history.jsonl /tmp/nic-evidence/
           cp data/intelligence/nic_forecast_calibration.json /tmp/nic-evidence/
           cp data/intelligence/nic_forecast_governance.json /tmp/nic-evidence/
+          cp data/intelligence/nic_signal_family_governance.json /tmp/nic-evidence/
           git fetch origin main
           git reset --hard origin/main
           cp /tmp/nic-evidence/nic_forecast_laboratory.json data/live/
@@ -58,6 +60,7 @@ jobs:
           cp /tmp/nic-evidence/nic_regime_history.jsonl data/intelligence/
           cp /tmp/nic-evidence/nic_forecast_calibration.json data/intelligence/
           cp /tmp/nic-evidence/nic_forecast_governance.json data/intelligence/
+          cp /tmp/nic-evidence/nic_signal_family_governance.json data/intelligence/
           git add data/live/nic_forecast_laboratory.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_regime_history.jsonl data/intelligence/nic_forecast_calibration.json
           git diff --cached --quiet && exit 0
           git commit -m "Record NIC Forecast Laboratory learning evidence"
