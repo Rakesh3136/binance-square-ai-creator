@@ -22,7 +22,7 @@ def metrics(rows):
     for r in scored:
         p=clamp(r.get("forecast_probability")); y=1.0 if r.get("hit") else 0.0
         bs+=(p-y)**2
-        ll-=math.log(max(1e-6,min(1-1e-6,p))) if y else math.log(max(1e-6,min(1-1e-6,p))
+        ll -= math.log(max(1e-6, p) if y else max(1e-6, 1.0 - p))
     return {"samples":len(scored),"brier_score":round(bs/len(scored),6),"log_loss":round(ll/len(scored),6),"coverage":round(len(scored)/len(rows),4)}
 def calibrate():
     rows=read(); groups={}
