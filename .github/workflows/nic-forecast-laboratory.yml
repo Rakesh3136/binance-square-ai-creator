@@ -60,7 +60,7 @@ jobs:
           cp data/intelligence/nic_forecast_champion.json /tmp/nic-evidence/
           cp data/intelligence/nic_forecast_governance.json /tmp/nic-evidence/
           cp data/intelligence/nic_signal_family_governance.json /tmp/nic-evidence/
-          cp data/intelligence/nic_signal_attribution.json data/intelligence/nic_decision_outcome_ledger.jsonl /tmp/nic-evidence/
+          cp data/intelligence/nic_signal_attribution.json /tmp/nic-evidence/
           cp data/intelligence/nic_decision_outcome_ledger.jsonl /tmp/nic-evidence/ || true
           git fetch origin main
           git reset --hard origin/main
@@ -75,7 +75,7 @@ jobs:
           cp /tmp/nic-evidence/nic_signal_attribution.json data/intelligence/
           cp /tmp/nic-evidence/nic_decision_outcome_ledger.jsonl data/intelligence/ || true
           cp /tmp/nic-evidence/nic_forecast_champion.json data/intelligence/
-          git add data/live/nic_forecast_laboratory.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_regime_history.jsonl data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_champion.json data/intelligence/nic_forecast_governance.json data/intelligence/nic_signal_family_governance.json data/intelligence/nic_signal_attribution.json
+          git add data/live/nic_forecast_laboratory.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_regime_history.jsonl data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_champion.json data/intelligence/nic_forecast_governance.json data/intelligence/nic_signal_family_governance.json data/intelligence/nic_signal_attribution.json data/intelligence/nic_decision_outcome_ledger.jsonl
           git diff --cached --quiet && exit 0
           git commit -m "Record NIC Forecast Laboratory learning evidence"
           git push origin HEAD:main
