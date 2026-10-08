@@ -60,7 +60,7 @@ def evaluate(rows):
     eligible={k:v for k,v in overall.items() if v["samples"]>=MIN_SAMPLES}
     if not eligible:
         return {"state":"NO_CHAMPION","champion":None,"overall":overall,"recent":recent_metrics}
-    ranked=sorted(eligible, key=lambda kv:(kv[1]["brier"],kv[1]["log_loss"]))
+    ranked=sorted(eligible.items(), key=lambda kv:(kv[1]["brier"],kv[1]["log_loss"]))
     best_name,best=ranked[0]
     baseline=overall["BASELINE_RAW"]
     improvement_b=(baseline["brier"]-best["brier"]) if baseline["brier"] is not None else 0
