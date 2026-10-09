@@ -9,7 +9,7 @@ GATE=ROOT/"src/nic24_2_evidence_content_integrity_gate.py"
 def run_case(post, frozen, enforce="true", technical_levels=None):
     with tempfile.TemporaryDirectory() as td:
         report=Path(td)/"draft.json"
-        report.write_text(json.dumps({"draft":{"post":post,"symbol":frozen.get("symbol")}}),encoding="utf-8")
+        report.write_text(json.dumps({"draft":{"post":post,"symbol":frozen.get("symbol"),"technical_levels":technical_levels or {}}}),encoding="utf-8")
         live=ROOT/"data/live"
         live.mkdir(parents=True,exist_ok=True)
         names={
