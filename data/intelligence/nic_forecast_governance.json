@@ -1,6 +1,6 @@
 {
   "schema": "NIC-FORECAST-GOVERNANCE-1.0",
-  "generated_at": "2026-10-09T03:12:05.651878+00:00",
+  "generated_at": "2026-10-09T17:28:30.366411+00:00",
   "minimum_events": 30,
   "rolling_window": 30,
   "cells": {
@@ -8,28 +8,28 @@
       "side": "BULLISH",
       "regime": "TREND_DOWN",
       "horizon_hours": 6,
-      "samples": 35,
-      "state": "DEGRADED",
-      "trust_multiplier": 0.65,
+      "samples": 40,
+      "state": "SUSPENDED",
+      "trust_multiplier": 0.0,
       "recent_metrics": {
         "samples": 30,
-        "brier_score": 0.23013,
-        "log_loss": 0.6495
+        "brier_score": 0.25849,
+        "log_loss": 0.710274
       },
-      "recovery_required": false,
+      "recovery_required": true,
       "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
     },
     "BEARISH|TREND_DOWN|6h": {
       "side": "BEARISH",
       "regime": "TREND_DOWN",
       "horizon_hours": 6,
-      "samples": 35,
-      "state": "DEGRADED",
-      "trust_multiplier": 0.65,
+      "samples": 40,
+      "state": "TRUSTED",
+      "trust_multiplier": 1.0,
       "recent_metrics": {
         "samples": 30,
-        "brier_score": 0.20776,
-        "log_loss": 0.601947
+        "brier_score": 0.233281,
+        "log_loss": 0.656184
       },
       "recovery_required": false,
       "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
@@ -98,13 +98,13 @@
       "side": "BULLISH",
       "regime": "RANGE",
       "horizon_hours": 6,
-      "samples": 10,
-      "state": "RECOVERY",
-      "trust_multiplier": 0.5,
+      "samples": 100,
+      "state": "SUSPENDED",
+      "trust_multiplier": 0.0,
       "recent_metrics": {
-        "samples": 10,
-        "brier_score": 0.306953,
-        "log_loss": 0.812593
+        "samples": 30,
+        "brier_score": 0.315313,
+        "log_loss": 0.831135
       },
       "recovery_required": true,
       "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
@@ -113,13 +113,193 @@
       "side": "BEARISH",
       "regime": "RANGE",
       "horizon_hours": 6,
+      "samples": 100,
+      "state": "SUSPENDED",
+      "trust_multiplier": 0.0,
+      "recent_metrics": {
+        "samples": 30,
+        "brier_score": 0.299922,
+        "log_loss": 0.798305
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|TREND_DOWN|12h": {
+      "side": "BULLISH",
+      "regime": "TREND_DOWN",
+      "horizon_hours": 12,
+      "samples": 40,
+      "state": "TRUSTED",
+      "trust_multiplier": 1.0,
+      "recent_metrics": {
+        "samples": 30,
+        "brier_score": 0.242552,
+        "log_loss": 0.673583
+      },
+      "recovery_required": false,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|TREND_DOWN|12h": {
+      "side": "BEARISH",
+      "regime": "TREND_DOWN",
+      "horizon_hours": 12,
+      "samples": 40,
+      "state": "TRUSTED",
+      "trust_multiplier": 1.0,
+      "recent_metrics": {
+        "samples": 30,
+        "brier_score": 0.226901,
+        "log_loss": 0.640376
+      },
+      "recovery_required": false,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|TREND_DOWN_EXTENDED|12h": {
+      "side": "BULLISH",
+      "regime": "TREND_DOWN_EXTENDED",
+      "horizon_hours": 12,
       "samples": 10,
       "state": "RECOVERY",
       "trust_multiplier": 0.5,
       "recent_metrics": {
         "samples": 10,
-        "brier_score": 0.306953,
-        "log_loss": 0.812593
+        "brier_score": 0.23125,
+        "log_loss": 0.654667
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|TREND_DOWN_EXTENDED|12h": {
+      "side": "BEARISH",
+      "regime": "TREND_DOWN_EXTENDED",
+      "horizon_hours": 12,
+      "samples": 10,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 10,
+        "brier_score": 0.224453,
+        "log_loss": 0.640967
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|HIGH_FLOW|12h": {
+      "side": "BULLISH",
+      "regime": "HIGH_FLOW",
+      "horizon_hours": 12,
+      "samples": 5,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 5,
+        "brier_score": 0.113906,
+        "log_loss": 0.411735
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|HIGH_FLOW|12h": {
+      "side": "BEARISH",
+      "regime": "HIGH_FLOW",
+      "horizon_hours": 12,
+      "samples": 5,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 5,
+        "brier_score": 0.113906,
+        "log_loss": 0.411735
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|RANGE|12h": {
+      "side": "BULLISH",
+      "regime": "RANGE",
+      "horizon_hours": 12,
+      "samples": 100,
+      "state": "SUSPENDED",
+      "trust_multiplier": 0.0,
+      "recent_metrics": {
+        "samples": 30,
+        "brier_score": 0.328672,
+        "log_loss": 0.854759
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|RANGE|12h": {
+      "side": "BEARISH",
+      "regime": "RANGE",
+      "horizon_hours": 12,
+      "samples": 100,
+      "state": "SUSPENDED",
+      "trust_multiplier": 0.0,
+      "recent_metrics": {
+        "samples": 30,
+        "brier_score": 0.292656,
+        "log_loss": 0.781876
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|TREND_UP|6h": {
+      "side": "BULLISH",
+      "regime": "TREND_UP",
+      "horizon_hours": 6,
+      "samples": 25,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 25,
+        "brier_score": 0.216656,
+        "log_loss": 0.625042
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|TREND_UP|12h": {
+      "side": "BULLISH",
+      "regime": "TREND_UP",
+      "horizon_hours": 12,
+      "samples": 25,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 25,
+        "brier_score": 0.273625,
+        "log_loss": 0.742919
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|TREND_UP|6h": {
+      "side": "BEARISH",
+      "regime": "TREND_UP",
+      "horizon_hours": 6,
+      "samples": 25,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 25,
+        "brier_score": 0.2245,
+        "log_loss": 0.641031
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|TREND_UP|12h": {
+      "side": "BEARISH",
+      "regime": "TREND_UP",
+      "horizon_hours": 12,
+      "samples": 25,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 25,
+        "brier_score": 0.276969,
+        "log_loss": 0.750467
       },
       "recovery_required": true,
       "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
