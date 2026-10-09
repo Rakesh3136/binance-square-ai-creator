@@ -397,16 +397,34 @@ jobs:
           python src/pipeline_stage.py visual success 'Visual package rendered and validated'
 
       - name: NIC 24.3 Early-entry and post-extension gate
+        id: early_entry
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          set +e
           python src/nic24_3_early_entry_gate.py
+          gate_rc=$?
+          set -e
           python -m json.tool data/live/nic24_3_early_entry_gate.json >/dev/null
+          publish=$(python -c 'import json; print(str(json.load(open("data/live/nic24_3_early_entry_gate.json")).get("publish", False)).lower())')
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          if [ "$gate_rc" -eq 24 ] && [ "$publish" = "false" ]; then
+            echo "NIC 24.3 made a valid no-publication decision; this is not a workflow error."
+            exit 0
+          fi
+          if [ "$gate_rc" -ne 0 ]; then
+            echo "NIC 24.3 encountered an execution/validation error (exit=$gate_rc)." >&2
+            exit "$gate_rc"
+          fi
+          if [ "$publish" != "true" ]; then
+            echo "NIC 24.3 did not explicitly authorize publication." >&2
+            exit 1
+          fi
 
       - name: NIC 24.2 Evidence-to-Content Integrity — authoritative publication gate
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           NIC24_2_ENFORCE: 'true'
@@ -417,13 +435,13 @@ jobs:
           python -c 'import json,sys; x=json.load(open("data/live/nic24_2_evidence_content_integrity.json")); print("NIC 24.2 authoritative result: passed=",x.get("passed"),"failures=",x.get("failures"),"warnings=",x.get("warnings")); sys.exit(0 if x.get("passed") is True and x.get("publish") is True else 24)'
 
       - name: Final production gate
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/production_manager.py
 
       - name: Build final publication payload
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -432,7 +450,7 @@ jobs:
           python src/write_to_earn_master.py
 
       - name: Extract publication and submit to Binance Square
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
