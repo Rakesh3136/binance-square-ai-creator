@@ -70,7 +70,7 @@ def draft_text(path):
     draft=data.get("draft") if isinstance(data.get("draft"),dict) else {}
     return data,draft,str(draft.get("post") or draft.get("text") or draft.get("content") or "").strip()
 
-def selected_contract(frozen, context, preflight):
+def selected_contract(frozen, context, preflight, draft_data=None):
     selected=preflight.get("selected_opportunity") if isinstance(preflight.get("selected_opportunity"),dict) else {}
     symbol=norm_symbol(frozen.get("symbol") or context.get("symbol") or selected.get("symbol"))
     category=str(frozen.get("category") or context.get("category") or selected.get("category") or "").lower()
@@ -78,17 +78,32 @@ def selected_contract(frozen, context, preflight):
     decision=str(frozen.get("decision") or frozen.get("state") or frozen.get("strategy_state") or "").upper()
     direction=str(frozen.get("direction") or selected.get("direction") or "").upper()
     levels={}
-    for key in ("entry_trigger","entry","trigger","tp1","tp2","target","sl","invalidation","support","resistance"):
+    for key in ("entry_trigger","entry","trigger","tp1","tp2","target","sl","invalidation","support","resistance","current_price"):
         value=frozen.get(key)
         if value is None: value=selected.get(key)
         if value is not None:
             try: levels[key]=float(value)
             except (TypeError,ValueError): pass
     setup=frozen.get("trade_setup") if isinstance(frozen.get("trade_setup"),dict) else {}
-    for key in ("entry_trigger","trigger","tp1","tp2","target","sl","invalidation"):
+    for key in ("entry_trigger","trigger","tp1","tp2","target","sl","invalidation","support","resistance","current_price"):
         if key not in levels and setup.get(key) is not None:
             try: levels[key]=float(setup[key])
             except (TypeError,ValueError): pass
+    # The technical enricher freezes its candle-derived levels in the current
+    # draft artifact. Use these only to fill fields absent from the upstream
+    # opportunity contract; never let editorial prose provide replacement values.
+    draft_data=draft_data if isinstance(draft_data,dict) else {}
+    draft=draft_data.get("draft") if isinstance(draft_data.get("draft"),dict) else {}
+    enriched=draft.get("technical_levels") if isinstance(draft.get("technical_levels"),dict) else {}
+    research=draft_data.get("research") if isinstance(draft_data.get("research"),dict) else {}
+    chart_levels=research.get("chart_levels") if isinstance(research.get("chart_levels"),dict) else {}
+    for source in (chart_levels,enriched):
+        for key in ("entry_trigger","entry","trigger","tp1","tp2","target","sl","invalidation","support","resistance","current_price"):
+            if key not in levels and source.get(key) is not None:
+                try: levels[key]=float(source[key])
+                except (TypeError,ValueError): pass
+    if not direction:
+        direction=str(enriched.get("direction") or chart_levels.get("direction") or "").upper()
     return {"symbol":symbol,"category":category,"regime":regime,"decision":decision,
             "direction":direction,"levels":levels,
             "confidence":frozen.get("confidence",selected.get("confidence")),
@@ -157,7 +172,7 @@ def main():
     prediction=load(LIVE/"nic_prediction_engine.json",{})
     market=load(LIVE/"market_snapshot.json",{})
     visual=load(LIVE/"validate_trade_visual_contract.json",{})
-    contract=selected_contract(frozen,context,preflight)
+    contract=selected_contract(frozen,context,preflight,data)
     failures=[]; warnings=[]; checks={}
     sym=contract["symbol"]
 
@@ -195,6 +210,7 @@ def main():
         if label=="take_profit": candidates+=["tp1","tp2","target"]
         if label in ("stop_loss","invalidation"): candidates+=["sl","invalidation"]
         if label=="trigger": candidates+=["entry_trigger","entry"]
+        if label=="price": candidates+=["current_price"]
         expected=next((contract["levels"][k] for k in candidates if k in contract["levels"]),None)
         if expected is None: mismatches.append({"label":label,"value":value,"expected":None})
         elif not equivalent_number(value,expected): mismatches.append({"label":label,"value":value,"expected":expected})
