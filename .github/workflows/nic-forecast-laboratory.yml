@@ -3,7 +3,7 @@ name: NIC Forecast Laboratory
 on:
   push:
     branches: [main]
-    paths: ["src/nic_winning_post_dna.py","tests/test_nic_winning_post_dna.py","src/content_portfolio_planner.py","src/nic_forecast_laboratory.py","src/nic_forecast_outcome_resolver.py","tests/test_nic_forecast_laboratory.py","tests/test_nic_forecast_outcome_resolver.py","src/nic_forecast_evidence_adapter.py","src/nic_forecast_calibrator.py","tests/test_nic_forecast_calibrator.py","src/nic_signal_family_governance.py","tests/test_nic_signal_family_governance.py","src/nic_signal_attribution.py","tests/test_nic_signal_attribution.py","src/nic_forecast_champion.py","tests/test_nic_forecast_champion.py","src/nic_forecast_decision_policy.py","tests/test_nic_forecast_decision_policy.py","src/nic_decision_outcome.py","src/nic_decision_outcome_resolver.py","tests/test_nic_decision_outcome.py","tests/test_nic_decision_outcome_resolver.py","src/nic_regime_transition.py","src/nic22_2_early_opportunity_engine.py","tests/test_nic22_2_early_opportunity_engine.py","tests/test_nic22_2_forecast_integration.py","tests/test_nic_forecast_evidence_adapter.py","tests/test_nic_regime_transition.py",".github/workflows/nic-forecast-laboratory.yml","data/live/nic_prediction_engine.json"]
+    paths: ["src/nic_winning_post_dna.py","tests/test_nic_winning_post_dna.py","src/content_portfolio_planner.py","src/nic_forecast_laboratory.py","src/nic_forecast_outcome_resolver.py","tests/test_nic_forecast_laboratory.py","tests/test_nic_forecast_outcome_resolver.py","src/nic_forecast_evidence_adapter.py","src/nic_forecast_calibrator.py","tests/test_nic_forecast_calibrator.py","src/nic_signal_family_governance.py","tests/test_nic_signal_family_governance.py","src/nic_signal_attribution.py","tests/test_nic_signal_attribution.py","src/nic_forecast_champion.py","tests/test_nic_forecast_champion.py","src/nic_forecast_decision_policy.py","tests/test_nic_forecast_decision_policy.py","src/nic_decision_outcome.py","src/nic_decision_outcome_resolver.py","tests/test_nic_decision_outcome.py","tests/test_nic_decision_outcome_resolver.py","src/nic_regime_transition.py","src/nic22_2_early_opportunity_engine.py","tests/test_nic22_2_early_opportunity_engine.py","tests/test_nic22_2_forecast_integration.py","tests/test_nic_forecast_evidence_adapter.py","tests/test_nic_regime_transition.py",".github/workflows/nic-forecast-laboratory.yml","data/live/nic_prediction_engine.json","src/nic_forecast_outcome_resolver.py","tests/test_nic_forecast_outcome_resolver.py"]
   workflow_dispatch:
 concurrency:
   group: nic-forecast-laboratory-main
@@ -59,6 +59,7 @@ jobs:
           cp data/live/nic_forecast_laboratory.json /tmp/nic-evidence/
           cp data/intelligence/nic_forecast_laboratory_report.json /tmp/nic-evidence/
           cp data/intelligence/nic_forecast_truth_ledger.jsonl /tmp/nic-evidence/
+          cp data/intelligence/nic_forecast_outcome_events.jsonl /tmp/nic-evidence/
           cp data/intelligence/nic_signal_predictivity_matrix.json /tmp/nic-evidence/
           cp data/intelligence/nic_regime_history.jsonl /tmp/nic-evidence/
           cp data/intelligence/nic_forecast_calibration.json /tmp/nic-evidence/
@@ -72,6 +73,7 @@ jobs:
           cp /tmp/nic-evidence/nic_forecast_laboratory.json data/live/
           cp /tmp/nic-evidence/nic_forecast_laboratory_report.json data/intelligence/
           cp /tmp/nic-evidence/nic_forecast_truth_ledger.jsonl data/intelligence/
+          cp /tmp/nic-evidence/nic_forecast_outcome_events.jsonl data/intelligence/
           cp /tmp/nic-evidence/nic_signal_predictivity_matrix.json data/intelligence/
           cp /tmp/nic-evidence/nic_regime_history.jsonl data/intelligence/
           cp /tmp/nic-evidence/nic_forecast_calibration.json data/intelligence/
@@ -80,7 +82,7 @@ jobs:
           cp /tmp/nic-evidence/nic_signal_attribution.json data/intelligence/
           cp /tmp/nic-evidence/nic_decision_outcome_ledger.jsonl data/intelligence/ || true
           cp /tmp/nic-evidence/nic_forecast_champion.json data/intelligence/
-          git add data/live/nic_forecast_laboratory.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_regime_history.jsonl data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_champion.json data/intelligence/nic_forecast_governance.json data/intelligence/nic_signal_family_governance.json data/intelligence/nic_signal_attribution.json data/intelligence/nic_decision_outcome_ledger.jsonl
+          git add data/live/nic_forecast_laboratory.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_regime_history.jsonl data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_champion.json data/intelligence/nic_forecast_governance.json data/intelligence/nic_signal_family_governance.json data/intelligence/nic_signal_attribution.json data/intelligence/nic_decision_outcome_ledger.jsonl
           git diff --cached --quiet && exit 0
           git commit -m "Record NIC Forecast Laboratory learning evidence"
           git push origin HEAD:main
