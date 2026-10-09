@@ -6,7 +6,7 @@ import subprocess, sys
 ROOT=Path(__file__).resolve().parents[1]
 GATE=ROOT/"src/nic24_2_evidence_content_integrity_gate.py"
 
-def run_case(post, frozen, enforce="true"):
+def run_case(post, frozen, enforce="true", technical_levels=None):
     with tempfile.TemporaryDirectory() as td:
         report=Path(td)/"draft.json"
         report.write_text(json.dumps({"draft":{"post":post,"symbol":frozen.get("symbol")}}),encoding="utf-8")
@@ -55,6 +55,16 @@ def test_certainty():
     r=run_case("BTC will rise, guaranteed, if momentum continues?",{"symbol":"BTC","category":"technical_setup","direction":"LONG"})
     assert r.returncode==24,r.stdout+r.stderr
 
+def test_technical_enrichment_handoff():
+    levels={"current_price":0.06863,"support":0.04829,"resistance":0.07162,
+            "tp1":0.0774525,"target":0.083285,"invalidation":0.04829,
+            "direction":"LONG_BIAS","timeframe":"1H"}
+    post=("STRK current price $0.06863; support $0.04829; resistance $0.07162; "
+          "TP1 $0.0774525; target $0.083285; invalidation $0.04829.")
+    r=run_case(post,{"symbol":"STRK","category":"technical_setup","direction":"LONG_BIAS"},
+               technical_levels=levels)
+    assert r.returncode==0,r.stdout+r.stderr
+
 if __name__=="__main__":
-    test_pass();test_foreign_coin();test_number_drift();test_watch_only();test_certainty()
+    test_pass();test_foreign_coin();test_number_drift();test_watch_only();test_certainty();test_technical_enrichment_handoff()
     print("NIC 24.2 tests passed")
