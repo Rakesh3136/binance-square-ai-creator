@@ -16,6 +16,7 @@ ROOT=Path(__file__).resolve().parents[1]
 LOG=ROOT/"analytics/publication_log.jsonl"; OUT=ROOT/"data/live/content_portfolio_plan.json"
 FOLLOW_UP=ROOT/"data/live/thesis_follow_up_opportunities.json"; MEMORY=ROOT/"data/live/thesis_memory.json"; NIC_OS=ROOT/"data/live/nic_monetization_contract.json"
 ROUTING=ROOT/"data/live/signal_first_routing.json"
+WINNING_DNA=ROOT/"data/live/nic_winning_post_dna.json"
 TREATMENTS=("market_setup","data_investigation","news_impact","asset_comparison","contrarian_thesis","outcome_accountability","weekly_synthesis")
 CATEGORY_MAP={"technical_setup":"market_setup","capital_flow_long":"market_setup","capital_flow_short":"market_setup","flow":"market_setup","top_gainers":"market_setup","top_losers":"market_setup","high_volatility":"market_setup","volume_leaders":"data_investigation","data_surprise":"data_investigation","comparison":"asset_comparison","breaking_news":"news_impact","news_and_macro":"news_impact","research_insight":"data_investigation","market_mechanism":"data_investigation","education":"data_investigation","creator_signal_outcome":"outcome_accountability","follow_up":"outcome_accountability"}
 NIC_LANE_CONTRACTS={"market_setup":"Chart-first conditional setup: evidence -> decision level -> confirmation -> invalidation; never force a trade call.","data_investigation":"Investigate one unusual relationship/anomaly using supplied evidence and explain the practical reader takeaway.","news_impact":"Use one fresh verified event, explain the supplied market mechanism, then identify what observable response would validate the interpretation.","asset_comparison":"Compare only evidence-supported assets; explain a concrete trade-off or relative-strength difference without inventing the second asset.","contrarian_thesis":"Challenge the obvious interpretation with supplied contrary evidence and define exactly what would falsify the thesis.","outcome_accountability":"Follow a prior thesis only when fresh evidence exists; state what changed, what held, and the next measurable test.","weekly_synthesis":"Synthesize verified observations from the week, separate knowns from unknowns, and define one next test."}
@@ -81,6 +82,12 @@ def run_nic19_guard():
     return guard
 
 def main():
+    dna_run=subprocess.run([sys.executable,str(ROOT/"src/nic_winning_post_dna.py")],cwd=ROOT,text=True,capture_output=True)
+    if dna_run.returncode!=0:
+        print(dna_run.stdout); print(dna_run.stderr)
+        raise RuntimeError("NIC Winning-Post DNA failed; refusing stale editorial contract")
+    try: winning_dna=json.loads(WINNING_DNA.read_text(encoding="utf-8"))
+    except Exception as exc: raise RuntimeError(f"NIC Winning-Post DNA output unavailable: {exc}") from exc
     refresh_thesis_bridge()
     recent=load_recent(); follow_ups=load_follow_ups(); counts=Counter(CATEGORY_MAP.get(category(x),"") for x in recent)
     try:
@@ -98,6 +105,7 @@ def main():
           "experiment_variable":os_contract.get("experiment_variable"),"experiment_treatment":os_contract.get("experiment_treatment"),
           "cycle_id":os_contract.get("cycle_id"),"recent_verified_publications":len(recent),"recent_treatment_counts":dict(counts),
           "thesis_follow_up":selected_follow_up,"thesis_follow_up_candidates":len(follow_ups),
+          "winning_post_dna":{"status":winning_dna.get("status"),"verified_revenue_post_count":winning_dna.get("verified_revenue_post_count"),"editorial_contract":winning_dna.get("editorial_contract")},
           "principles":{"asset_selection_unchanged":True,"evidence_unchanged":True,"signal_first_unchanged":True,"quality_gates_authoritative":True,
                         "no_private_chain_of_thought":True,"world_news_requires_fresh_verified_source":True,"one_story_per_post":True,
                         "thesis_follow_up_requires_fresh_evidence":True,"nic_os_lane_is_editorial_only":True,
