@@ -62,6 +62,7 @@ jobs:
           set -euo pipefail
           python -m compileall -q src
           python tests/test_publishing_pause.py
+          python tests/test_nic24_2_evidence_content_integrity_gate.py
           python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py src/nic22_4_adaptive_confirmation.py src/nic22_5_publication_eligibility.py src/nic23_5_counterfactual_challenge.py src/nic23_6_decision_calibration.py
           python tests/test_nic22_opportunity_diversity_engine.py
           python tests/test_nic22_2_early_opportunity_engine.py
@@ -393,16 +394,16 @@ jobs:
           python src/validate_trade_visual_contract.py
           python src/pipeline_stage.py visual success 'Visual package rendered and validated'
 
-      - name: NIC 24.2 Evidence-to-Content Integrity — shadow verification
+      - name: NIC 24.2 Evidence-to-Content Integrity — authoritative publication gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-          NIC24_2_ENFORCE: 'false'
+          NIC24_2_ENFORCE: 'true'
         run: |
+          set -euo pipefail
           python src/nic24_2_evidence_content_integrity_gate.py
           python -m json.tool data/live/nic24_2_evidence_content_integrity.json >/dev/null
-          echo "NIC 24.2 shadow result:"
-          python -c 'import json; x=json.load(open("data/live/nic24_2_evidence_content_integrity.json")); print("passed=",x.get("passed"),"failures=",x.get("failures"),"warnings=",x.get("warnings"))'
+          python -c 'import json,sys; x=json.load(open("data/live/nic24_2_evidence_content_integrity.json")); print("NIC 24.2 authoritative result: passed=",x.get("passed"),"failures=",x.get("failures"),"warnings=",x.get("warnings")); sys.exit(0 if x.get("passed") is True and x.get("publish") is True else 24)'
 
       - name: Final production gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
