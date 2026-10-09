@@ -65,6 +65,7 @@ def build(ctx):
     obs="$"+price(last) if last else "the latest verified price"
     voltext=f"{vol/1e6:.1f}M USDT" if vol>=1e6 else (f"{vol/1e3:.0f}K USDT" if vol>=1e3 else "the available quote-volume snapshot")
     seed=int(hashlib.sha256((s+cat+str(director.get("narrative_engine"))).encode()).hexdigest()[:8],16)%4
+    story_type=str(director.get("story_type") or sel.get("story_type") or director.get("narrative_engine") or "research_edge").strip().lower().replace(" ","_")
     if cat in {"breaking_news","news","news_and_macro","macro"}:
         articles=[x for x in news.get("articles") or [] if isinstance(x,dict)]
         a=next((x for x in articles if s in [sym(z) for z in (x.get("symbols") or [])]),None)
