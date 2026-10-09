@@ -55,6 +55,40 @@ def early_score(x):
     if 1.0 <= dist <= 5.0: s += 7
     return round(max(0, min(100, s)), 2)
 
+def attach_forecast_evidence(candidate):
+    """Attach calibrated forecast evidence as a bounded ranking hint, never an eligibility override."""
+    out=dict(candidate)
+    move=num(out.get("price_change_percent"))
+    relative=num(out.get("relative_strength_24h"))
+    # Direction is considered only when both observed 24h move and relative strength agree.
+    # Otherwise the candidate remains direction-neutral for forecast ranking.
+    side = "LONG" if move > 0 and relative > 0 else ("SHORT" if move < 0 and relative < 0 else "")
+    evidence={"symbol":str(out.get("symbol") or out.get("topic") or "").upper(),
+              "side":side,"decision":"WAIT","evidence_score":0.0,
+              "calibrated_probability":0.5,"probability_trusted":False,
+              "advisory_only":True,"publish_gate_unchanged":True}
+    if side:
+        try:
+            import sys
+            src=str(Path(__file__).resolve().parent)
+            if src not in sys.path: sys.path.insert(0,src)
+            from nic_forecast_evidence_adapter import evidence as get_evidence
+            evidence=get_evidence(out.get("symbol") or out.get("topic"),side)
+        except Exception as exc:
+            evidence={**evidence,"adapter_error":type(exc).__name__}
+    policy=evidence.get("decision_policy") if isinstance(evidence.get("decision_policy"),dict) else {}
+    expected="LONG_CANDIDATE" if side=="LONG" else ("SHORT_CANDIDATE" if side=="SHORT" else "")
+    trusted=(bool(side) and bool(evidence.get("probability_trusted"))
+             and str(policy.get("decision") or "").upper()==expected
+             and bool(evidence.get("publish_gate_unchanged",True)))
+    # Tiny capped bonus only when the historical evidence adapter independently
+    # trusts the probability and agrees with observed direction. Never filters candidates.
+    bonus=round(min(5.0,max(0.0,num(evidence.get("evidence_score"))/2.0)),2) if trusted else 0.0
+    out["forecast_evidence"]={**evidence,"ranking_bonus":bonus,"trusted_directional_alignment":trusted,
+                              "advisory_only":True,"eligibility_gate_unchanged":True}
+    out["adjusted_score"]=round(min(100.0,num(out.get("adjusted_score",out.get("raw_score",0)))+bonus),2)
+    return out
+
 def main():
     flow=load(FLOW,{})
     raw=flow.get("early_movers") if isinstance(flow.get("early_movers"),list) else []
@@ -89,6 +123,7 @@ def main():
             "confirmation_required":True,
             "editorial_instruction":"Treat this as an early setup candidate, not a pump prediction. Explain observed evidence, confirmation trigger, invalidation and uncertainty."
         })
+    candidates=[attach_forecast_evidence(c) for c in candidates]
     candidates.sort(key=lambda x:(x["adjusted_score"], -abs(num(x["price_change_percent"]))), reverse=True)
     candidates=candidates[:MAX_CANDIDATES]
 
