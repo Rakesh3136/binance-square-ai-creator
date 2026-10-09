@@ -92,6 +92,11 @@ def preflight():
     missing=[f"{n}:{p}" for n,p in required if not p.exists()]
     if missing: raise RuntimeError("publisher preflight missing: "+", ".join(missing))
 def main():
+    # Safety pause: do not publish automatically until NIC editorial, timing, and visual-truth gates are re-verified.
+    # Publishing can be re-enabled deliberately with PUBLISHING_ENABLED=true after explicit review.
+    if os.getenv("PUBLISHING_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
+        write_result({"status":"PUBLISHING_PAUSED","message":"Automatic Binance Square publishing is disabled pending NIC content, early-entry, and chart-truth remediation.","checked_at":now(),"endpoint":ENDPOINT,"post_id":None,"link":None,"publication_proof":"none","current_run_publication":"NO_NEW_PUBLICATION"})
+        return 0
     key=(os.getenv("BINANCE_SQUARE_OPENAPI_KEY") or os.getenv("BINANCE_SQUARE_API_KEY") or "").strip()
     if not key: return fail("BINANCE_SQUARE_OPENAPI_KEY/BINANCE_SQUARE_API_KEY is not configured","PUBLISHER_NOT_CONFIGURED")
     try:
