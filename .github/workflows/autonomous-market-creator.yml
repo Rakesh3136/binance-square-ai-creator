@@ -63,6 +63,8 @@ jobs:
           python -m compileall -q src
           python tests/test_publishing_pause.py
           python tests/test_nic24_2_evidence_content_integrity_gate.py
+          python tests/test_nic24_3_early_entry_gate.py
+          python -m py_compile src/nic24_3_early_entry_gate.py
           python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py src/nic22_4_adaptive_confirmation.py src/nic22_5_publication_eligibility.py src/nic23_5_counterfactual_challenge.py src/nic23_6_decision_calibration.py
           python tests/test_nic22_opportunity_diversity_engine.py
           python tests/test_nic22_2_early_opportunity_engine.py
@@ -393,6 +395,15 @@ jobs:
           python src/validate_tradingview_visual.py data/live/visual.png
           python src/validate_trade_visual_contract.py
           python src/pipeline_stage.py visual success 'Visual package rendered and validated'
+
+      - name: NIC 24.3 Early-entry and post-extension gate
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          set -euo pipefail
+          python src/nic24_3_early_entry_gate.py
+          python -m json.tool data/live/nic24_3_early_entry_gate.json >/dev/null
 
       - name: NIC 24.2 Evidence-to-Content Integrity — authoritative publication gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
