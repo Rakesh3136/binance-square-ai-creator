@@ -1,16 +1,16 @@
 {
   "schema": "NIC-FORECAST-CALIBRATION-2.0",
-  "generated_at": "2026-10-08T18:25:11.153505+00:00",
+  "generated_at": "2026-10-09T02:56:23.649424+00:00",
   "minimum_events": 30,
   "cells": {
     "BULLISH|RANGE|6h": {
       "side": "BULLISH",
       "regime": "RANGE",
       "horizon_hours": 6,
-      "samples": 185,
-      "wins": 30,
-      "raw_rate": 0.1622,
-      "calibrated_probability": 0.1658,
+      "samples": 195,
+      "wins": 40,
+      "raw_rate": 0.2051,
+      "calibrated_probability": 0.2081,
       "confidence": 1.0,
       "trusted": true
     },
@@ -40,10 +40,10 @@
       "side": "BEARISH",
       "regime": "RANGE",
       "horizon_hours": 6,
-      "samples": 185,
+      "samples": 195,
       "wins": 155,
-      "raw_rate": 0.8378,
-      "calibrated_probability": 0.8342,
+      "raw_rate": 0.7949,
+      "calibrated_probability": 0.7919,
       "confidence": 1.0,
       "trusted": true
     },
@@ -139,11 +139,11 @@
       "side": "BULLISH",
       "regime": "HIGH_FLOW",
       "horizon_hours": 6,
-      "samples": 15,
-      "wins": 0,
-      "raw_rate": 0.0,
-      "calibrated_probability": 0.2794,
-      "confidence": 0.5,
+      "samples": 20,
+      "wins": 5,
+      "raw_rate": 0.25,
+      "calibrated_probability": 0.3485,
+      "confidence": 0.6667,
       "trusted": false
     },
     "BULLISH|HIGH_FLOW|12h": {
@@ -172,11 +172,11 @@
       "side": "BEARISH",
       "regime": "HIGH_FLOW",
       "horizon_hours": 6,
-      "samples": 15,
+      "samples": 20,
       "wins": 15,
-      "raw_rate": 1.0,
-      "calibrated_probability": 0.7206,
-      "confidence": 0.5,
+      "raw_rate": 0.75,
+      "calibrated_probability": 0.6515,
+      "confidence": 0.6667,
       "trusted": false
     },
     "BEARISH|HIGH_FLOW|12h": {
@@ -205,10 +205,10 @@
       "side": "BULLISH",
       "regime": "TREND_DOWN",
       "horizon_hours": 6,
-      "samples": 70,
-      "wins": 15,
-      "raw_rate": 0.2143,
-      "calibrated_probability": 0.2222,
+      "samples": 105,
+      "wins": 50,
+      "raw_rate": 0.4762,
+      "calibrated_probability": 0.4766,
       "confidence": 1.0,
       "trusted": true
     },
@@ -238,10 +238,10 @@
       "side": "BEARISH",
       "regime": "TREND_DOWN",
       "horizon_hours": 6,
-      "samples": 70,
+      "samples": 105,
       "wins": 55,
-      "raw_rate": 0.7857,
-      "calibrated_probability": 0.7778,
+      "raw_rate": 0.5238,
+      "calibrated_probability": 0.5234,
       "confidence": 1.0,
       "trusted": true
     },
@@ -266,14 +266,67 @@
       "calibrated_probability": 0.7778,
       "confidence": 1.0,
       "trusted": true
+    },
+    "BULLISH|TREND_DOWN_EXTENDED|6h": {
+      "side": "BULLISH",
+      "regime": "TREND_DOWN_EXTENDED",
+      "horizon_hours": 6,
+      "samples": 10,
+      "wins": 10,
+      "raw_rate": 1.0,
+      "calibrated_probability": 0.6389,
+      "confidence": 0.3333,
+      "trusted": false
+    },
+    "BEARISH|TREND_DOWN_EXTENDED|6h": {
+      "side": "BEARISH",
+      "regime": "TREND_DOWN_EXTENDED",
+      "horizon_hours": 6,
+      "samples": 10,
+      "wins": 0,
+      "raw_rate": 0.0,
+      "calibrated_probability": 0.3611,
+      "confidence": 0.3333,
+      "trusted": false
     }
   },
   "global_metrics": {
-    "samples": 0,
-    "brier_score": null,
-    "log_loss": null,
-    "coverage": 0.0
+    "samples": 120,
+    "brier_score": 0.219486,
+    "log_loss": 0.629776,
+    "coverage": 0.0526
   },
-  "reliability_bins": {},
+  "reliability_bins": {
+    "6": {
+      "samples": 25,
+      "mean_predicted": 0.6325,
+      "observed_rate": 0.6
+    },
+    "3": {
+      "samples": 20,
+      "mean_predicted": 0.3531,
+      "observed_rate": 0.5
+    },
+    "5": {
+      "samples": 35,
+      "mean_predicted": 0.5286,
+      "observed_rate": 0.7143
+    },
+    "4": {
+      "samples": 30,
+      "mean_predicted": 0.425,
+      "observed_rate": 0.1667
+    },
+    "7": {
+      "samples": 5,
+      "mean_predicted": 0.7,
+      "observed_rate": 1.0
+    },
+    "2": {
+      "samples": 5,
+      "mean_predicted": 0.2625,
+      "observed_rate": 0.0
+    }
+  },
   "policy": "Probabilities are evaluated chronologically on resolved outcomes. Brier score and log loss measure probabilistic quality; small samples are shrunk toward 50% and are never trusted."
 }

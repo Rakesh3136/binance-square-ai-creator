@@ -1,62 +1,106 @@
 {
   "schema": "NIC-FORECAST-CHAMPION-1.0",
-  "generated_at": "2026-10-08T18:25:11.352125+00:00",
-  "resolved_samples": 0,
+  "generated_at": "2026-10-09T02:56:23.856435+00:00",
+  "resolved_samples": 120,
   "selection": {
-    "state": "NO_CHAMPION",
-    "champion": null,
+    "state": "CHAMPION",
+    "champion": "BASELINE_RAW",
+    "minimum_samples": 30,
+    "promotion_rule": {
+      "min_brier_improvement": 0.005,
+      "min_log_loss_improvement": 0.01,
+      "recent_non_regression": true
+    },
     "overall": {
       "BASELINE_RAW": {
-        "samples": 0,
-        "brier": null,
-        "log_loss": null,
-        "coverage": 0.0
+        "samples": 120,
+        "brier": 0.219486,
+        "log_loss": 0.629776,
+        "coverage": 1.0
       },
       "CONSERVATIVE": {
-        "samples": 0,
-        "brier": null,
-        "log_loss": null,
-        "coverage": 0.0
+        "samples": 120,
+        "brier": 0.224535,
+        "log_loss": 0.641098,
+        "coverage": 1.0
       },
       "CALIBRATED_SHRINK": {
-        "samples": 0,
-        "brier": null,
-        "log_loss": null,
-        "coverage": 0.0
+        "samples": 120,
+        "brier": 0.22839,
+        "log_loss": 0.649313,
+        "coverage": 1.0
       },
       "CONFIDENT": {
-        "samples": 0,
-        "brier": null,
-        "log_loss": null,
-        "coverage": 0.0
+        "samples": 120,
+        "brier": 0.217282,
+        "log_loss": 0.624421,
+        "coverage": 1.0
       }
     },
     "recent": {
       "BASELINE_RAW": {
-        "samples": 0,
-        "brier": null,
-        "log_loss": null,
-        "coverage": 0.0
+        "samples": 30,
+        "brier": 0.226927,
+        "log_loss": 0.646591,
+        "coverage": 1.0
       },
       "CONSERVATIVE": {
-        "samples": 0,
-        "brier": null,
-        "log_loss": null,
-        "coverage": 0.0
+        "samples": 30,
+        "brier": 0.232334,
+        "log_loss": 0.657637,
+        "coverage": 1.0
       },
       "CALIBRATED_SHRINK": {
-        "samples": 0,
-        "brier": null,
-        "log_loss": null,
-        "coverage": 0.0
+        "samples": 30,
+        "brier": 0.235694,
+        "log_loss": 0.664441,
+        "coverage": 1.0
       },
       "CONFIDENT": {
-        "samples": 0,
-        "brier": null,
-        "log_loss": null,
-        "coverage": 0.0
+        "samples": 30,
+        "brier": 0.223799,
+        "log_loss": 0.640132,
+        "coverage": 1.0
       }
-    }
+    },
+    "challengers": [
+      {
+        "name": "BASELINE_RAW",
+        "brier": 0.219486,
+        "log_loss": 0.629776,
+        "samples": 120,
+        "recent_brier": 0.226927,
+        "recent_log_loss": 0.646591,
+        "state": "CHAMPION"
+      },
+      {
+        "name": "CONSERVATIVE",
+        "brier": 0.224535,
+        "log_loss": 0.641098,
+        "samples": 120,
+        "recent_brier": 0.232334,
+        "recent_log_loss": 0.657637,
+        "state": "CHALLENGER"
+      },
+      {
+        "name": "CALIBRATED_SHRINK",
+        "brier": 0.22839,
+        "log_loss": 0.649313,
+        "samples": 120,
+        "recent_brier": 0.235694,
+        "recent_log_loss": 0.664441,
+        "state": "CHALLENGER"
+      },
+      {
+        "name": "CONFIDENT",
+        "brier": 0.217282,
+        "log_loss": 0.624421,
+        "samples": 120,
+        "recent_brier": 0.223799,
+        "recent_log_loss": 0.640132,
+        "state": "CHALLENGER"
+      }
+    ]
   },
   "policy": "Champion promotion is walk-forward and out-of-sample only. A challenger must materially improve Brier and log-loss versus the raw baseline and show no recent regression. This artifact is advisory and cannot bypass timing, diversity, cooldown, risk, visual truth, or publication gates."
 }

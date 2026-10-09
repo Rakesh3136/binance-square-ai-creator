@@ -1,8 +1,129 @@
 {
   "schema": "NIC-FORECAST-GOVERNANCE-1.0",
-  "generated_at": "2026-10-08T18:25:11.217998+00:00",
+  "generated_at": "2026-10-09T02:56:23.719719+00:00",
   "minimum_events": 30,
   "rolling_window": 30,
-  "cells": {},
+  "cells": {
+    "BULLISH|TREND_DOWN|6h": {
+      "side": "BULLISH",
+      "regime": "TREND_DOWN",
+      "horizon_hours": 6,
+      "samples": 35,
+      "state": "DEGRADED",
+      "trust_multiplier": 0.65,
+      "recent_metrics": {
+        "samples": 30,
+        "brier_score": 0.23013,
+        "log_loss": 0.6495
+      },
+      "recovery_required": false,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|TREND_DOWN|6h": {
+      "side": "BEARISH",
+      "regime": "TREND_DOWN",
+      "horizon_hours": 6,
+      "samples": 35,
+      "state": "DEGRADED",
+      "trust_multiplier": 0.65,
+      "recent_metrics": {
+        "samples": 30,
+        "brier_score": 0.20776,
+        "log_loss": 0.601947
+      },
+      "recovery_required": false,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|TREND_DOWN_EXTENDED|6h": {
+      "side": "BULLISH",
+      "regime": "TREND_DOWN_EXTENDED",
+      "horizon_hours": 6,
+      "samples": 10,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 10,
+        "brier_score": 0.209141,
+        "log_loss": 0.61092
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|TREND_DOWN_EXTENDED|6h": {
+      "side": "BEARISH",
+      "regime": "TREND_DOWN_EXTENDED",
+      "horizon_hours": 6,
+      "samples": 10,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 10,
+        "brier_score": 0.186953,
+        "log_loss": 0.565826
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|HIGH_FLOW|6h": {
+      "side": "BULLISH",
+      "regime": "HIGH_FLOW",
+      "horizon_hours": 6,
+      "samples": 5,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 5,
+        "brier_score": 0.16,
+        "log_loss": 0.510826
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|HIGH_FLOW|6h": {
+      "side": "BEARISH",
+      "regime": "HIGH_FLOW",
+      "horizon_hours": 6,
+      "samples": 5,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 5,
+        "brier_score": 0.16,
+        "log_loss": 0.510826
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BULLISH|RANGE|6h": {
+      "side": "BULLISH",
+      "regime": "RANGE",
+      "horizon_hours": 6,
+      "samples": 10,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 10,
+        "brier_score": 0.306953,
+        "log_loss": 0.812593
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    },
+    "BEARISH|RANGE|6h": {
+      "side": "BEARISH",
+      "regime": "RANGE",
+      "horizon_hours": 6,
+      "samples": 10,
+      "state": "RECOVERY",
+      "trust_multiplier": 0.5,
+      "recent_metrics": {
+        "samples": 10,
+        "brier_score": 0.306953,
+        "log_loss": 0.812593
+      },
+      "recovery_required": true,
+      "source_calibration_schema": "NIC-FORECAST-CALIBRATION-2.0"
+    }
+  },
   "policy": "Governance may downgrade forecast evidence when recent probabilistic quality degrades. SUSPENDED means no forecast trust multiplier. Recovery requires fresh resolved evidence; governance never overrides timing, diversity, cooldown, risk, visual truth, or publication gates."
 }
