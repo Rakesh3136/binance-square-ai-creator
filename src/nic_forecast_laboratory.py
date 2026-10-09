@@ -103,14 +103,27 @@ def read_jsonl(path):
         except: pass
     return out
 def build_learning():
-    rows=read_jsonl(LEDGER); now=datetime.now(timezone.utc)
-    resolved=[r for r in rows if r.get("resolved") and int(r.get("horizon_hours") or 0) in H]
-    base={}
-    groups={}
+    # Prediction snapshots are immutable; outcome events live in a separate append-only ledger.
+    snapshots=read_jsonl(LEDGER)
+    outcomes=read_jsonl(INT/"nic_forecast_outcome_events.jsonl")
+    resolved_ids={str(r.get("forecast_id")):r for r in outcomes if r.get("event_type")=="FORECAST_RESOLVED" and r.get("forecast_id")}
+    legacy={str(r.get("forecast_id")):r for r in snapshots if r.get("resolved") and r.get("forecast_id")}
+    joined=[]
+    for snap in snapshots:
+        fid=str(snap.get("forecast_id") or "")
+        outcome=resolved_ids.get(fid) or legacy.get(fid)
+        if not outcome: continue
+        row=dict(snap)
+        row["resolved"]=True
+        row["signed_return"]=n(outcome.get("signed_return",snap.get("signed_return")))
+        joined.append(row)
+    now=datetime.now(timezone.utc)
+    resolved=[r for r in joined if int(r.get("horizon_hours") or 0) in H]
+    base={}; groups={}
     for r in resolved:
         side=str(r.get("side") or "").upper(); reg=str(r.get("regime") or "UNKNOWN"); h=int(r.get("horizon_hours") or 0)
         signed=n(r.get("signed_return")); bk=(side,reg,h); base.setdefault(bk,[]).append(signed)
-        k=(side,str(r.get("feature") or ""),reg,h); g=groups.setdefault(k,{"returns":[]}); g["returns"].append(signed)
+        k=(side,str(r.get("feature") or ""),reg,h); groups.setdefault(k,{"returns":[]}); groups[k]["returns"].append(signed)
     matrix={}
     for (side,feature,reg,h),g in groups.items():
         vals=g["returns"]; base_vals=base.get((side,reg,h),[])
@@ -121,14 +134,14 @@ def build_learning():
         lift=rate-base_rate; recent_lift=recent_rate-base_rate
         key=f"{side}|{feature}|{reg}|{h}h"
         matrix[key]={"side":side,"feature":feature,"regime":reg,"horizon_hours":h,
-                     "samples":len(vals),"base_samples":len(base_vals),
-                     "hit_rate":round(rate,4),"base_hit_rate":round(base_rate,4),
-                     "lift":round(lift,4),"recent_lift":round(recent_lift,4),
-                     "mean_signed_return":round(sum(vals)/len(vals),4) if vals else None,
-                     "trusted":len(vals)>=MIN and lift>.05 and recent_lift>=0}
-    MATRIX.write_text(json.dumps({"schema":"NIC-SIGNAL-PREDICTIVITY-2.0","generated_at":now.isoformat(),
+            "samples":len(vals),"base_samples":len(base_vals),"hit_rate":round(rate,4),
+            "base_hit_rate":round(base_rate,4),"lift":round(lift,4),"recent_lift":round(recent_lift,4),
+            "mean_signed_return":round(sum(vals)/len(vals),4) if vals else None,
+            "trusted":len(vals)>=MIN and lift>.05 and recent_lift>=0}
+    MATRIX.write_text(json.dumps({"schema":"NIC-SIGNAL-PREDICTIVITY-3.0","generated_at":now.isoformat(),
         "minimum_events":MIN,"minimum_lift":0.05,"matrix":matrix,
-        "policy":"Trust only sufficiently sampled edge with positive lift versus same-side/regime/horizon base rate and no recent edge collapse."},indent=2))
+        "resolved_event_count":len(resolved_ids),"legacy_resolved_snapshot_count":len(legacy),
+        "policy":"Only terminal outcome events joined to immutable forecast snapshots may contribute to learning; trust requires >=30 observations, >5pp lift, and no recent collapse."},indent=2))
     return matrix
 
 def main():
