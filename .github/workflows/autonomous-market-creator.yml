@@ -64,7 +64,8 @@ jobs:
           python tests/test_publishing_pause.py
           python tests/test_nic24_2_evidence_content_integrity_gate.py
           python tests/test_nic24_3_early_entry_gate.py
-          python -m py_compile src/nic24_3_early_entry_gate.py
+          python -m py_compile src/nic24_3_early_entry_gate.py src/nic22_3_publication_alignment_gate.py
+          python tests/test_nic22_3_publication_alignment_gate.py
           python -m py_compile src/nic22_opportunity_diversity_engine.py src/nic21_2_hook_preflight.py src/nic22_2_early_opportunity_engine.py src/nic22_3_early_confirmation_engine.py src/nic22_4_adaptive_confirmation.py src/nic22_5_publication_eligibility.py src/nic23_5_counterfactual_challenge.py src/nic23_6_decision_calibration.py
           python tests/test_nic22_opportunity_diversity_engine.py
           python tests/test_nic22_2_early_opportunity_engine.py
@@ -404,6 +405,17 @@ jobs:
         run: |
           set -uo pipefail
           set +e
+          python src/nic22_3_publication_alignment_gate.py
+          alignment_rc=$?
+          if [ "$alignment_rc" -eq 24 ]; then
+            echo "NIC 22.3 alignment guard made a valid no-publication decision."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$alignment_rc" -ne 0 ]; then
+            echo "NIC 22.3 alignment guard execution/validation error (exit=$alignment_rc)." >&2
+            exit "$alignment_rc"
+          fi
           python src/nic24_3_early_entry_gate.py
           gate_rc=$?
           set -e
