@@ -102,6 +102,7 @@ jobs:
           from datetime import datetime, timezone
           from pathlib import Path
           now = datetime.now(timezone.utc)
+          failures = []
           checks = [
               ("data/live/market_snapshot.json", ("generated_at", "timestamp", "updated_at")),
           ]
@@ -113,7 +114,6 @@ jobs:
                       checks.append(("data/live/visual_decision.json", ("generated_at", "timestamp", "updated_at")))
               except Exception as exc:
                   failures.append(f"data/live/visual_decision.json: invalid ({exc})")
-          failures = []
           for filename, keys in checks:
               path = Path(filename)
               if not path.is_file():
