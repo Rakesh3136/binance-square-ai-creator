@@ -1,0 +1,136 @@
+name: NIC Human Review Approval Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      pending_run_id:
+        description: GitHub Actions run ID that produced the pending-review artifact
+        required: true
+        type: string
+      draft_sha256:
+        description: Exact draft SHA-256 from nic_pending_human_review.json
+        required: true
+        type: string
+      human_thesis:
+        description: Your own substantive thesis (at least 30 characters)
+        required: true
+        type: string
+      original_insight:
+        description: Specific original insight you personally added (at least 30 characters)
+        required: true
+        type: string
+      evidence_reviewed:
+        description: Identify the evidence you actually checked (at least 20 characters)
+        required: true
+        type: string
+      approved_for_publication:
+        description: Explicitly approve this exact draft after reviewing it
+        required: true
+        type: boolean
+        default: false
+      author_attestation:
+        description: Type the exact attestation phrase shown in the review brief
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  validate-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout review-handoff code
+        uses: actions/checkout@v4
+        with:
+          ref: nic/two-stage-human-review
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download pending draft artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.pending_run_id }}
+          name: nic-pending-human-review-${{ inputs.pending_run_id }}
+          path: .
+      - name: Record explicit human review
+        env:
+          DRAFT_SHA256: ${{ inputs.draft_sha256 }}
+          HUMAN_THESIS: ${{ inputs.human_thesis }}
+          ORIGINAL_INSIGHT: ${{ inputs.original_insight }}
+          EVIDENCE_REVIEWED: ${{ inputs.evidence_reviewed }}
+          APPROVED: ${{ inputs.approved_for_publication }}
+          AUTHOR_ATTESTATION: ${{ inputs.author_attestation }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path("data/live/nic_human_creator_input.json")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          value = {
+              "draft_sha256": os.environ["DRAFT_SHA256"].strip(),
+              "human_thesis": os.environ["HUMAN_THESIS"],
+              "original_insight": os.environ["ORIGINAL_INSIGHT"],
+              "evidence_reviewed": os.environ["EVIDENCE_REVIEWED"],
+              "approved_for_publication": os.environ["APPROVED"].lower() == "true",
+              "author_attestation": os.environ["AUTHOR_ATTESTATION"],
+          }
+          path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          PY
+      - name: Validate exact draft and human approval
+        id: approval
+        run: |
+          set -euo pipefail
+          DRAFT_PATH="$(python -c 'import json; print(json.load(open("data/live/nic_pending_human_review.json"))["draft_path"])')"
+          if [ ! -f "$DRAFT_PATH" ]; then
+            echo "Pending draft path is not present in the downloaded artifact; refusing approval." >&2
+            exit 24
+          fi
+          python src/nic_pending_human_review.py verify --draft-path "$DRAFT_PATH"
+          echo "Exact-draft human approval is valid. This step does not authorize publication."
+      - name: Require fresh market and chart evidence
+        run: |
+          python - <<'PY'
+          import json, sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+          now = datetime.now(timezone.utc)
+          checks = [
+              ("data/live/market_snapshot.json", ("generated_at", "timestamp", "updated_at")),
+              ("data/live/visual_metadata.json", ("generated_at", "timestamp", "updated_at")),
+          ]
+          failures = []
+          for filename, keys in checks:
+              path = Path(filename)
+              if not path.is_file():
+                  failures.append(f"{filename}: missing")
+                  continue
+              try:
+                  obj = json.loads(path.read_text(encoding="utf-8"))
+                  raw = next((obj.get(k) for k in keys if obj.get(k)), None)
+                  stamp = datetime.fromisoformat(str(raw).replace("Z", "+00:00")) if raw else None
+                  if stamp is None:
+                      raise ValueError("timestamp missing")
+                  if stamp.tzinfo is None:
+                      stamp = stamp.replace(tzinfo=timezone.utc)
+                  age = (now - stamp.astimezone(timezone.utc)).total_seconds()
+                  if age < 0 or age > 900:
+                      failures.append(f"{filename}: stale or future-dated ({age:.0f}s)")
+              except Exception as exc:
+                  failures.append(f"{filename}: invalid evidence timestamp ({exc})")
+          if failures:
+              print("BLOCKED: review is recorded, but evidence is not fresh enough to proceed.")
+              print("\n".join(failures))
+              sys.exit(24)
+          print("Market snapshot and chart metadata are fresh (<=15 minutes).")
+          PY
+      - name: Report safe validation outcome
+        if: success()
+        run: |
+          echo "APPROVAL_VALIDATED_REVALIDATION_REQUIRED"
+          echo "No post was published. The main production gates and publisher have not been invoked."
