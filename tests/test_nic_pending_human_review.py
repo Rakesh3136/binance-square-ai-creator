@@ -48,7 +48,7 @@ def test_external_draft_path_is_rejected():
 
 
 def test_changed_draft_invalidates_approval():
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=pending.ROOT) as tmp:
         path = Path(tmp) / "draft.json"
         write_draft(path)
         package = pending.prepare(path, Path(tmp) / "pending.json")
@@ -60,7 +60,7 @@ def test_changed_draft_invalidates_approval():
 
 
 def test_missing_human_approval_blocks():
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=pending.ROOT) as tmp:
         path = Path(tmp) / "draft.json"
         write_draft(path)
         package = pending.prepare(path, Path(tmp) / "pending.json")
