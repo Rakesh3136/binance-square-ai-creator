@@ -23,7 +23,7 @@ def test_resolution_emits_event_without_mutating_snapshot():
     snap={"forecast_id":"A|1","timestamp":(now-timedelta(hours=25)).isoformat(),"horizon_hours":24,
           "entry_price":100,"symbol":"TEST","side":"BULLISH","regime":"TREND_UP","feature":"trend_aligned"}
     before=dict(snap)
-    def fake_fetch(symbol,start,end): return [[end-3600000,0,0,0,101,0]]
+    def fake_fetch(symbol,start,end): return [[end-3600000,0,0,0,101,0,end-1]]
     new=resolver.resolve([snap],now=now,candle_fetcher=fake_fetch,existing_events=[])
     assert snap==before
     assert len(new)==1 and new[0]["event_type"]=="FORECAST_RESOLVED"
