@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "src/nic_human_creator_contribution_gate.py"
+      - "src/nic_pending_human_review.py"
+      - "tests/test_nic_pending_human_review.py"
       - "tests/test_nic_human_creator_contribution_gate.py"
       - ".github/workflows/autonomous-market-creator.yml"
       - ".github/workflows/nic-human-creator-collaboration-pr.yml"
@@ -23,5 +25,9 @@ jobs:
           python-version: "3.12"
       - name: Compile gate
         run: python -m py_compile src/nic_human_creator_contribution_gate.py
+      - name: Compile pending-review handoff
+        run: python -m py_compile src/nic_pending_human_review.py
       - name: Test human review and anti-stale-draft rules
-        run: python tests/test_nic_human_creator_contribution_gate.py
+        run: |
+          python tests/test_nic_human_creator_contribution_gate.py
+          python tests/test_nic_pending_human_review.py
