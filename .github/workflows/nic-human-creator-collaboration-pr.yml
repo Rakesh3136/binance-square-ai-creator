@@ -1,4 +1,5 @@
 name: NIC Human Creator Collaboration PR Checks
+# Includes static safety tests for the two-stage review/resume workflow.
 
 on:
   pull_request:
@@ -8,10 +9,10 @@ on:
       - "src/nic_pending_human_review.py"
       - "tests/test_nic_pending_human_review.py"
       - "tests/test_nic_review_resume_workflow.py"
-      - ".github/workflows/nic-human-review-approval-validation.yml"
       - "tests/test_nic_human_creator_contribution_gate.py"
       - ".github/workflows/autonomous-market-creator.yml"
       - ".github/workflows/nic-human-creator-collaboration-pr.yml"
+      - ".github/workflows/nic-human-review-approval-validation.yml"
 
 permissions:
   contents: read
@@ -25,7 +26,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate workflow YAML syntax
+        run: ruby -e 'require "yaml"; ARGV.each { |p| YAML.load_file(p); puts p + " valid" }' .github/workflows/autonomous-market-creator.yml .github/workflows/nic-human-review-approval-validation.yml
       - name: Compile gate
         run: python -m py_compile src/nic_human_creator_contribution_gate.py
+      - name: Compile pending-review handoff
+        run: python -m py_compile src/nic_pending_human_review.py
       - name: Test human review and anti-stale-draft rules
-        run: python tests/test_nic_human_creator_contribution_gate.py
+        run: |
+          python tests/test_nic_human_creator_contribution_gate.py
+          python tests/test_nic_pending_human_review.py
+          python tests/test_nic_review_resume_workflow.py
