@@ -49,7 +49,7 @@ def test_missing_human_approval_blocks():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "draft.json"
         write_draft(path)
-        package = pending.prepare(path)
+        package = pending.prepare(path, Path(tmp) / "pending.json")
         human = valid_input(package["draft_text"])
         human["approved_for_publication"] = False
         assert "explicit_approval_missing" in pending.verify_approval(package, human, path)
