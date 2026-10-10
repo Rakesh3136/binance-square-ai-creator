@@ -123,7 +123,7 @@ def test_malformed_jsonl_fails_closed():
     old_ledger = m.LEDGER
     try:
         m.LEDGER = ledger
-        ledger.write_text('{"forecast_id":"A"}\\n{broken json}\\n')
+        ledger.write_text('{"forecast_id":"A"}\n{broken json}\n')
         try:
             m.load_jsonl(ledger)
         except AssertionError as exc:
@@ -148,7 +148,7 @@ def test_failed_integrity_does_not_overwrite_last_calibration_report():
             m.EVENTS = intelligence / "nic_forecast_outcome_events.jsonl"
             m.OUT = intelligence / "nic_forecast_calibration.json"
             m.LEDGER.write_text("")
-            m.EVENTS.write_text(json.dumps({"event_type":"FORECAST_RESOLVED","forecast_id":"ORPHAN","signed_return":1}) + "\\n")
+            m.EVENTS.write_text(json.dumps({"event_type":"FORECAST_RESOLVED","forecast_id":"ORPHAN","signed_return":1}) + "\n")
             m.OUT.write_text('{"last_known_good":true}')
             try:
                 m.main()
