@@ -44,7 +44,7 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def prepare(draft_path: Path) -> dict:
+def prepare(draft_path: Path, pending_path: Path = PENDING) -> dict:
     report = read_json(draft_path)
     text = canonical_text(report)
     if not text:
