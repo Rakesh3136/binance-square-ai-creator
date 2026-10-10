@@ -162,6 +162,10 @@ def validate_artifact_integrity(snapshots, events, calibration, matrix):
     if len(terminal_id_list) != len(terminal_ids):
         raise AssertionError("Duplicate terminal outcome events for a forecast_id")
 
+    orphan_ids = sorted(terminal_ids - snapshot_ids)
+    if orphan_ids:
+        raise AssertionError(f"Terminal outcomes lack forecast snapshots: {len(orphan_ids)}")
+
     for event in terminal_rows:
         try:
             signed_return = float(event["signed_return"])
@@ -174,10 +178,6 @@ def validate_artifact_integrity(snapshots, events, calibration, matrix):
                 raise AssertionError("Terminal outcome hit label must be boolean")
             if event["hit"] != (signed_return > 0):
                 raise AssertionError("Terminal outcome hit label conflicts with signed_return")
-
-    orphan_ids = sorted(terminal_ids - snapshot_ids)
-    if orphan_ids:
-        raise AssertionError(f"Terminal outcomes lack forecast snapshots: {len(orphan_ids)}")
 
     resolved_rows = []
     seen = set()
