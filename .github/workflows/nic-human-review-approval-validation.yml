@@ -104,8 +104,15 @@ jobs:
           now = datetime.now(timezone.utc)
           checks = [
               ("data/live/market_snapshot.json", ("generated_at", "timestamp", "updated_at")),
-              ("data/live/visual_metadata.json", ("generated_at", "timestamp", "updated_at")),
           ]
+          decision_path = Path("data/live/visual_decision.json")
+          if decision_path.is_file():
+              try:
+                  decision = json.loads(decision_path.read_text(encoding="utf-8"))
+                  if decision.get("need_visual") is True:
+                      checks.append(("data/live/visual_decision.json", ("generated_at", "timestamp", "updated_at")))
+              except Exception as exc:
+                  failures.append(f"data/live/visual_decision.json: invalid ({exc})")
           failures = []
           for filename, keys in checks:
               path = Path(filename)
