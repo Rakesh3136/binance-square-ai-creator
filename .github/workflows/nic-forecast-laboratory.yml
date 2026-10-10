@@ -53,6 +53,37 @@ jobs:
           assert d["policy"]["neutral_wait_allowed"]
           print("Forecast Laboratory learning validation: PASS")
           PY
+      - name: Verify persisted learning artifacts agree
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("data/intelligence")
+          def jsonl(name):
+              p=root/name
+              if not p.exists(): return []
+              rows=[]
+              for line in p.read_text().splitlines():
+                  try: rows.append(json.loads(line))
+                  except json.JSONDecodeError: raise AssertionError(f"Invalid JSONL row in {name}")
+              return rows
+          snapshots=jsonl("nic_forecast_truth_ledger.jsonl")
+          events=jsonl("nic_forecast_outcome_events.jsonl")
+          terminal={str(x.get("forecast_id")) for x in events if x.get("event_type")=="FORECAST_RESOLVED" and x.get("forecast_id")}
+          legacy={str(x.get("forecast_id")) for x in snapshots if x.get("resolved") and x.get("forecast_id")}
+          calibration=json.loads((root/"nic_forecast_calibration.json").read_text())
+          matrix=json.loads((root/"nic_signal_predictivity_matrix.json").read_text())
+          scored=int(calibration.get("global_metrics",{}).get("samples") or 0)
+          resolved_ids=terminal | legacy
+          if scored and not resolved_ids:
+              raise AssertionError("Calibration scores exist but no resolved forecast IDs exist in either ledger")
+          if int(matrix.get("resolved_event_count") or 0) != len(terminal):
+              raise AssertionError("Signal matrix resolved-event count does not match terminal outcome ledger")
+          print(json.dumps({"snapshots":len(snapshots),"terminal_events":len(terminal),
+                            "resolved_ids":len(resolved_ids),"calibration_samples":scored,
+                            "matrix_resolved_event_count":matrix.get("resolved_event_count"),
+                            "persisted_learning_artifacts":"PASS"}))
+          PY
       - name: Commit evidence
         run: |
           git config user.name "github-actions[bot]"
