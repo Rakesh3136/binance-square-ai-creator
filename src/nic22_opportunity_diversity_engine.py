@@ -83,8 +83,8 @@ def apply_confirmation_policy(eligible, confirmation):
         return aligned, 'confirmed_symbol_authoritative' if aligned else 'confirmed_symbol_not_in_eligible_pool'
     safe=[]
     for score,candidate in eligible:
-        lane=str(candidate.get('category') or candidate.get('type') or '').strip().lower().replace(' ','_')
-        if lane not in TRADE_LANES:
+        lanes={str(candidate.get(key) or '').strip().lower().replace(' ','_') for key in ('category','type')}
+        if not (lanes & TRADE_LANES):
             safe.append((score,candidate))
     return safe, 'no_confirmed_trade_candidate; editorial_only' if safe else 'no_confirmed_candidate; trade_publication_blocked'
 
