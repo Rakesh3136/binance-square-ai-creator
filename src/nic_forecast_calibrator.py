@@ -20,8 +20,8 @@ def load_jsonl(path):
             row = json.loads(line)
             if isinstance(row, dict):
                 rows.append(row)
-        except (json.JSONDecodeError, TypeError):
-            continue
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise AssertionError(f"Invalid forecast ledger row in {path.name}") from exc
     return rows
 
 
@@ -206,9 +206,6 @@ def main():
         "resolved_event_samples": len(rows),
         "policy": "Calibration joins terminal outcome events to immutable snapshots by forecast_id; unresolved outcomes are excluded. Legacy resolved snapshots remain readable. Brier score and log loss measure probabilistic quality; small samples are shrunk toward 50% and are never trusted."
     }
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     matrix_path = ROOT / "data/intelligence/nic_signal_predictivity_matrix.json"
     matrix = {}
     if matrix_path.exists():
@@ -216,7 +213,11 @@ def main():
             matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
             raise AssertionError("Signal predictivity matrix is unreadable") from exc
+    # Validate before replacing the last known report. A failed check must not
+    # leave a newly written calibration artifact that looks authoritative.
     integrity = validate_artifact_integrity(load_jsonl(LEDGER), load_jsonl(EVENTS), payload, matrix)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(json.dumps({"artifact_integrity": "PASS", **integrity}))
     return payload
 
