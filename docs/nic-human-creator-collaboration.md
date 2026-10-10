@@ -29,6 +29,10 @@ The file `data/live/nic_human_creator_input.json` must be prepared by a human re
 
 These fields must reflect genuine review; do not invent personal trading history, results or experience.
 
+## Pending-draft preservation added
+
+When the human contribution gate blocks, the workflow now creates `data/live/nic_pending_human_review.json` and uploads a seven-day artifact containing the exact draft, its text/file SHA-256 hashes, review brief, and available market/chart context. The package verifier rejects a changed draft, mismatched approval hash, missing approval, or incomplete human contribution. This makes the blocked draft recoverable instead of leaving only a gate result in the run log.
+
 ## Important deployment limitation
 
-This is a strict gate, not a complete pause-and-resume publishing workflow. When human input is missing or stale, it produces a valid BLOCKED decision. Before enabling this as the default production requirement, NIC needs a two-stage workflow that preserves the exact pending draft, lets a human review it after generation, and resumes publication only for that same approved draft while revalidating market/chart freshness. Do not bypass the gate just to increase post volume.
+This is still not a complete pause-and-resume publisher. The pending artifact preserves the draft and review context, but the manual resume workflow must still retrieve that artifact, validate the human approval, rerun every applicable market/chart/editorial/publication gate, and publish only if the approved text remains byte-for-byte unchanged. The current implementation does not claim that a reviewed artifact can publish, and no production publishing behavior is enabled by this branch. Do not bypass the gate just to increase post volume.
