@@ -28,7 +28,7 @@ The ETH short (entry 2,581; stop 2,596.5) and QNT long-term idea (entry mentione
 Run tests with:
 
 ```bash
-python tests/test_trade_outcome_journal.py
+PYTHONPATH=. python tests/test_trade_outcome_journal.py
 ```
 
 **Integration status:** this module is deliberately isolated until the authoritative counterfactual gate and the production workflow's existing evaluation hooks are confirmed. It must not be treated as active production learning merely because the module exists.
