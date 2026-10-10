@@ -171,7 +171,12 @@ def main():
         time.sleep(.05)
     # Deduplicate immutable forecast IDs; the ledger becomes the audit trail.
     existing={r.get("forecast_id") for r in read_jsonl(LEDGER)}
-    append_jsonl(LEDGER,[x for x in new if x["forecast_id"] not in existing])
+    fresh=[];seen_new=set()
+    for row in new:
+        fid=row["forecast_id"]
+        if fid not in existing and fid not in seen_new:
+            fresh.append(row);seen_new.add(fid)
+    append_jsonl(LEDGER,fresh)
     matrix=build_learning()
     data={"schema":"NIC-FORECAST-LAB-2.0","generated_at":datetime.now(timezone.utc).isoformat(),"results":res,"failures":fails,
           "learning":{"truth_ledger":str(LEDGER.relative_to(ROOT)),"signal_matrix":str(MATRIX.relative_to(ROOT)),"regime_history":str(REGH.relative_to(ROOT)),"walk_forward_validation":True,"persistent_outcome_resolution":True},
@@ -179,7 +184,7 @@ def main():
     OUT.write_text(json.dumps(data,indent=2))
     claims=sum(1 for x in res if x.get("status")=="READY" for h in x["hypotheses"].values() for a in h["forward"]["predictivity"]["audits"] if a["predictive"])
     ready_count=sum(x.get("status")=="READY" for x in res)
-    appended_count=sum(1 for x in new if x["forecast_id"] not in existing)
+    appended_count=len(fresh)
     status="READY" if ready_count>0 and appended_count>0 else "BLOCKED"
     data["status"]=status
     data["block_reason"]=None if status=="READY" else "No fresh auditable forecast snapshots were produced; stale calibration must not be treated as current evidence."
