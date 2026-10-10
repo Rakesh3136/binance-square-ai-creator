@@ -134,7 +134,7 @@ def main() -> int:
     failures = verify_approval(package, human, path)
     print(json.dumps({"status": "APPROVAL_VALIDATION_PASS" if not failures else "BLOCKED", "failures": failures, "publication_authorized": False}, indent=2))
     # Verification is not publication; orchestration must still rerun live gates.
-    return 0
+    return 0 if not failures else 24
 
 
 if __name__ == "__main__":
