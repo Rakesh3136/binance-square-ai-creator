@@ -144,6 +144,16 @@ def build_learning():
         "policy":"Only terminal outcome events joined to immutable forecast snapshots may contribute to learning; trust requires >=30 observations, >5pp lift, and no recent collapse."},indent=2))
     return matrix
 
+def require_forecast_evidence(candidate_count, ready_count, appended_count):
+    """Fail closed when this cycle cannot create fresh, auditable forecast snapshots."""
+    if candidate_count <= 0:
+        raise RuntimeError("Forecast Laboratory blocked: prediction engine supplied zero candidates")
+    if ready_count <= 0:
+        raise RuntimeError("Forecast Laboratory blocked: no candidate passed market-data/hypothesis validation")
+    if appended_count <= 0:
+        raise RuntimeError("Forecast Laboratory blocked: no fresh immutable forecast snapshots were appended")
+
+
 def main():
     INT.mkdir(parents=True,exist_ok=True);cs=load(PRED).get("candidates") or [];res=[];fails=[];new=[]
     for c in cs[:12]:
@@ -161,13 +171,25 @@ def main():
         time.sleep(.05)
     # Deduplicate immutable forecast IDs; the ledger becomes the audit trail.
     existing={r.get("forecast_id") for r in read_jsonl(LEDGER)}
-    append_jsonl(LEDGER,[x for x in new if x["forecast_id"] not in existing])
+    fresh=[];seen_new=set()
+    for row in new:
+        fid=row["forecast_id"]
+        if fid not in existing and fid not in seen_new:
+            fresh.append(row);seen_new.add(fid)
+    append_jsonl(LEDGER,fresh)
     matrix=build_learning()
     data={"schema":"NIC-FORECAST-LAB-2.0","generated_at":datetime.now(timezone.utc).isoformat(),"results":res,"failures":fails,
           "learning":{"truth_ledger":str(LEDGER.relative_to(ROOT)),"signal_matrix":str(MATRIX.relative_to(ROOT)),"regime_history":str(REGH.relative_to(ROOT)),"walk_forward_validation":True,"persistent_outcome_resolution":True},
           "policy":{"competing_hypotheses":True,"neutral_wait_allowed":True,"historical_analogues_out_of_sample":True,"regime_matching":True,"base_rate_lift_required":True,"minimum_events":MIN,"no_guaranteed_forecast":True,"publication_gate_immutable":True}}
     OUT.write_text(json.dumps(data,indent=2))
     claims=sum(1 for x in res if x.get("status")=="READY" for h in x["hypotheses"].values() for a in h["forward"]["predictivity"]["audits"] if a["predictive"])
-    REPORT.write_text(json.dumps({"schema":"NIC-FORECAST-LAB-2.0","generated_at":data["generated_at"],"ready":sum(x.get("status")=="READY" for x in res),"failures":len(fails),"predictive_claims":claims,"learned_signal_cells":len(matrix),"policy":"No signal is trusted from correlation alone; persistent edge requires chronological validation and >=30 events."},indent=2))
-    print(json.dumps({"ready":len(res),"failures":len(fails),"learned_signal_cells":len(matrix)}))
+    ready_count=sum(x.get("status")=="READY" for x in res)
+    appended_count=len(fresh)
+    status="READY" if ready_count>0 and appended_count>0 else "BLOCKED"
+    data["status"]=status
+    data["block_reason"]=None if status=="READY" else "No fresh auditable forecast snapshots were produced; stale calibration must not be treated as current evidence."
+    OUT.write_text(json.dumps(data,indent=2))
+    REPORT.write_text(json.dumps({"schema":"NIC-FORECAST-LAB-2.0","generated_at":data["generated_at"],"status":status,"block_reason":data["block_reason"],"candidates":len(cs),"ready":ready_count,"appended_snapshots":appended_count,"failures":len(fails),"predictive_claims":claims,"learned_signal_cells":len(matrix),"policy":"No signal is trusted from correlation alone; persistent edge requires chronological validation and >=30 events."},indent=2))
+    print(json.dumps({"status":status,"candidates":len(cs),"ready":ready_count,"appended_snapshots":appended_count,"failures":len(fails),"learned_signal_cells":len(matrix)}))
+    require_forecast_evidence(len(cs),ready_count,appended_count)
 if __name__=="__main__":main()
