@@ -23,5 +23,5 @@ Each forecast needs a unique `forecast_id`, symbol, `probability_up` between 0 a
 ## Test
 
 ```bash
-python -m unittest tests.test_forecast_calibration
+python tests/test_forecast_calibration.py
 ```
