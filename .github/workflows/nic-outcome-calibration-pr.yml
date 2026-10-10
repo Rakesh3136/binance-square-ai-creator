@@ -5,8 +5,10 @@ on:
     paths:
       - "src/trade_outcome_journal.py"
       - "src/forecast_calibration.py"
+      - "src/nic_forecast_calibrator.py"
       - "tests/test_trade_outcome_journal.py"
       - "tests/test_forecast_calibration.py"
+      - "tests/test_nic_forecast_calibrator.py"
       - "docs/nic-trade-outcome-journal.md"
       - "docs/nic-forecast-calibration.md"
       - ".github/workflows/nic-outcome-calibration-pr.yml"
@@ -28,13 +30,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile new modules
-        run: python -m py_compile src/trade_outcome_journal.py src/forecast_calibration.py
+      - name: Compile new and production calibration modules
+        run: python -m py_compile src/trade_outcome_journal.py src/forecast_calibration.py src/nic_forecast_calibrator.py
       - name: Test evidence-first outcome journal
         run: python tests/test_trade_outcome_journal.py
-      - name: Test forecast calibration
+      - name: Test draft calibration utility
         run: python tests/test_forecast_calibration.py
-      - name: Verify no live publishing side effects
+      - name: Test production forecast event-ledger integration
+        run: python tests/test_nic_forecast_calibrator.py
+      - name: Verify no live publishing side effects in new modules
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -43,5 +47,5 @@ jobs:
           forbidden = ("binance_square_publisher", "publish_post(", "submit_order(")
           assert not any(token in journal for token in forbidden)
           assert not any(token in calibration for token in forbidden)
-          print("Evidence-learning modules remain isolated from publishing and order execution.")
+          print("New evidence-learning modules remain isolated from publishing and order execution.")
           PY
