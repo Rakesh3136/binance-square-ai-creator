@@ -1,6 +1,6 @@
 {
   "schema": "NIC-SIGNAL-PREDICTIVITY-3.0",
-  "generated_at": "2026-10-10T18:24:53.288874+00:00",
+  "generated_at": "2026-10-10T18:42:16.752062+00:00",
   "minimum_events": 30,
   "minimum_lift": 0.05,
   "matrix": {
@@ -2106,6 +2106,5 @@
     }
   },
   "resolved_event_count": 4320,
-  "legacy_resolved_snapshot_count": 2880,
-  "policy": "Only terminal outcome events joined to immutable forecast snapshots may contribute to learning; trust requires >=30 observations, >5pp lift, and no recent collapse."
+  "policy": "Immutable forecast snapshots joined to unique terminal outcome events; closed horizon candle only; missing candles stay unresolved. Minimum sample and recent-edge tests required."
 }
