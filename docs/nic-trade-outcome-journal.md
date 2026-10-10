@@ -23,12 +23,12 @@ The ETH short (entry 2,581; stop 2,596.5) and QNT long-term idea (entry mentione
 
 - `append_record(record, path=...)` validates and appends one event.
 - `read_latest(path=...)` returns the latest event per trade ID.
-- `summary(path=...)` reports outcomes, thesis quality, and learning status separately.
+- `summary(path=...)` reports outcomes, thesis quality, and learning status.
 
 Run tests with:
 
 ```bash
-python -m unittest tests.test_trade_outcome_journal
+python tests/test_trade_outcome_journal.py
 ```
 
 **Integration status:** this module is deliberately isolated until the authoritative counterfactual gate and the production workflow's existing evaluation hooks are confirmed. It must not be treated as active production learning merely because the module exists.
