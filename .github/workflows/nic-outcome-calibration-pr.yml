@@ -1,0 +1,45 @@
+name: NIC Outcome Journal and Forecast Calibration PR Checks
+
+on:
+  pull_request:
+    paths:
+      - "src/trade_outcome_journal.py"
+      - "src/forecast_calibration.py"
+      - "tests/test_trade_outcome_journal.py"
+      - "tests/test_forecast_calibration.py"
+      - "docs/nic-trade-outcome-journal.md"
+      - "docs/nic-forecast-calibration.md"
+      - ".github/workflows/nic-outcome-calibration-pr.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-evidence-learning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile new modules
+        run: python -m py_compile src/trade_outcome_journal.py src/forecast_calibration.py
+      - name: Test evidence-first outcome journal
+        run: python tests/test_trade_outcome_journal.py
+      - name: Test forecast calibration
+        run: python tests/test_forecast_calibration.py
+      - name: Verify no live publishing side effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          journal = Path("src/trade_outcome_journal.py").read_text()
+          calibration = Path("src/forecast_calibration.py").read_text()
+          forbidden = ("binance_square_publisher", "publish_post(", "submit_order(")
+          assert not any(token in journal for token in forbidden)
+          assert not any(token in calibration for token in forbidden)
+          print("Evidence-learning modules remain isolated from publishing and order execution.")
+          PY
