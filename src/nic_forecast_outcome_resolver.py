@@ -22,7 +22,7 @@ def load_rows(path=LEDGER):
         except Exception: pass
     return out
 def candles(symbol,start_ms,end_ms):
-    q=urllib.parse.urlencode({"symbol":symbol+"USDT","interval":"1h","startTime":start_ms,"endTime":end_ms,"limit":5})
+    q=urllib.parse.urlencode({"symbol":symbol+"USDT","interval":"1h","startTime":max(start_ms,end_ms-2*60*60*1000),"endTime":end_ms,"limit":5})
     for b in BASES:
         try: return json.loads(urllib.request.urlopen(b+"/api/v3/klines?"+q,timeout=15).read())
         except Exception: pass
@@ -56,7 +56,7 @@ def resolve(rows, now=None, candle_fetcher=None, existing_events=None):
         s=str(x.get("symbol","")).upper().replace("USDT","")
         key=(s,int(ts.timestamp()*1000),int(due.timestamp()*1000))
         if key not in cache: cache[key]=fetch(*key)
-        eligible=[k for k in cache[key] if isinstance(k,list) and len(k)>=5 and int(k[0])<=int(due.timestamp()*1000)]
+        eligible=[k for k in cache[key] if isinstance(k,list) and len(k)>=7 and int(k[6])<=int(due.timestamp()*1000)]
         if not eligible: continue
         target=float(max(eligible,key=lambda k:int(k[0]))[4]); entry=float(x["entry_price"])
         if entry<=0 or target<=0: continue
@@ -100,7 +100,7 @@ def rebuild(snapshots,events):
     MATRIX.parent.mkdir(parents=True,exist_ok=True)
     MATRIX.write_text(json.dumps({"schema":"NIC-SIGNAL-PREDICTIVITY-3.0","generated_at":datetime.now(timezone.utc).isoformat(),
         "minimum_events":30,"minimum_lift":.05,"matrix":matrix,"resolved_event_count":len(by_id),
-        "policy":"Immutable forecast snapshots joined to unique terminal outcome events; minimum sample and recent-edge tests required."},indent=2))
+        "policy":"Immutable forecast snapshots joined to unique terminal outcome events; closed horizon candle only; missing candles stay unresolved. Minimum sample and recent-edge tests required."},indent=2))
     return matrix
 if __name__=="__main__":
     EVENTS.parent.mkdir(parents=True,exist_ok=True)
