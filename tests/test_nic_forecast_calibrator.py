@@ -199,6 +199,21 @@ def test_failed_integrity_does_not_overwrite_last_calibration_report():
         m.ROOT, m.LEDGER, m.EVENTS, m.OUT = old_root, old_ledger, old_events, old_out
 
 
+
+
+def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
+    workflow = (ROOT / ".github" / "workflows" / "autonomous-market-creator.yml").read_text()
+    lab = workflow.index("run_component nic_forecast_laboratory python src/nic_forecast_laboratory.py")
+    resolver = workflow.index("run_component nic_forecast_outcome_resolver python src/nic_forecast_outcome_resolver.py")
+    calibrator = workflow.index("run_component nic_forecast_calibrator python src/nic_forecast_calibrator.py")
+    validator = workflow.index("run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py")
+    assert lab < resolver < calibrator < validator
+    assert "FAILED nic_forecast_calibration_artifact_missing" in workflow
+    assert "Persist Forecast Laboratory evidence ledgers" in workflow
+    assert "git add -- data/intelligence/nic_forecast_truth_ledger.jsonl" in workflow
+    assert "paths-ignore:" in workflow
+
+
 if __name__ == "__main__":
     test_small_samples_are_shrunk()
     test_probability_metrics_are_computed()
@@ -213,4 +228,5 @@ if __name__ == "__main__":
     test_artifact_integrity_rejects_invalid_probability()
     test_malformed_jsonl_fails_closed()
     test_failed_integrity_does_not_overwrite_last_calibration_report()
+    test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order()
     print("NIC forecast event-ledger calibration tests: PASS")
