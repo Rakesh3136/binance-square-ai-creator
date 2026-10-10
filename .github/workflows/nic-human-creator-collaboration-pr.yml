@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "src/nic_human_creator_contribution_gate.py"
+      - "src/nic_forecast_calibrator.py"
+      - "tests/test_nic_forecast_calibrator.py"
       - "src/nic_pending_human_review.py"
       - "tests/test_nic_pending_human_review.py"
       - "tests/test_nic_review_resume_workflow.py"
@@ -25,7 +27,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile gate
-        run: python -m py_compile src/nic_human_creator_contribution_gate.py
+      - name: Compile gate and forecast calibrator
+        run: python -m py_compile src/nic_human_creator_contribution_gate.py src/nic_forecast_calibrator.py
       - name: Test human review and anti-stale-draft rules
         run: python tests/test_nic_human_creator_contribution_gate.py
