@@ -34,8 +34,9 @@ jobs:
       - run: python tests/test_nic22_2_forecast_integration.py
       - run: python tests/test_nic_forecast_calibrator.py
       - run: python tests/test_nic_regime_transition.py
-      - run: python src/nic_forecast_laboratory.py
+      # Resolve matured prior forecasts before this cycle builds its learning matrix.
       - run: python src/nic_forecast_outcome_resolver.py
+      - run: python src/nic_forecast_laboratory.py
       - run: python src/nic_decision_outcome_resolver.py
       - run: python src/nic_forecast_calibrator.py
       - run: python src/nic_forecast_governance.py
