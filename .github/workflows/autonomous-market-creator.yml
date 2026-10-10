@@ -335,10 +335,23 @@ jobs:
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
           DRAFT_PATH="$DRAFT_PATH" python src/nic_human_creator_contribution_gate.py
+          python src/nic_pending_human_review.py prepare --draft-path "$DRAFT_PATH"
           python -m json.tool "$DRAFT_PATH" >/dev/null
           blocked=$(python -c 'import json; p=json.load(open("data/live/editorial_polish.json")); h=json.load(open("data/live/nic_human_creator_gate.json")); print(str(str(p.get("status", "")).upper()=="BLOCKED" or h.get("publish") is not True).lower())')
           echo "Human creator contribution gate: $(python -c 'import json; print(json.load(open("data/live/nic_human_creator_gate.json")).get("status", "UNKNOWN"))')"
+          echo "Pending review package: $(python -c 'import json; print(json.load(open("data/live/nic_pending_human_review.json")).get("draft_text_sha256", "missing"))')"
           echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve exact draft for human review
+        if: ${{ steps.editorial.outputs.blocked == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic-pending-human-review-${{ github.run_id }}
+          path: |
+            ${{ steps.editorial.outputs.path }}
+            data/live/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: NIC 21.2 Hook Diversity + Anti-Bot Preflight
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
