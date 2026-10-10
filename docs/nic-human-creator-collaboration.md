@@ -32,3 +32,8 @@ These fields must reflect genuine review; do not invent personal trading history
 ## Important deployment limitation
 
 This is a strict gate, not a complete pause-and-resume publishing workflow. When human input is missing or stale, it produces a valid BLOCKED decision. Before enabling this as the default production requirement, NIC needs a two-stage workflow that preserves the exact pending draft, lets a human review it after generation, and resumes publication only for that same approved draft while revalidating market/chart freshness. Do not bypass the gate just to increase post volume.
+
+
+## Pending-draft handoff and reviewed resume
+
+When the human contribution gate blocks a draft, the workflow preserves the exact draft, its text/file SHA-256 hashes, review brief, and runtime market/chart context in a seven-day Actions artifact. The manual workflow `.github/workflows/nic-human-review-approval-validation.yml` accepts an explicit human approval tied to that exact draft, rejects changed files or mismatched hashes, requires fresh market evidence (maximum 15 minutes), and reruns the configured editorial, chart, evidence, timing, production and publication gates before the publisher can run. Any gate block skips publication. A successful CI run validates code and safety tests; it does not prove a real Binance Square post. Do not claim publishing is verified until a fresh, explicitly approved end-to-end run returns a confirmed post result.
