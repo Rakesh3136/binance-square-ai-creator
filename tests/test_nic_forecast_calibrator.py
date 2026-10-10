@@ -209,6 +209,9 @@ def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
     validator = workflow.index("run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py")
     assert lab < resolver < calibrator < validator
     assert "FAILED nic_forecast_calibration_artifact_missing" in workflow
+    assert "Persist Forecast Laboratory evidence ledgers" in workflow
+    assert "git add -- data/intelligence/nic_forecast_truth_ledger.jsonl" in workflow
+    assert "paths-ignore:" in workflow
 
 
 if __name__ == "__main__":
