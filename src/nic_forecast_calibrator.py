@@ -149,9 +149,32 @@ def reliability(rows):
 
 def validate_artifact_integrity(snapshots, events, calibration, matrix):
     """Reject learning reports that cannot be reconciled to persisted source evidence."""
-    snapshot_ids = {str(row.get("forecast_id")) for row in snapshots if row.get("forecast_id")}
-    terminal_ids = {str(row.get("forecast_id")) for row in events
-                    if row.get("event_type") == "FORECAST_RESOLVED" and row.get("forecast_id")}
+    snapshot_id_list = [str(row.get("forecast_id")) for row in snapshots if row.get("forecast_id")]
+    snapshot_ids = set(snapshot_id_list)
+    if len(snapshot_id_list) != len(snapshot_ids):
+        raise AssertionError("Duplicate immutable forecast snapshot IDs")
+
+    terminal_rows = [row for row in events if row.get("event_type") == "FORECAST_RESOLVED"]
+    terminal_id_list = [str(row.get("forecast_id")) for row in terminal_rows if row.get("forecast_id")]
+    if any(not row.get("forecast_id") for row in terminal_rows):
+        raise AssertionError("Terminal outcome event is missing forecast_id")
+    terminal_ids = set(terminal_id_list)
+    if len(terminal_id_list) != len(terminal_ids):
+        raise AssertionError("Duplicate terminal outcome events for a forecast_id")
+
+    for event in terminal_rows:
+        try:
+            signed_return = float(event["signed_return"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AssertionError("Terminal outcome has no valid signed_return") from exc
+        if not math.isfinite(signed_return):
+            raise AssertionError("Terminal outcome signed_return must be finite")
+        if "hit" in event:
+            if not isinstance(event["hit"], bool):
+                raise AssertionError("Terminal outcome hit label must be boolean")
+            if event["hit"] != (signed_return > 0):
+                raise AssertionError("Terminal outcome hit label conflicts with signed_return")
+
     orphan_ids = sorted(terminal_ids - snapshot_ids)
     if orphan_ids:
         raise AssertionError(f"Terminal outcomes lack forecast snapshots: {len(orphan_ids)}")
@@ -171,6 +194,19 @@ def validate_artifact_integrity(snapshots, events, calibration, matrix):
             continue
         if fid in terminal_ids or row.get("resolved"):
             resolved_rows.append(row)
+
+    for row in resolved_rows:
+        probability = row.get("forecast_probability")
+        if probability is None:
+            continue
+        if isinstance(probability, bool):
+            raise AssertionError("Forecast probability must be numeric, not boolean")
+        try:
+            probability = float(probability)
+        except (TypeError, ValueError) as exc:
+            raise AssertionError("Forecast probability must be numeric") from exc
+        if not math.isfinite(probability) or not 0.0 <= probability <= 1.0:
+            raise AssertionError("Forecast probability must be finite and between 0 and 1")
 
     expected_scored = sum(row.get("forecast_probability") is not None for row in resolved_rows)
     actual_scored = int((calibration.get("global_metrics") or {}).get("samples") or 0)
