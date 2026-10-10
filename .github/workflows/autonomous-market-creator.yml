@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'data/intelligence/nic_forecast_truth_ledger.jsonl'
+      - 'data/intelligence/nic_forecast_outcome_events.jsonl'
+      - 'data/intelligence/nic_signal_predictivity_matrix.json'
+      - 'data/intelligence/nic_forecast_calibration.json'
+      - 'data/intelligence/nic_forecast_laboratory_report.json'
+      - 'data/intelligence/nic_regime_history.jsonl'
+      - 'data/live/nic_forecast_laboratory.json'
   schedule:
     - cron: '*/20 * * * *'
   workflow_dispatch:
@@ -512,3 +520,19 @@ jobs:
           python src/nic_transparency_journal.py || true
           python src/pipeline_state.py || true
           python src/diagnostics_report.py || true
+
+      - name: Persist Forecast Laboratory evidence ledgers
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_regime_history.jsonl data/live/nic_forecast_laboratory.json
+          if git diff --cached --quiet; then
+            echo "No Forecast Laboratory evidence changes to persist."
+            exit 0
+          fi
+          git commit -m "Persist NIC Forecast Laboratory evidence"
+          git push origin HEAD:main
