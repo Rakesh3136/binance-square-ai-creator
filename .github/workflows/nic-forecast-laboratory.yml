@@ -34,8 +34,9 @@ jobs:
       - run: python tests/test_nic22_2_forecast_integration.py
       - run: python tests/test_nic_forecast_calibrator.py
       - run: python tests/test_nic_regime_transition.py
-      - run: python src/nic_forecast_laboratory.py
+      # Resolve matured prior forecasts before building this cycle's learning matrix.
       - run: python src/nic_forecast_outcome_resolver.py
+      - run: python src/nic_forecast_laboratory.py
       - run: python src/nic_decision_outcome_resolver.py
       - run: python src/nic_forecast_calibrator.py
       - run: python src/nic_forecast_governance.py
@@ -52,6 +53,47 @@ jobs:
           assert d["policy"]["neutral_wait_allowed"]
           print("Forecast Laboratory learning validation: PASS")
           PY
+      - name: Verify persisted learning artifacts agree
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("data/intelligence")
+          def jsonl(name):
+              path = root / name
+              if not path.exists():
+                  return []
+              rows = []
+              for line in path.read_text(encoding="utf-8").splitlines():
+                  try:
+                      value = json.loads(line)
+                  except json.JSONDecodeError as exc:
+                      raise AssertionError(f"Invalid JSONL row in {name}") from exc
+                  if not isinstance(value, dict):
+                      raise AssertionError(f"Non-object JSONL row in {name}")
+                  rows.append(value)
+              return rows
+          snapshots = jsonl("nic_forecast_truth_ledger.jsonl")
+          events = jsonl("nic_forecast_outcome_events.jsonl")
+          terminal = {str(x.get("forecast_id")) for x in events
+                      if x.get("event_type") == "FORECAST_RESOLVED" and x.get("forecast_id")}
+          legacy = {str(x.get("forecast_id")) for x in snapshots
+                    if x.get("resolved") and x.get("forecast_id")}
+          calibration = json.loads((root / "nic_forecast_calibration.json").read_text(encoding="utf-8"))
+          matrix = json.loads((root / "nic_signal_predictivity_matrix.json").read_text(encoding="utf-8"))
+          scored = int(calibration.get("global_metrics", {}).get("samples") or 0)
+          resolved_ids = terminal | legacy
+          if scored and not resolved_ids:
+              raise AssertionError("Calibration scores exist but no resolved forecast IDs exist in either ledger")
+          matrix_count = int(matrix.get("resolved_event_count") or 0)
+          if matrix_count != len(terminal):
+              raise AssertionError(f"Signal matrix event count {matrix_count} != terminal outcome IDs {len(terminal)}")
+          print(json.dumps({"snapshots": len(snapshots), "terminal_events": len(terminal),
+                            "resolved_ids": len(resolved_ids), "calibration_samples": scored,
+                            "matrix_resolved_event_count": matrix_count,
+                            "persisted_learning_artifacts": "PASS"}))
+          PY
+
       - name: Commit evidence
         run: |
           git config user.name "github-actions[bot]"

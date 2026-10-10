@@ -1,10 +1,18 @@
 name: NIC Human Creator Collaboration PR Checks
-# Includes static safety tests for the two-stage review/resume workflow.
+# Includes static safety tests for human review, resume publishing, and forecast learning.
 
 on:
   pull_request:
     branches: [main]
     paths:
+      - "src/nic_forecast_calibrator.py"
+      - "src/trade_outcome_journal.py"
+      - "src/forecast_calibration.py"
+      - "tests/test_nic_forecast_calibrator.py"
+      - "tests/test_trade_outcome_journal.py"
+      - "tests/test_forecast_calibration.py"
+      - ".github/workflows/nic-forecast-laboratory.yml"
+      - ".github/workflows/nic-outcome-calibration-pr.yml"
       - "src/nic_human_creator_contribution_gate.py"
       - "src/nic_pending_human_review.py"
       - "tests/test_nic_pending_human_review.py"
@@ -28,6 +36,15 @@ jobs:
           python-version: "3.12"
       - name: Validate workflow YAML syntax
         run: ruby -e 'require "yaml"; ARGV.each { |p| YAML.load_file(p); puts p + " valid" }' .github/workflows/autonomous-market-creator.yml .github/workflows/nic-human-review-approval-validation.yml
+      - name: Validate forecast workflow YAML syntax
+        run: ruby -e 'require "yaml"; ARGV.each { |p| YAML.load_file(p); puts p + " valid" }' .github/workflows/nic-forecast-laboratory.yml .github/workflows/nic-outcome-calibration-pr.yml
+      - name: Compile forecast learning modules
+        run: python -m py_compile src/nic_forecast_calibrator.py src/trade_outcome_journal.py src/forecast_calibration.py
+      - name: Test forecast artifact integrity
+        run: |
+          python tests/test_nic_forecast_calibrator.py
+          python tests/test_trade_outcome_journal.py
+          python tests/test_forecast_calibration.py
       - name: Compile gate
         run: python -m py_compile src/nic_human_creator_contribution_gate.py
       - name: Compile pending-review handoff
