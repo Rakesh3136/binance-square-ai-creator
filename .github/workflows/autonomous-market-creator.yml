@@ -334,24 +334,9 @@ jobs:
           test -s "$DRAFT_PATH"
           echo "path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
           DRAFT_PATH="$DRAFT_PATH" python src/human_editor.py
-          DRAFT_PATH="$DRAFT_PATH" python src/nic_human_creator_contribution_gate.py
-          python src/nic_pending_human_review.py prepare --draft-path "$DRAFT_PATH"
           python -m json.tool "$DRAFT_PATH" >/dev/null
-          blocked=$(python -c 'import json; p=json.load(open("data/live/editorial_polish.json")); h=json.load(open("data/live/nic_human_creator_gate.json")); print(str(str(p.get("status", "")).upper()=="BLOCKED" or h.get("publish") is not True).lower())')
-          echo "Pending review package: $(python -c 'import json; x=json.load(open("data/live/nic_pending_human_review.json")); print(x.get("draft_text_sha256", "missing"))')"
-          echo "Human creator contribution gate: $(python -c 'import json; print(json.load(open("data/live/nic_human_creator_gate.json")).get("status", "UNKNOWN"))')"
+          blocked=$(python -c 'import json; p=json.load(open("data/live/editorial_polish.json")); print(str(str(p.get("status", "")).upper()=="BLOCKED").lower())')
           echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
-
-      - name: Preserve exact draft for human review
-        if: ${{ steps.editorial.outputs.blocked == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nic-pending-human-review-${{ github.run_id }}
-          path: |
-            ${{ steps.editorial.outputs.path }}
-            data/live/
-          if-no-files-found: warn
-          retention-days: 7
 
       - name: NIC 21.2 Hook Diversity + Anti-Bot Preflight
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
@@ -469,8 +454,36 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/production_manager.py
 
-      - name: Build final publication payload
+      - name: Final human creator contribution gate
+        id: human_review
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          set -euo pipefail
+          python src/nic_human_creator_contribution_gate.py
+          python -m json.tool data/live/nic_human_creator_gate.json >/dev/null
+          blocked=$(python -c 'import json; h=json.load(open("data/live/nic_human_creator_gate.json")); print(str(h.get("publish") is not True).lower())')
+          echo "Human creator contribution gate: $(python -c 'import json; print(json.load(open("data/live/nic_human_creator_gate.json")).get("status", "UNKNOWN"))')"
+          if [ "$blocked" = "true" ]; then
+            python src/nic_pending_human_review.py prepare --draft-path "$DRAFT_PATH"
+            echo "Pending review package: $(python -c 'import json; x=json.load(open("data/live/nic_pending_human_review.json")); print(x.get("draft_text_sha256", "missing"))')"
+          fi
+          echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve exact final draft and gate context for human review
+        if: ${{ steps.human_review.outputs.blocked == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic-pending-human-review-${{ github.run_id }}
+          path: |
+            ${{ steps.editorial.outputs.path }}
+            data/live/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Build final publication payload
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' && steps.human_review.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -479,7 +492,7 @@ jobs:
           python src/write_to_earn_master.py
 
       - name: Extract publication and submit to Binance Square
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' && steps.human_review.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
