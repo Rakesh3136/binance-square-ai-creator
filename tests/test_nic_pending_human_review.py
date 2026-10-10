@@ -24,7 +24,7 @@ def valid_input(post):
 
 
 def test_pending_package_binds_exact_file_and_text():
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=pending.ROOT) as tmp:
         path = Path(tmp) / "draft.json"
         write_draft(path)
         package = pending.prepare(path, Path(tmp) / "pending.json")
