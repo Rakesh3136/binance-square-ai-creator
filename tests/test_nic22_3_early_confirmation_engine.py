@@ -17,12 +17,13 @@ def test_requires_multiple_independent_signals():
 def test_extended_move_is_not_confirmed_early():
     c={"price_change_percent":8,"volume_acceleration":3,"volume_vs_24h_median":3,
        "relative_strength_24h":4,"oi_change_3h_pct":4,"breakout_distance_pct":1,
-       "discovery_score":90}
-    assert abs(float(c["price_change_percent"])) > n.MAX_PRICE_MOVE
+       "discovery_score":90,"flow_state":"LATE"}
+    selected,near,evaluated=n.evaluate_candidates([c])
+    assert selected is None
+    assert near is None
+    assert evaluated[0]["confirmation_eligible"] is False
 
 def test_near_miss_contract():
-    # Deliberately calibrated to 49? No: this fixture must exercise the
-    # WATCH_ONLY 50-59.99 band without changing the production threshold.
     c={"price_change_percent":2,"volume_acceleration":1.5,"volume_vs_24h_median":1.2,
        "relative_strength_24h":0.5,"oi_change_3h_pct":1,"breakout_distance_pct":5,
        "discovery_score":50}
@@ -32,6 +33,32 @@ def test_near_miss_contract():
     assert n.NEAR_MISS_MIN_SCORE == 50.0
     assert sum(breakdown.values()) == score
     assert score == 56.0
+
+def test_ranked_queue_selects_confirmed_candidate_below_weak_top_pick():
+    weak={"symbol":"WEAK","flow_state":"EARLY","price_change_percent":1.5,
+          "volume_acceleration":1.1,"volume_vs_24h_median":1.0,"relative_strength_24h":0.1,
+          "oi_change_3h_pct":0,"breakout_distance_pct":8,"discovery_score":40,"adjusted_score":99}
+    strong={"symbol":"STRONG","flow_state":"DEVELOPING","price_change_percent":2,
+            "volume_acceleration":2,"volume_vs_24h_median":2,"relative_strength_24h":2,
+            "oi_change_3h_pct":2,"breakout_distance_pct":2,"discovery_score":70,"adjusted_score":70}
+    selected,near,evaluated=n.evaluate_candidates([weak,strong])
+    assert len(evaluated)==2
+    assert selected is not None
+    assert selected["symbol"]=="STRONG"
+    assert selected["confirmation_status"]=="CONFIRMED_EARLY_SETUP"
+    assert near is None
+
+def test_extended_candidate_never_becomes_near_miss_or_confirmed():
+    extended={"symbol":"PUMPED","flow_state":"LATE","price_change_percent":9,
+              "volume_acceleration":3,"volume_vs_24h_median":3,"relative_strength_24h":4,
+              "oi_change_3h_pct":4,"breakout_distance_pct":1,"discovery_score":90}
+    early={"symbol":"WATCH","flow_state":"EARLY","price_change_percent":2,
+           "volume_acceleration":1.5,"volume_vs_24h_median":1.2,"relative_strength_24h":0.5,
+           "oi_change_3h_pct":1,"breakout_distance_pct":5,"discovery_score":50}
+    selected,near,evaluated=n.evaluate_candidates([extended,early])
+    assert selected is None
+    assert near is not None and near["symbol"]=="WATCH"
+    assert evaluated[0]["confirmation_eligible"] is False
 
 def test_contracts():
     assert n.MIN_SCORE == 60.0
@@ -43,5 +70,7 @@ if __name__=="__main__":
     test_requires_multiple_independent_signals()
     test_extended_move_is_not_confirmed_early()
     test_near_miss_contract()
+    test_ranked_queue_selects_confirmed_candidate_below_weak_top_pick()
+    test_extended_candidate_never_becomes_near_miss_or_confirmed()
     test_contracts()
-    print("NIC22.3 tests passed")
+    print("NIC22.3 ranked confirmation tests passed")
