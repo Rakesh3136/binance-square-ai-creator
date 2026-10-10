@@ -72,8 +72,8 @@ def prepare(draft_path: Path, pending_path: Path = PENDING) -> dict:
             "must_revalidate_market_and_chart_before_resume": True,
         },
     }
-    LIVE.mkdir(parents=True, exist_ok=True)
-    PENDING.write_text(json.dumps(package, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    pending_path.parent.mkdir(parents=True, exist_ok=True)
+    pending_path.write_text(json.dumps(package, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return package
 
 
@@ -113,16 +113,24 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("prepare", "verify"))
     parser.add_argument("--draft-path", required=True)
+    parser.add_argument("--pending-path", default=str(PENDING))
+    parser.add_argument("--input-path", default=str(INPUT))
     args = parser.parse_args()
     path = Path(args.draft_path)
     if not path.is_absolute():
         path = ROOT / path
+    pending_path = Path(args.pending_path)
+    if not pending_path.is_absolute():
+        pending_path = ROOT / pending_path
+    input_path = Path(args.input_path)
+    if not input_path.is_absolute():
+        input_path = ROOT / input_path
     if args.command == "prepare":
-        result = prepare(path)
+        result = prepare(path, pending_path)
         print(json.dumps({"status": result["status"], "draft_text_sha256": result["draft_text_sha256"], "symbol": result["symbol"], "publication_authorized": False}, indent=2))
         return 0
-    package = read_json(PENDING)
-    human = read_json(INPUT)
+    package = read_json(pending_path)
+    human = read_json(input_path)
     failures = verify_approval(package, human, path)
     print(json.dumps({"status": "APPROVAL_VALIDATION_PASS" if not failures else "BLOCKED", "failures": failures, "publication_authorized": False}, indent=2))
     # Verification is not publication; orchestration must still rerun live gates.
