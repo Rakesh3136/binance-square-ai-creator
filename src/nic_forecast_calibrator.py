@@ -147,6 +147,54 @@ def reliability(rows):
             for key, value in bins.items()}
 
 
+def validate_artifact_integrity(snapshots, events, calibration, matrix):
+    """Reject learning reports that cannot be reconciled to persisted source evidence."""
+    snapshot_ids = {str(row.get("forecast_id")) for row in snapshots if row.get("forecast_id")}
+    terminal_ids = {str(row.get("forecast_id")) for row in events
+                    if row.get("event_type") == "FORECAST_RESOLVED" and row.get("forecast_id")}
+    orphan_ids = sorted(terminal_ids - snapshot_ids)
+    if orphan_ids:
+        raise AssertionError(f"Terminal outcomes lack forecast snapshots: {len(orphan_ids)}")
+
+    resolved_rows = []
+    seen = set()
+    for row in snapshots:
+        fid = str(row.get("forecast_id") or "")
+        if not fid or fid in seen:
+            continue
+        seen.add(fid)
+        try:
+            horizon = int(row.get("horizon_hours") or 0)
+        except (TypeError, ValueError):
+            continue
+        if horizon not in H:
+            continue
+        if fid in terminal_ids or row.get("resolved"):
+            resolved_rows.append(row)
+
+    expected_scored = sum(row.get("forecast_probability") is not None for row in resolved_rows)
+    actual_scored = int((calibration.get("global_metrics") or {}).get("samples") or 0)
+    if actual_scored != expected_scored:
+        raise AssertionError(
+            f"Calibration sample mismatch: report={actual_scored}, source_snapshots={expected_scored}"
+        )
+
+    reported_resolved = calibration.get("resolved_event_samples")
+    if reported_resolved is not None and int(reported_resolved) != len(resolved_rows):
+        raise AssertionError(
+            f"Calibration resolved-row mismatch: report={reported_resolved}, source_rows={len(resolved_rows)}"
+        )
+
+    matrix_count = int(matrix.get("resolved_event_count") or 0)
+    if matrix_count != len(terminal_ids):
+        raise AssertionError(
+            f"Signal matrix event mismatch: report={matrix_count}, terminal_ledger={len(terminal_ids)}"
+        )
+    return {"snapshots": len(snapshot_ids), "terminal_events": len(terminal_ids),
+            "resolved_rows": len(resolved_rows), "calibration_samples": actual_scored,
+            "matrix_resolved_event_count": matrix_count}
+
+
 def main():
     rows = read()
     cells = calibrate()
@@ -159,7 +207,17 @@ def main():
         "policy": "Calibration joins terminal outcome events to immutable snapshots by forecast_id; unresolved outcomes are excluded. Legacy resolved snapshots remain readable. Brier score and log loss measure probabilistic quality; small samples are shrunk toward 50% and are never trusted."
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    matrix_path = ROOT / "data/intelligence/nic_signal_predictivity_matrix.json"
+    matrix = {}
+    if matrix_path.exists():
+        try:
+            matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            raise AssertionError("Signal predictivity matrix is unreadable") from exc
+    integrity = validate_artifact_integrity(load_jsonl(LEDGER), load_jsonl(EVENTS), payload, matrix)
+    print(json.dumps({"artifact_integrity": "PASS", **integrity}))
     return payload
 
 
