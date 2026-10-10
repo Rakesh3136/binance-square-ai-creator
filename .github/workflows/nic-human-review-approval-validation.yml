@@ -187,6 +187,7 @@ jobs:
           # Rewriters may have changed the approved draft. Recheck both the exact
           # file fingerprint and the human contribution immediately before payload build.
           run_gate python src/nic_human_creator_contribution_gate.py
+          run_gate python -c 'import json,sys; x=json.load(open("data/live/nic_human_creator_gate.json")); print("Human contribution gate:",x.get("status")); sys.exit(0 if x.get("publish") is True else 24)'
           run_gate python src/nic_pending_human_review.py verify --draft-path "$DRAFT_PATH"
       - name: Build final payload and monetization eligibility
         if: ${{ steps.resume_gates.outputs.publish == 'true' }}
