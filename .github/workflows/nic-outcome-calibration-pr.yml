@@ -1,0 +1,53 @@
+name: NIC Outcome Journal and Forecast Calibration PR Checks
+
+on:
+  pull_request:
+    paths:
+      - "src/trade_outcome_journal.py"
+      - "src/forecast_calibration.py"
+      - "src/nic_forecast_calibrator.py"
+      - "tests/test_trade_outcome_journal.py"
+      - "tests/test_forecast_calibration.py"
+      - "tests/test_nic_forecast_calibrator.py"
+      - "docs/nic-trade-outcome-journal.md"
+      - "docs/nic-forecast-calibration.md"
+      - ".github/workflows/nic-outcome-calibration-pr.yml"
+      - ".github/workflows/nic-forecast-laboratory.yml"
+      - "src/nic_forecast_laboratory.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-evidence-learning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile new and production calibration modules
+        run: python -m py_compile src/trade_outcome_journal.py src/forecast_calibration.py src/nic_forecast_calibrator.py
+      - name: Test evidence-first outcome journal
+        run: python tests/test_trade_outcome_journal.py
+      - name: Test draft calibration utility
+        run: python tests/test_forecast_calibration.py
+      - name: Test production forecast event-ledger integration
+        run: python tests/test_nic_forecast_calibrator.py
+      - name: Verify no live publishing side effects in new modules
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          journal = Path("src/trade_outcome_journal.py").read_text()
+          calibration = Path("src/forecast_calibration.py").read_text()
+          forbidden = ("binance_square_publisher", "publish_post(", "submit_order(")
+          assert not any(token in journal for token in forbidden)
+          assert not any(token in calibration for token in forbidden)
+          print("New evidence-learning modules remain isolated from publishing and order execution.")
+          PY
