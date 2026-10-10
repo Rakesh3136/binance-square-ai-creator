@@ -69,9 +69,61 @@ def test_missing_or_unresolved_outcomes_are_not_scored():
         m.LEDGER, m.EVENTS = old_ledger, old_events
 
 
+
+def test_artifact_integrity_accepts_consistent_ledgers_and_reports():
+    snapshots = [{"forecast_id":"A","horizon_hours":6,"forecast_probability":0.8,"resolved":False},
+                 {"forecast_id":"B","horizon_hours":24,"forecast_probability":0.6,"resolved":False}]
+    events = [{"event_type":"FORECAST_RESOLVED","forecast_id":"A","signed_return":1,"hit":True}]
+    calibration = {"global_metrics":{"samples":1},"resolved_event_samples":1}
+    matrix = {"resolved_event_count":1}
+    result = m.validate_artifact_integrity(snapshots, events, calibration, matrix)
+    assert result["calibration_samples"] == 1
+    assert result["terminal_events"] == 1
+
+
+def test_artifact_integrity_rejects_orphan_terminal_event():
+    try:
+        m.validate_artifact_integrity([], [{"event_type":"FORECAST_RESOLVED","forecast_id":"ORPHAN"}],
+                                      {"global_metrics":{"samples":0}}, {"resolved_event_count":1})
+    except AssertionError as exc:
+        assert "lack forecast snapshots" in str(exc)
+    else:
+        raise AssertionError("orphan outcome must fail integrity validation")
+
+
+def test_artifact_integrity_rejects_stale_calibration_count():
+    snapshots = [{"forecast_id":"A","horizon_hours":6,"forecast_probability":0.8,"resolved":False}]
+    events = [{"event_type":"FORECAST_RESOLVED","forecast_id":"A","signed_return":1,"hit":True}]
+    try:
+        m.validate_artifact_integrity(snapshots, events,
+                                      {"global_metrics":{"samples":720},"resolved_event_samples":720},
+                                      {"resolved_event_count":1})
+    except AssertionError as exc:
+        assert "Calibration sample mismatch" in str(exc)
+    else:
+        raise AssertionError("stale calibration report must fail integrity validation")
+
+
+def test_artifact_integrity_rejects_matrix_event_count_mismatch():
+    snapshots = [{"forecast_id":"A","horizon_hours":6,"forecast_probability":0.8,"resolved":False}]
+    events = [{"event_type":"FORECAST_RESOLVED","forecast_id":"A","signed_return":1,"hit":True}]
+    try:
+        m.validate_artifact_integrity(snapshots, events,
+                                      {"global_metrics":{"samples":1},"resolved_event_samples":1},
+                                      {"resolved_event_count":3480})
+    except AssertionError as exc:
+        assert "Signal matrix event mismatch" in str(exc)
+    else:
+        raise AssertionError("stale matrix count must fail integrity validation")
+
+
 if __name__ == "__main__":
     test_small_samples_are_shrunk()
     test_probability_metrics_are_computed()
     test_new_terminal_events_join_immutable_snapshots()
     test_missing_or_unresolved_outcomes_are_not_scored()
+    test_artifact_integrity_accepts_consistent_ledgers_and_reports()
+    test_artifact_integrity_rejects_orphan_terminal_event()
+    test_artifact_integrity_rejects_stale_calibration_count()
+    test_artifact_integrity_rejects_matrix_event_count_mismatch()
     print("NIC forecast event-ledger calibration tests: PASS")
