@@ -49,6 +49,8 @@ def prepare(draft_path: Path, pending_path: Path = PENDING) -> dict:
     text = canonical_text(report)
     if not text:
         raise ValueError("cannot preserve a draft without publishable text")
+    if not draft_path.resolve().is_relative_to(ROOT):
+        raise ValueError("draft must be inside the repository so the review artifact can restore it safely")
     brief = read_json(BRIEF)
     expected = sha256_text(text)
     if brief and brief.get("draft_sha256") != expected:
@@ -59,7 +61,7 @@ def prepare(draft_path: Path, pending_path: Path = PENDING) -> dict:
         "schema": "NIC-PENDING-HUMAN-REVIEW-1.0",
         "status": "PENDING_HUMAN_REVIEW",
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "draft_path": str(draft_path.resolve()),
+        "draft_path": str(draft_path.resolve().relative_to(ROOT)) if draft_path.resolve().is_relative_to(ROOT) else "",
         "draft_text_sha256": expected,
         "draft_file_sha256": hashlib.sha256(draft_path.read_bytes()).hexdigest(),
         "symbol": symbol or None,
