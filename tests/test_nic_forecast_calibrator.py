@@ -117,6 +117,50 @@ def test_artifact_integrity_rejects_matrix_event_count_mismatch():
         raise AssertionError("stale matrix count must fail integrity validation")
 
 
+
+def test_malformed_jsonl_fails_closed():
+    ledger = ROOT / "tests" / "tmp_forecast_ledger.jsonl"
+    old_ledger = m.LEDGER
+    try:
+        m.LEDGER = ledger
+        ledger.write_text('{"forecast_id":"A"}\\n{broken json}\\n')
+        try:
+            m.load_jsonl(ledger)
+        except AssertionError as exc:
+            assert "Invalid forecast ledger row" in str(exc)
+        else:
+            raise AssertionError("malformed source evidence must not be silently ignored")
+    finally:
+        ledger.unlink(missing_ok=True)
+        m.LEDGER = old_ledger
+
+
+def test_failed_integrity_does_not_overwrite_last_calibration_report():
+    import tempfile
+    old_root, old_ledger, old_events, old_out = m.ROOT, m.LEDGER, m.EVENTS, m.OUT
+    try:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            intelligence = root / "data" / "intelligence"
+            intelligence.mkdir(parents=True)
+            m.ROOT = root
+            m.LEDGER = intelligence / "nic_forecast_truth_ledger.jsonl"
+            m.EVENTS = intelligence / "nic_forecast_outcome_events.jsonl"
+            m.OUT = intelligence / "nic_forecast_calibration.json"
+            m.LEDGER.write_text("")
+            m.EVENTS.write_text(json.dumps({"event_type":"FORECAST_RESOLVED","forecast_id":"ORPHAN","signed_return":1}) + "\\n")
+            m.OUT.write_text('{"last_known_good":true}')
+            try:
+                m.main()
+            except AssertionError as exc:
+                assert "lack forecast snapshots" in str(exc)
+            else:
+                raise AssertionError("orphan terminal event must fail calibration")
+            assert json.loads(m.OUT.read_text()) == {"last_known_good": True}
+    finally:
+        m.ROOT, m.LEDGER, m.EVENTS, m.OUT = old_root, old_ledger, old_events, old_out
+
+
 if __name__ == "__main__":
     test_small_samples_are_shrunk()
     test_probability_metrics_are_computed()
@@ -126,4 +170,6 @@ if __name__ == "__main__":
     test_artifact_integrity_rejects_orphan_terminal_event()
     test_artifact_integrity_rejects_stale_calibration_count()
     test_artifact_integrity_rejects_matrix_event_count_mismatch()
+    test_malformed_jsonl_fails_closed()
+    test_failed_integrity_does_not_overwrite_last_calibration_report()
     print("NIC forecast event-ledger calibration tests: PASS")
