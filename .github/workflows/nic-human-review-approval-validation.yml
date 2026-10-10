@@ -1,4 +1,4 @@
-name: NIC Human Review Approval Validation
+name: NIC Human Review Resume and Publish
 
 on:
   workflow_dispatch:
@@ -38,11 +38,11 @@ permissions:
   contents: read
 
 jobs:
-  validate-review:
+  resume-reviewed-draft:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
-      - name: Checkout review-handoff code
+      - name: Checkout current production gate code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
@@ -50,14 +50,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Download pending draft artifact
+      - name: Download exact pending draft and runtime context
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.pending_run_id }}
           name: nic-pending-human-review-${{ inputs.pending_run_id }}
-          path: .
+          path: data
       - name: Record explicit human review
         env:
           DRAFT_SHA256: ${{ inputs.draft_sha256 }}
@@ -82,18 +82,18 @@ jobs:
           }
           path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
           PY
-      - name: Validate exact draft and human approval
-        id: approval
+      - name: Validate exact pending draft and human approval
+        env:
+          DRAFT_SHA256: ${{ inputs.draft_sha256 }}
         run: |
           set -euo pipefail
           DRAFT_PATH="$(python -c 'import json; print(json.load(open("data/live/nic_pending_human_review.json"))["draft_path"])')"
-          if [ ! -f "$DRAFT_PATH" ]; then
-            echo "Pending draft path is not present in the downloaded artifact; refusing approval." >&2
-            exit 24
-          fi
+          test -n "$DRAFT_PATH"
+          test -s "$DRAFT_PATH"
+          python -c 'import json,os,sys; p=json.load(open("data/live/nic_pending_human_review.json")); sys.exit(0 if p.get("draft_text_sha256")==os.environ["DRAFT_SHA256"] else 24)'
           python src/nic_pending_human_review.py verify --draft-path "$DRAFT_PATH"
-          echo "Exact-draft human approval is valid. This step does not authorize publication."
       - name: Require fresh market and chart evidence
+        id: freshness
         run: |
           python - <<'PY'
           import json, sys
@@ -124,13 +124,85 @@ jobs:
               except Exception as exc:
                   failures.append(f"{filename}: invalid evidence timestamp ({exc})")
           if failures:
-              print("BLOCKED: review is recorded, but evidence is not fresh enough to proceed.")
+              print("BLOCKED: approval recorded, but market/chart evidence is missing or older than 15 minutes.")
               print("\n".join(failures))
               sys.exit(24)
-          print("Market snapshot and chart metadata are fresh (<=15 minutes).")
+          print("Market and chart evidence freshness passed.")
           PY
-      - name: Report safe validation outcome
-        if: success()
+      - name: Re-run all final editorial, chart, timing, and publication gates
+        id: resume_gates
+        env:
+          DRAFT_PATH: ${{ steps.validate.outputs.draft_path }}
+          NIC24_2_ENFORCE: "true"
         run: |
-          echo "APPROVAL_VALIDATED_REVALIDATION_REQUIRED"
-          echo "No post was published. The main production gates and publisher have not been invoked."
+          set -euo pipefail
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          run_gate() {
+            set +e
+            "$@"
+            rc=$?
+            set -e
+            if [ "$rc" -eq 24 ]; then
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              echo "A gate made a valid no-publication decision; publisher will be skipped."
+              exit 0
+            fi
+            if [ "$rc" -ne 0 ]; then
+              echo "Gate execution failed (exit=$rc); publisher will be skipped." >&2
+              exit "$rc"
+            fi
+          }
+          DRAFT_PATH="$(python -c 'import json; print(json.load(open("data/live/nic_pending_human_review.json"))["draft_path"])')"
+          export DRAFT_PATH
+          run_gate python src/news_headline_integrity_repair.py
+          run_gate python src/hook_diversity_rewriter.py
+          run_gate python src/nic21_2_hook_preflight.py
+          run_gate python src/nic21_originality_visual_truth.py
+          run_gate python src/mechanism_value_rewriter.py
+          run_gate python src/nic_editorial_quality_gate.py
+          run_gate python src/jev_runtime_gate.py
+          run_gate python src/elite_prepublication_judge.py
+          run_gate python src/elite_prepublication_gate.py
+          run_gate python src/content_integrity_gate_4.py
+          run_gate python src/visual_decision.py
+          NEED_VISUAL="$(python -c 'import json; print(str(json.load(open("data/live/visual_decision.json")).get("need_visual",False)).lower())')"
+          if [ "$NEED_VISUAL" = "true" ]; then
+            run_gate python src/validate_visual.py
+            run_gate python src/validate_tradingview_visual.py data/live/visual.png
+            run_gate python src/validate_trade_visual_contract.py
+          fi
+          run_gate python src/nic22_3_publication_alignment_gate.py
+          run_gate python src/nic24_3_early_entry_gate.py
+          run_gate python src/nic24_2_evidence_content_integrity_gate.py
+          run_gate python src/production_manager.py
+          # Rewriters may have changed the approved draft. Recheck both the exact
+          # file fingerprint and the human contribution immediately before payload build.
+          run_gate python src/nic_human_creator_contribution_gate.py
+          run_gate python src/nic_pending_human_review.py verify --draft-path "$DRAFT_PATH"
+      - name: Build final payload and monetization eligibility
+        if: ${{ steps.resume_gates.outputs.publish == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.resume_gates.outputs.draft_path }}
+        run: |
+          set -euo pipefail
+          python src/publication_payload_builder.py
+          python src/write_to_earn_eligibility_gate.py
+          python src/write_to_earn_master.py
+          python src/nic_pending_human_review.py verify --draft-path "$(python -c 'import json; print(json.load(open("data/live/nic_pending_human_review.json"))["draft_path"])')"
+      - name: Publish the exact approved draft to Binance Square
+        if: ${{ steps.resume_gates.outputs.publish == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.resume_gates.outputs.draft_path }}
+          BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
+        run: |
+          set -euo pipefail
+          python src/nic_pending_human_review.py verify --draft-path "$DRAFT_PATH"
+          python src/binance_square_publisher.py
+      - name: Record resume outcome and learning
+        if: always()
+        run: |
+          python src/nic_monetization_os.py post || true
+          python src/write_to_earn_7day_controller.py || true
+          python src/nic_transparency_journal.py || true
+          python src/pipeline_state.py || true
+          python src/diagnostics_report.py || true
