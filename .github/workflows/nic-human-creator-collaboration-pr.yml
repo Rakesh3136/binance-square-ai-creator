@@ -1,0 +1,27 @@
+name: NIC Human Creator Collaboration PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/nic_human_creator_contribution_gate.py"
+      - "tests/test_nic_human_creator_contribution_gate.py"
+      - ".github/workflows/autonomous-market-creator.yml"
+      - ".github/workflows/nic-human-creator-collaboration-pr.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-human-contribution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile gate
+        run: python -m py_compile src/nic_human_creator_contribution_gate.py
+      - name: Test human review and anti-stale-draft rules
+        run: python tests/test_nic_human_creator_contribution_gate.py
