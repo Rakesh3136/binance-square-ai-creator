@@ -121,6 +121,12 @@ jobs:
           run_component nic_market_experience python src/nic_market_experience.py
           run_component nic_prediction_engine python src/nic_prediction_engine.py
           if [ -s data/live/nic_prediction_engine.json ]; then python -m json.tool data/live/nic_prediction_engine.json >/dev/null || { echo "FAILED nic_prediction_engine_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_prediction_engine_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
+          # Forecast learning is part of the authoritative intelligence cadence.
+          # Snapshot first, resolve matured forecasts second, calibrate only after reconciliation.
+          run_component nic_forecast_laboratory python src/nic_forecast_laboratory.py
+          run_component nic_forecast_outcome_resolver python src/nic_forecast_outcome_resolver.py
+          run_component nic_forecast_calibrator python src/nic_forecast_calibrator.py
+          if [ -s data/intelligence/nic_forecast_calibration.json ]; then python -m json.tool data/intelligence/nic_forecast_calibration.json >/dev/null || { echo "FAILED nic_forecast_calibration_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_forecast_calibration_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
           run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py
           run_component nic24_regime_router python src/nic24_regime_aware_strategy_router.py
           run_component nic24_1_strategy_content_router python src/nic24_1_strategy_content_router.py
