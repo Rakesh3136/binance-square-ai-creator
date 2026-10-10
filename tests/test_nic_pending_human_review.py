@@ -27,7 +27,7 @@ def test_pending_package_binds_exact_file_and_text():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "draft.json"
         write_draft(path)
-        package = pending.prepare(path)
+        package = pending.prepare(path, Path(tmp) / "pending.json")
         assert package["status"] == "PENDING_HUMAN_REVIEW"
         assert package["policy"]["publication_authorized"] is False
         assert pending.verify_approval(package, valid_input(package["draft_text"]), path) == []
