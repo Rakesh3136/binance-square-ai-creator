@@ -37,7 +37,7 @@ def test_changed_draft_invalidates_approval():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "draft.json"
         write_draft(path)
-        package = pending.prepare(path)
+        package = pending.prepare(path, Path(tmp) / "pending.json")
         human = valid_input(package["draft_text"])
         write_draft(path, "$ABC has already broken out.")
         failures = pending.verify_approval(package, human, path)
