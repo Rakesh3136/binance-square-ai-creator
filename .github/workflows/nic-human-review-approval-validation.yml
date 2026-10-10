@@ -83,6 +83,7 @@ jobs:
           path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
           PY
       - name: Validate exact pending draft and human approval
+        id: validate
         env:
           DRAFT_SHA256: ${{ inputs.draft_sha256 }}
         run: |
@@ -90,6 +91,7 @@ jobs:
           DRAFT_PATH="$(python -c 'import json; print(json.load(open("data/live/nic_pending_human_review.json"))["draft_path"])')"
           test -n "$DRAFT_PATH"
           test -s "$DRAFT_PATH"
+          echo "draft_path=$DRAFT_PATH" >> "$GITHUB_OUTPUT"
           python -c 'import json,os,sys; p=json.load(open("data/live/nic_pending_human_review.json")); sys.exit(0 if p.get("draft_text_sha256")==os.environ["DRAFT_SHA256"] else 24)'
           python src/nic_pending_human_review.py verify --draft-path "$DRAFT_PATH"
       - name: Require fresh market and chart evidence
