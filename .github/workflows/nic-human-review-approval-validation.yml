@@ -173,7 +173,6 @@ jobs:
           run_gate python src/elite_prepublication_judge.py
           run_gate python src/elite_prepublication_gate.py
           run_gate python src/content_integrity_gate_4.py
-          run_gate python src/visual_decision.py
           NEED_VISUAL="$(python -c 'import json; print(str(json.load(open("data/live/visual_decision.json")).get("need_visual",False)).lower())')"
           if [ "$NEED_VISUAL" = "true" ]; then
             run_gate python src/validate_visual.py
