@@ -30,7 +30,21 @@ def test_pending_package_binds_exact_file_and_text():
         package = pending.prepare(path, Path(tmp) / "pending.json")
         assert package["status"] == "PENDING_HUMAN_REVIEW"
         assert package["policy"]["publication_authorized"] is False
+        assert not Path(package["draft_path"]).is_absolute()
+        assert (pending.ROOT / package["draft_path"]).resolve() == path.resolve()
         assert pending.verify_approval(package, valid_input(package["draft_text"]), path) == []
+
+
+def test_external_draft_path_is_rejected():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "draft.json"
+        write_draft(path)
+        try:
+            pending.prepare(path, Path(tmp) / "pending.json")
+        except ValueError as exc:
+            assert "inside the repository" in str(exc)
+        else:
+            raise AssertionError("external draft path must be rejected")
 
 
 def test_changed_draft_invalidates_approval():
@@ -57,6 +71,7 @@ def test_missing_human_approval_blocks():
 
 if __name__ == "__main__":
     test_pending_package_binds_exact_file_and_text()
+    test_external_draft_path_is_rejected()
     test_changed_draft_invalidates_approval()
     test_missing_human_approval_blocks()
     print("NIC pending human review tests passed")
