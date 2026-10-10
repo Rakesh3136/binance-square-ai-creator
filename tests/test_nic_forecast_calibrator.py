@@ -118,6 +118,44 @@ def test_artifact_integrity_rejects_matrix_event_count_mismatch():
 
 
 
+def test_artifact_integrity_rejects_duplicate_snapshot_ids():
+    snapshots = [{"forecast_id": "A", "horizon_hours": 6, "forecast_probability": 0.8, "resolved": False},
+                 {"forecast_id": "A", "horizon_hours": 6, "forecast_probability": 0.8, "resolved": False}]
+    try:
+        m.validate_artifact_integrity(snapshots, [], {"global_metrics": {"samples": 0}},
+                                      {"resolved_event_count": 0})
+    except AssertionError as exc:
+        assert "Duplicate immutable forecast snapshot IDs" in str(exc)
+    else:
+        raise AssertionError("duplicate immutable snapshots must fail integrity validation")
+
+
+def test_artifact_integrity_rejects_conflicting_hit_label():
+    snapshots = [{"forecast_id": "A", "horizon_hours": 6, "forecast_probability": 0.8, "resolved": False}]
+    events = [{"event_type": "FORECAST_RESOLVED", "forecast_id": "A", "signed_return": 1.0, "hit": False}]
+    try:
+        m.validate_artifact_integrity(snapshots, events,
+                                      {"global_metrics": {"samples": 1}, "resolved_event_samples": 1},
+                                      {"resolved_event_count": 1})
+    except AssertionError as exc:
+        assert "conflicts with signed_return" in str(exc)
+    else:
+        raise AssertionError("conflicting outcome labels must fail integrity validation")
+
+
+def test_artifact_integrity_rejects_invalid_probability():
+    snapshots = [{"forecast_id": "A", "horizon_hours": 6, "forecast_probability": 1.5, "resolved": False}]
+    events = [{"event_type": "FORECAST_RESOLVED", "forecast_id": "A", "signed_return": 1.0, "hit": True}]
+    try:
+        m.validate_artifact_integrity(snapshots, events,
+                                      {"global_metrics": {"samples": 1}, "resolved_event_samples": 1},
+                                      {"resolved_event_count": 1})
+    except AssertionError as exc:
+        assert "between 0 and 1" in str(exc)
+    else:
+        raise AssertionError("out-of-range probabilities must fail integrity validation")
+
+
 def test_malformed_jsonl_fails_closed():
     ledger = ROOT / "tests" / "tmp_forecast_ledger.jsonl"
     old_ledger = m.LEDGER
@@ -170,6 +208,9 @@ if __name__ == "__main__":
     test_artifact_integrity_rejects_orphan_terminal_event()
     test_artifact_integrity_rejects_stale_calibration_count()
     test_artifact_integrity_rejects_matrix_event_count_mismatch()
+    test_artifact_integrity_rejects_duplicate_snapshot_ids()
+    test_artifact_integrity_rejects_conflicting_hit_label()
+    test_artifact_integrity_rejects_invalid_probability()
     test_malformed_jsonl_fails_closed()
     test_failed_integrity_does_not_overwrite_last_calibration_report()
     print("NIC forecast event-ledger calibration tests: PASS")
