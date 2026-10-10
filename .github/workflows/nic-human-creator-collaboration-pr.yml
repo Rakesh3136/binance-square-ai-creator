@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate workflow YAML syntax
+        run: ruby -e 'require "yaml"; ARGV.each { |p| YAML.load_file(p); puts "#{p}: valid YAML" }' .github/workflows/autonomous-market-creator.yml .github/workflows/nic-human-review-approval-validation.yml
       - name: Compile gate
         run: python -m py_compile src/nic_human_creator_contribution_gate.py
       - name: Compile pending-review handoff
