@@ -9,7 +9,7 @@ REPORT=INT/"nic_forecast_laboratory_report.json"; LEDGER=INT/"nic_forecast_truth
 BASES=("https://data-api.binance.vision","https://api-gcp.binance.com","https://api1.binance.com","https://api2.binance.com")
 MIN=30; H=(6,12,24)
 STRATEGY_VERSION="NIC-PROSPECTIVE-CHAMPION-1.0"
-STRATEGY_SPEC={"analogue_pool_size":80,"decision_margin":0.05,"horizons_hours":[6,12,24],"input_candles":"closed_1h_only","probability_source":"nearest_historical_analogue_raw_hit_rate","cost_model":"fee_and_slippage_stress_in_prospective_evaluator"}
+STRATEGY_SPEC={"analogue_pool_size":80,"analogue_label_exclusion_hours":24,"analogue_regime_mismatch_penalty":1.25,"decision_margin":0.05,"feature_periods":{"ema_fast":20,"ema_slow":50,"rsi":14,"volume_average":20,"momentum_lookback_hours":6},"horizons_hours":[6,12,24],"input_candles":"closed_1h_only","minimum_closed_candles":120,"minimum_feature_audit_events":30,"analogue_distance_scales":{"trend":1,"momentum":5,"rsi":15,"volume_ratio":1.5,"distance_ema20":5,"range_position":0.3},"probability_source":"nearest_historical_analogue_raw_hit_rate","cost_model":"fee_and_slippage_stress_in_prospective_evaluator"}
 STRATEGY_SPEC_SHA256=hashlib.sha256(json.dumps(STRATEGY_SPEC,sort_keys=True,separators=(",",":")).encode()).hexdigest()
 def n(v,d=0.0):
     try:x=float(v); return x if math.isfinite(x) else d
