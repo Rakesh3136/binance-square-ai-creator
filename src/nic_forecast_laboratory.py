@@ -85,7 +85,9 @@ def run(cand,rows):
             vals=[ret(rows,i,h) for _,i,_ in pool];vals=[x if side=="BULLISH" else -x for x in vals if x is not None];hs[str(h)]=summarize(vals)
         audits=[walkforward(rows,side,f) for f in features]
         hs["predictivity"]={"minimum_events":MIN,"audits":audits,
-                            "trusted_features":[a["feature"] for a in audits if a["predictive"]]}
+                            "validation_type":"FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+                            "trusted_features":[],
+                            "candidate_features":[a["feature"] for a in audits if a["predictive"]]}
         hyps[side]={"analogues":len(pool),"forward":hs}
     # Explicit neutral state prevents forced bull/bear decisions.
     scores={s:sum((hyps[s]["forward"][str(h)]["hit_rate"] or 0) for h in H)/3 for s in hyps}
