@@ -257,7 +257,7 @@ def main():
     data["status"]=status
     data["block_reason"]=block_reason
     OUT.write_text(json.dumps(data,indent=2))
-    REPORT.write_text(json.dumps({"schema":"NIC-FORECAST-LAB-2.0","generated_at":data["generated_at"],"status":status,"block_reason":block_reason,"candidates":len(cs),"ready":ready_count,"attempted_snapshots":attempted_count,"appended_snapshots":appended_count,"deduplicated_snapshots":attempted_count-appended_count,"failures":len(fails),"predictive_claims":0,"candidate_signal_associations":claims,"learned_signal_cells":len(matrix),"policy":"No signal is trusted from correlation alone; persistent edge requires chronological validation and >=30 events."},indent=2))
+    REPORT.write_text(json.dumps({"schema":"NIC-FORECAST-LAB-2.0","generated_at":data["generated_at"],"status":status,"block_reason":block_reason,"candidates":len(cs),"ready":ready_count,"attempted_snapshots":attempted_count,"appended_snapshots":appended_count,"deduplicated_snapshots":attempted_count-appended_count,"persisted_snapshot_count":len(persisted_snapshots),"appended_forecast_ids":[str(row.get("forecast_id") or "") for row in fresh],"failures":len(fails),"predictive_claims":0,"candidate_signal_associations":claims,"learned_signal_cells":len(matrix),"policy":"No signal is trusted from correlation alone; persistent edge requires chronological validation and >=30 events."},indent=2))
     print(json.dumps({"status":status,"candidates":len(cs),"ready":ready_count,"attempted_snapshots":attempted_count,"appended_snapshots":appended_count,"failures":len(fails),"learned_signal_cells":len(matrix)}))
     require_forecast_evidence(len(cs),ready_count,appended_count,attempted_count)
 if __name__=="__main__":main()
