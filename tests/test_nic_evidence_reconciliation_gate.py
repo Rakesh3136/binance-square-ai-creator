@@ -63,7 +63,7 @@ class GateTests(unittest.TestCase):
             d.mkdir(parents=True)
             snapshot_path = d / "nic_forecast_truth_ledger.jsonl"
             outcome_path = d / "nic_forecast_outcome_events.jsonl"
-            snapshot_path.write_text(json.dumps({"forecast_id": "persisted-id"}) + "\\n", encoding="utf-8")
+            snapshot_path.write_text(json.dumps({"forecast_id": "persisted-id"}) + "\n", encoding="utf-8")
             outcome_path.write_text("", encoding="utf-8")
             sh = hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
             eh = hashlib.sha256(outcome_path.read_bytes()).hexdigest()
