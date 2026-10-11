@@ -17,6 +17,7 @@ on:
       - ".github/workflows/nic-outcome-calibration-pr.yml"
       - ".github/workflows/nic-forecast-laboratory.yml"
       - "src/nic_forecast_laboratory.py"
+      - "tests/test_nic_forecast_laboratory.py"
   workflow_dispatch:
 
 permissions:
@@ -47,6 +48,8 @@ jobs:
         run: python tests/test_nic_forecast_profitability.py
       - name: Test Forecast Laboratory fails closed without fresh evidence
         run: python tests/test_nic_forecast_laboratory_fail_closed.py
+      - name: Test closed-candle-only forecast inputs
+        run: python tests/test_nic_forecast_laboratory.py
       - name: Verify no live publishing side effects in new modules
         run: |
           python - <<'PY'
