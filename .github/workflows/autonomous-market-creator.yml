@@ -536,6 +536,13 @@ jobs:
             exit 0
           fi
           git commit -m "Persist NIC Forecast Laboratory evidence"
+          # Other pipeline components may leave unrelated runtime files modified.
+          # Stash those files so Git can safely rebase the committed evidence change.
+          # This is the final workflow step, so do not re-apply the runtime-only stash.
+          git stash push --include-untracked -m "runtime artifacts held aside during forecast evidence persistence" || {
+            echo "::error::Could not safely preserve unrelated runtime artifacts before forecast evidence rebase."
+            exit 1
+          }
           # Other scheduled workflows may push while this creator run is executing.
           # Rebase onto the newest main before each push; never force-push evidence.
           for attempt in 1 2 3; do
