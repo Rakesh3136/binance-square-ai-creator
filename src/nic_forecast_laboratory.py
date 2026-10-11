@@ -8,6 +8,8 @@ PRED=LIVE/"nic_prediction_engine.json"; OUT=LIVE/"nic_forecast_laboratory.json"
 REPORT=INT/"nic_forecast_laboratory_report.json"; LEDGER=INT/"nic_forecast_truth_ledger.jsonl"; MATRIX=INT/"nic_signal_predictivity_matrix.json"; REGH=INT/"nic_regime_history.jsonl"
 BASES=("https://data-api.binance.vision","https://api-gcp.binance.com","https://api1.binance.com","https://api2.binance.com")
 MIN=30; H=(6,12,24)
+STRATEGY_VERSION="NIC-PROSPECTIVE-CHAMPION-1.0"
+STRATEGY_SPEC={"analogue_pool_size":80,"decision_margin":0.05,"horizons_hours":[6,12,24],"input_candles":"closed_1h_only","probability_source":"nearest_historical_analogue_raw_hit_rate","cost_model":"fee_and_slippage_stress_in_prospective_evaluator"}
 def n(v,d=0.0):
     try:x=float(v); return x if math.isfinite(x) else d
     except:return d
@@ -131,7 +133,9 @@ def make_snapshots(symbol, result):
                              else ("SHORT_CANDIDATE" if result["decision"] == "BEARISH" and side == "BEARISH" else "WAIT")),
                 "forecast_probability": max(0.0, min(1.0, probability)),
                 "probability_source": "nearest_historical_analogue_raw_hit_rate",
-                "validation_status": "LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF",
+                "strategy_version": STRATEGY_VERSION,
+                "strategy_spec": STRATEGY_SPEC,
+                "validation_status": "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN",
                 "resolved": False
             })
     return rows
