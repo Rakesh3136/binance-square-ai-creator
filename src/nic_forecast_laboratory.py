@@ -15,12 +15,23 @@ def load(p,d=None):
     try:v=json.loads(p.read_text()); return v if isinstance(v,type(d if d is not None else {})) else (d if d is not None else {})
     except:return d if d is not None else {}
 def sym(v): return str(v or "").upper().replace("BINANCE:","").replace("USDT","").strip()
+def closed_candles(rows, now_ms=None, interval_ms=60*60*1000):
+    """Exclude the still-forming candle; forecasts may use only completed bars."""
+    now_ms = int(time.time() * 1000) if now_ms is None else int(now_ms)
+    return [row for row in rows if int(row.get("t") or 0) + interval_ms <= now_ms]
+
+
 def candles(s,limit=720):
     q=urllib.parse.urlencode({"symbol":sym(s)+"USDT","interval":"1h","limit":limit}); last=None
     for b in BASES:
         try:
             r=urllib.request.urlopen(urllib.request.Request(b+"/api/v3/klines?"+q,headers={"User-Agent":"binance-square-ai-creator/nic-forecast-lab"}),timeout=15)
-            raw=json.loads(r.read()); return [{"t":int(x[0]),"h":n(x[2]),"l":n(x[3]),"c":n(x[4]),"v":n(x[7])} for x in raw if isinstance(x,list) and len(x)>=8]
+            raw=json.loads(r.read())
+            parsed=[{"t":int(x[0]),"h":n(x[2]),"l":n(x[3]),"c":n(x[4]),"v":n(x[7])} for x in raw if isinstance(x,list) and len(x)>=8]
+            closed=closed_candles(parsed)
+            if len(closed) < 120:
+                raise RuntimeError(f"Only {len(closed)} fully closed hourly candles; need at least 120")
+            return closed
         except Exception as e:last=e
     raise RuntimeError(str(last))
 def ema(v,p):
