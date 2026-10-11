@@ -135,6 +135,7 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
         groups.setdefault(key, []).append(row)
     report_groups = {}
     for (side, horizon), items in sorted(groups.items()):
+        items = sorted(items, key=lambda row: (str(row.get("timestamp") or ""), str(row.get("forecast_id") or "")))
         split = max(1, int(len(items) * 0.7))
         train, test = items[:split], items[split:]
         total_metrics = trade_metrics(items, cost)
