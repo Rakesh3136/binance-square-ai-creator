@@ -1,4 +1,8 @@
-"""NIC Forecast probability calibration joined to immutable snapshots and terminal events."""
+"""NIC Forecast probability calibration joined to immutable snapshots and terminal events.
+
+Calibration measures probability quality only; it is not evidence of net trading profitability.
+The separate profitability evaluator scores actionable forecasts and remains fail-closed.
+"""
 from __future__ import annotations
 import json, math
 from pathlib import Path
