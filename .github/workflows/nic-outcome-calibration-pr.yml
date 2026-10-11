@@ -6,6 +6,8 @@ on:
       - "src/trade_outcome_journal.py"
       - "src/forecast_calibration.py"
       - "src/nic_forecast_calibrator.py"
+      - "src/nic_forecast_profitability.py"
+      - "tests/test_nic_forecast_profitability.py"
       - "tests/test_trade_outcome_journal.py"
       - "tests/test_forecast_calibration.py"
       - "tests/test_nic_forecast_calibrator.py"
@@ -34,13 +36,15 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile new and production calibration modules
-        run: python -m py_compile src/trade_outcome_journal.py src/forecast_calibration.py src/nic_forecast_calibrator.py
+        run: python -m py_compile src/trade_outcome_journal.py src/forecast_calibration.py src/nic_forecast_calibrator.py src/nic_forecast_profitability.py
       - name: Test evidence-first outcome journal
         run: python tests/test_trade_outcome_journal.py
       - name: Test draft calibration utility
         run: python tests/test_forecast_calibration.py
       - name: Test production forecast event-ledger integration
         run: python tests/test_nic_forecast_calibrator.py
+      - name: Test action-aware profitability proof gate
+        run: python tests/test_nic_forecast_profitability.py
       - name: Test Forecast Laboratory fails closed without fresh evidence
         run: python tests/test_nic_forecast_laboratory_fail_closed.py
       - name: Verify no live publishing side effects in new modules
