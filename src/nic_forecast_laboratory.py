@@ -145,6 +145,22 @@ def read_jsonl(path):
         try: out.append(json.loads(line))
         except: pass
     return out
+
+def verify_persisted_snapshots(path, expected_records):
+    """Prove every newly reported forecast ID exists exactly once in the persisted ledger."""
+    persisted = read_jsonl(path)
+    ids = [str(row.get("forecast_id") or "") for row in persisted]
+    if any(not fid for fid in ids):
+        raise RuntimeError("Truth ledger contains a snapshot without forecast_id")
+    if len(ids) != len(set(ids)):
+        raise RuntimeError("Truth ledger contains duplicate immutable forecast IDs")
+    expected = {str(row.get("forecast_id") or "") for row in expected_records}
+    if "" in expected:
+        raise RuntimeError("New forecast snapshot is missing forecast_id")
+    missing = expected - set(ids)
+    if missing:
+        raise RuntimeError(f"Forecast persistence verification failed: {len(missing)} newly appended IDs are missing from truth ledger")
+    return persisted
 def build_learning():
     # Prediction snapshots are immutable; outcome events live in a separate append-only ledger.
     snapshots=read_jsonl(LEDGER)
@@ -220,6 +236,9 @@ def main():
         if fid not in existing and fid not in seen_new:
             fresh.append(row);seen_new.add(fid)
     append_jsonl(LEDGER,fresh)
+    # Never publish a successful report based only on the in-memory list. Re-read
+    # the file from disk and verify every new immutable forecast was actually persisted.
+    persisted_snapshots = verify_persisted_snapshots(LEDGER, fresh)
     matrix=build_learning()
     data={"schema":"NIC-FORECAST-LAB-2.0","generated_at":datetime.now(timezone.utc).isoformat(),"results":res,"failures":fails,
           "learning":{"truth_ledger":str(LEDGER.relative_to(ROOT)),"signal_matrix":str(MATRIX.relative_to(ROOT)),"regime_history":str(REGH.relative_to(ROOT)),"walk_forward_validation":False,"live_forecast_snapshots":True,"validation_status":"LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF","persistent_outcome_resolution":True},
