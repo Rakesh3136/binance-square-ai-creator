@@ -10,6 +10,17 @@ def test_wait():
 def test_signal_audit_contract():
  x=m.walkforward([{"c":100,"h":101,"l":99,"v":100}]*150,"BULLISH","volume_expansion")
  assert set(("feature","base","conditional","lift","eligible","predictive"))<=set(x)
+
+def test_open_hourly_candle_is_excluded():
+ now = 8 * 60 * 60 * 1000 + 30 * 60 * 1000
+ rows = [
+  {"t": 7 * 60 * 60 * 1000, "c": 1},
+  {"t": 8 * 60 * 60 * 1000, "c": 2},
+ ]
+ closed = m.closed_candles(rows, now_ms=now)
+ assert [x["c"] for x in closed] == [1]
+ assert [x["c"] for x in m.closed_candles(rows, now_ms=8 * 60 * 60 * 1000)] == [1]
+
 def test_one_snapshot_per_side_horizon_not_per_feature():
  result={"status":"READY","as_of":"2026-10-11T10:00:00+00:00","symbol":"TEST","regime":"RANGE",
          "current_features":{"price":100,"trend":1,"momentum":2,"rsi":55,"volume_ratio":1.4,"distance_ema20":1,"range_position":.6},
@@ -22,4 +33,4 @@ def test_one_snapshot_per_side_horizon_not_per_feature():
  assert {x["horizon_hours"] for x in rows}=={6,12,24}
  assert all("feature_flags" in x and x["feature"]=="COMPOSITE" for x in rows)
  assert all(x["validation_status"]=="LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF" for x in rows)
-if __name__=="__main__": test_regime();test_wait();test_signal_audit_contract();test_one_snapshot_per_side_horizon_not_per_feature();print("Forecast Laboratory learning tests passed")
+if __name__=="__main__": test_regime();test_wait();test_signal_audit_contract();test_open_hourly_candle_is_excluded();test_one_snapshot_per_side_horizon_not_per_feature();print("Forecast Laboratory learning tests passed")
