@@ -141,6 +141,24 @@ jobs:
           run_component nic_forecast_profitability python src/nic_forecast_profitability.py
           run_component nic_portfolio_reality_engine python src/nic_portfolio_reality_engine.py
           if [ -s data/intelligence/nic_portfolio_reality.json ]; then python -m json.tool data/intelligence/nic_portfolio_reality.json >/dev/null || { echo "FAILED nic_portfolio_reality_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_portfolio_reality_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root = Path("data/intelligence")
+          report = json.loads((root / "nic_portfolio_reality.json").read_text(encoding="utf-8"))
+          snapshots_path = root / "nic_forecast_truth_ledger.jsonl"
+          outcomes_path = root / "nic_forecast_outcome_events.jsonl"
+          snapshots = [json.loads(line) for line in snapshots_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+          outcomes = [json.loads(line) for line in outcomes_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+          files = report.get("source_file_evidence") or {}
+          assert files.get("snapshot_ledger_sha256") == hashlib.sha256(snapshots_path.read_bytes()).hexdigest(), "Portfolio Reality snapshot source hash is stale"
+          assert files.get("outcome_ledger_sha256") == hashlib.sha256(outcomes_path.read_bytes()).hexdigest(), "Portfolio Reality outcome source hash is stale"
+          evidence = report.get("source_evidence") or {}
+          assert evidence.get("snapshot_count") == len(snapshots), "Portfolio Reality snapshot count mismatch"
+          assert evidence.get("terminal_outcome_count") == sum(x.get("event_type") == "FORECAST_RESOLVED" for x in outcomes), "Portfolio Reality terminal outcome count mismatch"
+          assert report.get("status") == "NOT_PROVEN" and report.get("trade_or_publication_authorization") is False, "Portfolio Reality must never authorize trades or publication"
+          print("NIC Portfolio Reality evidence reconciliation: PASS")
+          PY
           if [ -s data/intelligence/nic_forecast_calibration.json ]; then python -m json.tool data/intelligence/nic_forecast_calibration.json >/dev/null || { echo "FAILED nic_forecast_calibration_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_forecast_calibration_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
           run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py
           run_component nic24_regime_router python src/nic24_regime_aware_strategy_router.py
