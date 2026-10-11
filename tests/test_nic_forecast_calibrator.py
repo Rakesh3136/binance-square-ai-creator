@@ -220,6 +220,11 @@ def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
     assert "git stash push --include-untracked" in workflow
     assert "git fetch origin main" in workflow
     assert "git rebase origin/main" in workflow
+    assert "NIC_EVIDENCE_COMMIT" in workflow
+    assert "Merge and reconcile NIC Forecast Laboratory evidence" in workflow
+    assert "lambda x: str(x.get(\"forecast_id\") or \"\")" in workflow
+    assert "python src/nic_forecast_outcome_resolver.py" in workflow
+    assert "python src/nic_forecast_calibrator.py" in workflow
     assert "for attempt in 1 2 3" in workflow
     assert "git push origin HEAD:main" in workflow
     assert "Forecast evidence persistence failed after three safe push attempts" in workflow
