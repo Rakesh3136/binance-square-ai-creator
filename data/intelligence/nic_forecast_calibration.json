@@ -1,16 +1,16 @@
 {
   "schema": "NIC-FORECAST-CALIBRATION-3.0",
-  "generated_at": "2026-10-10T22:28:12.909235+00:00",
+  "generated_at": "2026-10-11T00:54:30.699429+00:00",
   "minimum_events": 30,
   "cells": {
     "BULLISH|RANGE|6h": {
       "side": "BULLISH",
       "regime": "RANGE",
       "horizon_hours": 6,
-      "samples": 510,
-      "wins": 260,
-      "raw_rate": 0.5098,
-      "calibrated_probability": 0.5098,
+      "samples": 585,
+      "wins": 305,
+      "raw_rate": 0.5214,
+      "calibrated_probability": 0.5213,
       "confidence": 1.0,
       "trusted": true
     },
@@ -40,10 +40,10 @@
       "side": "BEARISH",
       "regime": "RANGE",
       "horizon_hours": 6,
-      "samples": 510,
-      "wins": 230,
-      "raw_rate": 0.451,
-      "calibrated_probability": 0.4512,
+      "samples": 585,
+      "wins": 255,
+      "raw_rate": 0.4359,
+      "calibrated_probability": 0.4361,
       "confidence": 1.0,
       "trusted": true
     },
@@ -73,10 +73,10 @@
       "side": "BULLISH",
       "regime": "TREND_UP",
       "horizon_hours": 6,
-      "samples": 220,
-      "wins": 60,
-      "raw_rate": 0.2727,
-      "calibrated_probability": 0.2748,
+      "samples": 240,
+      "wins": 70,
+      "raw_rate": 0.2917,
+      "calibrated_probability": 0.2934,
       "confidence": 1.0,
       "trusted": true
     },
@@ -106,10 +106,10 @@
       "side": "BEARISH",
       "regime": "TREND_UP",
       "horizon_hours": 6,
-      "samples": 220,
-      "wins": 160,
-      "raw_rate": 0.7273,
-      "calibrated_probability": 0.7252,
+      "samples": 240,
+      "wins": 170,
+      "raw_rate": 0.7083,
+      "calibrated_probability": 0.7066,
       "confidence": 1.0,
       "trusted": true
     },
@@ -332,34 +332,56 @@
       "calibrated_probability": 0.3611,
       "confidence": 0.3333,
       "trusted": false
+    },
+    "BULLISH|TREND_UP_EXTENDED|6h": {
+      "side": "BULLISH",
+      "regime": "TREND_UP_EXTENDED",
+      "horizon_hours": 6,
+      "samples": 25,
+      "wins": 10,
+      "raw_rate": 0.4,
+      "calibrated_probability": 0.4228,
+      "confidence": 0.8333,
+      "trusted": false
+    },
+    "BEARISH|TREND_UP_EXTENDED|6h": {
+      "side": "BEARISH",
+      "regime": "TREND_UP_EXTENDED",
+      "horizon_hours": 6,
+      "samples": 25,
+      "wins": 15,
+      "raw_rate": 0.6,
+      "calibrated_probability": 0.5772,
+      "confidence": 0.8333,
+      "trusted": false
     }
   },
   "global_metrics": {
-    "samples": 2520,
-    "brier_score": 0.261586,
-    "log_loss": 0.721915,
-    "coverage": 0.5385
+    "samples": 2760,
+    "brier_score": 0.259556,
+    "log_loss": 0.717133,
+    "coverage": 0.561
   },
   "reliability_bins": {
     "6": {
-      "samples": 535,
-      "mean_predicted": 0.636,
-      "observed_rate": 0.5047
+      "samples": 550,
+      "mean_predicted": 0.6356,
+      "observed_rate": 0.5091
     },
     "3": {
-      "samples": 550,
-      "mean_predicted": 0.3528,
-      "observed_rate": 0.4636
+      "samples": 570,
+      "mean_predicted": 0.3529,
+      "observed_rate": 0.4474
     },
     "5": {
-      "samples": 615,
-      "mean_predicted": 0.5413,
-      "observed_rate": 0.626
+      "samples": 715,
+      "mean_predicted": 0.5419,
+      "observed_rate": 0.5944
     },
     "4": {
-      "samples": 615,
-      "mean_predicted": 0.4456,
-      "observed_rate": 0.374
+      "samples": 705,
+      "mean_predicted": 0.4445,
+      "observed_rate": 0.4043
     },
     "8": {
       "samples": 45,
@@ -372,9 +394,9 @@
       "observed_rate": 0.625
     },
     "7": {
-      "samples": 55,
-      "mean_predicted": 0.7136,
-      "observed_rate": 0.4545
+      "samples": 65,
+      "mean_predicted": 0.7183,
+      "observed_rate": 0.5385
     },
     "9": {
       "samples": 5,
@@ -382,9 +404,9 @@
       "observed_rate": 1.0
     },
     "2": {
-      "samples": 55,
-      "mean_predicted": 0.2648,
-      "observed_rate": 0.4545
+      "samples": 60,
+      "mean_predicted": 0.2604,
+      "observed_rate": 0.4167
     },
     "0": {
       "samples": 5,
@@ -392,6 +414,6 @@
       "observed_rate": 0.0
     }
   },
-  "resolved_event_samples": 4680,
+  "resolved_event_samples": 4920,
   "policy": "Calibration joins terminal outcome events to immutable snapshots by forecast_id; unresolved outcomes are excluded. Legacy resolved snapshots remain readable. Brier score and log loss measure probabilistic quality; small samples are shrunk toward 50% and are never trusted."
 }
