@@ -65,7 +65,7 @@ jobs:
       - name: Verify persisted learning artifacts agree
         run: |
           python - <<'PY'
-          import json
+          import hashlib, json
           from pathlib import Path
           root = Path("data/intelligence")
           def jsonl(name):
@@ -100,6 +100,13 @@ jobs:
           portfolio = json.loads((root / "nic_portfolio_reality.json").read_text(encoding="utf-8"))
           evidence = portfolio.get("source_evidence") or {}
           terminal_rows = sum(x.get("event_type") == "FORECAST_RESOLVED" for x in events)
+          file_evidence = portfolio.get("source_file_evidence") or {}
+          snapshot_path = root / "nic_forecast_truth_ledger.jsonl"
+          outcome_path = root / "nic_forecast_outcome_events.jsonl"
+          if file_evidence.get("snapshot_ledger_sha256") != hashlib.sha256(snapshot_path.read_bytes()).hexdigest():
+              raise AssertionError("Portfolio Reality snapshot source hash is stale")
+          if file_evidence.get("outcome_ledger_sha256") != hashlib.sha256(outcome_path.read_bytes()).hexdigest():
+              raise AssertionError("Portfolio Reality outcome source hash is stale")
           if evidence.get("snapshot_count") != len(snapshots):
               raise AssertionError("Portfolio Reality snapshot count does not match immutable ledger")
           if evidence.get("terminal_outcome_count") != terminal_rows:
