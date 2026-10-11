@@ -76,7 +76,7 @@ def main() -> None:
     profitability = json.loads(PROFITABILITY.read_text(encoding="utf-8"))
     report = evaluate(portfolio, profitability)
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(report, indent=2) + "\\n", encoding="utf-8")
+    OUT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({
         "status": report["status"],
         "approved_strategy_groups": report["approved_strategy_groups"],
