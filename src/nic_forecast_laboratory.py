@@ -176,14 +176,18 @@ def build_learning():
         "policy":"Only terminal outcome events joined to immutable forecast snapshots may contribute to learning; trust requires >=30 observations, >5pp lift, and no recent collapse."},indent=2))
     return matrix
 
-def require_forecast_evidence(candidate_count, ready_count, appended_count):
-    """Fail closed when this cycle cannot create fresh, auditable forecast snapshots."""
+def require_forecast_evidence(candidate_count, ready_count, appended_count, attempted_count=0):
+    """Fail closed on missing candidates/data, but allow duplicate-only closed-candle no-op cycles."""
     if candidate_count <= 0:
         raise RuntimeError("Forecast Laboratory blocked: prediction engine supplied zero candidates")
     if ready_count <= 0:
         raise RuntimeError("Forecast Laboratory blocked: no candidate passed market-data/hypothesis validation")
-    if appended_count <= 0:
-        raise RuntimeError("Forecast Laboratory blocked: no fresh immutable forecast snapshots were appended")
+    if appended_count <= 0 and attempted_count <= 0:
+        raise RuntimeError("Forecast Laboratory blocked: no fresh immutable forecast snapshots were appended and no valid snapshot candidates were generated")
+    # Forecast IDs are anchored to the last closed hourly candle. A 20-minute
+    # schedule will revisit the same candle; if valid snapshots were generated
+    # but all IDs already exist, treat it as an auditable no-op, not a failure.
+    return "APPENDED" if appended_count > 0 else "NO_NEW_CLOSED_CANDLE"
 
 
 def main():
@@ -213,11 +217,17 @@ def main():
     claims=sum(1 for x in res if x.get("status")=="READY" for h in x["hypotheses"].values() for a in h["forward"]["predictivity"]["audits"] if a["predictive"])
     ready_count=sum(x.get("status")=="READY" for x in res)
     appended_count=len(fresh)
-    status="READY" if ready_count>0 and appended_count>0 else "BLOCKED"
+    attempted_count=len(new)
+    if ready_count>0 and appended_count>0:
+        status="READY"; block_reason=None
+    elif ready_count>0 and attempted_count>0:
+        status="NO_NEW_CLOSED_CANDLE"; block_reason="Valid forecast IDs already exist for this closed-candle window; duplicate snapshots were not appended."
+    else:
+        status="BLOCKED"; block_reason="No fresh auditable forecast snapshots were produced; stale calibration must not be treated as current evidence."
     data["status"]=status
-    data["block_reason"]=None if status=="READY" else "No fresh auditable forecast snapshots were produced; stale calibration must not be treated as current evidence."
+    data["block_reason"]=block_reason
     OUT.write_text(json.dumps(data,indent=2))
-    REPORT.write_text(json.dumps({"schema":"NIC-FORECAST-LAB-2.0","generated_at":data["generated_at"],"status":status,"block_reason":data["block_reason"],"candidates":len(cs),"ready":ready_count,"appended_snapshots":appended_count,"failures":len(fails),"predictive_claims":0,"candidate_signal_associations":claims,"learned_signal_cells":len(matrix),"policy":"No signal is trusted from correlation alone; persistent edge requires chronological validation and >=30 events."},indent=2))
-    print(json.dumps({"status":status,"candidates":len(cs),"ready":ready_count,"appended_snapshots":appended_count,"failures":len(fails),"learned_signal_cells":len(matrix)}))
-    require_forecast_evidence(len(cs),ready_count,appended_count)
+    REPORT.write_text(json.dumps({"schema":"NIC-FORECAST-LAB-2.0","generated_at":data["generated_at"],"status":status,"block_reason":block_reason,"candidates":len(cs),"ready":ready_count,"attempted_snapshots":attempted_count,"appended_snapshots":appended_count,"deduplicated_snapshots":attempted_count-appended_count,"failures":len(fails),"predictive_claims":0,"candidate_signal_associations":claims,"learned_signal_cells":len(matrix),"policy":"No signal is trusted from correlation alone; persistent edge requires chronological validation and >=30 events."},indent=2))
+    print(json.dumps({"status":status,"candidates":len(cs),"ready":ready_count,"attempted_snapshots":attempted_count,"appended_snapshots":appended_count,"failures":len(fails),"learned_signal_cells":len(matrix)}))
+    require_forecast_evidence(len(cs),ready_count,appended_count,attempted_count)
 if __name__=="__main__":main()
