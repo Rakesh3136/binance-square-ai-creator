@@ -330,7 +330,7 @@ jobs:
           mode=str(eligibility.get("publication_mode","BLOCKED")).upper()
           # Trade-mode posts require an explicitly admitted strategy; exploratory
           # results and missing/stale admission evidence must never pass this gate.
-          trade_admitted=admission.get("status") == "ADMITTED" and admission.get("trade_authorization") is True
+          trade_admitted=admission.get("status") == "ADMITTED" and admission.get("trade_mode_publication_admitted") is True
           safe=bool(routing.get("publish")) and eligible and ((decision == "TRADE" and passed and mode == "TRADE" and trade_admitted) or (decision in {"EDITORIAL_SIGNAL","EDITORIAL","RESEARCH","NO_TRADE"} and mode in {"EDITORIAL","TRADE"}))
           print("true" if safe else "false")
           PY
