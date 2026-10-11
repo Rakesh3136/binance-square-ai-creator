@@ -61,6 +61,35 @@ def test_wait_and_legacy_rows_never_count_as_trades():
     assert report["groups"] == {}
 
 
+def test_source_validator_counts_only_actionable_decisions():
+    with tempfile.TemporaryDirectory() as directory:
+        ledger = Path(directory) / "truth.jsonl"
+        events = Path(directory) / "outcomes.jsonl"
+        snapshots = [
+            {"forecast_id": "long", "timestamp": "0001", "side": "BULLISH", "decision": "LONG_CANDIDATE", "horizon_hours": 6},
+            {"forecast_id": "wait", "timestamp": "0002", "side": "BULLISH", "decision": "WAIT", "horizon_hours": 6},
+            {"forecast_id": "legacy", "timestamp": "0003", "side": "BEARISH", "horizon_hours": 6},
+        ]
+        outcomes = [
+            {"forecast_id": row["forecast_id"], "event_type": "FORECAST_RESOLVED",
+             "signed_return": 0.5, "hit": True}
+            for row in snapshots
+        ]
+        ledger.write_text("".join(__import__("json").dumps(row) + "\\n" for row in snapshots), encoding="utf-8")
+        events.write_text("".join(__import__("json").dumps(row) + "\\n" for row in outcomes), encoding="utf-8")
+        report = m.evaluate(m.load_resolved(snapshots, outcomes))
+        report["source_evidence"] = {
+            "snapshot_ledger_sha256": m.file_sha256(ledger),
+            "outcome_ledger_sha256": m.file_sha256(events),
+            "snapshot_count": len(snapshots),
+            "terminal_outcome_count": len(outcomes),
+            "resolved_forecast_count": len(snapshots),
+        }
+        m.validate_report_sources(report, snapshots, outcomes, ledger_path=ledger, events_path=events)
+        assert report["resolved_forecast_count"] == 3
+        assert report["sample_count"] == 1
+
+
 def test_bad_cost_configuration_rejected():
     try:
         m.evaluate([], fee_per_side_pct=-0.1)

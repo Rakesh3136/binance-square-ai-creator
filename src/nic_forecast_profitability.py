@@ -239,8 +239,22 @@ def validate_report_sources(report: dict, snapshots: list[dict], events: list[di
     for key, value in expected.items():
         if evidence.get(key) != value:
             raise AssertionError(f"Profitability source evidence mismatch for {key}")
-    if report.get("sample_count") != expected["resolved_forecast_count"]:
-        raise AssertionError("Profitability sample count does not match current immutable source evidence")
+    resolved_rows = load_resolved(snapshots, events)
+    actionable_count = sum(
+        1 for row in resolved_rows
+        if (
+            (str(row.get("side") or "").upper() == "BULLISH"
+             and str(row.get("decision") or "").upper() == "LONG_CANDIDATE")
+            or
+            (str(row.get("side") or "").upper() == "BEARISH"
+             and str(row.get("decision") or "").upper() == "SHORT_CANDIDATE")
+        )
+    )
+    if report.get("sample_count") != actionable_count:
+        raise AssertionError(
+            "Profitability sample count does not match actionable resolved forecasts "
+            f"(reported={report.get('sample_count')}, expected={actionable_count})"
+        )
     if not snapshots and report.get("status") != "NOT_PROVEN":
         raise AssertionError("Empty forecast ledger cannot support a profitability claim")
     if report.get("status") == "PROVISIONAL_POSITIVE_HELD_OUT":
