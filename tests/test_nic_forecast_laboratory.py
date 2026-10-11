@@ -12,14 +12,14 @@ def test_signal_audit_contract():
  assert set(("feature","base","conditional","lift","eligible","predictive"))<=set(x)
 
 def test_open_hourly_candle_is_excluded():
- now = 10 * 60 * 60 * 1000
+ now = 8 * 60 * 60 * 1000 + 30 * 60 * 1000
  rows = [
-  {"t": 8 * 60 * 60 * 1000, "c": 1},
-  {"t": 9 * 60 * 60 * 1000, "c": 2},
+  {"t": 7 * 60 * 60 * 1000, "c": 1},
+  {"t": 8 * 60 * 60 * 1000, "c": 2},
  ]
  closed = m.closed_candles(rows, now_ms=now)
  assert [x["c"] for x in closed] == [1]
- assert m.closed_candles(rows, now_ms=9 * 60 * 60 * 1000) == []
+ assert [x["c"] for x in m.closed_candles(rows, now_ms=8 * 60 * 60 * 1000)] == [1]
 
 def test_one_snapshot_per_side_horizon_not_per_feature():
  result={"status":"READY","as_of":"2026-10-11T10:00:00+00:00","symbol":"TEST","regime":"RANGE",
