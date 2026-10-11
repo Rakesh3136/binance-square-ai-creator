@@ -82,11 +82,19 @@ def rebuild(snapshots,events):
         fid=str(x.get("forecast_id") or ""); outcome=by_id.get(fid) or legacy.get(fid)
         if outcome:
             row=dict(x); row["resolved"]=True; row["signed_return"]=float(outcome.get("signed_return",0)); joined.append(row)
+    joined.sort(key=lambda x: str(x.get("timestamp") or ""))
     base={}; groups={}
     for x in joined:
         side=str(x.get("side") or "").upper(); reg=str(x.get("regime") or "UNKNOWN"); h=int(x.get("horizon_hours") or 0)
         signed=float(x.get("signed_return",0)); base.setdefault((side,reg,h),[]).append(signed)
-        groups.setdefault((side,str(x.get("feature") or ""),reg,h),[]).append(signed)
+        flags=x.get("feature_flags") if isinstance(x.get("feature_flags"),dict) else {}
+        active=[str(name) for name,value in flags.items() if value is True]
+        # Read old feature-per-row snapshots for backwards compatibility.
+        if not flags:
+            legacy_feature=str(x.get("feature") or "")
+            active=[legacy_feature] if legacy_feature and legacy_feature!="COMPOSITE" else []
+        for feature in active:
+            groups.setdefault((side,feature,reg,h),[]).append(signed)
     matrix={}
     for (side,feature,reg,h),vals in groups.items():
         b=base.get((side,reg,h),[]); rate=sum(x>0 for x in vals)/len(vals); br=sum(x>0 for x in b)/len(b) if b else 0
