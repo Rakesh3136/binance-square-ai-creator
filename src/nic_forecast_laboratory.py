@@ -135,6 +135,7 @@ def make_snapshots(symbol, result):
                 "forecast_probability": max(0.0, min(1.0, probability)),
                 "probability_source": "nearest_historical_analogue_raw_hit_rate",
                 "strategy_version": STRATEGY_VERSION,
+                "strategy_frozen_at": ts,
                 "strategy_spec": STRATEGY_SPEC,
                 "strategy_spec_sha256": STRATEGY_SPEC_SHA256,
                 "validation_status": "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN",
