@@ -212,8 +212,12 @@ def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
     lab = workflow.index("run_component nic_forecast_laboratory python src/nic_forecast_laboratory.py")
     resolver = workflow.index("run_component nic_forecast_outcome_resolver python src/nic_forecast_outcome_resolver.py")
     calibrator = workflow.index("run_component nic_forecast_calibrator python src/nic_forecast_calibrator.py")
+    profitability = workflow.index("run_component nic_forecast_profitability python src/nic_forecast_profitability.py")
     validator = workflow.index("run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py")
-    assert lab < resolver < calibrator < validator
+    assert lab < resolver < calibrator < profitability < validator
+    assert "data/intelligence/nic_forecast_profitability.json" in workflow
+    assert "src/nic_forecast_profitability.py" in lab_workflow
+    assert "tests/test_nic_forecast_profitability.py" in lab_workflow
     assert "FAILED nic_forecast_calibration_artifact_missing" in workflow
     assert "Persist Forecast Laboratory evidence ledgers" in workflow
     assert "git add -- data/intelligence/nic_forecast_truth_ledger.jsonl" in workflow
