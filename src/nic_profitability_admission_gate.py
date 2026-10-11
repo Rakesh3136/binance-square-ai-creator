@@ -65,6 +65,7 @@ def evaluate(portfolio: dict, profitability: dict) -> dict:
         "approved_strategy_groups": sorted(approved) if admitted else [],
         "reasons": [] if admitted else reasons,
         "trade_authorization": False,
+        "trade_mode_publication_admitted": admitted,
         "publication_or_trade_authorization": False,
         "note": "A gate pass is necessary, not sufficient, for live trading; human approval, real execution evidence, risk controls, and an untouched final holdout remain required.",
     }
