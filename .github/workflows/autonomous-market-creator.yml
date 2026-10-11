@@ -9,6 +9,7 @@ on:
       - 'data/intelligence/nic_forecast_outcome_events.jsonl'
       - 'data/intelligence/nic_signal_predictivity_matrix.json'
       - 'data/intelligence/nic_forecast_calibration.json'
+      - 'data/intelligence/nic_forecast_profitability.json'
       - 'data/intelligence/nic_forecast_laboratory_report.json'
       - 'data/intelligence/nic_regime_history.jsonl'
       - 'data/live/nic_forecast_laboratory.json'
@@ -136,6 +137,7 @@ jobs:
           run_component nic_forecast_laboratory python src/nic_forecast_laboratory.py
           run_component nic_forecast_outcome_resolver python src/nic_forecast_outcome_resolver.py
           run_component nic_forecast_calibrator python src/nic_forecast_calibrator.py
+          run_component nic_forecast_profitability python src/nic_forecast_profitability.py
           if [ -s data/intelligence/nic_forecast_calibration.json ]; then python -m json.tool data/intelligence/nic_forecast_calibration.json >/dev/null || { echo "FAILED nic_forecast_calibration_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_forecast_calibration_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
           run_component nic_prediction_contract_validator python src/nic_prediction_contract_validator.py
           run_component nic24_regime_router python src/nic24_regime_aware_strategy_router.py
@@ -531,7 +533,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_regime_history.jsonl data/live/nic_forecast_laboratory.json
+          git add -- data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_profitability.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_regime_history.jsonl data/live/nic_forecast_laboratory.json
           if git diff --cached --quiet; then
             echo "No Forecast Laboratory evidence changes to persist."
             exit 0
