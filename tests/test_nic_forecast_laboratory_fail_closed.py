@@ -36,13 +36,20 @@ def test_no_fresh_snapshots_fails_closed():
         raise AssertionError("a cycle without fresh snapshots must not silently pass")
 
 
+def test_duplicate_only_closed_candle_is_a_valid_noop():
+    result = MODULE.require_forecast_evidence(5, 3, 0, attempted_count=9)
+    assert result == "NO_NEW_CLOSED_CANDLE"
+
+
 def test_fresh_forecast_evidence_is_allowed():
-    MODULE.require_forecast_evidence(5, 3, 9)
+    result = MODULE.require_forecast_evidence(5, 3, 9, attempted_count=9)
+    assert result == "APPENDED"
 
 
 if __name__ == "__main__":
     test_empty_prediction_queue_fails_closed()
     test_no_ready_candidates_fails_closed()
     test_no_fresh_snapshots_fails_closed()
+    test_duplicate_only_closed_candle_is_a_valid_noop()
     test_fresh_forecast_evidence_is_allowed()
     print("NIC Forecast Laboratory empty-evidence fail-closed tests: PASS")
