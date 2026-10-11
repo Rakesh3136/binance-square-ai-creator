@@ -97,9 +97,20 @@ jobs:
           matrix_count = int(matrix.get("resolved_event_count") or 0)
           if matrix_count != len(terminal):
               raise AssertionError(f"Signal matrix event count {matrix_count} != terminal outcome IDs {len(terminal)}")
+          portfolio = json.loads((root / "nic_portfolio_reality.json").read_text(encoding="utf-8"))
+          evidence = portfolio.get("source_evidence") or {}
+          terminal_rows = sum(x.get("event_type") == "FORECAST_RESOLVED" for x in events)
+          if evidence.get("snapshot_count") != len(snapshots):
+              raise AssertionError("Portfolio Reality snapshot count does not match immutable ledger")
+          if evidence.get("terminal_outcome_count") != terminal_rows:
+              raise AssertionError("Portfolio Reality terminal outcome count does not match event ledger")
+          if portfolio.get("status") != "NOT_PROVEN" or portfolio.get("trade_or_publication_authorization") is not False:
+              raise AssertionError("Portfolio Reality must fail closed and never authorize trades/publication")
           print(json.dumps({"snapshots": len(snapshots), "terminal_events": len(terminal),
                             "resolved_ids": len(resolved_ids), "calibration_samples": scored,
                             "matrix_resolved_event_count": matrix_count,
+                            "portfolio_status": portfolio.get("status"),
+                            "portfolio_actionable_forecasts": evidence.get("resolved_actionable_forecasts"),
                             "persisted_learning_artifacts": "PASS"}))
           PY
 
