@@ -33,7 +33,7 @@ def test_one_snapshot_per_side_horizon_not_per_feature():
  assert {x["horizon_hours"] for x in rows}=={6,12,24}
  assert all("feature_flags" in x and x["feature"]=="COMPOSITE" for x in rows)
  assert all(x["validation_status"]=="LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF" for x in rows)
-if __name__=="__main__": test_regime();test_wait();test_signal_audit_contract();test_open_hourly_candle_is_excluded();test_one_snapshot_per_side_horizon_not_per_feature();print("Forecast Laboratory learning tests passed")
+if __name__=="__main__": test_regime();test_wait();test_signal_audit_contract();test_open_hourly_candle_is_excluded();test_one_snapshot_per_side_horizon_not_per_feature();test_persistence_verification_fails_when_expected_id_is_absent();print("Forecast Laboratory learning tests passed")
 
 def test_persistence_verification_fails_when_expected_id_is_absent():
  import tempfile
