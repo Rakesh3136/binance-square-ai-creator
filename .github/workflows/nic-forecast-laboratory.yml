@@ -50,7 +50,9 @@ jobs:
           import json
           d=json.load(open("data/live/nic_forecast_laboratory.json"))
           assert d["schema"]=="NIC-FORECAST-LAB-2.0"
-          assert d["learning"]["walk_forward_validation"]
+          assert d["learning"]["walk_forward_validation"] is False
+          assert d["learning"]["validation_status"] == "LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF"
+          assert d["learning"]["live_forecast_snapshots"] is True
           assert d["learning"]["persistent_outcome_resolution"]
           assert d["policy"]["neutral_wait_allowed"]
           print("Forecast Laboratory learning validation: PASS")
