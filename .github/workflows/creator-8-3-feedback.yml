@@ -11,8 +11,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: creator-8-3-feedback
-  cancel-in-progress: true
+  # Share the production evidence-writer lock; this workflow also commits data/.
+  group: nic-forecast-production-evidence-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   monetization_feedback:

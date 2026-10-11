@@ -5,6 +5,7 @@ assumptions. It is not an exchange account PnL ledger and never authorizes tradi
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -15,8 +16,10 @@ ROOT = Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "data/intelligence/nic_forecast_truth_ledger.jsonl"
 EVENTS = ROOT / "data/intelligence/nic_forecast_outcome_events.jsonl"
 OUT = ROOT / "data/intelligence/nic_forecast_profitability.json"
-MIN_TOTAL = 100
-MIN_TEST = 30
+MIN_TOTAL = 300
+MIN_TEST = 100
+# One-sided 99% lower bound with a conservative six-cell multiple-testing adjustment.
+EDGE_LOWER_BOUND_Z = 2.64
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -111,10 +114,16 @@ def trade_metrics(rows: list[dict], round_trip_cost_pct: float) -> dict:
     negative_sum = abs(sum(losses))
     count = len(net)
     expectancy = sum(net) / count if count else None
+    sample_std = (math.sqrt(sum((value - expectancy) ** 2 for value in net) / (count - 1))
+                  if count > 1 and expectancy is not None else None)
+    lower_bound = (expectancy - EDGE_LOWER_BOUND_Z * sample_std / math.sqrt(count)
+                   if count > 1 and sample_std is not None else None)
     return {
         "samples": count,
         "gross_mean_return_pct": round(sum(gross) / count, 5) if count else None,
         "net_mean_return_pct": round(expectancy, 5) if count else None,
+        "net_mean_return_lower_bound_pct": round(lower_bound, 5) if lower_bound is not None else None,
+        "confidence_bound": "one-sided 99% normal-approximation lower bound; z=2.64 for six-group screening",
         "net_total_return_pct_points": round(sum(net), 5) if count else None,
         "net_win_rate": round(len(wins) / count, 5) if count else None,
         "profit_factor": round(positive_sum / negative_sum, 5) if negative_sum else (None if not wins else "INF"),
@@ -210,6 +219,43 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
     }
 
 
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes() if path.exists() else b"").hexdigest()
+
+
+def validate_report_sources(report: dict, snapshots: list[dict], events: list[dict],
+                            ledger_path: Path = LEDGER, events_path: Path = EVENTS) -> dict:
+    """Fail closed if profitability metrics are not tied to the exact persisted source files."""
+    evidence = report.get("source_evidence")
+    if not isinstance(evidence, dict):
+        raise AssertionError("Profitability report is missing source-evidence provenance")
+    expected = {
+        "snapshot_ledger_sha256": file_sha256(ledger_path),
+        "outcome_ledger_sha256": file_sha256(events_path),
+        "snapshot_count": len(snapshots),
+        "terminal_outcome_count": sum(x.get("event_type") == "FORECAST_RESOLVED" for x in events),
+        "resolved_forecast_count": len(load_resolved(snapshots, events)),
+    }
+    for key, value in expected.items():
+        if evidence.get(key) != value:
+            raise AssertionError(f"Profitability source evidence mismatch for {key}")
+    if report.get("sample_count") != expected["resolved_forecast_count"]:
+        raise AssertionError("Profitability sample count does not match current immutable source evidence")
+    if not snapshots and report.get("status") != "NOT_PROVEN":
+        raise AssertionError("Empty forecast ledger cannot support a profitability claim")
+    if report.get("status") == "PROVISIONAL_POSITIVE_HELD_OUT":
+        groups = report.get("groups") or {}
+        if not any(
+            group.get("status") == "PROVISIONAL_POSITIVE_HELD_OUT"
+            and (group.get("held_out_test") or {}).get("net_mean_return_lower_bound_pct", 0) > 0
+            and isinstance((group.get("held_out_test") or {}).get("profit_factor"), (int, float))
+            and (group.get("held_out_test") or {}).get("profit_factor") > 1
+            for group in groups.values()
+        ):
+            raise AssertionError("Positive profitability status lacks a qualifying held-out group")
+    return expected
+
+
 def main():
     snapshots = read_jsonl(LEDGER)
     events = read_jsonl(EVENTS)
@@ -219,6 +265,22 @@ def main():
         fee_per_side_pct=os.getenv("NIC_FEE_PER_SIDE_PCT", "0.1"),
         slippage_per_side_pct=os.getenv("NIC_SLIPPAGE_PER_SIDE_PCT", "0.05"),
     )
+    report["source_evidence"] = {
+        "snapshot_ledger_sha256": file_sha256(LEDGER),
+        "outcome_ledger_sha256": file_sha256(EVENTS),
+        "snapshot_count": len(snapshots),
+        "terminal_outcome_count": sum(x.get("event_type") == "FORECAST_RESOLVED" for x in events),
+        "resolved_forecast_count": len(rows),
+    }
+    report["proof_policy"] = {
+        "minimum_total_per_side_horizon": MIN_TOTAL,
+        "minimum_held_out_per_side_horizon": MIN_TEST,
+        "required_held_out_net_expectancy": "positive",
+        "required_profit_factor": "> 1 after assumed costs",
+        "required_confidence_bound": "positive one-sided 99% normal-approximation lower bound; six-group screening adjustment",
+        "status_ceiling": "PROVISIONAL_POSITIVE_HELD_OUT; never a guarantee or trade authorization",
+    }
+    validate_report_sources(report, snapshots, events)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps({
