@@ -85,13 +85,45 @@ def run(cand,rows):
             vals=[ret(rows,i,h) for _,i,_ in pool];vals=[x if side=="BULLISH" else -x for x in vals if x is not None];hs[str(h)]=summarize(vals)
         audits=[walkforward(rows,side,f) for f in features]
         hs["predictivity"]={"minimum_events":MIN,"audits":audits,
-                            "trusted_features":[a["feature"] for a in audits if a["predictive"]]}
+                            "validation_type":"FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+                            "trusted_features":[],
+                            "candidate_features":[a["feature"] for a in audits if a["predictive"]]}
         hyps[side]={"analogues":len(pool),"forward":hs}
     # Explicit neutral state prevents forced bull/bear decisions.
     scores={s:sum((hyps[s]["forward"][str(h)]["hit_rate"] or 0) for h in H)/3 for s in hyps}
     decision="BULLISH" if scores["BULLISH"]>scores["BEARISH"]+.05 else ("BEARISH" if scores["BEARISH"]>scores["BULLISH"]+.05 else "WAIT")
+    # Anchor forecasts to the last fully closed candle, not each 20-minute workflow start.
+    # This prevents repeated snapshots for the same hourly decision and entry price.
+    candle_close_ms = int(rows[ci].get("t") or 0) + 60 * 60 * 1000
+    as_of = datetime.fromtimestamp(candle_close_ms / 1000, timezone.utc).isoformat() if candle_close_ms else datetime.now(timezone.utc).isoformat()
     return {"status":"READY","symbol":sym(cand.get("symbol")),"regime":reg,"current_features":cur,"hypotheses":hyps,"decision":decision,
-            "decision_rule":"WAIT unless competing sides separate by >5pp average hit rate; feature trust also requires >=30 events and >5pp lift.","as_of":datetime.now(timezone.utc).isoformat()}
+            "decision_rule":"WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.","as_of":as_of}
+def make_snapshots(symbol, result):
+    """Create one independent forecast record per side and horizon; features are attributes, not duplicate forecasts."""
+    if result.get("status") != "READY":
+        return []
+    symbol = sym(symbol)
+    ts = result["as_of"]
+    flags = {side: signal_flags(result["current_features"], side)
+             for side in ("BULLISH", "BEARISH")}
+    rows = []
+    for side, hypothesis in result["hypotheses"].items():
+        for horizon in H:
+            probability = float(hypothesis["forward"][str(horizon)].get("hit_rate") or 0.5)
+            rows.append({
+                "forecast_id": f"{symbol}|{ts}|{side}|{horizon}h",
+                "timestamp": ts, "symbol": symbol, "side": side,
+                "regime": result["regime"], "feature": "COMPOSITE",
+                "feature_flags": flags[side], "horizon_hours": horizon,
+                "entry_price": result["current_features"]["price"],
+                "decision": ("LONG_CANDIDATE" if result["decision"] == "BULLISH" and side == "BULLISH"
+                             else ("SHORT_CANDIDATE" if result["decision"] == "BEARISH" and side == "BEARISH" else "WAIT")),
+                "forecast_probability": max(0.0, min(1.0, probability)),
+                "probability_source": "nearest_historical_analogue_raw_hit_rate",
+                "validation_status": "LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF",
+                "resolved": False
+            })
+    return rows
 def append_jsonl(path,records):
     with path.open("a") as f:
         for x in records:f.write(json.dumps(x,separators=(",",":"))+"\n")
@@ -161,11 +193,7 @@ def main():
             rows=candles(c.get("symbol"));out=run(c,rows);res.append(out)
             if out.get("status")=="READY":
                 ts=out["as_of"];reg=out["regime"]
-                for side,hyp in out["hypotheses"].items():
-                    for a in hyp["forward"]["predictivity"]["audits"]:
-                        for horizon in H:
-                            probability=float(hyp["forward"][str(horizon)].get("hit_rate") or 0.5)
-                            new.append({"forecast_id":f"{sym(c.get('symbol'))}|{ts}|{side}|{a['feature']}|{horizon}","timestamp":ts,"symbol":sym(c.get("symbol")),"side":side,"regime":reg,"feature":a["feature"],"horizon_hours":horizon,"entry_price":out["current_features"]["price"],"decision":("LONG_CANDIDATE" if out["decision"]=="BULLISH" and side=="BULLISH" else ("SHORT_CANDIDATE" if out["decision"]=="BEARISH" and side=="BEARISH" else "WAIT")),"forecast_probability":max(0.0,min(1.0,probability)),"resolved":False})
+                new.extend(make_snapshots(c.get("symbol"), out))
                 append_jsonl(REGH,[{"timestamp":ts,"symbol":out["symbol"],"regime":reg,"features":out["current_features"]}])
         except Exception as e:fails.append({"symbol":sym(c.get("symbol")),"error":type(e).__name__+":"+str(e)})
         time.sleep(.05)
@@ -179,8 +207,8 @@ def main():
     append_jsonl(LEDGER,fresh)
     matrix=build_learning()
     data={"schema":"NIC-FORECAST-LAB-2.0","generated_at":datetime.now(timezone.utc).isoformat(),"results":res,"failures":fails,
-          "learning":{"truth_ledger":str(LEDGER.relative_to(ROOT)),"signal_matrix":str(MATRIX.relative_to(ROOT)),"regime_history":str(REGH.relative_to(ROOT)),"walk_forward_validation":True,"persistent_outcome_resolution":True},
-          "policy":{"competing_hypotheses":True,"neutral_wait_allowed":True,"historical_analogues_out_of_sample":True,"regime_matching":True,"base_rate_lift_required":True,"minimum_events":MIN,"no_guaranteed_forecast":True,"publication_gate_immutable":True}}
+          "learning":{"truth_ledger":str(LEDGER.relative_to(ROOT)),"signal_matrix":str(MATRIX.relative_to(ROOT)),"regime_history":str(REGH.relative_to(ROOT)),"walk_forward_validation":False,"live_forecast_snapshots":True,"validation_status":"LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF","persistent_outcome_resolution":True},
+          "policy":{"competing_hypotheses":True,"neutral_wait_allowed":True,"historical_analogues_used_for_live_forecasts":True,"historical_walk_forward_proof":False,"regime_matching":True,"base_rate_lift_required":True,"minimum_events":MIN,"no_guaranteed_forecast":True,"publication_gate_immutable":True}}
     OUT.write_text(json.dumps(data,indent=2))
     claims=sum(1 for x in res if x.get("status")=="READY" for h in x["hypotheses"].values() for a in h["forward"]["predictivity"]["audits"] if a["predictive"])
     ready_count=sum(x.get("status")=="READY" for x in res)
@@ -189,7 +217,7 @@ def main():
     data["status"]=status
     data["block_reason"]=None if status=="READY" else "No fresh auditable forecast snapshots were produced; stale calibration must not be treated as current evidence."
     OUT.write_text(json.dumps(data,indent=2))
-    REPORT.write_text(json.dumps({"schema":"NIC-FORECAST-LAB-2.0","generated_at":data["generated_at"],"status":status,"block_reason":data["block_reason"],"candidates":len(cs),"ready":ready_count,"appended_snapshots":appended_count,"failures":len(fails),"predictive_claims":claims,"learned_signal_cells":len(matrix),"policy":"No signal is trusted from correlation alone; persistent edge requires chronological validation and >=30 events."},indent=2))
+    REPORT.write_text(json.dumps({"schema":"NIC-FORECAST-LAB-2.0","generated_at":data["generated_at"],"status":status,"block_reason":data["block_reason"],"candidates":len(cs),"ready":ready_count,"appended_snapshots":appended_count,"failures":len(fails),"predictive_claims":0,"candidate_signal_associations":claims,"learned_signal_cells":len(matrix),"policy":"No signal is trusted from correlation alone; persistent edge requires chronological validation and >=30 events."},indent=2))
     print(json.dumps({"status":status,"candidates":len(cs),"ready":ready_count,"appended_snapshots":appended_count,"failures":len(fails),"learned_signal_cells":len(matrix)}))
     require_forecast_evidence(len(cs),ready_count,appended_count)
 if __name__=="__main__":main()
