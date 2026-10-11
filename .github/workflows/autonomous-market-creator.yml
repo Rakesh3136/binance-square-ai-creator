@@ -536,6 +536,11 @@ jobs:
             exit 0
           fi
           git commit -m "Persist NIC Forecast Laboratory evidence"
+          # This job can leave unrelated runtime files dirty. Stash those after the
+          # evidence commit so git rebase has a clean worktree; this runner is disposable.
+          if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+            git stash push --include-untracked -m "temporary non-forecast runtime artifacts before evidence rebase"
+          fi
           # Other scheduled workflows may push while this creator run is executing.
           # Rebase onto the newest main before each push; never force-push evidence.
           for attempt in 1 2 3; do
