@@ -537,22 +537,67 @@ jobs:
             exit 0
           fi
           git commit -m "Persist NIC Forecast Laboratory evidence"
+          evidence_commit=$(git rev-parse HEAD)
           # Other pipeline components may leave unrelated runtime files modified.
           # Stash those files so Git can safely rebase the committed evidence change.
           # This is the final workflow step, so do not re-apply the runtime-only stash.
           git stash push --include-untracked -m "runtime artifacts held aside during forecast evidence persistence" || {
-            echo "::error::Could not safely preserve unrelated runtime artifacts before forecast evidence rebase."
+            echo "::error::Could not safely preserve unrelated runtime artifacts before forecast evidence persistence."
             exit 1
           }
           # Other scheduled workflows may push while this creator run is executing.
-          # Rebase onto the newest main before each push; never force-push evidence.
+          # Retry safe pushes. If generated evidence files conflict, merge append-only
+          # source ledgers by immutable IDs and regenerate derived metrics from merged sources.
           for attempt in 1 2 3; do
             git fetch origin main
             if ! git merge-base --is-ancestor origin/main HEAD; then
               if ! git rebase origin/main; then
                 git rebase --abort || true
-                echo "::error::Forecast evidence persistence could not safely rebase onto origin/main; evidence was not force-pushed."
-                exit 1
+                echo "Evidence files conflicted with a concurrent run; rebuilding on latest main from immutable source rows."
+                git fetch origin main
+                git reset --hard origin/main
+                export NIC_EVIDENCE_COMMIT="$evidence_commit"
+                python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          source = os.environ["NIC_EVIDENCE_COMMIT"]
+          root = Path(".")
+          def committed(path):
+              return subprocess.check_output(["git", "show", f"{source}:{path}"], text=True)
+          def rows(path):
+              p = root / path
+              if not p.exists(): return []
+              out = []
+              for line in p.read_text(encoding="utf-8").splitlines():
+                  if line.strip():
+                      value = json.loads(line)
+                      if not isinstance(value, dict): raise ValueError(f"Invalid row in {path}")
+                      out.append(value)
+              return out
+          def merge_jsonl(path, identity):
+              current = rows(path)
+              seen = {identity(x) for x in current}
+              for line in committed(path).splitlines():
+                  if not line.strip(): continue
+                  row = json.loads(line)
+                  key = identity(row)
+                  if key and key not in seen:
+                      current.append(row); seen.add(key)
+              target = root / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text("".join(json.dumps(x, separators=(",", ":")) + "\n" for x in current), encoding="utf-8")
+          merge_jsonl("data/intelligence/nic_forecast_truth_ledger.jsonl", lambda x: str(x.get("forecast_id") or ""))
+          merge_jsonl("data/intelligence/nic_forecast_outcome_events.jsonl", lambda x: str(x.get("event_id") or x.get("forecast_id") or ""))
+          merge_jsonl("data/intelligence/nic_regime_history.jsonl", lambda x: "|".join(str(x.get(k) or "") for k in ("timestamp", "symbol", "regime")))
+          for path in ("data/intelligence/nic_forecast_laboratory_report.json", "data/live/nic_forecast_laboratory.json"):
+              target = root / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(committed(path), encoding="utf-8")
+          PY
+                python src/nic_forecast_outcome_resolver.py
+                python src/nic_forecast_calibrator.py
+                git add -- data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_regime_history.jsonl data/live/nic_forecast_laboratory.json
+                git commit -m "Merge and reconcile NIC Forecast Laboratory evidence"
               fi
             fi
             if git push origin HEAD:main; then
