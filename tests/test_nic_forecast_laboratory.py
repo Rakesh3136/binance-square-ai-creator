@@ -32,7 +32,8 @@ def test_one_snapshot_per_side_horizon_not_per_feature():
  assert len({x["forecast_id"] for x in rows})==6
  assert {x["horizon_hours"] for x in rows}=={6,12,24}
  assert all("feature_flags" in x and x["feature"]=="COMPOSITE" for x in rows)
- assert all(x["validation_status"]=="LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF" for x in rows)
+ assert all(x["validation_status"]=="PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN" for x in rows)
+ assert all(x["strategy_version"]==m.STRATEGY_VERSION and x["strategy_spec_sha256"]==m.STRATEGY_SPEC_SHA256 for x in rows)
 def test_persistence_verification_fails_when_expected_id_is_absent():
  import tempfile
  with tempfile.TemporaryDirectory() as tmp:
