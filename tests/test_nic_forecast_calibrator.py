@@ -203,6 +203,12 @@ def test_failed_integrity_does_not_overwrite_last_calibration_report():
 
 def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
     workflow = (ROOT / ".github" / "workflows" / "autonomous-market-creator.yml").read_text()
+    lab_workflow = (ROOT / ".github" / "workflows" / "nic-forecast-laboratory.yml").read_text()
+    shared_lock = "nic-forecast-production-evidence-${{ github.ref }}"
+    assert shared_lock in workflow
+    assert shared_lock in lab_workflow
+    assert "cancel-in-progress: false" in workflow
+    assert "cancel-in-progress: false" in lab_workflow
     lab = workflow.index("run_component nic_forecast_laboratory python src/nic_forecast_laboratory.py")
     resolver = workflow.index("run_component nic_forecast_outcome_resolver python src/nic_forecast_outcome_resolver.py")
     calibrator = workflow.index("run_component nic_forecast_calibrator python src/nic_forecast_calibrator.py")
