@@ -1,6 +1,6 @@
 """NIC Forecast Laboratory: competing hypotheses plus persistent truth-ledger learning."""
 from __future__ import annotations
-import json,math,urllib.parse,urllib.request,time
+import hashlib,json,math,urllib.parse,urllib.request,time
 from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]; LIVE=ROOT/"data/live"; INT=ROOT/"data/intelligence"
@@ -10,6 +10,7 @@ BASES=("https://data-api.binance.vision","https://api-gcp.binance.com","https://
 MIN=30; H=(6,12,24)
 STRATEGY_VERSION="NIC-PROSPECTIVE-CHAMPION-1.0"
 STRATEGY_SPEC={"analogue_pool_size":80,"decision_margin":0.05,"horizons_hours":[6,12,24],"input_candles":"closed_1h_only","probability_source":"nearest_historical_analogue_raw_hit_rate","cost_model":"fee_and_slippage_stress_in_prospective_evaluator"}
+STRATEGY_SPEC_SHA256=hashlib.sha256(json.dumps(STRATEGY_SPEC,sort_keys=True,separators=(",",":")).encode()).hexdigest()
 def n(v,d=0.0):
     try:x=float(v); return x if math.isfinite(x) else d
     except:return d
@@ -135,6 +136,7 @@ def make_snapshots(symbol, result):
                 "probability_source": "nearest_historical_analogue_raw_hit_rate",
                 "strategy_version": STRATEGY_VERSION,
                 "strategy_spec": STRATEGY_SPEC,
+                "strategy_spec_sha256": STRATEGY_SPEC_SHA256,
                 "validation_status": "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN",
                 "resolved": False
             })
