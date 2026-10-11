@@ -536,4 +536,23 @@ jobs:
             exit 0
           fi
           git commit -m "Persist NIC Forecast Laboratory evidence"
-          git push origin HEAD:main
+          # Other scheduled workflows may push while this creator run is executing.
+          # Rebase onto the newest main before each push; never force-push evidence.
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if ! git merge-base --is-ancestor origin/main HEAD; then
+              if ! git rebase origin/main; then
+                git rebase --abort || true
+                echo "::error::Forecast evidence persistence could not safely rebase onto origin/main; evidence was not force-pushed."
+                exit 1
+              fi
+            fi
+            if git push origin HEAD:main; then
+              echo "Forecast evidence persisted successfully on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Forecast evidence push raced with another main update (attempt ${attempt}/3); retrying."
+            sleep $((attempt * 2))
+          done
+          echo "::error::Forecast evidence persistence failed after three safe push attempts."
+          exit 1
