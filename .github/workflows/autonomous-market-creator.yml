@@ -28,9 +28,10 @@ on:
         type: boolean
 
 concurrency:
-  # Keep one authoritative creator cycle active. Queue the next cycle instead of
-  # cancelling a live market-refresh job when a push/schedule overlaps it.
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Serialize the creator and Forecast Laboratory because both write the same
+  # immutable forecast ledgers and derived calibration artifacts on main.
+  # Separate workflow-specific groups allowed concurrent commits and data loss.
+  group: nic-forecast-production-evidence-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
