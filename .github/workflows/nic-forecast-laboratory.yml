@@ -46,6 +46,9 @@ jobs:
       - run: python src/nic_forecast_calibrator.py
       - run: python src/nic_forecast_profitability.py
       - run: python src/nic_portfolio_reality_engine.py
+      # Run the same strict evidence gate used by PR checks against freshly generated artifacts.
+      - name: Reconcile forecast evidence before commit
+        run: python src/nic_evidence_reconciliation_gate.py
       - run: python src/nic_forecast_governance.py
       - run: python src/nic_signal_family_governance.py
       - run: python src/nic_forecast_champion.py
@@ -84,6 +87,12 @@ jobs:
               return rows
           snapshots = jsonl("nic_forecast_truth_ledger.jsonl")
           events = jsonl("nic_forecast_outcome_events.jsonl")
+          lab_report = json.loads((root / "nic_forecast_laboratory_report.json").read_text(encoding="utf-8"))
+          appended = int(lab_report.get("appended_snapshots") or 0)
+          if appended > 0 and not snapshots:
+              raise AssertionError("Forecast Laboratory claims appended snapshots but the persisted truth ledger is empty")
+          if appended > len(snapshots):
+              raise AssertionError(f"Forecast Laboratory claims {appended} appended snapshots but only {len(snapshots)} snapshots are persisted")
           terminal = {str(x.get("forecast_id")) for x in events
                       if x.get("event_type") == "FORECAST_RESOLVED" and x.get("forecast_id")}
           legacy = {str(x.get("forecast_id")) for x in snapshots
@@ -156,6 +165,8 @@ jobs:
           cp /tmp/nic-evidence/nic_signal_attribution.json data/intelligence/
           cp /tmp/nic-evidence/nic_decision_outcome_ledger.jsonl data/intelligence/ || true
           cp /tmp/nic-evidence/nic_forecast_champion.json data/intelligence/
+          # Revalidate the exact post-reset working tree that will be committed.
+          python src/nic_evidence_reconciliation_gate.py
           git add data/live/nic_forecast_laboratory.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_regime_history.jsonl data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_profitability.json data/intelligence/nic_portfolio_reality.json data/intelligence/nic_forecast_champion.json data/intelligence/nic_forecast_governance.json data/intelligence/nic_signal_family_governance.json data/intelligence/nic_signal_attribution.json data/intelligence/nic_decision_outcome_ledger.jsonl
           git diff --cached --quiet && exit 0
           git commit -m "Record NIC Forecast Laboratory learning evidence"
