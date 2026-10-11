@@ -84,6 +84,12 @@ jobs:
               return rows
           snapshots = jsonl("nic_forecast_truth_ledger.jsonl")
           events = jsonl("nic_forecast_outcome_events.jsonl")
+          lab_report = json.loads((root / "nic_forecast_laboratory_report.json").read_text(encoding="utf-8"))
+          appended = int(lab_report.get("appended_snapshots") or 0)
+          if appended > 0 and not snapshots:
+              raise AssertionError("Forecast Laboratory claims appended snapshots but the persisted truth ledger is empty")
+          if appended > len(snapshots):
+              raise AssertionError(f"Forecast Laboratory claims {appended} appended snapshots but only {len(snapshots)} snapshots are persisted")
           terminal = {str(x.get("forecast_id")) for x in events
                       if x.get("event_type") == "FORECAST_RESOLVED" and x.get("forecast_id")}
           legacy = {str(x.get("forecast_id")) for x in snapshots
