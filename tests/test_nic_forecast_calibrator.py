@@ -211,6 +211,7 @@ def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
     assert "FAILED nic_forecast_calibration_artifact_missing" in workflow
     assert "Persist Forecast Laboratory evidence ledgers" in workflow
     assert "git add -- data/intelligence/nic_forecast_truth_ledger.jsonl" in workflow
+    assert "git stash push --include-untracked" in workflow
     assert "git fetch origin main" in workflow
     assert "git rebase origin/main" in workflow
     assert "for attempt in 1 2 3" in workflow
