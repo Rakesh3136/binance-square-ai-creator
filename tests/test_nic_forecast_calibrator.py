@@ -204,11 +204,14 @@ def test_failed_integrity_does_not_overwrite_last_calibration_report():
 def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
     workflow = (ROOT / ".github" / "workflows" / "autonomous-market-creator.yml").read_text()
     lab_workflow = (ROOT / ".github" / "workflows" / "nic-forecast-laboratory.yml").read_text()
+    feedback_workflow = (ROOT / ".github" / "workflows" / "creator-8-3-feedback.yml").read_text()
     shared_lock = "nic-forecast-production-evidence-${{ github.ref }}"
     assert shared_lock in workflow
     assert shared_lock in lab_workflow
     assert "cancel-in-progress: false" in workflow
     assert "cancel-in-progress: false" in lab_workflow
+    assert shared_lock in feedback_workflow
+    assert "cancel-in-progress: false" in feedback_workflow
     lab = workflow.index("run_component nic_forecast_laboratory python src/nic_forecast_laboratory.py")
     resolver = workflow.index("run_component nic_forecast_outcome_resolver python src/nic_forecast_outcome_resolver.py")
     calibrator = workflow.index("run_component nic_forecast_calibrator python src/nic_forecast_calibrator.py")
@@ -229,6 +232,11 @@ def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
     assert "lambda x: str(x.get(\"forecast_id\") or \"\")" in workflow
     assert "python src/nic_forecast_outcome_resolver.py" in workflow
     assert "python src/nic_forecast_calibrator.py" in workflow
+    fallback_calibrator = workflow.rindex("python src/nic_forecast_calibrator.py")
+    fallback_profitability = workflow.index("python src/nic_forecast_profitability.py", fallback_calibrator)
+    assert fallback_calibrator < fallback_profitability
+    assert "source_evidence" in (ROOT / "src" / "nic_forecast_profitability.py").read_text()
+    assert "net_mean_return_lower_bound_pct" in (ROOT / "src" / "nic_forecast_profitability.py").read_text()
     assert "for attempt in 1 2 3" in workflow
     assert "git push origin HEAD:main" in workflow
     assert "Forecast evidence persistence failed after three safe push attempts" in workflow
