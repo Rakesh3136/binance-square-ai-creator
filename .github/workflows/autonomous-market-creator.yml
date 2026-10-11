@@ -75,6 +75,7 @@ jobs:
           python -m py_compile src/nic_human_creator_contribution_gate.py
           python tests/test_nic_human_creator_contribution_gate.py
           python tests/test_nic_forecast_laboratory_fail_closed.py
+          python tests/test_nic_profitability_admission_gate.py
           python tests/test_publishing_pause.py
           python tests/test_nic24_2_evidence_content_integrity_gate.py
           python tests/test_nic24_3_early_entry_gate.py
@@ -140,6 +141,7 @@ jobs:
           run_component nic_forecast_calibrator python src/nic_forecast_calibrator.py
           run_component nic_forecast_profitability python src/nic_forecast_profitability.py
           run_component nic_portfolio_reality_engine python src/nic_portfolio_reality_engine.py
+          run_component nic_profitability_admission_gate python src/nic_profitability_admission_gate.py
           if [ -s data/intelligence/nic_portfolio_reality.json ]; then python -m json.tool data/intelligence/nic_portfolio_reality.json >/dev/null || { echo "FAILED nic_portfolio_reality_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_portfolio_reality_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
           python - <<'PY'
           import hashlib, json
@@ -321,11 +323,15 @@ jobs:
           routing=json.load(open("data/live/signal_first_routing.json"))
           challenge=json.load(open("data/live/nic23_5_counterfactual_challenge.json"))
           eligibility=json.load(open("data/live/nic22_5_publication_eligibility.json"))
+          admission=json.load(open("data/live/nic_profitability_admission.json"))
           decision=str(challenge.get("decision"," ")).upper()
           passed=bool(challenge.get("challenge_passed"))
           eligible=bool(eligibility.get("eligible"))
           mode=str(eligibility.get("publication_mode","BLOCKED")).upper()
-          safe=bool(routing.get("publish")) and eligible and ((decision == "TRADE" and passed and mode == "TRADE") or (decision in {"EDITORIAL_SIGNAL","EDITORIAL","RESEARCH","NO_TRADE"} and mode in {"EDITORIAL","TRADE"}))
+          # Trade-mode posts require an explicitly admitted strategy; exploratory
+          # results and missing/stale admission evidence must never pass this gate.
+          trade_admitted=admission.get("status") == "ADMITTED" and admission.get("trade_authorization") is True
+          safe=bool(routing.get("publish")) and eligible and ((decision == "TRADE" and passed and mode == "TRADE" and trade_admitted) or (decision in {"EDITORIAL_SIGNAL","EDITORIAL","RESEARCH","NO_TRADE"} and mode in {"EDITORIAL","TRADE"}))
           print("true" if safe else "false")
           PY
           )
