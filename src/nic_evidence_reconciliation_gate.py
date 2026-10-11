@@ -31,7 +31,22 @@ def validate(root):
     tids=[str(x.get("forecast_id") or "") for x in terminal]
     if any(not x for x in tids) or len(tids)!=len(set(tids)): raise AssertionError("Missing or duplicate terminal outcome IDs")
     if set(tids)-set(ids): raise AssertionError("Terminal outcome has no immutable snapshot")
-    if int(lab.get("appended_snapshots") or 0)>0 and not snaps: raise AssertionError("Laboratory reports appended snapshots but truth ledger is empty")
+    appended=int(lab.get("appended_snapshots") or 0)
+    if appended>0 and not snaps: raise AssertionError("Laboratory reports appended snapshots but truth ledger is empty")
+    reported_ids=lab.get("appended_forecast_ids")
+    if not isinstance(reported_ids,list):
+        if appended>0: raise AssertionError("Laboratory report lacks exact appended forecast IDs; cannot reconcile persistence")
+        reported_ids=[]
+    if len(reported_ids)!=appended:
+        raise AssertionError("Laboratory appended snapshot count does not match its exact appended forecast ID list")
+    if len(reported_ids)!=len(set(str(x) for x in reported_ids)):
+        raise AssertionError("Laboratory report contains duplicate appended forecast IDs")
+    missing_reported=set(str(x) for x in reported_ids)-set(ids)
+    if missing_reported:
+        raise AssertionError(f"Laboratory reports {len(missing_reported)} appended forecast IDs absent from persisted truth ledger")
+    persisted_count=lab.get("persisted_snapshot_count")
+    if persisted_count is not None and persisted_count!=len(snaps):
+        raise AssertionError("Laboratory persisted snapshot count does not match immutable truth ledger")
     sh,eh=sha(sp),sha(ep)
     pe=portfolio.get("source_evidence") or {}; pf=portfolio.get("source_file_evidence") or {}
     if pf.get("snapshot_ledger_sha256")!=sh or pf.get("outcome_ledger_sha256")!=eh: raise AssertionError("Portfolio Reality source file hash mismatch")
