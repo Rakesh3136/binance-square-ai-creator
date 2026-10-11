@@ -29,7 +29,7 @@ def test_heldout_positive_edge_can_be_reported_but_never_authorizes_trading():
     rows = []
     for i in range(150):
         # Early segment mixed; later held-out segment positive after assumed 0.3% costs.
-        ret = (0.8 if i >= 105 else (0.5 if i % 2 else -0.4))
+        ret = ((-0.4 if i % 5 == 0 else 0.8) if i >= 105 else (0.5 if i % 2 else -0.4))
         rows.append({"forecast_id": str(i), "timestamp": f"{i:04d}", "side": "BULLISH",
                      "horizon_hours": 6, "signed_return_pct": ret})
     report = m.evaluate(rows)
