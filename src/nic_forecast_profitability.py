@@ -85,6 +85,8 @@ def load_resolved(snapshots: list[dict], events: list[dict]) -> list[dict]:
             "side": str(snap.get("side") or event.get("side") or "").upper(),
             "regime": str(snap.get("regime") or event.get("regime") or "UNKNOWN"),
             "horizon_hours": horizon,
+            "decision": str(snap.get("decision") or "").upper(),
+            "forecast_probability": finite_float(snap.get("forecast_probability")),
             "signed_return_pct": signed,
         })
     orphan = set(by_id) - seen
@@ -129,8 +131,25 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
     if fee is None or slippage is None or fee < 0 or slippage < 0:
         raise ValueError("Fees and slippage must be finite non-negative percentages")
     cost = 2 * (fee + slippage)
-    groups = {}
+
+    # Only the action explicitly selected by the forecast policy is eligible for
+    # the trade-return proxy. WAIT and legacy rows without an action are not trades.
+    actionable = []
+    excluded_missing_decision = 0
+    excluded_non_actionable = 0
     for row in rows:
+        side = str(row.get("side") or "").upper()
+        decision = str(row.get("decision") or "").upper()
+        expected = {"BULLISH": "LONG_CANDIDATE", "BEARISH": "SHORT_CANDIDATE"}.get(side)
+        if not decision:
+            excluded_missing_decision += 1
+        elif expected is None or decision != expected:
+            excluded_non_actionable += 1
+        else:
+            actionable.append(row)
+
+    groups = {}
+    for row in actionable:
         key = (str(row.get("side") or "UNKNOWN").upper(), int(row.get("horizon_hours") or 0))
         groups.setdefault(key, []).append(row)
     report_groups = {}
@@ -152,16 +171,27 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
             "side": side, "horizon_hours": horizon,
             "total": total_metrics, "chronological_train": trade_metrics(train, cost),
             "held_out_test": test_metrics,
-            "status": "PROVISIONAL_POSITIVE_HELD_OUT" if proven else "NOT_PROVEN",
-            "reason": None if proven else "Requires >=100 matured forecasts, >=30 later held-out outcomes, positive held-out net expectancy and profit factor >1 after assumed costs.",
+            "status": "EXPLORATORY_SUBGROUP_CANDIDATE_NOT_PROOF" if proven else "NOT_PROVEN",
+            "reason": ("Positive chronological subgroup only; multiple testing, overlapping signals, execution and portfolio-level profitability remain unproven."
+                       if proven else "Requires >=100 actionable forecasts, >=30 later held-out outcomes, positive held-out net expectancy and profit factor >1 after assumed costs."),
         }
-    all_metrics = trade_metrics(rows, cost)
+    all_metrics = trade_metrics(actionable, cost)
+    candidates = [key for key, value in report_groups.items()
+                  if value["status"] == "EXPLORATORY_SUBGROUP_CANDIDATE_NOT_PROOF"]
     return {
-        "schema": "NIC-FORECAST-PROFITABILITY-1.0",
+        "schema": "NIC-FORECAST-PROFITABILITY-1.1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "PROVISIONAL_POSITIVE_HELD_OUT" if any(x["status"] == "PROVISIONAL_POSITIVE_HELD_OUT" for x in report_groups.values()) else "NOT_PROVEN",
+        # A positive subgroup is a research lead, not proof that the complete
+        # deployed strategy is profitable. This evaluator does not yet simulate
+        # non-overlapping positions, portfolio sizing, stops/targets or real fills.
+        "status": "NOT_PROVEN",
+        "exploratory_subgroup_candidates": candidates,
         "mode": "SHADOW_EVALUATION_ONLY",
-        "sample_count": len(rows),
+        "resolved_forecast_count": len(rows),
+        "sample_count": len(actionable),
+        "excluded_non_actionable_count": excluded_non_actionable,
+        "excluded_legacy_missing_decision_count": excluded_missing_decision,
+        "portfolio_simulation_status": "NOT_IMPLEMENTED",
         "cost_assumptions": {
             "fee_per_side_pct": fee, "slippage_per_side_pct": slippage,
             "round_trip_cost_pct": round(cost, 5),
@@ -172,7 +202,8 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
         "limitations": [
             "Directional price-return proxy, not verified exchange-account PnL.",
             "Bearish returns assume short-direction exposure; borrow, funding, leverage, liquidation and venue constraints are excluded.",
-            "No claim of predictive edge until chronological held-out outcomes pass the sample and net-return criteria.",
+            "Only explicit LONG_CANDIDATE/SHORT_CANDIDATE forecasts enter the trade-return proxy; WAIT and legacy rows without decisions are excluded.",
+            "Positive subgroup results are exploratory only; the top-level strategy remains NOT_PROVEN until a pre-registered, non-overlapping portfolio simulation passes held-out testing.",
             "Overlapping forecasts can be statistically dependent; the report is not a guarantee of future profits.",
         ],
         "publication_or_trade_authorization": False,
