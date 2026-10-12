@@ -37,5 +37,35 @@ class PublishingPauseTest(unittest.TestCase):
                 os.environ["BINANCE_SQUARE_API_KEY"] = old_api
 
 
+
+    def test_editorial_only_mode_allows_non_actionable_editorial(self):
+        ok, _ = publisher.editorial_only_publication_check(
+            "A research note comparing liquidity and volatility without a trade setup.",
+            {"publication_mode": "EDITORIAL", "trade_authorized": False},
+            "EDITORIAL_ONLY",
+        )
+        self.assertTrue(ok)
+
+    def test_trade_mode_never_passes_editorial_publication_guard(self):
+        ok, _ = publisher.editorial_only_publication_check(
+            "Market setup", {"publication_mode": "TRADE", "trade_authorized": True},
+            "EDITORIAL_ONLY",
+        )
+        self.assertFalse(ok)
+
+    def test_actionable_trade_levels_block_editorial_auto_publication(self):
+        for text in ("Entry: 100.5", "Stop-loss: 98", "TP1: 105", "Buy now"):
+            ok, _ = publisher.editorial_only_publication_check(
+                text, {"publication_mode": "EDITORIAL", "trade_authorized": False},
+                "EDITORIAL_ONLY",
+            )
+            self.assertFalse(ok)
+
+    def test_missing_or_wrong_mode_fails_closed(self):
+        ok, _ = publisher.editorial_only_publication_check(
+            "Research note", {}, "ALL_CONTENT"
+        )
+        self.assertFalse(ok)
+
 if __name__ == "__main__":
     unittest.main()
