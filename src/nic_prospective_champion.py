@@ -164,6 +164,31 @@ def prospective_rows(snapshots: list[dict], events: list[dict]) -> tuple[list[di
     }
 
 
+def remove_overlapping_positions(rows: list[dict]) -> tuple[list[dict], int]:
+    """Keep at most one open position per symbol in a strategy/horizon group.
+
+    Forecasts are processed chronologically. A later forecast for the same symbol
+    is excluded while the previous forecast's holding window is still open. This
+    conservative rule prevents correlated hourly snapshots from being counted as
+    independent trades in the prospective sample.
+    """
+    ordered = sorted(rows, key=lambda row: (row["timestamp"], row["symbol"], row["forecast_id"]))
+    next_available: dict[str, datetime] = {}
+    selected: list[dict] = []
+    excluded = 0
+    for row in ordered:
+        start = parse_time(row["timestamp"])
+        end = parse_time(row["exit_time"])
+        symbol = str(row["symbol"]).upper()
+        available = next_available.get(symbol)
+        if available is not None and start < available:
+            excluded += 1
+            continue
+        selected.append(row)
+        next_available[symbol] = end
+    return selected, excluded
+
+
 def chronological_split(rows: list[dict], *, train_fraction: float = 0.70) -> tuple[list[dict], list[dict], str | None]:
     ordered = sorted(rows, key=lambda row: (row["timestamp"], row["symbol"], row["forecast_id"]))
     if len(ordered) < 2:
@@ -193,7 +218,10 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
     reports = {}
     promising_groups = []
     review_groups = []
-    for (version, spec_hash, side, horizon), items in sorted(groups.items()):
+    overlap_exclusions = 0
+    for (version, spec_hash, side, horizon), raw_items in sorted(groups.items()):
+        items, excluded_overlaps = remove_overlapping_positions(raw_items)
+        overlap_exclusions += excluded_overlaps
         train, test, boundary = chronological_split(items)
         train_metrics = portfolio.portfolio_simulate(train, round_trip_cost_pct=cost)
         test_metrics = portfolio.portfolio_simulate(test, round_trip_cost_pct=cost)
@@ -228,7 +256,9 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
             "strategy_spec_sha256": spec_hash,
             "side": side,
             "horizon_hours": horizon,
-            "prospective_resolved_candidates": len(items),
+            "prospective_resolved_candidates_before_overlap_filter": len(raw_items),
+            "overlapping_same_symbol_candidates_excluded": excluded_overlaps,
+            "prospective_non_overlapping_candidates": len(items),
             "chronological_train_candidates": len(train),
             "purged_held_out_test_candidates": len(test),
             "test_boundary_utc": boundary,
@@ -254,7 +284,11 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
         "mode": "SHADOW_ONLY",
         "strategy_version": lab.STRATEGY_VERSION,
         "strategy_spec_sha256": lab.STRATEGY_SPEC_SHA256,
-        "sample_counts": counts,
+        "sample_counts": {**counts,
+            "overlapping_same_symbol_candidates_excluded": overlap_exclusions,
+            "effective_non_overlapping_actionable_count": sum(
+                int(group["prospective_non_overlapping_candidates"]) for group in reports.values()
+            )},
         "minimum_total_candidates": min_total,
         "minimum_held_out_candidates": min_test,
         "cost_assumptions": {

@@ -68,6 +68,24 @@ def test_outcome_cannot_resolve_before_forecast_horizon():
         raise AssertionError("Premature outcome must fail closed")
 
 
+def test_overlapping_same_symbol_forecasts_do_not_inflate_effective_sample():
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    snaps, events = [], []
+    for i, hour in enumerate((0, 1, 2, 6, 7, 12)):
+        ts = (start + timedelta(hours=hour)).isoformat()
+        fid = f"same-coin-{i}"
+        snaps.append(snapshot(fid, ts, symbol="SAME"))
+        events.append(event(fid, ts, 1.0))
+    rows, _ = m.prospective_rows(snaps, events)
+    effective, excluded = m.remove_overlapping_positions(rows)
+    assert len(rows) == 6
+    assert len(effective) == 3
+    assert excluded == 3
+    assert [r["timestamp"] for r in effective] == [
+        (start + timedelta(hours=h)).isoformat() for h in (0, 6, 12)
+    ]
+
+
 def test_positive_forward_cohort_is_review_candidate_not_proven():
     snaps, events = [], []
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -92,5 +110,6 @@ if __name__ == "__main__":
     test_empty_evidence_stays_collecting_and_never_authorizes()
     test_only_frozen_prospective_actionable_cohort_is_counted()
     test_outcome_cannot_resolve_before_forecast_horizon()
+    test_overlapping_same_symbol_forecasts_do_not_inflate_effective_sample()
     test_positive_forward_cohort_is_review_candidate_not_proven()
     print("NIC prospective champion tests: PASS")
