@@ -86,6 +86,23 @@ def test_overlapping_same_symbol_forecasts_do_not_inflate_effective_sample():
     ]
 
 
+def test_positive_but_weaker_than_opposite_direction_is_not_review_candidate():
+    snaps, events = [], []
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    # Small positive gross returns are eaten by execution costs, so this should
+    # never be presented as evidence of a profitable champion.
+    for i in range(40):
+        ts = (start + timedelta(days=i)).isoformat()
+        fid = f"weak-{i}"
+        snaps.append(snapshot(fid, ts, symbol=f"WEAK{i}"))
+        events.append(event(fid, ts, 0.05))
+    report = m.evaluate(snaps, events, min_total=20, min_test=5)
+    group = report["strategy_groups"]["BULLISH|6h"]
+    assert group["status"] != "CANDIDATE_FOR_HUMAN_REVIEW_NOT_PROOF"
+    assert "beats_baseline_at_base_and_stress_costs" in group["matched_opposite_direction_baseline"]
+    assert report["trade_authorization"] is False
+
+
 def test_positive_forward_cohort_is_review_candidate_not_proven():
     snaps, events = [], []
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -102,6 +119,11 @@ def test_positive_forward_cohort_is_review_candidate_not_proven():
     group = report["strategy_groups"]["BULLISH|6h"]
     assert group["status"] == "CANDIDATE_FOR_HUMAN_REVIEW_NOT_PROOF"
     assert group["execution_cost_stress_test"]["passed"] is True
+    baseline = group["matched_opposite_direction_baseline"]
+    assert baseline["is_market_benchmark"] is False
+    assert baseline["beats_baseline_at_base_and_stress_costs"] is True
+    assert baseline["held_out_net_pnl_advantage"] > 0
+    assert baseline["stress_net_pnl_advantage"] > 0
     assert group["promotion_allowed"] is False
     assert report["trade_authorization"] is False
 
@@ -111,5 +133,6 @@ if __name__ == "__main__":
     test_only_frozen_prospective_actionable_cohort_is_counted()
     test_outcome_cannot_resolve_before_forecast_horizon()
     test_overlapping_same_symbol_forecasts_do_not_inflate_effective_sample()
+    test_positive_but_weaker_than_opposite_direction_is_not_review_candidate()
     test_positive_forward_cohort_is_review_candidate_not_proven()
     print("NIC prospective champion tests: PASS")

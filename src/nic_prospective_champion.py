@@ -226,6 +226,26 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
         train_metrics = portfolio.portfolio_simulate(train, round_trip_cost_pct=cost)
         test_metrics = portfolio.portfolio_simulate(test, round_trip_cost_pct=cost)
         stress_metrics = portfolio.portfolio_simulate(test, round_trip_cost_pct=stress_round_trip_cost_pct)
+        # Matched counterfactual: reverse each forecast's direction on the exact
+        # same assets, timestamps, horizons, and held-out rows. This is not a
+        # market benchmark; it tests whether the chosen direction adds value.
+        opposite_test_rows = [
+            {**row, "signed_return_pct": -float(row["signed_return_pct"])}
+            for row in test
+        ]
+        opposite_stress_rows = [
+            {**row, "signed_return_pct": -float(row["signed_return_pct"])}
+            for row in test
+        ]
+        opposite_test_metrics = portfolio.portfolio_simulate(
+            opposite_test_rows, round_trip_cost_pct=cost
+        )
+        opposite_stress_metrics = portfolio.portfolio_simulate(
+            opposite_stress_rows, round_trip_cost_pct=stress_round_trip_cost_pct
+        )
+        benchmark_delta = round(test_metrics["net_pnl"] - opposite_test_metrics["net_pnl"], 4)
+        stress_benchmark_delta = round(stress_metrics["net_pnl"] - opposite_stress_metrics["net_pnl"], 4)
+        beats_matched_baseline = benchmark_delta > 0 and stress_benchmark_delta > 0
         enough = len(items) >= min_total and test_metrics["trades_closed"] >= min_test
         profitable = (
             test_metrics["net_pnl"] > 0
@@ -243,7 +263,7 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
         )
         if not enough:
             status = "COLLECTING_PROSPECTIVE_OUTCOMES"
-        elif profitable and stress_pass:
+        elif profitable and stress_pass and beats_matched_baseline:
             status = "CANDIDATE_FOR_HUMAN_REVIEW_NOT_PROOF"
             review_groups.append(f"{side}|{horizon}h")
         elif test_metrics["net_pnl"] > 0:
@@ -264,6 +284,15 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
             "test_boundary_utc": boundary,
             "chronological_train": train_metrics,
             "purged_held_out_test": test_metrics,
+            "matched_opposite_direction_baseline": {
+                "method": "Reverse each forecast return on the identical held-out assets, timestamps, horizons, and position-sizing rules",
+                "is_market_benchmark": False,
+                "base_cost_metrics": opposite_test_metrics,
+                "stress_cost_metrics": opposite_stress_metrics,
+                "held_out_net_pnl_advantage": benchmark_delta,
+                "stress_net_pnl_advantage": stress_benchmark_delta,
+                "beats_baseline_at_base_and_stress_costs": beats_matched_baseline,
+            },
             "execution_cost_stress_test": {
                 "round_trip_cost_pct": stress_round_trip_cost_pct,
                 "metrics": stress_metrics,
@@ -309,7 +338,7 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
         },
         "trade_authorization": False,
         "publication_or_trade_authorization": False,
-        "note": "Prospective cohort evidence only. Even a review candidate is not proof of future profitability and never authorizes a trade or publication.",
+        "note": "Prospective cohort evidence only. Review candidacy additionally requires beating a matched opposite-direction counterfactual on the same held-out rows at base and stress costs. This is not a broad market benchmark. No result is proof of future profitability and no status authorizes a trade or publication.",
     }
 
 
