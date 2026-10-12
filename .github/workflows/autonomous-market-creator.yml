@@ -260,6 +260,9 @@ jobs:
         run: |
           python src/square_performance_collector.py
           python src/square_post_detail_collector.py
+          python src/nic_post_publication_outcome_14.py
+          python -m json.tool data/live/nic_post_publication_outcome_14.json >/dev/null
+          python -m json.tool data/intelligence/nic_post_publication_outcome_14_report.json >/dev/null
           python src/nic_outcome_learner.py
           python src/nic_strategy_calibrator.py
           python src/nic_adaptive_experience.py
