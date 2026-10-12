@@ -77,6 +77,7 @@ jobs:
           python tests/test_nic_forecast_laboratory_fail_closed.py
           python tests/test_nic_profitability_admission_gate.py
           python tests/test_publishing_pause.py
+          python tests/test_nic_editorial_lane_gate.py
           python tests/test_nic24_2_evidence_content_integrity_gate.py
           python tests/test_nic24_3_early_entry_gate.py
           python -m py_compile src/nic24_3_early_entry_gate.py src/nic22_3_publication_alignment_gate.py
@@ -347,13 +348,18 @@ jobs:
           python -m json.tool data/live/signal_first_routing.json >/dev/null
           python -m json.tool data/live/nic23_5_counterfactual_challenge.json >/dev/null
           python src/freeze_opportunity.py
+
+      - name: Trade setup contract and decision gates
+        if: ${{ steps.verified_publication.outputs.publish == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
+        run: |
+          set -euo pipefail
           python src/early_setup_gate.py
           python src/opportunity_contract_gate.py
           python src/adversarial_brain.py
           python src/decision_ensemble_gate.py
           python src/creator_brain.py
           python src/creator_brain_gate.py
-          python src/pipeline_stage.py creator_brain success 'Authoritative creator brain completed'
+          python src/pipeline_stage.py creator_brain success 'Authoritative trade creator brain completed'
       - name: Build and refine publishable content
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
@@ -446,7 +452,7 @@ jobs:
 
       - name: NIC 24.3 Early-entry and post-extension gate
         id: early_entry
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -482,8 +488,19 @@ jobs:
             exit 1
           fi
 
+      - name: NIC editorial-only publication gate
+        id: editorial_lane
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_eligibility.outputs.mode == 'EDITORIAL' }}
+        run: |
+          set -euo pipefail
+          python src/nic_editorial_lane_gate.py
+          python -m json.tool data/live/nic_editorial_lane_gate.json >/dev/null
+          publish=$(python -c 'import json; print(str(json.load(open("data/live/nic_editorial_lane_gate.json")).get("publish", False)).lower())')
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          test "$publish" = "true"
+
       - name: NIC 24.2 Evidence-to-Content Integrity — authoritative publication gate
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           NIC24_2_ENFORCE: 'true'
@@ -494,14 +511,14 @@ jobs:
           python -c 'import json,sys; x=json.load(open("data/live/nic24_2_evidence_content_integrity.json")); print("NIC 24.2 authoritative result: passed=",x.get("passed"),"failures=",x.get("failures"),"warnings=",x.get("warnings")); sys.exit(0 if x.get("passed") is True and x.get("publish") is True else 24)'
 
       - name: Final production gate
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: python src/production_manager.py
 
       - name: Final human creator contribution gate
         id: human_review
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && (steps.early_entry.outputs.publish == 'true' || steps.editorial_lane.outputs.publish == 'true') }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -528,7 +545,7 @@ jobs:
           retention-days: 7
 
       - name: Build final publication payload
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' && steps.human_review.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && (steps.early_entry.outputs.publish == 'true' || steps.editorial_lane.outputs.publish == 'true') && steps.human_review.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -537,7 +554,7 @@ jobs:
           python src/write_to_earn_master.py
 
       - name: Extract publication and submit to Binance Square
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' && steps.human_review.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && (steps.early_entry.outputs.publish == 'true' || steps.editorial_lane.outputs.publish == 'true') && steps.human_review.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
