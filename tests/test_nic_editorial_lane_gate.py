@@ -1,6 +1,13 @@
+import importlib.util
 import unittest
-from src.nic_editorial_lane_gate import evaluate
+from pathlib import Path
 from datetime import datetime, timezone
+
+ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location("nic_editorial_lane_gate", ROOT / "src" / "nic_editorial_lane_gate.py")
+module = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(module)
+evaluate = module.evaluate
 
 NOW = datetime.now(timezone.utc).isoformat()
 
