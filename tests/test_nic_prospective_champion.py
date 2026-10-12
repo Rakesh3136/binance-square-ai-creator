@@ -157,4 +157,5 @@ if __name__ == "__main__":
     test_overlapping_same_symbol_forecasts_do_not_inflate_effective_sample()
     test_positive_but_weaker_than_opposite_direction_is_not_review_candidate()
     test_positive_forward_cohort_is_review_candidate_not_proven()
+    test_missing_btc_benchmark_fails_closed_for_human_review()
     print("NIC prospective champion tests: PASS")
