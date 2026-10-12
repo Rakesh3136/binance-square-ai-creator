@@ -1,0 +1,29 @@
+name: NIC Editorial Authorization and Publication Proof Checks
+
+on:
+  pull_request:
+    paths:
+      - 'nic_publication_policy.json'
+      - 'src/nic_publication_authorization.py'
+      - 'src/nic_publication_proof_audit.py'
+      - 'src/binance_square_publisher.py'
+      - 'tests/test_nic_publication_authorization.py'
+      - '.github/workflows/autonomous-market-creator.yml'
+      - '.github/workflows/nic-publication-proof-pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  editorial-authorization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile authorization and proof audit
+        run: python -m py_compile src/nic_publication_authorization.py src/nic_publication_proof_audit.py src/binance_square_publisher.py
+      - name: Run fail-closed authorization and proof tests
+        run: python tests/test_nic_publication_authorization.py

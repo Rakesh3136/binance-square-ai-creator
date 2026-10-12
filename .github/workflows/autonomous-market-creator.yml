@@ -542,8 +542,21 @@ jobs:
           fi
           echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
 
+      - name: NIC editorial automatic-publication authorization
+        id: publication_authorization
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && (steps.early_entry.outputs.publish == 'true' || steps.editorial_lane.outputs.publish == 'true') }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          set -euo pipefail
+          python src/nic_publication_authorization.py --draft-path "$DRAFT_PATH"
+          python -m json.tool data/live/nic_publication_authorization.json >/dev/null
+          authorized=$(python -c 'import json; print(str(json.load(open("data/live/nic_publication_authorization.json")).get("authorized", False)).lower())')
+          echo "authorized=$authorized" >> "$GITHUB_OUTPUT"
+          echo "NIC publication authorization: $authorized"
+
       - name: Preserve exact final draft and gate context for human review
-        if: ${{ steps.human_review.outputs.blocked == 'true' }}
+        if: ${{ steps.human_review.outputs.blocked == 'true' && steps.publication_authorization.outputs.authorized != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: nic-pending-human-review-${{ github.run_id }}
@@ -554,7 +567,7 @@ jobs:
           retention-days: 7
 
       - name: Build final publication payload
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && (steps.early_entry.outputs.publish == 'true' || steps.editorial_lane.outputs.publish == 'true') && steps.human_review.outputs.blocked != 'true' }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_authorization.outputs.authorized == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -563,13 +576,34 @@ jobs:
           python src/write_to_earn_master.py
 
       - name: Extract publication and submit to Binance Square
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && (steps.early_entry.outputs.publish == 'true' || steps.editorial_lane.outputs.publish == 'true') && steps.human_review.outputs.blocked != 'true' }}
+        id: publish_result
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_authorization.outputs.authorized == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
           PUBLISHING_ENABLED: 'true'
           NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY
         run: python src/binance_square_publisher.py
+
+      - name: Audit verifiable Binance Square publication proof
+        if: always()
+        env:
+          NIC_RUN_ID: ${{ github.run_id }}
+          PUBLISHER_OUTCOME: ${{ steps.publish_result.outcome }}
+        run: |
+          python src/nic_publication_proof_audit.py
+          python -m json.tool data/live/nic_publication_proof_audit.json >/dev/null
+
+      - name: Upload publication proof audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic-publication-proof-${{ github.run_id }}
+          path: |
+            data/live/nic_publication_proof_audit.json
+            data/live/publication_result.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Record outcome and learning
         if: always()

@@ -45,8 +45,11 @@ def test_autonomous_flow_reviews_only_the_final_gated_draft():
     assert human_gate > chart_gate
     assert autonomous.index("Preserve exact final draft and gate context for human review") > human_gate
     payload_section = autonomous[autonomous.index("Build final publication payload"):publisher]
-    assert "steps.human_review.outputs.blocked != 'true'" in payload_section
+    assert "steps.publication_authorization.outputs.authorized == 'true'" in payload_section
+    assert "steps.human_review.outputs.blocked != 'true'" not in payload_section
     assert human_gate < publisher
+    assert "NIC editorial automatic-publication authorization" in autonomous
+    assert "human_review_claimed" in Path("src/nic_publication_authorization.py").read_text(encoding="utf-8")
 
 def test_artifact_restores_repo_relative_data_paths_and_no_write_permission():
     assert "path: data" in workflow

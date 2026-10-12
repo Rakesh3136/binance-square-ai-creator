@@ -26,6 +26,8 @@ def canonical_post_id(v):
 def clean_symbol(v):
     s=re.sub(r"USDT$","",str(v or "").upper().replace("$","").strip()); return s if re.fullmatch(r"[A-Z0-9]{1,15}",s) else ""
 def write_result(result):
+    # Bind every result to its GitHub run so prior-cycle output cannot prove this cycle published.
+    result.setdefault("github_run_id", os.getenv("GITHUB_RUN_ID") or None)
     LIVE.mkdir(parents=True,exist_ok=True); RESULT_PATH.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8"); print(json.dumps(result,indent=2,ensure_ascii=False))
 def fail(message,code,exit_code=2):
     write_result({"status":code,"message":message,"checked_at":now(),"endpoint":ENDPOINT,"post_id":None,"link":None,"publication_proof":"none"}); return exit_code
