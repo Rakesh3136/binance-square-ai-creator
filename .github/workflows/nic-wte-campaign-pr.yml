@@ -1,0 +1,26 @@
+name: NIC Write-to-Earn Publication Lineage Checks
+
+on:
+  pull_request:
+    paths:
+      - 'src/write_to_earn_7day_controller.py'
+      - 'src/binance_square_publisher.py'
+      - 'tests/test_wte_campaign_lineage.py'
+      - '.github/workflows/nic-wte-campaign-pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wte-lineage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile publication lineage components
+        run: python -m py_compile src/write_to_earn_7day_controller.py src/binance_square_publisher.py
+      - name: Test campaign start and post lineage
+        run: python tests/test_wte_campaign_lineage.py
