@@ -3,7 +3,9 @@ name: NIC Editorial Lane PR Checks
 on:
   pull_request:
     paths:
-      - 'src/nic_editorial_lane_gate.py'\n      - 'src/nic_editorial_context_sync.py'\n      - 'tests/test_nic_editorial_context_sync.py'
+      - 'src/nic_editorial_lane_gate.py'
+      - 'src/nic_editorial_context_sync.py'
+      - 'tests/test_nic_editorial_context_sync.py'
       - 'tests/test_nic_editorial_lane_gate.py'
       - '.github/workflows/autonomous-market-creator.yml'
       - '.github/workflows/nic-editorial-lane-pr.yml'
@@ -24,3 +26,7 @@ jobs:
         run: python -m py_compile src/nic_editorial_lane_gate.py
       - name: Run editorial lane fail-closed tests
         run: python tests/test_nic_editorial_lane_gate.py
+      - name: Compile editorial context sync
+        run: python -m py_compile src/nic_editorial_context_sync.py
+      - name: Run editorial context sync tests
+        run: python tests/test_nic_editorial_context_sync.py
