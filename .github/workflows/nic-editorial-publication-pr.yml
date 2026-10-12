@@ -1,0 +1,25 @@
+name: NIC Editorial-Only Publication PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/binance_square_publisher.py'
+      - 'tests/test_publishing_pause.py'
+      - '.github/workflows/nic-editorial-publication-pr.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  editorial-publication-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile publisher
+        run: python -m py_compile src/binance_square_publisher.py
+      - name: Verify default pause and editorial-only authorization
+        run: python tests/test_publishing_pause.py
