@@ -22,7 +22,7 @@ def rows(path):
   except Exception: pass
  return out
 def pid(x):
- raw=str(x.get("canonical_post_id") or x.get("post_id") or x.get("publication_id") or "").strip()
+ raw=str(x.get("canonical_post_id") or x.get("post_id") or x.get("publication_id") or x.get("link") or x.get("url") or "").strip()
  for pat in (r"/(?:square/)?post/([A-Za-z0-9_-]+)",r"/uni-qr/cpos/([A-Za-z0-9_-]+)",r"/(?:square/)?content/([A-Za-z0-9_-]+)"):
   m=re.search(pat,raw,flags=re.I)
   if m: raw=m.group(1); break
