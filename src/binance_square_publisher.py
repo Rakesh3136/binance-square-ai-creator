@@ -91,6 +91,30 @@ def preflight():
     required=[("publication_payload",PAYLOAD_PATH),("publication_context",CONTEXT_PATH),("authoritative_opportunity",FROZEN_PATH),("write_to_earn_eligibility",WTE_PATH),("content_craft",CRAFT_PATH)]
     missing=[f"{n}:{p}" for n,p in required if not p.exists()]
     if missing: raise RuntimeError("publisher preflight missing: "+", ".join(missing))
+def editorial_only_publication_check(text, eligibility, mode):
+    """Permit auto-publication only for an explicitly selected editorial lane.
+
+    This is publication permission only, never trade permission. Trade modes and
+    executable setup levels fail closed even if the global publish toggle is on.
+    """
+    if str(mode or "").strip().upper() != "EDITORIAL_ONLY":
+        return False, "NIC_AUTO_PUBLICATION_MODE must be EDITORIAL_ONLY"
+    if str(eligibility.get("publication_mode") or "").strip().upper() != "EDITORIAL":
+        return False, "current-cycle NIC 22.5 eligibility is not EDITORIAL"
+    if eligibility.get("trade_authorized") is not False:
+        return False, "editorial lane must explicitly deny trade authorization"
+    actionable = re.compile(
+        r"(?:\\bentry\\s*(?:price)?\\s*[:=@]|"
+        r"\\bstop[ -]?loss\\s*[:=@]|\\btake[ -]?profit\\s*[:=@]|"
+        r"\\b(?:SL|TP[1-3]?)\\s*[:=@]|"
+        r"\\b(?:buy|sell)\\s+now\\b|\\b(?:open|enter)\\s+(?:a\\s+)?"
+        r"(?:long|short)\\b|\\b\\d{1,3}\\s*x\\s+leverage\\b)",
+        re.I,
+    )
+    if actionable.search(str(text or "")):
+        return False, "draft contains executable trade instructions or levels"
+    return True, "editorial-only auto-publication checks passed"
+
 def main():
     # Safety pause: do not publish automatically until NIC editorial, timing, and visual-truth gates are re-verified.
     # Publishing can be re-enabled deliberately with PUBLISHING_ENABLED=true after explicit review.
@@ -101,6 +125,12 @@ def main():
     if not key: return fail("BINANCE_SQUARE_OPENAPI_KEY/BINANCE_SQUARE_API_KEY is not configured","PUBLISHER_NOT_CONFIGURED")
     try:
         preflight(); text=text_payload(); context=load(CONTEXT_PATH); frozen=load(FROZEN_PATH); monetization_os=load(MONETIZATION_OS_PATH); story_discovery=load(STORY_DISCOVERY_PATH); craft=load(CRAFT_PATH)
+        if os.getenv("NIC_AUTO_PUBLICATION_MODE", "").strip().upper() != "EDITORIAL_ONLY":
+            raise RuntimeError("automatic publication requires NIC_AUTO_PUBLICATION_MODE=EDITORIAL_ONLY")
+        eligibility=load(LIVE/"nic22_5_publication_eligibility.json")
+        allowed, reason=editorial_only_publication_check(text, eligibility, os.getenv("NIC_AUTO_PUBLICATION_MODE"))
+        if not allowed:
+            raise RuntimeError("editorial-only publication guard blocked: "+reason)
         symbol=clean_symbol(context.get("symbol") or context.get("primary_symbol") or frozen.get("symbol") or frozen.get("symbol_usdt")); category=str(context.get("category") or context.get("content_category") or frozen.get("category") or frozen.get("content_category") or "").lower()
         if not symbol: raise RuntimeError("publication symbol is missing")
         wte=load(WTE_PATH)
