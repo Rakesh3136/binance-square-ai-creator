@@ -1,0 +1,23 @@
+name: NIC Post-Publication Outcome Metrics Bridge Checks
+on:
+  pull_request:
+    paths:
+      - 'src/nic_post_publication_outcome_14.py'
+      - 'tests/test_nic_post_publication_outcome_14.py'
+      - '.github/workflows/autonomous-market-creator.yml'
+      - '.github/workflows/nic-post-publication-outcome-pr.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  outcome-metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile post-publication outcome tracker
+        run: python -m py_compile src/nic_post_publication_outcome_14.py
+      - name: Test nested/flat metrics, IDs, and unknown handling
+        run: python tests/test_nic_post_publication_outcome_14.py
