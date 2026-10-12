@@ -150,6 +150,7 @@ def prospective_rows(snapshots: list[dict], events: list[dict]) -> tuple[list[di
             "strategy_version": lab.STRATEGY_VERSION,
             "strategy_spec_sha256": snap["strategy_spec_sha256"],
             "regime": str(snap.get("regime") or "UNKNOWN"),
+            "benchmark_btc_return_pct": (float(event["benchmark_btc_return_pct"]) if event.get("benchmark_btc_return_pct") is not None else None),
         })
     orphan_events = set(terminal) - seen
     if orphan_events:
@@ -246,6 +247,26 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
         benchmark_delta = round(test_metrics["net_pnl"] - opposite_test_metrics["net_pnl"], 4)
         stress_benchmark_delta = round(stress_metrics["net_pnl"] - opposite_stress_metrics["net_pnl"], 4)
         beats_matched_baseline = benchmark_delta > 0 and stress_benchmark_delta > 0
+        # Compare with BTC buy-and-hold over the same entry/exit windows. This is
+        # only available when every held-out row has a provenance-backed BTC return.
+        btc_complete = bool(test) and all(
+            isinstance(row.get("benchmark_btc_return_pct"), (int, float))
+            and math.isfinite(float(row["benchmark_btc_return_pct"]))
+            for row in test
+        )
+        btc_rows = [
+            {**row, "signed_return_pct": float(row["benchmark_btc_return_pct"])}
+            for row in test
+        ] if btc_complete else []
+        btc_test_metrics = portfolio.portfolio_simulate(btc_rows, round_trip_cost_pct=cost) if btc_complete else None
+        btc_stress_metrics = portfolio.portfolio_simulate(
+            btc_rows, round_trip_cost_pct=stress_round_trip_cost_pct
+        ) if btc_complete else None
+        btc_advantage = round(test_metrics["net_pnl"] - btc_test_metrics["net_pnl"], 4) if btc_complete else None
+        btc_stress_advantage = round(stress_metrics["net_pnl"] - btc_stress_metrics["net_pnl"], 4) if btc_complete else None
+        beats_btc = bool(btc_complete and btc_advantage > 0 and btc_stress_advantage > 0)
+        cash_baseline = {"method": "Hold cash; no positions and no trading costs", "net_pnl": 0.0, "net_return_pct": 0.0}
+        beats_cash_at_base_and_stress = test_metrics["net_pnl"] > 0 and stress_metrics["net_pnl"] > 0
         enough = len(items) >= min_total and test_metrics["trades_closed"] >= min_test
         profitable = (
             test_metrics["net_pnl"] > 0
@@ -263,7 +284,7 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
         )
         if not enough:
             status = "COLLECTING_PROSPECTIVE_OUTCOMES"
-        elif profitable and stress_pass and beats_matched_baseline:
+        elif profitable and stress_pass and beats_matched_baseline and beats_cash_at_base_and_stress and beats_btc:
             status = "CANDIDATE_FOR_HUMAN_REVIEW_NOT_PROOF"
             review_groups.append(f"{side}|{horizon}h")
         elif test_metrics["net_pnl"] > 0:
@@ -284,6 +305,21 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
             "test_boundary_utc": boundary,
             "chronological_train": train_metrics,
             "purged_held_out_test": test_metrics,
+            "cash_neutral_baseline": {
+                **cash_baseline,
+                "beats_cash_at_base_and_stress_costs": beats_cash_at_base_and_stress,
+            },
+            "btc_buy_and_hold_baseline": {
+                "method": "BTC/USDT buy-and-hold over each identical forecast entry-to-horizon window; cost model and portfolio constraints matched",
+                "benchmark_symbol": "BTCUSDT",
+                "complete_held_out_benchmark_coverage": btc_complete,
+                "base_cost_metrics": btc_test_metrics,
+                "stress_cost_metrics": btc_stress_metrics,
+                "held_out_net_pnl_advantage": btc_advantage,
+                "stress_net_pnl_advantage": btc_stress_advantage,
+                "beats_benchmark_at_base_and_stress_costs": beats_btc,
+                "note": "Missing BTC candles are not inferred; incomplete benchmark coverage blocks human-review candidacy.",
+            },
             "matched_opposite_direction_baseline": {
                 "method": "Reverse each forecast return on the identical held-out assets, timestamps, horizons, and position-sizing rules",
                 "is_market_benchmark": False,
@@ -338,7 +374,7 @@ def evaluate(snapshots: list[dict], events: list[dict], *, min_total: int = MIN_
         },
         "trade_authorization": False,
         "publication_or_trade_authorization": False,
-        "note": "Prospective cohort evidence only. Review candidacy additionally requires beating a matched opposite-direction counterfactual on the same held-out rows at base and stress costs. This is not a broad market benchmark. No result is proof of future profitability and no status authorizes a trade or publication.",
+        "note": "Prospective cohort evidence only. Human-review candidacy requires positive held-out net PnL at base/stress costs and outperformance versus the opposite-direction counterfactual, BTC buy-and-hold on matched windows, and cash. Missing BTC coverage blocks candidacy. No result proves future profitability or authorizes a trade or publication.",
     }
 
 

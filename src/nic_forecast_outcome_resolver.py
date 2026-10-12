@@ -27,6 +27,34 @@ def candles(symbol,start_ms,end_ms):
         try: return json.loads(urllib.request.urlopen(b+"/api/v3/klines?"+q,timeout=15).read())
         except Exception: pass
     return []
+def btc_benchmark_return(start_ms, end_ms):
+    """Return BTC/USDT close-to-close percentage over a forecast's exact window.
+
+    Uses closed hourly candles only. Missing entry/exit candles return None; no
+    proxy or interpolated market return is substituted.
+    """
+    q=urllib.parse.urlencode({
+        "symbol":"BTCUSDT","interval":"1h",
+        "startTime":max(0,start_ms-2*60*60*1000),
+        "endTime":end_ms,"limit":40
+    })
+    for base in BASES:
+        try:
+            req=urllib.request.Request(base+"/api/v3/klines?"+q,
+                headers={"User-Agent":"binance-square-ai-creator/nic-benchmark"})
+            rows=json.loads(urllib.request.urlopen(req,timeout=15).read())
+            closed=[k for k in rows if isinstance(k,list) and len(k)>=7 and int(k[6])<=end_ms]
+            entry=[k for k in closed if int(k[6])<=start_ms]
+            exit_rows=[k for k in closed if int(k[6])<=end_ms]
+            if not entry or not exit_rows:
+                continue
+            p0=float(max(entry,key=lambda k:int(k[6]))[4])
+            p1=float(max(exit_rows,key=lambda k:int(k[6]))[4])
+            if p0>0 and p1>0:
+                return round((p1/p0-1)*100,6)
+        except Exception:
+            continue
+    return None
 def existing_event_ids(events):
     return {str(x.get("forecast_id")) for x in events if x.get("event_type")=="FORECAST_RESOLVED" and x.get("forecast_id")}
 def resolve(rows, now=None, candle_fetcher=None, existing_events=None):
@@ -61,10 +89,12 @@ def resolve(rows, now=None, candle_fetcher=None, existing_events=None):
         target=float(max(eligible,key=lambda k:int(k[0]))[4]); entry=float(x["entry_price"])
         if entry<=0 or target<=0: continue
         raw=(target/entry-1)*100; signed=raw if str(x.get("side","")).upper()=="BULLISH" else -raw
+        benchmark=btc_benchmark_return(int(ts.timestamp()*1000),int(due.timestamp()*1000))
         ev={"event_type":"FORECAST_RESOLVED","event_id":fid+"|resolved","forecast_id":fid,
             "resolved_at":now.isoformat(),"symbol":s,"side":x.get("side"),"regime":x.get("regime"),
             "feature":x.get("feature"),"horizon_hours":int(x["horizon_hours"]),"entry_price":entry,
-            "outcome_price":target,"raw_return":round(raw,6),"signed_return":round(signed,6),"hit":signed>0}
+            "outcome_price":target,"raw_return":round(raw,6),"signed_return":round(signed,6),
+            "benchmark_symbol":"BTCUSDT","benchmark_btc_return_pct":benchmark,"hit":signed>0}
         added.append(ev); seen.add(fid)
     return added
 def append_new_events(events,new):

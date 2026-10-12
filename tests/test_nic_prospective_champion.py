@@ -32,7 +32,8 @@ def snapshot(fid, ts, *, side="BULLISH", decision="LONG_CANDIDATE", symbol="TST"
 def event(fid, ts, ret):
     resolved = datetime.fromisoformat(ts.replace("Z", "+00:00")) + timedelta(hours=7)
     return {"event_type": "FORECAST_RESOLVED", "forecast_id": fid,
-            "resolved_at": resolved.isoformat(), "signed_return": ret}
+            "resolved_at": resolved.isoformat(), "signed_return": ret,
+            "benchmark_symbol": "BTCUSDT", "benchmark_btc_return_pct": ret / 2}
 
 
 def test_empty_evidence_stays_collecting_and_never_authorizes():
@@ -124,7 +125,28 @@ def test_positive_forward_cohort_is_review_candidate_not_proven():
     assert baseline["beats_baseline_at_base_and_stress_costs"] is True
     assert baseline["held_out_net_pnl_advantage"] > 0
     assert baseline["stress_net_pnl_advantage"] > 0
+    btc = group["btc_buy_and_hold_baseline"]
+    assert btc["complete_held_out_benchmark_coverage"] is True
+    assert btc["beats_benchmark_at_base_and_stress_costs"] is True
+    assert group["cash_neutral_baseline"]["beats_cash_at_base_and_stress_costs"] is True
     assert group["promotion_allowed"] is False
+    assert report["trade_authorization"] is False
+
+
+def test_missing_btc_benchmark_fails_closed_for_human_review():
+    snaps, events = [], []
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    for i in range(40):
+        ts = (start + timedelta(days=i)).isoformat()
+        fid = f"no-btc-{i}"
+        snaps.append(snapshot(fid, ts, symbol=f"NOBTC{i}"))
+        ev = event(fid, ts, 1.2)
+        ev.pop("benchmark_btc_return_pct")
+        events.append(ev)
+    report = m.evaluate(snaps, events, min_total=20, min_test=5)
+    group = report["strategy_groups"]["BULLISH|6h"]
+    assert group["btc_buy_and_hold_baseline"]["complete_held_out_benchmark_coverage"] is False
+    assert group["status"] != "CANDIDATE_FOR_HUMAN_REVIEW_NOT_PROOF"
     assert report["trade_authorization"] is False
 
 
@@ -135,4 +157,5 @@ if __name__ == "__main__":
     test_overlapping_same_symbol_forecasts_do_not_inflate_effective_sample()
     test_positive_but_weaker_than_opposite_direction_is_not_review_candidate()
     test_positive_forward_cohort_is_review_candidate_not_proven()
+    test_missing_btc_benchmark_fails_closed_for_human_review()
     print("NIC prospective champion tests: PASS")
