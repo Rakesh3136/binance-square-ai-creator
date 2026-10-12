@@ -58,16 +58,48 @@ def dt(value):
     except Exception:
         return None
 
-def campaign_start(previous):
+def verified_row(row):
+    status=str(row.get("status") or "")
+    return status in {"PUBLISHED_VERIFIED_BY_API_RESPONSE","PUBLISHED_AUTONOMOUSLY","VERIFIED_PUBLISHED"} and bool(row.get("publication_proof") and (row.get("canonical_post_id") or row.get("post_id")))
+
+def current_run_publication_time(publications, result, run_id):
+    """Return timestamp only for a current-run API-confirmed post in the durable log."""
+    if not run_id or str(result.get("github_run_id") or "") != str(run_id):
+        return None
+    if str(result.get("status") or "").upper() != "PUBLISHED_VERIFIED_BY_API_RESPONSE":
+        return None
+    wanted=str(result.get("canonical_post_id") or result.get("post_id") or "").strip()
+    if not wanted:
+        return None
+    for row in reversed(publications):
+        got=str(row.get("canonical_post_id") or row.get("post_id") or "").strip()
+        if got == wanted and verified_row(row):
+            return dt(row.get("published_at") or row.get("timestamp"))
+    return None
+
+def campaign_start(previous, publications=None, result=None, run_id=None, now=None):
     env=os.getenv("WTE_7DAY_START_UTC","").strip()
     if env:
         parsed=dt(env)
         if parsed: return parsed
+    now=now or datetime.now(timezone.utc)
+    publications=publications or []
     existing=dt(previous.get("campaign_start_utc"))
-    if existing: return existing
-    # First observed run starts the campaign; no claim is made that this
-    # corresponds to the user's Rewards Hub activation date.
-    return datetime.now(timezone.utc)
+    current_post=current_run_publication_time(publications, result or {}, run_id)
+    if existing:
+        # Repair the old first-run race only when this run proves the exact post
+        # was published just before the previous controller initialized, and
+        # the old controller counted zero posts. Never reset an established campaign.
+        if current_post and int(previous.get("verified_publications_total") or 0)==0 and existing>current_post:
+            age=(existing-current_post).total_seconds()
+            if 0 <= age <= 30*60:
+                return current_post
+        return existing
+    if current_post:
+        return current_post
+    # No verified current-run post: start observation now. Do not backdate to
+    # unrelated historical posts or claim this equals Rewards Hub activation.
+    return now
 
 def verified_publications(start):
     out=[]
@@ -75,14 +107,17 @@ def verified_publications(start):
         stamp=dt(row.get("published_at") or row.get("timestamp"))
         if not stamp or stamp < start: continue
         status=str(row.get("status") or "")
-        if status.startswith("PUBLISHED_") and row.get("publication_proof") and row.get("post_id"):
+        if verified_row(row):
             out.append(row)
     return out
 
 def main():
     now=datetime.now(timezone.utc)
     previous=load(STATE,{})
-    start=campaign_start(previous)
+    publication_rows=rows(PUB)
+    publication_result=load(LIVE/"publication_result.json",{})
+    run_id=os.getenv("GITHUB_RUN_ID","")
+    start=campaign_start(previous,publication_rows,publication_result,run_id,now)
     elapsed=max(0,(now-start).total_seconds())
     day=min(7,int(elapsed//86400)+1)
     pubs=verified_publications(start)
@@ -90,7 +125,10 @@ def main():
     for p in pubs:
         stamp=dt(p.get("published_at") or p.get("timestamp"))
         if stamp:
-            by_day[(stamp.date()-start.date()).days+1]+=1
+            # Campaign days are elapsed 24-hour windows, not calendar-date labels.
+            # This prevents a post at 23:59 from being counted on day 2 at 00:01.
+            bucket=max(1,int((stamp-start).total_seconds()//86400)+1)
+            by_day[bucket]+=1
 
     # A primary daily target is a planning heuristic only. The actual Rewards
     # Hub task may have different thresholds or regional requirements.
@@ -121,7 +159,9 @@ def main():
         "assumptions":{
             "source_of_truth":"Rewards Hub task shown to the account",
             "daily_target_is_configurable":True,
-            "campaign_start_is_local_controller_start_unless_WTE_7DAY_START_UTC_is_set":True,
+            "campaign_start_is_explicit_env_or_first_current_run_verified_publication_else_controller_start":True,
+            "current_run_post_must_match_run_id_and_canonical_post_id":True,
+            "campaign_day_uses_elapsed_24_hour_windows":True,
             "revenue_only_from_explicit_verified_fields":True,"reward_source":"analytics/wte_reward_events.jsonl","performance_reward_fields_are_not_trusted":True,
         },
         "monetization_measurement":{
