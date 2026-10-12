@@ -65,7 +65,7 @@ def main():
         load("nic23_5_counterfactual_challenge.json"),
     )
     LIVE.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(result, indent=2) + "\\n", encoding="utf-8")
+    OUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
     return 0 if result["publish"] else 24
 
