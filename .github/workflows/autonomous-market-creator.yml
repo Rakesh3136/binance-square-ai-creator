@@ -360,6 +360,15 @@ jobs:
           python src/creator_brain.py
           python src/creator_brain_gate.py
           python src/pipeline_stage.py creator_brain success 'Authoritative trade creator brain completed'
+      - name: Synchronize editorial context to frozen opportunity
+        if: ${{ steps.verified_publication.outputs.publish == 'true' && steps.publication_eligibility.outputs.mode == 'EDITORIAL' }}
+        run: |
+          set -euo pipefail
+          python src/nic_editorial_context_sync.py
+          python -m json.tool data/live/nic_editorial_context_sync.json >/dev/null
+          python src/creator_brain.py
+          python src/creator_brain_gate.py
+
       - name: Build and refine publishable content
         if: ${{ steps.cadence.outputs.publish == 'true' }}
         env:
