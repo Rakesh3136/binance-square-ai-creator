@@ -104,11 +104,11 @@ def editorial_only_publication_check(text, eligibility, mode):
     if eligibility.get("trade_authorized") is not False:
         return False, "editorial lane must explicitly deny trade authorization"
     actionable = re.compile(
-        r"(?:\\bentry\\s*(?:price)?\\s*[:=@]|"
-        r"\\bstop[ -]?loss\\s*[:=@]|\\btake[ -]?profit\\s*[:=@]|"
-        r"\\b(?:SL|TP[1-3]?)\\s*[:=@]|"
-        r"\\b(?:buy|sell)\\s+now\\b|\\b(?:open|enter)\\s+(?:a\\s+)?"
-        r"(?:long|short)\\b|\\b\\d{1,3}\\s*x\\s+leverage\\b)",
+        r"(?:\bentry\s*(?:price)?\s*[:=@]|"
+        r"\bstop[ -]?loss\s*[:=@]|\btake[ -]?profit\s*[:=@]|"
+        r"\b(?:SL|TP[1-3]?)\s*[:=@]|"
+        r"\b(?:buy|sell)\s+now\b|\b(?:open|enter)\s+(?:a\s+)?"
+        r"(?:long|short)\b|\b\d{1,3}\s*x\s+leverage\b)",
         re.I,
     )
     if actionable.search(str(text or "")):
