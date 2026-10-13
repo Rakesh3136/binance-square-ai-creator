@@ -30,7 +30,11 @@ def candles(s,limit=720):
         try:
             r=urllib.request.urlopen(urllib.request.Request(b+"/api/v3/klines?"+q,headers={"User-Agent":"binance-square-ai-creator/nic-forecast-lab"}),timeout=15)
             raw=json.loads(r.read())
-            parsed=[{"t":int(x[0]),"h":n(x[2]),"l":n(x[3]),"c":n(x[4]),"v":n(x[7])} for x in raw if isinstance(x,list) and len(x)>=8]
+            retrieved_at=datetime.now(timezone.utc).isoformat()
+            endpoint=b+"/api/v3/klines"
+            parsed=[{"t":int(x[0]),"h":n(x[2]),"l":n(x[3]),"c":n(x[4]),"v":n(x[7]),
+                     "source_endpoint":endpoint,"source_retrieved_at":retrieved_at}
+                    for x in raw if isinstance(x,list) and len(x)>=8]
             closed=closed_candles(parsed)
             if len(closed) < 120:
                 raise RuntimeError(f"Only {len(closed)} fully closed hourly candles; need at least 120")
@@ -110,8 +114,23 @@ def run(cand,rows):
     # This prevents repeated snapshots for the same hourly decision and entry price.
     candle_close_ms = int(rows[ci].get("t") or 0) + 60 * 60 * 1000
     as_of = datetime.fromtimestamp(candle_close_ms / 1000, timezone.utc).isoformat() if candle_close_ms else datetime.now(timezone.utc).isoformat()
+    last_candle = rows[ci]
+    source_provenance = None
+    if last_candle.get("source_endpoint") and last_candle.get("source_retrieved_at"):
+        source_provenance = {
+            "provider": "Binance Spot Market Data API",
+            "endpoint": str(last_candle["source_endpoint"]),
+            "instrument": sym(cand.get("symbol")) + "USDT",
+            "interval": "1h",
+            "closed_candle_open_time": datetime.fromtimestamp(int(last_candle["t"]) / 1000, timezone.utc).isoformat(),
+            "closed_candle_as_of": as_of,
+            "retrieved_at": str(last_candle["source_retrieved_at"]),
+            "source_policy": "closed_1h_only",
+            "strategy_spec_sha256": STRATEGY_SPEC_SHA256,
+        }
     return {"status":"READY","symbol":sym(cand.get("symbol")),"regime":reg,"current_features":cur,"hypotheses":hyps,"decision":decision,
-            "decision_rule":"WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.","as_of":as_of}
+            "decision_rule":"WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.","as_of":as_of,
+            "market_data_provenance":source_provenance}
 def make_snapshots(symbol, result):
     """Create one independent forecast record per side and horizon; features are attributes, not duplicate forecasts."""
     if result.get("status") != "READY":
@@ -139,6 +158,8 @@ def make_snapshots(symbol, result):
                 "strategy_spec": STRATEGY_SPEC,
                 "strategy_spec_sha256": STRATEGY_SPEC_SHA256,
                 "validation_status": "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN",
+                "source_provenance": dict(result.get("market_data_provenance") or {}),
+                "source_provenance_required": True,
                 "resolved": False
             })
     return rows
