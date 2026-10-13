@@ -27,6 +27,8 @@ CREATORS=[
 SOURCE_RULES={"priority":["official/primary","reputable data/research","reputable journalism","community observation"],"independent_sources_for_material_claim":2,"preserve_url_timestamp_and_excerpt_hash":True,"separate_fact_inference_hypothesis":True,"store_disconfirming_evidence":True,"unverified_creator_earnings_are_not_facts":True}
 PROMOTION={"minimum_independent_observations":3,"require_out_of_sample_test_for_predictive_rule":True,"require_costs_and_matched_benchmarks":True,"require_regime_and_asset_scope":True,"insufficient_evidence_action":"WAIT_OR_RESEARCH"}
 GUARDRAILS={"trade_authorized":False,"publication_authorized":False,"live_orders_enabled":False,"learning_may_bypass_gates":False,"creator_examples_are_benchmarks_not_templates":True,"views_are_not_revenue":True,"revenue_requires_verified_write_to_earn_evidence":True}
+REQUIRED_INPUTS=("market_intelligence","square_style","knowledge_acquisition","content_craft","forecast_profitability")
+READY_STATUSES={"READY","SUCCESS","SUCCEEDED","COMPLETE","COMPLETED","OK","PASS","PASSED","PRESENT","CURRENT"}
 
 def now(): return datetime.now(timezone.utc).isoformat()
 def read(path):
@@ -35,14 +37,27 @@ def read(path):
         return v if isinstance(v,(dict,list)) else {}
     except (OSError,json.JSONDecodeError): return {}
 def digest(v): return hashlib.sha256(json.dumps(v,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+def validate_artifacts(artifacts):
+    """Return current-run evidence gaps; explicit failed/stale statuses never count as present."""
+    gaps=[]
+    for key in REQUIRED_INPUTS:
+        value=artifacts.get(key)
+        if not isinstance(value,(dict,list)) or not value:
+            gaps.append(key+"_artifact_missing")
+            continue
+        if isinstance(value,dict) and "status" in value:
+            status=str(value.get("status","")).strip().upper()
+            if status not in READY_STATUSES:
+                gaps.append(key+"_artifact_status_"+(status.lower() or "empty"))
+    return sorted(set(gaps))
 def build_contract(artifacts, previous=None):
     previous=previous if isinstance(previous,dict) else {}
-    gaps=[]
-    for key in ("market_intelligence","square_style","knowledge_acquisition","content_craft","forecast_profitability"):
-        if not artifacts.get(key): gaps.append(key+"_artifact_missing")
-    gaps=sorted(set([str(x) for x in previous.get("known_gaps",[]) if isinstance(x,str)]+gaps))
-    inputs={k:{"present":bool(v),"status":str(v.get("status","PRESENT")).upper() if isinstance(v,dict) else ("PRESENT" if v else "MISSING"),"sha256":digest(v)} for k,v in artifacts.items()}
-    result={"schema":"NIC-DEEP-LEARNING-1.0","generated_at":now(),"status":"LEARNING_WITH_GAPS" if gaps else "LEARNING_INPUTS_PRESENT","mission":"Build evidence-grounded market understanding and original, useful Binance Square creator capability; measure before promoting beliefs.","domains":[{"domain":n,"objective":o,"mode":"RESEARCH_AND_MEASURE","promotion":"EVIDENCE_REQUIRED","failure_policy":"KEEP_UNCERTAIN_AND_RECORD_GAP"} for n,o in MARKET+CREATORS],"source_rules":SOURCE_RULES,"promotion_rules":PROMOTION,"guardrails":GUARDRAILS,"inputs":inputs,"known_gaps":gaps,"next_actions":["refresh primary-source market and platform evidence","separate facts from inference and competing hypotheses","measure original reader payoff rather than copying creators","test forecasts chronologically after costs against cash, BTC and matched counterfactuals","record failed hypotheses and negative outcomes","keep publishing paused until quality gates pass production verification"]}
+    gaps=validate_artifacts(artifacts)
+    inputs={}
+    for key,value in artifacts.items():
+        status=(str(value.get("status","PRESENT")).strip().upper() if isinstance(value,dict) and value else ("PRESENT" if value else "MISSING"))
+        inputs[key]={"present":bool(value),"status":status,"sha256":digest(value)}
+    result={"schema":"NIC-DEEP-LEARNING-1.1","generated_at":now(),"status":"LEARNING_WITH_GAPS" if gaps else "LEARNING_INPUTS_PRESENT","mission":"Build evidence-grounded market understanding and original, useful Binance Square creator capability; measure before promoting beliefs.","domains":[{"domain":n,"objective":o,"mode":"RESEARCH_AND_MEASURE","promotion":"EVIDENCE_REQUIRED","failure_policy":"KEEP_UNCERTAIN_AND_RECORD_GAP"} for n,o in MARKET+CREATORS],"source_rules":SOURCE_RULES,"promotion_rules":PROMOTION,"guardrails":GUARDRAILS,"inputs":inputs,"known_gaps":gaps,"previous_run_known_gaps":sorted(set(str(x) for x in previous.get("known_gaps",[]) if isinstance(x,str))),"next_actions":["refresh primary-source market and platform evidence","separate facts from inference and competing hypotheses","measure original reader payoff rather than copying creators","test forecasts chronologically after costs against cash, BTC and matched counterfactuals","record failed hypotheses and negative outcomes","keep publishing paused until quality gates pass production verification"]}
     result["contract_sha256"]=digest(result)
     return result
 def main():
@@ -51,7 +66,7 @@ def main():
     LIVE.mkdir(parents=True,exist_ok=True); INTEL.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     MEMORY.write_text(json.dumps({"updated_at":result["generated_at"],"known_gaps":result["known_gaps"],"last_contract_sha256":result["contract_sha256"]},indent=2)+"\n",encoding="utf-8")
-    REPORT.write_text(json.dumps({"status":result["status"],"domain_count":len(result["domains"]),"input_status":{k:v["status"] for k,v in result["inputs"].items()},"known_gaps":result["known_gaps"],"trade_authorized":False,"publication_authorized":False},indent=2)+"\n",encoding="utf-8")
+    REPORT.write_text(json.dumps({"status":result["status"],"domain_count":len(result["domains"]),"input_status":{k:v["status"] for k,v in result["inputs"].items()},"known_gaps":result["known_gaps"],"previous_run_known_gaps":result["previous_run_known_gaps"],"trade_authorized":False,"publication_authorized":False},indent=2)+"\n",encoding="utf-8")
     print(json.dumps({"status":result["status"],"domains":len(result["domains"]),"known_gaps":result["known_gaps"],"trade_authorized":False,"publication_authorized":False},indent=2))
     return 0
 if __name__=="__main__": raise SystemExit(main())

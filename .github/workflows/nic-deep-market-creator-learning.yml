@@ -26,6 +26,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate learning pipeline syntax
+        run: >-
+          python -m py_compile
+          src/nic_financial_market_intelligence.py
+          src/square_style_intelligence.py
+          src/nic_autonomous_knowledge_acquisition.py
+          src/nic_story_discovery_5.py
+          src/nic_content_craft_intelligence_9.py
+          src/nic_deep_market_creator_learning.py
       - name: Build market knowledge
         if: github.event_name != 'pull_request'
         run: python src/nic_financial_market_intelligence.py
