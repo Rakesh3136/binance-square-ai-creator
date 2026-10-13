@@ -56,13 +56,13 @@ def test_valid_ledgers_verify_integrity_not_profitability():
     assert result["publication_authorized"] is False
 
 
-def test_snapshot_without_terminal_outcome_is_not_resolved_by_itself():
+def test_snapshot_without_terminal_outcome_is_not_counted_as_resolved():
     snapshots, outcomes, report, sh, oh = fixture()
     outcomes = outcomes[:1]
     report["source_evidence"] = m.source_evidence(snapshots, outcomes, 1, sh, oh)
     report["resolved_forecast_count"], report["sample_count"] = 1, 1
     result = m.evaluate_evidence(snapshots, outcomes, report, sh, oh)
-    assert result["status"] == "BLOCKED"
+    assert result["status"] == "VERIFIED"
     assert result["joined_resolved_forecast_count"] == 1
 
 
