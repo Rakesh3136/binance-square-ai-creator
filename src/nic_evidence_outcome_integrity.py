@@ -9,7 +9,6 @@ import argparse
 import hashlib
 import json
 import math
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -250,7 +249,7 @@ def main() -> int:
         "trade_authorized": False,
         "publication_authorized": False,
     }))
-    return 0 if result["status"] == "VERIFIED" else 1
+    return {"VERIFIED": 0, "BLOCKED": 2, "FAILED": 1}.get(result["status"], 1)
 
 
 if __name__ == "__main__":
