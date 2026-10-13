@@ -49,6 +49,7 @@ jobs:
       - name: Test learning contract
         run: python -m pytest -q tests/test_nic_deep_market_creator_learning.py
       - name: Upload learning report
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: nic-deep-learning-${{ github.run_id }}
