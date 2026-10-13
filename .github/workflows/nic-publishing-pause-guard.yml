@@ -1,0 +1,34 @@
+name: NIC Publishing Pause Guard
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/nic-publishing-pause-guard.yml'
+      - '.github/workflows/autonomous-market-creator.yml'
+      - 'src/binance_square_publisher.py'
+      - 'tests/test_publishing_pause.py'
+  pull_request:
+    paths:
+      - '.github/workflows/nic-publishing-pause-guard.yml'
+      - '.github/workflows/autonomous-market-creator.yml'
+      - 'src/binance_square_publisher.py'
+      - 'tests/test_publishing_pause.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nic-publishing-pause-guard
+  cancel-in-progress: false
+jobs:
+  verify-publishing-pause:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile publisher without invoking network calls
+        run: python -m py_compile src/binance_square_publisher.py
+      - name: Test publisher default pause and workflow hard-disable
+        run: python tests/test_publishing_pause.py
