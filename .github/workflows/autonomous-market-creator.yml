@@ -505,6 +505,9 @@ jobs:
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_eligibility.outputs.mode == 'EDITORIAL' }}
         run: |
           set -euo pipefail
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          set -euo pipefail
           python src/nic_editorial_lane_gate.py
           python -m json.tool data/live/nic_editorial_lane_gate.json >/dev/null
           publish=$(python -c 'import json; print(str(json.load(open("data/live/nic_editorial_lane_gate.json")).get("publish", False)).lower())')
