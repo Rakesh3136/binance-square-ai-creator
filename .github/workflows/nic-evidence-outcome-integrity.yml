@@ -53,4 +53,5 @@ jobs:
           exit 1
       - name: Record insufficient evidence without calling it a test failure
         if: always() && env.NIC_EVIDENCE_INTEGRITY_EXIT == '2'
-        run: echo "Evidence integrity is BLOCKED: no sufficient joined, provenance-complete outcome evidence. Profitability remains NOT_PROVEN."
+        run: |
+          echo "Evidence integrity is BLOCKED: no sufficient joined, provenance-complete outcome evidence. Profitability remains NOT_PROVEN."
