@@ -503,8 +503,7 @@ jobs:
       - name: NIC editorial-only publication gate
         id: editorial_lane
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_eligibility.outputs.mode == 'EDITORIAL' }}
-        run: |
-          set -euo pipefail
+        env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
           set -euo pipefail
