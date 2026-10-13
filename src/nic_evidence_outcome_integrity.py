@@ -95,6 +95,14 @@ def evaluate_evidence(
     """Check immutable IDs, explicit terminal joins, provenance, and report-to-ledger equality."""
     errors: list[str] = []
     warnings: list[str] = []
+    warning_counts: dict[str, int] = {}
+
+    def add_warning(code: str, detail: str | None = None) -> None:
+        warning_counts[code] = warning_counts.get(code, 0) + 1
+        # Keep the report compact; counts preserve the full population.
+        if len(warnings) < 25:
+            warnings.append(f"{code}:{detail}" if detail else code)
+
     snapshot_by_id: dict[str, dict[str, Any]] = {}
     terminal_by_id: dict[str, dict[str, Any]] = {}
 
@@ -108,9 +116,9 @@ def evaluate_evidence(
             continue
         snapshot_by_id[forecast_id] = snapshot
         if not _timestamp(snapshot.get("timestamp") or snapshot.get("created_at")):
-            warnings.append(f"snapshot_missing_valid_timestamp:{forecast_id}")
+            add_warning("snapshot_missing_valid_timestamp", forecast_id)
         if not _has_source_provenance(snapshot):
-            warnings.append(f"snapshot_missing_source_provenance:{forecast_id}")
+            add_warning("snapshot_missing_source_provenance", forecast_id)
 
     terminal_events = [row for row in outcomes if row.get("event_type") == "FORECAST_RESOLVED"]
     for index, event in enumerate(terminal_events, 1):
@@ -127,7 +135,7 @@ def evaluate_evidence(
         if _number(event.get("signed_return")) is None:
             errors.append(f"terminal_outcome_invalid_signed_return:{forecast_id}")
         if not _timestamp(event.get("resolved_at") or event.get("timestamp")):
-            warnings.append(f"terminal_outcome_missing_valid_timestamp:{forecast_id}")
+            add_warning("terminal_outcome_missing_valid_timestamp", forecast_id)
 
     resolved_ids = sorted(set(snapshot_by_id) & set(terminal_by_id))
     actionable_ids: set[str] = set()
@@ -141,17 +149,17 @@ def evaluate_evidence(
             actionable_ids.add(forecast_id)
 
     if not resolved_ids:
-        warnings.append("no_explicit_terminal_outcomes_joined_to_snapshots")
+        add_warning("no_explicit_terminal_outcomes_joined_to_snapshots")
 
     actual_source = source_evidence(
         snapshots, outcomes, len(resolved_ids), snapshot_sha256, outcomes_sha256
     )
     if not isinstance(report, dict):
-        warnings.append("profitability_report_missing_or_invalid")
+        add_warning("profitability_report_missing_or_invalid")
         report = {}
     evidence = report.get("source_evidence")
     if not isinstance(evidence, dict):
-        warnings.append("profitability_report_missing_source_evidence")
+        add_warning("profitability_report_missing_source_evidence")
     else:
         for key, actual in actual_source.items():
             if evidence.get(key) != actual:
@@ -173,7 +181,7 @@ def evaluate_evidence(
 
     if errors:
         status = "FAILED"
-    elif warnings:
+    elif warning_counts:
         status = "BLOCKED"
     else:
         status = "VERIFIED"
@@ -190,6 +198,8 @@ def evaluate_evidence(
         "source_evidence": actual_source,
         "errors": sorted(set(errors)),
         "warnings": sorted(set(warnings)),
+        "warning_counts": dict(sorted(warning_counts.items())),
+        "warning_total_count": sum(warning_counts.values()),
         "profitability_status": str(report.get("status") or "NOT_PROVEN"),
         "profitability_proven": False,
         "trade_authorized": False,
@@ -244,7 +254,7 @@ def main() -> int:
         "terminal_outcomes": result.get("terminal_outcome_count", 0),
         "joined_resolved": result.get("joined_resolved_forecast_count", 0),
         "errors": len(result.get("errors", [])),
-        "warnings": len(result.get("warnings", [])),
+        "warnings": result.get("warning_total_count", len(result.get("warnings", []))),
         "profitability_proven": False,
         "trade_authorized": False,
         "publication_authorized": False,
