@@ -53,6 +53,9 @@ jobs:
       - name: Reconcile deep learning contract
         if: github.event_name != 'pull_request'
         run: python src/nic_deep_market_creator_learning.py
+      - name: Exercise learning contract safely in pull requests
+        if: github.event_name == 'pull_request'
+        run: python src/nic_deep_market_creator_learning.py
       - name: Install test dependency
         run: python -m pip install pytest
       - name: Test learning contract
