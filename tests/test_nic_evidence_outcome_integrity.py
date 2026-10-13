@@ -56,6 +56,21 @@ def test_valid_ledgers_verify_integrity_not_profitability():
     assert result["publication_authorized"] is False
 
 
+def test_empty_ledgers_are_blocked_not_profitable():
+    snapshots, outcomes = [], []
+    snapshot_hash = outcomes_hash = "empty-ledger-sha"
+    report = {
+        "status": "NOT_PROVEN",
+        "resolved_forecast_count": 0,
+        "sample_count": 0,
+        "source_evidence": m.source_evidence(snapshots, outcomes, 0, snapshot_hash, outcomes_hash),
+    }
+    result = m.evaluate_evidence(snapshots, outcomes, report, snapshot_hash, outcomes_hash)
+    assert result["status"] == "BLOCKED"
+    assert result["joined_resolved_forecast_count"] == 0
+    assert result["profitability_proven"] is False
+
+
 def test_snapshot_without_terminal_outcome_is_not_counted_as_resolved():
     snapshots, outcomes, report, sh, oh = fixture()
     outcomes = outcomes[:1]
