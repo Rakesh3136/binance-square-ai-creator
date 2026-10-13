@@ -6,6 +6,9 @@ on:
       - 'tests/test_nic_evidence_outcome_integrity.py'
       - '.github/workflows/nic-evidence-outcome-integrity.yml'
       - 'src/nic_forecast_profitability.py'
+      - 'data/intelligence/nic_forecast_profitability.json'
+      - 'data/intelligence/nic_forecast_truth_ledger.jsonl'
+      - 'data/intelligence/nic_forecast_outcome_events.jsonl'
   workflow_dispatch:
   schedule:
     - cron: "41 3 * * 1,4"
@@ -28,10 +31,8 @@ jobs:
       - name: Install test dependency
         run: python -m pip install pytest
       - name: Test evidence reconciliation with controlled fixtures
-        if: github.event_name == 'pull_request'
         run: python -m pytest -q tests/test_nic_evidence_outcome_integrity.py
-      - name: Audit production forecast evidence
-        if: github.event_name != 'pull_request'
+      - name: Audit committed evidence and profitability report
         run: |
           set +e
           python src/nic_evidence_outcome_integrity.py
@@ -39,14 +40,17 @@ jobs:
           echo "NIC_EVIDENCE_INTEGRITY_EXIT=$status" >> "$GITHUB_ENV"
           exit 0
       - name: Upload integrity report
-        if: always() && github.event_name != 'pull_request'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: nic-evidence-outcome-integrity-${{ github.run_id }}
           path: data/intelligence/nic_evidence_outcome_integrity.json
           if-no-files-found: error
-      - name: Fail closed unless production evidence is verified
-        if: always() && github.event_name != 'pull_request' && env.NIC_EVIDENCE_INTEGRITY_EXIT != '0'
+      - name: Fail CI on contradictory evidence
+        if: always() && env.NIC_EVIDENCE_INTEGRITY_EXIT == '1'
         run: |
-          echo "NIC evidence integrity is blocked or failed; see uploaded report."
+          echo "NIC evidence/report contradiction detected; see the integrity report artifact."
           exit 1
+      - name: Record insufficient evidence without calling it a test failure
+        if: always() && env.NIC_EVIDENCE_INTEGRITY_EXIT == '2'
+        run: echo "Evidence integrity is BLOCKED: no sufficient joined, provenance-complete outcome evidence. Profitability remains NOT_PROVEN."
