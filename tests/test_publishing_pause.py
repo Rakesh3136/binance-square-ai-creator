@@ -67,5 +67,26 @@ class PublishingPauseTest(unittest.TestCase):
         )
         self.assertFalse(ok)
 
+    def test_autonomous_workflow_hard_disables_publication_steps(self):
+        workflow = (ROOT / ".github" / "workflows" / "autonomous-market-creator.yml").read_text(encoding="utf-8")
+
+        def step_block(name):
+            marker = f"      - name: {name}"
+            start = workflow.index(marker)
+            end = workflow.find("\\n      - name:", start + len(marker))
+            return workflow[start:] if end < 0 else workflow[start:end]
+
+        authorization = step_block("NIC editorial automatic-publication authorization")
+        payload = step_block("Build final publication payload")
+        publisher_step = step_block("Extract publication and submit to Binance Square")
+        review_artifact = step_block("Preserve exact final draft and gate context for mandatory human review")
+
+        self.assertIn("if: ${{ false }}", authorization)
+        self.assertIn("if: ${{ false }}", payload)
+        self.assertIn("if: ${{ false }}", publisher_step)
+        self.assertIn("PUBLISHING_ENABLED: 'false'", publisher_step)
+        self.assertIn("mandatory human review", review_artifact)
+        self.assertIn("steps.cadence.outputs.publish == 'true'", review_artifact)
+
 if __name__ == "__main__":
     unittest.main()
