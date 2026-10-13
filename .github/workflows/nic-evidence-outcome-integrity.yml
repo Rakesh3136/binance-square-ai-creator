@@ -1,5 +1,17 @@
 name: NIC Evidence-to-Outcome Integrity
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/nic-evidence-outcome-integrity.yml'
+      - 'src/nic_evidence_outcome_integrity.py'
+      - 'src/nic_forecast_profitability.py'
+      - 'src/nic_forecast_laboratory.py'
+      - 'tests/test_nic_evidence_outcome_integrity.py'
+      - 'tests/test_nic_forecast_laboratory.py'
+      - 'data/intelligence/nic_forecast_profitability.json'
+      - 'data/intelligence/nic_forecast_truth_ledger.jsonl'
+      - 'data/intelligence/nic_forecast_outcome_events.jsonl'
   pull_request:
     paths:
       - 'src/nic_evidence_outcome_integrity.py'
