@@ -24,6 +24,10 @@ def test_open_hourly_candle_is_excluded():
 def test_one_snapshot_per_side_horizon_not_per_feature():
  result={"status":"READY","as_of":"2026-10-11T10:00:00+00:00","symbol":"TEST","regime":"RANGE",
          "current_features":{"price":100,"trend":1,"momentum":2,"rsi":55,"volume_ratio":1.4,"distance_ema20":1,"range_position":.6},
+         "market_data_provenance":{"provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines",
+           "instrument":"TESTUSDT","interval":"1h","closed_candle_open_time":"2026-10-11T09:00:00+00:00",
+           "closed_candle_as_of":"2026-10-11T10:00:00+00:00","retrieved_at":"2026-10-11T10:00:01+00:00",
+           "source_policy":"closed_1h_only","strategy_spec_sha256":m.STRATEGY_SPEC_SHA256},
          "decision":"BULLISH","hypotheses":{}}
  for side in ("BULLISH","BEARISH"):
   result["hypotheses"][side]={"forward":{str(h):{"hit_rate":.61 if side=="BULLISH" else .39} for h in (6,12,24)}}
@@ -34,6 +38,10 @@ def test_one_snapshot_per_side_horizon_not_per_feature():
  assert all("feature_flags" in x and x["feature"]=="COMPOSITE" for x in rows)
  assert all(x["validation_status"]=="PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN" for x in rows)
  assert all(x["strategy_version"]==m.STRATEGY_VERSION and x["strategy_spec_sha256"]==m.STRATEGY_SPEC_SHA256 for x in rows)
+ assert all(x["source_provenance_required"] is True for x in rows)
+ assert all(x["source_provenance"]["provider"]=="Binance Spot Market Data API" for x in rows)
+ assert all(x["source_provenance"]["endpoint"].endswith("/api/v3/klines") for x in rows)
+ assert all(x["source_provenance"]["closed_candle_as_of"]==result["as_of"] for x in rows)
 def test_persistence_verification_fails_when_expected_id_is_absent():
  import tempfile
  with tempfile.TemporaryDirectory() as tmp:
