@@ -547,7 +547,8 @@ jobs:
 
       - name: NIC editorial automatic-publication authorization
         id: publication_authorization
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && (steps.early_entry.outputs.publish == 'true' || steps.editorial_lane.outputs.publish == 'true') }}
+        # HARD SAFETY PAUSE: require an explicit future code review to re-enable automatic posting.
+        if: ${{ false }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -558,8 +559,8 @@ jobs:
           echo "authorized=$authorized" >> "$GITHUB_OUTPUT"
           echo "NIC publication authorization: $authorized"
 
-      - name: Preserve exact final draft and gate context for human review
-        if: ${{ steps.human_review.outputs.blocked == 'true' && steps.publication_authorization.outputs.authorized != 'true' }}
+      - name: Preserve exact final draft and gate context for mandatory human review
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: nic-pending-human-review-${{ github.run_id }}
@@ -570,7 +571,8 @@ jobs:
           retention-days: 7
 
       - name: Build final publication payload
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_authorization.outputs.authorized == 'true' }}
+        # HARD SAFETY PAUSE: do not prepare an auto-submission payload while publishing is paused.
+        if: ${{ false }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -580,12 +582,12 @@ jobs:
 
       - name: Extract publication and submit to Binance Square
         id: publish_result
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_authorization.outputs.authorized == 'true' }}
+        # HARD SAFETY PAUSE: the publisher must not run until a separate reviewed release removes this guard.
+        if: ${{ false }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
-          # Safety pause: do not auto-publish until originality, pump-timing, and chart-truth defects are remediated and production-verified.
-          # The publisher defaults to PUBLISHING_PAUSED when PUBLISHING_ENABLED is absent.
+          PUBLISHING_ENABLED: 'false'
           NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY
         run: python src/binance_square_publisher.py
 
