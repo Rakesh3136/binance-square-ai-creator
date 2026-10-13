@@ -1,0 +1,39 @@
+name: NIC Deep Market and Creator Learning
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1,4"
+permissions:
+  contents: write
+concurrency:
+  group: nic-deep-market-creator-learning
+  cancel-in-progress: false
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build market knowledge
+        run: python src/nic_financial_market_intelligence.py
+      - name: Build Square creator benchmark intelligence
+        run: python src/square_style_intelligence.py
+      - name: Plan autonomous knowledge acquisition
+        run: python src/nic_autonomous_knowledge_acquisition.py
+      - name: Build content craft contract
+        run: python src/nic_content_craft_intelligence_9.py
+      - name: Reconcile deep learning contract
+        run: python src/nic_deep_market_creator_learning.py
+      - name: Test learning contract
+        run: python -m pytest -q tests/test_nic_deep_market_creator_learning.py
+      - name: Upload learning report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic-deep-learning-${{ github.run_id }}
+          path: |
+            data/live/nic_deep_learning_contract.json
+            data/intelligence/nic_deep_learning_report.json
+          if-no-files-found: error
