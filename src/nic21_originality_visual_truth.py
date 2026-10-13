@@ -134,6 +134,7 @@ def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
     meta = load_json(VISUAL_META, {})
     required = {"symbol": symbol}
     setup_like = bool(SETUP_TERMS.search(draft_text))
+    setup_like = bool(SETUP_TERMS.search(draft_text))
     failures: list[str] = []
     warnings: list[str] = []
 
