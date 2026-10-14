@@ -66,7 +66,12 @@ def test_source_validator_counts_only_actionable_decisions():
         ledger = Path(directory) / "truth.jsonl"
         events = Path(directory) / "outcomes.jsonl"
         snapshots = [
-            {"forecast_id": "long", "timestamp": "0001", "side": "BULLISH", "decision": "LONG_CANDIDATE", "horizon_hours": 6},
+            {"forecast_id": "long", "timestamp": "2026-10-01T10:00:00Z", "side": "BULLISH", "decision": "LONG_CANDIDATE", "horizon_hours": 6,
+             "source_provenance": {"provider": "Binance Spot Market Data API",
+                 "endpoint": "https://data-api.binance.vision/api/v3/klines", "instrument": "BTCUSDT",
+                 "interval": "1h", "closed_candle_open_time": "2026-10-01T09:00:00Z",
+                 "closed_candle_as_of": "2026-10-01T10:00:00Z", "retrieved_at": "2026-10-01T10:00:01Z",
+                 "strategy_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
             {"forecast_id": "wait", "timestamp": "0002", "side": "BULLISH", "decision": "WAIT", "horizon_hours": 6},
             {"forecast_id": "legacy", "timestamp": "0003", "side": "BEARISH", "horizon_hours": 6},
         ]
