@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LEDGER = ROOT / "data/intelligence/nic_forecast_truth_ledger.jsonl"
-EVENTS = ROOT / "data/intelligence/nic_forecast_outcome_events.jsonl"
+LEDGER = ROOT / "data/intelligence/nic_forecast_prospective_cohort.jsonl"
+EVENTS = ROOT / "data/intelligence/nic_forecast_prospective_outcome_events.jsonl"
 OUT = ROOT / "data/intelligence/nic_forecast_profitability.json"
 MIN_TOTAL = 300
 MIN_TEST = 100
@@ -357,7 +357,8 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
     candidates = [key for key, value in report_groups.items()
                   if value["status"] == "EXPLORATORY_SUBGROUP_CANDIDATE_NOT_PROOF"]
     return {
-        "schema": "NIC-FORECAST-PROFITABILITY-1.1",
+        "schema": "NIC-FORECAST-PROFITABILITY-1.2",
+        "cohort_policy": "PROSPECTIVE_FROZEN_PROVENANCE_BACKED_ONLY",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         # A positive subgroup is a research lead, not proof that the complete
         # deployed strategy is profitable. This evaluator does not yet simulate
