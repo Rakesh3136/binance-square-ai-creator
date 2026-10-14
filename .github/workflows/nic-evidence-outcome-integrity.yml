@@ -7,13 +7,15 @@ on:
       - 'src/nic_evidence_outcome_integrity.py'
       - 'src/nic_forecast_profitability.py'
       - 'src/nic_forecast_laboratory.py'
+      - 'src/nic_forecast_outcome_resolver.py'
+      - 'src/nic_forecast_calibrator.py'
+      - 'tests/test_nic_forecast_outcome_resolver.py'
+      - 'tests/test_nic_forecast_calibrator.py'
       - 'tests/test_nic_evidence_outcome_integrity.py'
       - 'tests/test_nic_forecast_laboratory.py'
       - 'tests/test_nic_forecast_profitability.py'
       - 'data/intelligence/nic_forecast_profitability.json'
       - 'data/intelligence/nic_forecast_truth_ledger.jsonl'
-      - 'data/intelligence/nic_forecast_prospective_cohort.jsonl'
-      - 'data/intelligence/nic_forecast_prospective_outcome_events.jsonl'
       - 'data/intelligence/nic_forecast_outcome_events.jsonl'
       - 'data/intelligence/nic_forecast_prospective_cohort.jsonl'
       - 'data/intelligence/nic_forecast_prospective_outcome_events.jsonl'
@@ -28,6 +30,8 @@ on:
       - 'data/intelligence/nic_forecast_profitability.json'
       - 'data/intelligence/nic_forecast_truth_ledger.jsonl'
       - 'data/intelligence/nic_forecast_outcome_events.jsonl'
+      - 'data/intelligence/nic_forecast_prospective_cohort.jsonl'
+      - 'data/intelligence/nic_forecast_prospective_outcome_events.jsonl'
   workflow_dispatch:
   schedule:
     - cron: "41 3 * * 1,4"
@@ -46,11 +50,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile integrity validator
-        run: python -m py_compile src/nic_evidence_outcome_integrity.py src/nic_forecast_laboratory.py src/nic_forecast_outcome_resolver.py src/nic_forecast_profitability.py
+        run: python -m py_compile src/nic_evidence_outcome_integrity.py src/nic_forecast_laboratory.py src/nic_forecast_outcome_resolver.py src/nic_forecast_profitability.py src/nic_forecast_calibrator.py
       - name: Install test dependency
         run: python -m pip install pytest
       - name: Test evidence reconciliation with controlled fixtures
-        run: python -m pytest -q tests/test_nic_evidence_outcome_integrity.py tests/test_nic_forecast_laboratory.py tests/test_nic_forecast_outcome_resolver.py tests/test_nic_forecast_profitability.py
+        run: python -m pytest -q tests/test_nic_evidence_outcome_integrity.py tests/test_nic_forecast_laboratory.py tests/test_nic_forecast_outcome_resolver.py tests/test_nic_forecast_profitability.py tests/test_nic_forecast_calibrator.py
       - name: Rebuild profitability report from exact persisted ledgers
         run: python src/nic_forecast_profitability.py
       - name: Audit evidence against the freshly rebuilt profitability report
