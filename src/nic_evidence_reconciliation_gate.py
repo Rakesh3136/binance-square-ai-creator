@@ -23,7 +23,8 @@ def sha(path): return hashlib.sha256(path.read_bytes() if path.exists() else b""
 
 def validate(root):
     d=root/"data/intelligence"; sp=d/"nic_forecast_truth_ledger.jsonl"; ep=d/"nic_forecast_outcome_events.jsonl"
-    snaps=rows(sp); events=rows(ep); lab=obj(d/"nic_forecast_laboratory_report.json")
+    csp=d/"nic_forecast_prospective_cohort.jsonl"; cep=d/"nic_forecast_prospective_outcome_events.jsonl"
+    snaps=rows(sp); events=rows(ep); cohort=rows(csp); cohort_events=rows(cep); lab=obj(d/"nic_forecast_laboratory_report.json")
     portfolio=obj(d/"nic_portfolio_reality.json"); profit=obj(d/"nic_forecast_profitability.json")
     ids=[str(x.get("forecast_id") or "") for x in snaps]
     if any(not x for x in ids) or len(ids)!=len(set(ids)): raise AssertionError("Missing or duplicate snapshot forecast IDs")
@@ -47,18 +48,24 @@ def validate(root):
     persisted_count=lab.get("persisted_snapshot_count")
     if persisted_count is not None and persisted_count!=len(snaps):
         raise AssertionError("Laboratory persisted snapshot count does not match immutable truth ledger")
-    sh,eh=sha(sp),sha(ep)
+    csh,ceh=sha(csp),sha(cep)
+    cohort_ids=[str(x.get("forecast_id") or "") for x in cohort]
+    if any(not x for x in cohort_ids) or len(cohort_ids)!=len(set(cohort_ids)): raise AssertionError("Missing or duplicate prospective cohort forecast IDs")
+    cohort_terminal=[x for x in cohort_events if x.get("event_type")=="FORECAST_RESOLVED"]
+    cohort_tids=[str(x.get("forecast_id") or "") for x in cohort_terminal]
+    if any(not x for x in cohort_tids) or len(cohort_tids)!=len(set(cohort_tids)): raise AssertionError("Missing or duplicate prospective terminal outcome IDs")
+    if set(cohort_tids)-set(cohort_ids): raise AssertionError("Prospective terminal outcome has no cohort snapshot")
     pe=portfolio.get("source_evidence") or {}; pf=portfolio.get("source_file_evidence") or {}
-    if pf.get("snapshot_ledger_sha256")!=sh or pf.get("outcome_ledger_sha256")!=eh: raise AssertionError("Portfolio Reality source file hash mismatch")
-    if pe.get("snapshot_count")!=len(snaps) or pe.get("terminal_outcome_count")!=len(terminal): raise AssertionError("Portfolio Reality counts disagree with ledgers")
+    if pf.get("snapshot_ledger_sha256")!=csh or pf.get("outcome_ledger_sha256")!=ceh: raise AssertionError("Portfolio Reality source file hash mismatch")
+    if pe.get("snapshot_count")!=len(cohort) or pe.get("terminal_outcome_count")!=len(cohort_terminal): raise AssertionError("Portfolio Reality counts disagree with prospective cohort")
     if portfolio.get("status")!="NOT_PROVEN" or portfolio.get("trade_or_publication_authorization") is not False: raise AssertionError("Portfolio must remain non-authorizing and NOT_PROVEN")
     source=profit.get("source_evidence")
     if not isinstance(source,dict): raise AssertionError("Profitability report missing source provenance")
-    if source.get("snapshot_ledger_sha256")!=sh or source.get("outcome_ledger_sha256")!=eh: raise AssertionError("Profitability source hash mismatch")
-    if source.get("snapshot_count")!=len(snaps) or source.get("terminal_outcome_count")!=len(terminal): raise AssertionError("Profitability counts disagree with ledgers")
+    if source.get("snapshot_ledger_sha256")!=csh or source.get("outcome_ledger_sha256")!=ceh: raise AssertionError("Profitability source hash mismatch")
+    if source.get("snapshot_count")!=len(cohort) or source.get("terminal_outcome_count")!=len(cohort_terminal): raise AssertionError("Profitability counts disagree with prospective cohort")
     if profit.get("status")!="NOT_PROVEN" or profit.get("publication_or_trade_authorization") is not False: raise AssertionError("Profitability must remain non-authorizing and NOT_PROVEN")
-    if not snaps and (int(profit.get("resolved_forecast_count") or 0) or int(profit.get("sample_count") or 0)): raise AssertionError("Profitability claims samples with empty truth ledger")
-    return {"status":"PASS","snapshots":len(snaps),"terminal_outcomes":len(terminal),"trade_or_publication_authorization":False}
+    if not cohort and (int(profit.get("resolved_forecast_count") or 0) or int(profit.get("sample_count") or 0)): raise AssertionError("Profitability claims samples with empty prospective cohort")
+    return {"status":"PASS","historical_snapshots":len(snaps),"historical_terminal_outcomes":len(terminal),"prospective_snapshots":len(cohort),"prospective_terminal_outcomes":len(cohort_terminal),"trade_or_publication_authorization":False}
 
 if __name__=="__main__":
     print(json.dumps(validate(Path(__file__).resolve().parents[1]),sort_keys=True))
