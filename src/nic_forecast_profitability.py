@@ -155,6 +155,147 @@ def trade_metrics(rows: list[dict], round_trip_cost_pct: float) -> dict:
     }
 
 
+
+
+def _parse_timestamp(value) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+
+
+def simulate_non_overlapping_portfolio(
+    rows: list[dict],
+    round_trip_cost_pct: float,
+    initial_equity: float = 10_000.0,
+    max_positions: int = 5,
+    fixed_horizon_hours: int = 6,
+) -> dict:
+    """Deterministic shadow portfolio; fixed horizon, no same-symbol overlap, no live orders.
+
+    Uses only explicit actionable resolved forecasts with complete provenance when the
+    loader has assessed it. Position notional is fixed at initial_equity/max_positions,
+    avoiding look-ahead sizing or compounding. This is a directional return proxy,
+    not exchange-account PnL; no intratrade mark-to-market is available.
+    """
+    if not math.isfinite(initial_equity) or initial_equity <= 0:
+        raise ValueError("initial_equity must be finite and positive")
+    if max_positions < 1 or fixed_horizon_hours < 1:
+        raise ValueError("max_positions and fixed_horizon_hours must be positive")
+    cost = finite_float(round_trip_cost_pct)
+    if cost is None or cost < 0:
+        raise ValueError("round_trip_cost_pct must be finite and non-negative")
+
+    candidates = []
+    skipped_invalid_timestamp = 0
+    skipped_missing_provenance = 0
+    skipped_non_actionable = 0
+    skipped_other_horizon = 0
+    for row in rows:
+        if row.get("source_provenance_complete") is False:
+            skipped_missing_provenance += 1
+            continue
+        try:
+            horizon = int(row.get("horizon_hours") or 0)
+        except (TypeError, ValueError):
+            horizon = 0
+        if horizon != fixed_horizon_hours:
+            skipped_other_horizon += 1
+            continue
+        side = str(row.get("side") or "").upper()
+        decision = str(row.get("decision") or "").upper()
+        expected = {"BULLISH": "LONG_CANDIDATE", "BEARISH": "SHORT_CANDIDATE"}.get(side)
+        if expected is None or decision != expected:
+            skipped_non_actionable += 1
+            continue
+        entry = _parse_timestamp(str(row.get("timestamp") or ""))
+        gross = finite_float(row.get("signed_return_pct"))
+        symbol = str(row.get("symbol") or "").upper().strip()
+        if entry is None or gross is None or not symbol:
+            skipped_invalid_timestamp += 1
+            continue
+        candidates.append({**row, "_entry": entry, "_exit": entry + __import__("datetime").timedelta(hours=fixed_horizon_hours),
+                           "_net_return_pct": gross - cost, "_symbol": symbol})
+
+    candidates.sort(key=lambda row: (row["_entry"], row["_symbol"], str(row.get("forecast_id") or "")))
+    active = []
+    equity = float(initial_equity)
+    peak = equity
+    max_drawdown_pct = 0.0
+    accepted = []
+    skipped_overlap = 0
+    skipped_capacity = 0
+    fixed_notional = initial_equity / max_positions
+
+    def close_until(cutoff=None, close_all=False):
+        nonlocal equity, peak, max_drawdown_pct, active
+        closing = [position for position in active if close_all or position["_exit"] <= cutoff]
+        closing.sort(key=lambda position: (position["_exit"], position["_symbol"], str(position.get("forecast_id") or "")))
+        for position in closing:
+            equity += fixed_notional * position["_net_return_pct"] / 100.0
+            peak = max(peak, equity)
+            if peak > 0:
+                max_drawdown_pct = max(max_drawdown_pct, (peak - equity) / peak * 100.0)
+            accepted.append({
+                "forecast_id": str(position.get("forecast_id") or ""),
+                "symbol": position["_symbol"],
+                "entry_at": position["_entry"].isoformat(),
+                "exit_at": position["_exit"].isoformat(),
+                "horizon_hours": fixed_horizon_hours,
+                "gross_return_pct": round(position["_net_return_pct"] + cost, 5),
+                "net_return_pct": round(position["_net_return_pct"], 5),
+                "notional": round(fixed_notional, 2),
+                "net_pnl": round(fixed_notional * position["_net_return_pct"] / 100.0, 5),
+            })
+        active = [position for position in active if position not in closing]
+
+    for candidate in candidates:
+        close_until(candidate["_entry"])
+        if any(position["_symbol"] == candidate["_symbol"] for position in active):
+            skipped_overlap += 1
+            continue
+        if len(active) >= max_positions:
+            skipped_capacity += 1
+            continue
+        active.append(candidate)
+    close_until(close_all=True)
+
+    pnl_values = [trade["net_pnl"] for trade in accepted]
+    wins = sum(value > 0 for value in pnl_values)
+    gross_profit = sum(value for value in pnl_values if value > 0)
+    gross_loss = abs(sum(value for value in pnl_values if value < 0))
+    return {
+        "status": "SIMULATED_SHADOW_ONLY" if accepted else "INSUFFICIENT_ELIGIBLE_TRADES",
+        "method": "chronological fixed-6h horizon; max five concurrent positions; same-symbol overlap blocked",
+        "initial_equity": round(initial_equity, 2),
+        "final_equity": round(equity, 5),
+        "net_pnl": round(equity - initial_equity, 5),
+        "total_return_pct": round((equity / initial_equity - 1.0) * 100.0, 5),
+        "accepted_trade_count": len(accepted),
+        "net_win_rate": round(wins / len(accepted), 5) if accepted else None,
+        "profit_factor": round(gross_profit / gross_loss, 5) if gross_loss else (None if not gross_profit else "INF"),
+        "max_closed_equity_drawdown_pct": round(max_drawdown_pct, 5),
+        "fixed_notional_per_position": round(fixed_notional, 2),
+        "max_positions": max_positions,
+        "fixed_horizon_hours": fixed_horizon_hours,
+        "skipped_same_symbol_overlap_count": skipped_overlap,
+        "skipped_position_capacity_count": skipped_capacity,
+        "skipped_missing_provenance_count": skipped_missing_provenance,
+        "skipped_non_actionable_count": skipped_non_actionable,
+        "skipped_other_horizon_count": skipped_other_horizon,
+        "skipped_invalid_timestamp_or_return_count": skipped_invalid_timestamp,
+        "closed_trades": accepted,
+        "limitations": [
+            "Uses directional signed-return proxies, not verified exchange fills or account PnL.",
+            "Fixed position notional and close-to-close outcome labels omit intratrade path, stop/target order, funding, borrow, liquidation and real execution.",
+            "A simulated result is not out-of-sample proof, does not authorize trading, and must not be presented as a guaranteed edge.",
+        ],
+    }
+
+
 def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05) -> dict:
     fee = finite_float(fee_per_side_pct)
     slippage = finite_float(slippage_per_side_pct)
@@ -212,6 +353,7 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
                        if proven else "Requires >=100 actionable forecasts, >=30 later held-out outcomes, positive held-out net expectancy and profit factor >1 after assumed costs."),
         }
     all_metrics = trade_metrics(actionable, cost)
+    portfolio = simulate_non_overlapping_portfolio(rows, cost)
     candidates = [key for key, value in report_groups.items()
                   if value["status"] == "EXPLORATORY_SUBGROUP_CANDIDATE_NOT_PROOF"]
     return {
@@ -228,7 +370,8 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
         "excluded_non_actionable_count": excluded_non_actionable,
         "excluded_legacy_missing_decision_count": excluded_missing_decision,
         "excluded_missing_source_provenance_count": excluded_missing_provenance,
-        "portfolio_simulation_status": "NOT_IMPLEMENTED",
+        "portfolio_simulation_status": portfolio["status"],
+        "shadow_portfolio_simulation": portfolio,
         "cost_assumptions": {
             "fee_per_side_pct": fee, "slippage_per_side_pct": slippage,
             "round_trip_cost_pct": round(cost, 5),
