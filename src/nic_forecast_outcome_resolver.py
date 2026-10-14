@@ -8,8 +8,8 @@ import json,urllib.parse,urllib.request
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-LEDGER=ROOT/"data/intelligence/nic_forecast_truth_ledger.jsonl"
-EVENTS=ROOT/"data/intelligence/nic_forecast_outcome_events.jsonl"
+LEDGER=ROOT/"data/intelligence/nic_forecast_prospective_cohort.jsonl"
+EVENTS=ROOT/"data/intelligence/nic_forecast_prospective_outcome_events.jsonl"
 MATRIX=ROOT/"data/intelligence/nic_signal_predictivity_matrix.json"
 BASES=("https://data-api.binance.vision","https://api-gcp.binance.com","https://api1.binance.com","https://api2.binance.com")
 def load_rows(path=LEDGER):
@@ -63,17 +63,11 @@ def resolve(rows, now=None, candle_fetcher=None, existing_events=None):
     for x in rows:
         fid=str(x.get("forecast_id") or "")
         if not fid or fid in seen: continue
-        # Backward compatibility: preserve old resolved rows, but do not rewrite them.
-        if x.get("resolved"):
-            try:
-                ev={"event_type":"FORECAST_RESOLVED","event_id":fid+"|resolved","forecast_id":fid,
-                    "resolved_at":x.get("resolved_at") or now.isoformat(),"symbol":x.get("symbol"),
-                    "side":x.get("side"),"regime":x.get("regime"),"feature":x.get("feature"),
-                    "horizon_hours":int(x.get("horizon_hours") or 0),"entry_price":x.get("entry_price"),
-                    "outcome_price":x.get("outcome_price"),"raw_return":x.get("raw_return"),
-                    "signed_return":float(x.get("signed_return",0)),"hit":bool(x.get("hit"))}
-                added.append(ev); seen.add(fid)
-            except Exception: pass
+        if x.get("resolved") or x.get("validation_status") != "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN":
+            continue
+        source=x.get("source_provenance")
+        required=("provider","endpoint","instrument","interval","closed_candle_open_time","closed_candle_as_of","retrieved_at","strategy_spec_sha256")
+        if not isinstance(source,dict) or any(not source.get(key) for key in required):
             continue
         if not x.get("timestamp") or not x.get("horizon_hours") or not x.get("entry_price"): continue
         try:
@@ -107,9 +101,12 @@ def append_new_events(events,new):
 def rebuild(snapshots,events):
     by_id={str(x.get("forecast_id")):x for x in events if x.get("event_type")=="FORECAST_RESOLVED" and x.get("forecast_id")}
     joined=[]
-    legacy={str(x.get("forecast_id")):x for x in snapshots if x.get("resolved") and x.get("forecast_id")}
     for x in snapshots:
-        fid=str(x.get("forecast_id") or ""); outcome=by_id.get(fid) or legacy.get(fid)
+        fid=str(x.get("forecast_id") or ""); outcome=by_id.get(fid)
+        source=x.get("source_provenance")
+        required=("provider","endpoint","instrument","interval","closed_candle_open_time","closed_candle_as_of","retrieved_at","strategy_spec_sha256")
+        if x.get("validation_status") != "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN" or not isinstance(source,dict) or any(not source.get(key) for key in required):
+            continue
         if outcome:
             row=dict(x); row["resolved"]=True; row["signed_return"]=float(outcome.get("signed_return",0)); joined.append(row)
     joined.sort(key=lambda x: str(x.get("timestamp") or ""))
