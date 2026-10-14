@@ -15,8 +15,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 INTEL = ROOT / "data/intelligence"
-SNAPSHOTS = INTEL / "nic_forecast_truth_ledger.jsonl"
-OUTCOMES = INTEL / "nic_forecast_outcome_events.jsonl"
+SNAPSHOTS = INTEL / "nic_forecast_prospective_cohort.jsonl"
+OUTCOMES = INTEL / "nic_forecast_prospective_outcome_events.jsonl"
 PROFITABILITY = INTEL / "nic_forecast_profitability.json"
 OUTPUT = INTEL / "nic_evidence_outcome_integrity.json"
 
@@ -195,7 +195,8 @@ def evaluate_evidence(
         status = "VERIFIED"
 
     return {
-        "schema": "NIC-EVIDENCE-OUTCOME-INTEGRITY-1.0",
+        "schema": "NIC-EVIDENCE-OUTCOME-INTEGRITY-1.1",
+        "cohort_policy": "PROSPECTIVE_FROZEN_PROVENANCE_BACKED_ONLY",
         "status": status,
         "checked_at": datetime.now().astimezone().isoformat(),
         "mode": "READ_ONLY_EVIDENCE_AUDIT",
