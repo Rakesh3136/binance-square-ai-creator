@@ -32,6 +32,8 @@ def test_resolution_emits_event_without_mutating_snapshot():
     assert snap==before
     assert len(new)==1 and new[0]["event_type"]=="FORECAST_RESOLVED"
     assert new[0]["signed_return"]==1.0
+    assert new[0]["strategy_spec_sha256"]=="a"*64
+    assert new[0]["source_provenance"]["instrument"]=="TESTUSDT"
 
 def test_legacy_resolved_snapshot_never_becomes_terminal_event():
     snap={"forecast_id":"legacy","resolved":True,"signed_return":99,"side":"BULLISH","horizon_hours":6}
