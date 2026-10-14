@@ -11,17 +11,30 @@ def test_small_samples_are_shrunk():
     ledger = ROOT / "tests" / "tmp_forecast_ledger.jsonl"
     events = ROOT / "tests" / "tmp_forecast_events.jsonl"
     old_ledger, old_events = m.LEDGER, m.EVENTS
+    snapshot = {
+        "forecast_id": "A", "validation_status": "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN",
+        "horizon_hours": 6, "side": "BULLISH", "regime": "RANGE", "forecast_probability": 0.8,
+        "source_provenance": {
+            "provider": "Binance Spot Market Data API",
+            "endpoint": "https://data-api.binance.vision/api/v3/klines",
+            "instrument": "BTCUSDT", "interval": "1h",
+            "closed_candle_open_time": "2026-10-01T09:00:00Z",
+            "closed_candle_as_of": "2026-10-01T10:00:00Z",
+            "retrieved_at": "2026-10-01T10:00:01Z",
+            "strategy_spec_sha256": "a" * 64,
+        },
+    }
+    event = {"event_type": "FORECAST_RESOLVED", "forecast_id": "A", "signed_return": 10, "hit": True}
     try:
         m.LEDGER, m.EVENTS = ledger, events
-        ledger.write_text(json.dumps({"forecast_id":"A","validation_status":"PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN","horizon_hours":6,"side":"BULLISH","regime":"RANGE","forecast_probability":0.8,"source_provenance":{"provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines","instrument":"BTCUSDT","interval":"1h","closed_candle_open_time":"2026-10-01T09:00:00Z","closed_candle_as_of":"2026-10-01T10:00:00Z","retrieved_at":"2026-10-01T10:00:01Z","strategy_spec_sha256":"a"*64})+"\n")
-        events.write_text(json.dumps({"event_type":"FORECAST_RESOLVED","forecast_id":"A","signed_return":10,"hit":True})+"\n")
+        ledger.write_text(json.dumps(snapshot) + "\\n")
+        events.write_text(json.dumps(event) + "\\n")
         cell = m.calibrate()["BULLISH|RANGE|6h"]
         assert cell["calibrated_probability"] < 0.8
         assert cell["trusted"] is False
     finally:
         ledger.unlink(missing_ok=True); events.unlink(missing_ok=True)
         m.LEDGER, m.EVENTS = old_ledger, old_events
-
 
 def test_probability_metrics_are_computed():
     metrics = m.metrics([{"forecast_probability":0.8,"hit":True},{"forecast_probability":0.2,"hit":False}])
