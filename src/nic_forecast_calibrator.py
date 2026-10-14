@@ -8,8 +8,8 @@ import json, math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LEDGER = ROOT / "data/intelligence/nic_forecast_truth_ledger.jsonl"
-EVENTS = ROOT / "data/intelligence/nic_forecast_outcome_events.jsonl"
+LEDGER = ROOT / "data/intelligence/nic_forecast_prospective_cohort.jsonl"
+EVENTS = ROOT / "data/intelligence/nic_forecast_prospective_outcome_events.jsonl"
 OUT = ROOT / "data/intelligence/nic_forecast_calibration.json"
 H = (6, 12, 24)
 MIN = 30
@@ -57,6 +57,13 @@ def read():
         if horizon not in H:
             continue
         event = terminal.get(fid)
+        if snapshot.get("validation_status") != "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN":
+            continue
+        source = snapshot.get("source_provenance")
+        required = ("provider", "endpoint", "instrument", "interval", "closed_candle_open_time",
+                    "closed_candle_as_of", "retrieved_at", "strategy_spec_sha256")
+        if not isinstance(source, dict) or any(not isinstance(source.get(k), str) or not source[k].strip() for k in required):
+            continue
         if event is not None:
             try:
                 signed = float(event["signed_return"])
@@ -67,15 +74,7 @@ def read():
             row.update({"resolved": True, "signed_return": signed, "hit": hit,
                         "resolution_event_id": event.get("event_id")})
             rows.append(row)
-        elif snapshot.get("resolved"):
-            # Backward compatibility for snapshots resolved before event-ledger rollout.
-            row = dict(snapshot)
-            try:
-                row["signed_return"] = float(row.get("signed_return") or 0.0)
-            except (TypeError, ValueError):
-                continue
-            row["hit"] = bool(row.get("hit", row["signed_return"] > 0))
-            rows.append(row)
+
     return rows
 
 
@@ -196,7 +195,7 @@ def validate_artifact_integrity(snapshots, events, calibration, matrix):
             continue
         if horizon not in H:
             continue
-        if fid in terminal_ids or row.get("resolved"):
+        if fid in terminal_ids:
             resolved_rows.append(row)
 
     for row in resolved_rows:
@@ -244,7 +243,7 @@ def main():
         "minimum_events": MIN, "cells": cells, "global_metrics": metrics(rows),
         "reliability_bins": reliability(rows),
         "resolved_event_samples": len(rows),
-        "policy": "Calibration joins terminal outcome events to immutable snapshots by forecast_id; unresolved outcomes are excluded. Legacy resolved snapshots remain readable. Brier score and log loss measure probabilistic quality; small samples are shrunk toward 50% and are never trusted."
+        "policy": "Calibration joins explicit terminal outcome events to the isolated provenance-backed prospective cohort by forecast_id; legacy resolved flags and historical mixed ledgers are excluded. Brier score and log loss measure probabilistic quality; small samples are shrunk toward 50% and are never trusted."
     }
     matrix_path = ROOT / "data/intelligence/nic_signal_predictivity_matrix.json"
     matrix = {}

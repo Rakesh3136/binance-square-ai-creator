@@ -229,3 +229,13 @@ def test_shadow_portfolio_does_not_mix_horizons_or_claim_profitability():
     assert report["shadow_portfolio_simulation"]["accepted_trade_count"] == 0
     assert report["shadow_portfolio_simulation"]["skipped_other_horizon_count"] == 1
     assert report["publication_or_trade_authorization"] is False
+
+
+def test_production_evaluator_uses_isolated_prospective_ledgers():
+    assert m.LEDGER.name == "nic_forecast_prospective_cohort.jsonl"
+    assert m.EVENTS.name == "nic_forecast_prospective_outcome_events.jsonl"
+
+
+def test_production_evaluator_uses_isolated_prospective_ledgers():
+    assert m.LEDGER.name == "nic_forecast_prospective_cohort.jsonl"
+    assert m.EVENTS.name == "nic_forecast_prospective_outcome_events.jsonl"

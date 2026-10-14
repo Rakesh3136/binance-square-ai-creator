@@ -628,7 +628,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_profitability.json data/intelligence/nic_portfolio_reality.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_regime_history.jsonl data/live/nic_forecast_laboratory.json
+          git add -- data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_forecast_prospective_cohort.jsonl data/intelligence/nic_forecast_prospective_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_profitability.json data/intelligence/nic_portfolio_reality.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_regime_history.jsonl data/live/nic_forecast_laboratory.json
           if git diff --cached --quiet; then
             echo "No Forecast Laboratory evidence changes to persist."
             exit 0
@@ -685,6 +685,8 @@ jobs:
               target.write_text("".join(json.dumps(x, separators=(",", ":")) + "\n" for x in current), encoding="utf-8")
           merge_jsonl("data/intelligence/nic_forecast_truth_ledger.jsonl", lambda x: str(x.get("forecast_id") or ""))
           merge_jsonl("data/intelligence/nic_forecast_outcome_events.jsonl", lambda x: str(x.get("event_id") or x.get("forecast_id") or ""))
+          merge_jsonl("data/intelligence/nic_forecast_prospective_cohort.jsonl", lambda x: str(x.get("forecast_id") or ""))
+          merge_jsonl("data/intelligence/nic_forecast_prospective_outcome_events.jsonl", lambda x: str(x.get("event_id") or x.get("forecast_id") or ""))
           merge_jsonl("data/intelligence/nic_regime_history.jsonl", lambda x: "|".join(str(x.get(k) or "") for k in ("timestamp", "symbol", "regime")))
           for path in ("data/intelligence/nic_forecast_laboratory_report.json", "data/live/nic_forecast_laboratory.json"):
               target = root / path

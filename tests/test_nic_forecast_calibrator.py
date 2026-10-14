@@ -11,17 +11,30 @@ def test_small_samples_are_shrunk():
     ledger = ROOT / "tests" / "tmp_forecast_ledger.jsonl"
     events = ROOT / "tests" / "tmp_forecast_events.jsonl"
     old_ledger, old_events = m.LEDGER, m.EVENTS
+    snapshot = {
+        "forecast_id": "A", "validation_status": "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN",
+        "horizon_hours": 6, "side": "BULLISH", "regime": "RANGE", "forecast_probability": 0.8,
+        "source_provenance": {
+            "provider": "Binance Spot Market Data API",
+            "endpoint": "https://data-api.binance.vision/api/v3/klines",
+            "instrument": "BTCUSDT", "interval": "1h",
+            "closed_candle_open_time": "2026-10-01T09:00:00Z",
+            "closed_candle_as_of": "2026-10-01T10:00:00Z",
+            "retrieved_at": "2026-10-01T10:00:01Z",
+            "strategy_spec_sha256": "a" * 64,
+        },
+    }
+    event = {"event_type": "FORECAST_RESOLVED", "forecast_id": "A", "signed_return": 10, "hit": True}
     try:
         m.LEDGER, m.EVENTS = ledger, events
-        ledger.write_text('{"forecast_id":"A","resolved":true,"horizon_hours":6,"side":"BULLISH","regime":"RANGE","signed_return":10}\n')
-        events.write_text("")
+        ledger.write_text(json.dumps(snapshot) + chr(10))
+        events.write_text(json.dumps(event) + chr(10))
         cell = m.calibrate()["BULLISH|RANGE|6h"]
         assert cell["calibrated_probability"] < 0.8
         assert cell["trusted"] is False
     finally:
         ledger.unlink(missing_ok=True); events.unlink(missing_ok=True)
         m.LEDGER, m.EVENTS = old_ledger, old_events
-
 
 def test_probability_metrics_are_computed():
     metrics = m.metrics([{"forecast_probability":0.8,"hit":True},{"forecast_probability":0.2,"hit":False}])
@@ -35,11 +48,17 @@ def test_new_terminal_events_join_immutable_snapshots():
     events = ROOT / "tests" / "tmp_forecast_events.jsonl"
     old_ledger, old_events = m.LEDGER, m.EVENTS
     snapshot = {"forecast_id":"A","timestamp":"2026-10-01T00:00:00+00:00","horizon_hours":6,
-                "side":"BULLISH","regime":"RANGE","forecast_probability":0.8,"resolved":False}
+                "side":"BULLISH","regime":"RANGE","forecast_probability":0.8,"resolved":False,
+                "validation_status":"PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN",
+                "source_provenance":{"provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines",
+                "instrument":"BTCUSDT","interval":"1h","closed_candle_open_time":"2026-10-01T09:00:00Z",
+                "closed_candle_as_of":"2026-10-01T10:00:00Z","retrieved_at":"2026-10-01T10:00:01Z",
+                "strategy_spec_sha256":"a"*64}}
     event = {"event_type":"FORECAST_RESOLVED","event_id":"A|resolved","forecast_id":"A",
              "signed_return":1.25,"hit":True}
     unresolved = {"forecast_id":"B","horizon_hours":6,"side":"BULLISH","regime":"RANGE",
-                  "forecast_probability":0.9,"resolved":False}
+                  "forecast_probability":0.9,"resolved":False,"validation_status":"PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN",
+                  "source_provenance":snapshot["source_provenance"]}
     try:
         m.LEDGER, m.EVENTS = ledger, events
         ledger.write_text("\n".join(json.dumps(x) for x in [snapshot, unresolved]) + "\n")
@@ -182,8 +201,8 @@ def test_failed_integrity_does_not_overwrite_last_calibration_report():
             intelligence = root / "data" / "intelligence"
             intelligence.mkdir(parents=True)
             m.ROOT = root
-            m.LEDGER = intelligence / "nic_forecast_truth_ledger.jsonl"
-            m.EVENTS = intelligence / "nic_forecast_outcome_events.jsonl"
+            m.LEDGER = intelligence / "nic_forecast_prospective_cohort.jsonl"
+            m.EVENTS = intelligence / "nic_forecast_prospective_outcome_events.jsonl"
             m.OUT = intelligence / "nic_forecast_calibration.json"
             m.LEDGER.write_text("")
             m.EVENTS.write_text(json.dumps({"event_type":"FORECAST_RESOLVED","forecast_id":"ORPHAN","signed_return":1}) + "\n")

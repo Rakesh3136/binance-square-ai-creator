@@ -4,7 +4,7 @@ import hashlib,json,math,urllib.parse,urllib.request,time
 from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]; LIVE=ROOT/"data/live"; INT=ROOT/"data/intelligence"
-PRED=LIVE/"nic_prediction_engine.json"; OUT=LIVE/"nic_forecast_laboratory.json"
+PRED=LIVE/"nic_prediction_engine.json"; OUT=LIVE/"nic_forecast_laboratory.json"; COHORT=INT/"nic_forecast_prospective_cohort.jsonl"
 REPORT=INT/"nic_forecast_laboratory_report.json"; LEDGER=INT/"nic_forecast_truth_ledger.jsonl"; MATRIX=INT/"nic_signal_predictivity_matrix.json"; REGH=INT/"nic_regime_history.jsonl"
 BASES=("https://data-api.binance.vision","https://api-gcp.binance.com","https://api1.binance.com","https://api2.binance.com")
 MIN=30; H=(6,12,24)
@@ -163,6 +163,23 @@ def make_snapshots(symbol, result):
                 "resolved": False
             })
     return rows
+def is_prospective_snapshot(row):
+    if row.get("validation_status") != "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN":
+        return False
+    source=row.get("source_provenance")
+    required=("provider","endpoint","instrument","interval","closed_candle_open_time","closed_candle_as_of","retrieved_at","strategy_spec_sha256")
+    if not isinstance(source,dict) or any(not isinstance(source.get(k),str) or not source[k].strip() for k in required):
+        return False
+    if not source["endpoint"].startswith("https://"):
+        return False
+    digest=source["strategy_spec_sha256"]
+    if len(digest)!=64 or any(ch not in "0123456789abcdef" for ch in digest.lower()):
+        return False
+    for key in ("closed_candle_open_time","closed_candle_as_of","retrieved_at"):
+        try: datetime.fromisoformat(source[key].replace("Z","+00:00"))
+        except ValueError: return False
+    return True
+
 def append_jsonl(path,records):
     with path.open("a") as f:
         for x in records:f.write(json.dumps(x,separators=(",",":"))+"\n")
@@ -191,14 +208,13 @@ def verify_persisted_snapshots(path, expected_records):
     return persisted
 def build_learning():
     # Prediction snapshots are immutable; outcome events live in a separate append-only ledger.
-    snapshots=read_jsonl(LEDGER)
-    outcomes=read_jsonl(INT/"nic_forecast_outcome_events.jsonl")
+    snapshots=[r for r in read_jsonl(COHORT) if is_prospective_snapshot(r)]
+    outcomes=read_jsonl(INT/"nic_forecast_prospective_outcome_events.jsonl")
     resolved_ids={str(r.get("forecast_id")):r for r in outcomes if r.get("event_type")=="FORECAST_RESOLVED" and r.get("forecast_id")}
-    legacy={str(r.get("forecast_id")):r for r in snapshots if r.get("resolved") and r.get("forecast_id")}
     joined=[]
     for snap in snapshots:
         fid=str(snap.get("forecast_id") or "")
-        outcome=resolved_ids.get(fid) or legacy.get(fid)
+        outcome=resolved_ids.get(fid)
         if not outcome: continue
         row=dict(snap)
         row["resolved"]=True
@@ -227,7 +243,7 @@ def build_learning():
             "trusted":len(vals)>=MIN and lift>.05 and recent_lift>=0}
     MATRIX.write_text(json.dumps({"schema":"NIC-SIGNAL-PREDICTIVITY-3.0","generated_at":now.isoformat(),
         "minimum_events":MIN,"minimum_lift":0.05,"matrix":matrix,
-        "resolved_event_count":len(resolved_ids),"legacy_resolved_snapshot_count":len(legacy),
+        "resolved_event_count":len(resolved_ids),"prospective_cohort_only":True,
         "policy":"Only terminal outcome events joined to immutable forecast snapshots may contribute to learning; trust requires >=30 observations, >5pp lift, and no recent collapse."},indent=2))
     return matrix
 
@@ -264,12 +280,16 @@ def main():
         if fid not in existing and fid not in seen_new:
             fresh.append(row);seen_new.add(fid)
     append_jsonl(LEDGER,fresh)
+    cohort_existing={r.get("forecast_id") for r in read_jsonl(COHORT)}
+    cohort_fresh=[row for row in fresh if is_prospective_snapshot(row) and row.get("forecast_id") not in cohort_existing]
+    append_jsonl(COHORT,cohort_fresh)
+    verify_persisted_snapshots(COHORT,cohort_fresh)
     # Never publish a successful report based only on the in-memory list. Re-read
     # the file from disk and verify every new immutable forecast was actually persisted.
     persisted_snapshots = verify_persisted_snapshots(LEDGER, fresh)
     matrix=build_learning()
     data={"schema":"NIC-FORECAST-LAB-2.0","generated_at":datetime.now(timezone.utc).isoformat(),"results":res,"failures":fails,
-          "learning":{"truth_ledger":str(LEDGER.relative_to(ROOT)),"signal_matrix":str(MATRIX.relative_to(ROOT)),"regime_history":str(REGH.relative_to(ROOT)),"walk_forward_validation":False,"live_forecast_snapshots":True,"validation_status":"LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF","persistent_outcome_resolution":True},
+          "learning":{"truth_ledger":str(LEDGER.relative_to(ROOT)),"prospective_cohort":str(COHORT.relative_to(ROOT)),"signal_matrix":str(MATRIX.relative_to(ROOT)),"regime_history":str(REGH.relative_to(ROOT)),"walk_forward_validation":False,"live_forecast_snapshots":True,"validation_status":"LIVE_FORWARD_ONLY_NO_HISTORICAL_WALK_FORWARD_PROOF","persistent_outcome_resolution":True},
           "policy":{"competing_hypotheses":True,"neutral_wait_allowed":True,"historical_analogues_used_for_live_forecasts":True,"historical_walk_forward_proof":False,"regime_matching":True,"base_rate_lift_required":True,"minimum_events":MIN,"no_guaranteed_forecast":True,"publication_gate_immutable":True}}
     OUT.write_text(json.dumps(data,indent=2))
     claims=sum(1 for x in res if x.get("status")=="READY" for h in x["hypotheses"].values() for a in h["forward"]["predictivity"]["audits"] if a["predictive"])
