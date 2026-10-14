@@ -21,14 +21,21 @@ def test_unresolved_not_trusted():
 
 def test_resolution_emits_event_without_mutating_snapshot():
     now=datetime.now(timezone.utc)
+    source={"provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines","instrument":"TESTUSDT","interval":"1h","closed_candle_open_time":"2026-10-01T09:00:00Z","closed_candle_as_of":"2026-10-01T10:00:00Z","retrieved_at":"2026-10-01T10:00:01Z","strategy_spec_sha256":"a"*64}
     snap={"forecast_id":"A|1","timestamp":(now-timedelta(hours=25)).isoformat(),"horizon_hours":24,
-          "entry_price":100,"symbol":"TEST","side":"BULLISH","regime":"TREND_UP","feature":"trend_aligned"}
+          "entry_price":100,"symbol":"TEST","side":"BULLISH","regime":"TREND_UP","feature":"COMPOSITE",
+          "validation_status":"PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN","strategy_version":"NIC-PROSPECTIVE-CHAMPION-1.0",
+          "strategy_spec_sha256":"a"*64,"source_provenance":source}
     before=dict(snap)
     def fake_fetch(symbol,start,end): return [[end-3600000,0,0,0,101,0,end-1]]
     new=resolver.resolve([snap],now=now,candle_fetcher=fake_fetch,existing_events=[])
     assert snap==before
     assert len(new)==1 and new[0]["event_type"]=="FORECAST_RESOLVED"
     assert new[0]["signed_return"]==1.0
+
+def test_legacy_resolved_snapshot_never_becomes_terminal_event():
+    snap={"forecast_id":"legacy","resolved":True,"signed_return":99,"side":"BULLISH","horizon_hours":6}
+    assert resolver.resolve([snap],now=datetime.now(timezone.utc),candle_fetcher=lambda *a: [],existing_events=[]) == []
 
 def test_legacy_resolved_snapshot_never_becomes_terminal_event():
     snap={"forecast_id":"legacy","resolved":True,"signed_return":99,"side":"BULLISH","horizon_hours":6}
