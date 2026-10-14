@@ -45,6 +45,26 @@ def finite_float(value, default=None):
     return result if math.isfinite(result) else default
 
 
+def has_complete_source_provenance(snapshot: dict) -> bool:
+    """Require source details sufficient to reproduce a forecast's market observation."""
+    source = snapshot.get("source_provenance")
+    if not isinstance(source, dict):
+        return False
+    required = ("provider", "endpoint", "instrument", "interval", "closed_candle_open_time",
+                "closed_candle_as_of", "retrieved_at", "strategy_spec_sha256")
+    if any(not isinstance(source.get(key), str) or not source[key].strip() for key in required):
+        return False
+    if not source["endpoint"].startswith("https://") or not source["instrument"].strip():
+        return False
+    for key in ("closed_candle_open_time", "closed_candle_as_of", "retrieved_at"):
+        try:
+            datetime.fromisoformat(source[key].replace("Z", "+00:00"))
+        except ValueError:
+            return False
+    digest = source["strategy_spec_sha256"]
+    return len(digest) == 64 and all(ch in "0123456789abcdef" for ch in digest.lower())
+
+
 def load_resolved(snapshots: list[dict], events: list[dict]) -> list[dict]:
     by_id = {}
     for event in events:
@@ -65,9 +85,9 @@ def load_resolved(snapshots: list[dict], events: list[dict]) -> list[dict]:
         if fid in seen:
             raise AssertionError(f"Duplicate forecast snapshot {fid}")
         seen.add(fid)
+        # Only explicit terminal outcome events can resolve a forecast. A legacy
+        # snapshot's mutable resolved=true flag is not an outcome event and is ignored.
         event = by_id.get(fid)
-        if event is None and snap.get("resolved"):
-            event = snap
         if event is None:
             continue
         signed = finite_float(event.get("signed_return"))
@@ -91,6 +111,7 @@ def load_resolved(snapshots: list[dict], events: list[dict]) -> list[dict]:
             "decision": str(snap.get("decision") or "").upper(),
             "forecast_probability": finite_float(snap.get("forecast_probability")),
             "signed_return_pct": signed,
+            "source_provenance_complete": has_complete_source_provenance(snap),
         })
     orphan = set(by_id) - seen
     if orphan:
@@ -146,7 +167,13 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
     actionable = []
     excluded_missing_decision = 0
     excluded_non_actionable = 0
+    excluded_missing_provenance = 0
     for row in rows:
+        # Production rows are tagged by load_resolved; direct evaluator fixtures
+        # without this field remain useful for unit-testing the metric arithmetic.
+        if row.get("source_provenance_complete") is False:
+            excluded_missing_provenance += 1
+            continue
         side = str(row.get("side") or "").upper()
         decision = str(row.get("decision") or "").upper()
         expected = {"BULLISH": "LONG_CANDIDATE", "BEARISH": "SHORT_CANDIDATE"}.get(side)
@@ -200,6 +227,7 @@ def evaluate(rows: list[dict], fee_per_side_pct=0.1, slippage_per_side_pct=0.05)
         "sample_count": len(actionable),
         "excluded_non_actionable_count": excluded_non_actionable,
         "excluded_legacy_missing_decision_count": excluded_missing_decision,
+        "excluded_missing_source_provenance_count": excluded_missing_provenance,
         "portfolio_simulation_status": "NOT_IMPLEMENTED",
         "cost_assumptions": {
             "fee_per_side_pct": fee, "slippage_per_side_pct": slippage,
@@ -242,7 +270,7 @@ def validate_report_sources(report: dict, snapshots: list[dict], events: list[di
     resolved_rows = load_resolved(snapshots, events)
     actionable_count = sum(
         1 for row in resolved_rows
-        if (
+        if row.get("source_provenance_complete") is not False and (
             (str(row.get("side") or "").upper() == "BULLISH"
              and str(row.get("decision") or "").upper() == "LONG_CANDIDATE")
             or
