@@ -11,6 +11,16 @@ def test_prospective_cohort_rejects_legacy_or_incomplete_provenance():
  assert not m.is_prospective_snapshot({**row,"validation_status":"legacy"})
  assert not m.is_prospective_snapshot({**row,"source_provenance":{"url":"https://example.com"}})
 
+def test_prospective_cohort_rejects_legacy_or_incomplete_provenance():
+ row={"validation_status":"PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN","source_provenance":{
+  "provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines",
+  "instrument":"BTCUSDT","interval":"1h","closed_candle_open_time":"2026-10-01T09:00:00Z",
+  "closed_candle_as_of":"2026-10-01T10:00:00Z","retrieved_at":"2026-10-01T10:00:01Z",
+  "strategy_spec_sha256":"a"*64}}
+ assert m.is_prospective_snapshot(row)
+ assert not m.is_prospective_snapshot({**row,"validation_status":"legacy"})
+ assert not m.is_prospective_snapshot({**row,"source_provenance":{"url":"https://example.com"}})
+
 def test_regime():
  assert m.regime({"rsi":75,"momentum":8,"trend":1,"volume_ratio":1})=="TREND_UP_EXTENDED"
  assert m.regime({"rsi":25,"momentum":-8,"trend":-1,"volume_ratio":1})=="TREND_DOWN_EXTENDED"
