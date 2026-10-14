@@ -12,8 +12,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LEDGER = ROOT / "data/intelligence/nic_forecast_truth_ledger.jsonl"
-EVENTS = ROOT / "data/intelligence/nic_forecast_outcome_events.jsonl"
+LEDGER = ROOT / "data/intelligence/nic_forecast_prospective_cohort.jsonl"
+EVENTS = ROOT / "data/intelligence/nic_forecast_prospective_outcome_events.jsonl"
 OUT = ROOT / "data/intelligence/nic_portfolio_reality.json"
 INITIAL_EQUITY = 10_000.0
 ALLOCATION_FRACTION = 0.10
@@ -74,9 +74,14 @@ def join_resolved(snapshots: list[dict], events: list[dict]) -> list[dict]:
         if fid in seen:
             raise AssertionError(f"Duplicate immutable snapshot {fid}")
         seen.add(fid)
+        if snap.get("validation_status") != "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN":
+            continue
+        source = snap.get("source_provenance")
+        required = ("provider", "endpoint", "instrument", "interval", "closed_candle_open_time",
+                    "closed_candle_as_of", "retrieved_at", "strategy_spec_sha256")
+        if not isinstance(source, dict) or any(not isinstance(source.get(k), str) or not source[k].strip() for k in required):
+            continue
         event = terminal.get(fid)
-        if event is None and snap.get("resolved"):
-            event = snap
         if event is None:
             continue
         side = str(snap.get("side") or "").upper()
