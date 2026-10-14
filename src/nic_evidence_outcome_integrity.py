@@ -65,13 +65,21 @@ def _number(value: Any) -> float | None:
 
 
 def _has_source_provenance(snapshot: dict[str, Any]) -> bool:
-    for key in ("source_provenance", "source_url", "source_urls", "source_ids", "sources"):
-        value = snapshot.get(key)
-        if isinstance(value, str) and value.strip():
-            return True
-        if isinstance(value, (list, dict)) and bool(value):
-            return True
-    return False
+    """Require canonical, reproducible source metadata; a URL alone is insufficient."""
+    source = snapshot.get("source_provenance")
+    if not isinstance(source, dict):
+        return False
+    required = ("provider", "endpoint", "instrument", "interval", "closed_candle_open_time",
+                "closed_candle_as_of", "retrieved_at", "strategy_spec_sha256")
+    if any(not isinstance(source.get(key), str) or not source[key].strip() for key in required):
+        return False
+    if not source["endpoint"].startswith("https://"):
+        return False
+    for key in ("closed_candle_open_time", "closed_candle_as_of", "retrieved_at"):
+        if not _timestamp(source[key]):
+            return False
+    digest = source["strategy_spec_sha256"]
+    return len(digest) == 64 and all(ch in "0123456789abcdef" for ch in digest.lower())
 
 
 def source_evidence(snapshots: list[dict[str, Any]], outcomes: list[dict[str, Any]],
@@ -145,7 +153,7 @@ def evaluate_evidence(
         side = str(snapshot.get("side") or event.get("side") or "").upper()
         decision = str(snapshot.get("decision") or "").upper()
         expected = {"BULLISH": "LONG_CANDIDATE", "BEARISH": "SHORT_CANDIDATE"}.get(side)
-        if expected and decision == expected:
+        if expected and decision == expected and _has_source_provenance(snapshot):
             actionable_ids.add(forecast_id)
 
     if not resolved_ids:
