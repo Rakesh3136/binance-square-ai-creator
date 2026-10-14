@@ -53,7 +53,7 @@ def test_new_terminal_events_join_immutable_snapshots():
                 "source_provenance":{"provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines",
                 "instrument":"BTCUSDT","interval":"1h","closed_candle_open_time":"2026-10-01T09:00:00Z",
                 "closed_candle_as_of":"2026-10-01T10:00:00Z","retrieved_at":"2026-10-01T10:00:01Z",
-                "strategy_spec_sha256":"a"*64}
+                "strategy_spec_sha256":"a"*64}}
     event = {"event_type":"FORECAST_RESOLVED","event_id":"A|resolved","forecast_id":"A",
              "signed_return":1.25,"hit":True}
     unresolved = {"forecast_id":"B","horizon_hours":6,"side":"BULLISH","regime":"RANGE",
