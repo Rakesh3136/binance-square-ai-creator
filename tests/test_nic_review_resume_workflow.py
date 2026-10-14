@@ -43,7 +43,7 @@ def test_autonomous_flow_reviews_only_the_final_gated_draft():
     chart_gate = autonomous.index("NIC 24.2 Evidence-to-Content Integrity")
     publisher = autonomous.index("python src/binance_square_publisher.py")
     assert human_gate > chart_gate
-    assert autonomous.index("Preserve exact final draft and gate context for human review") > human_gate
+    assert autonomous.index("Preserve exact final draft and gate context for mandatory human review") > human_gate
     payload_section = autonomous[autonomous.index("Build final publication payload"):publisher]
     assert "steps.publication_authorization.outputs.authorized == 'true'" in payload_section
     assert "steps.human_review.outputs.blocked != 'true'" not in payload_section
