@@ -1,14 +1,14 @@
 {
   "schema": "NIC-PORTFOLIO-REALITY-1.0",
-  "generated_at": "2026-10-14T17:05:43.992792+00:00",
+  "generated_at": "2026-10-14T19:42:06.417394+00:00",
   "status": "NOT_PROVEN",
   "mode": "SHADOW_ONLY_NO_LIVE_ORDERS",
   "source_evidence": {
-    "snapshot_ledger_sha256": "67984f8026c40d0d6bf2b90b475a49e23de923d14e1b6144d564e2dee4368d89",
-    "outcome_ledger_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "snapshot_count": 204,
-    "terminal_outcome_count": 0,
-    "resolved_actionable_forecasts": 0
+    "snapshot_ledger_sha256": "8142b978fb18c56fa6eef3dcff8e48508cd876afe4740f8a0fd0cbc5af2600ca",
+    "outcome_ledger_sha256": "238ee3b04857c5c62e5aca2cc65bd763f916c4680f2e2d1c3f60131714b1bfb4",
+    "snapshot_count": 276,
+    "terminal_outcome_count": 22,
+    "resolved_actionable_forecasts": 8
   },
   "cost_assumptions": {
     "fee_per_side_pct": 0.1,
@@ -17,7 +17,151 @@
     "notional_fraction_per_position": 0.1,
     "maximum_concurrent_positions_per_policy": 5
   },
-  "strategy_groups": {},
+  "strategy_groups": {
+    "BEARISH|6h": {
+      "side": "BEARISH",
+      "horizon_hours": 6,
+      "total_candidates": 2,
+      "chronological_train": {
+        "trades_closed": 1,
+        "starting_equity": 10000.0,
+        "ending_equity": 9957.6209,
+        "net_pnl": -42.3791,
+        "net_return_pct": -0.42379,
+        "net_win_rate": 0.0,
+        "profit_factor": 0.0,
+        "mean_net_trade_return_pct": -4.237913,
+        "mean_return_lower_bound_pct": null,
+        "max_drawdown_pct_of_initial_equity": 0.42379,
+        "max_concurrent_positions": 5,
+        "allocation_fraction_per_position": 0.1,
+        "skipped_overlapping_same_symbol": 0,
+        "skipped_position_capacity": 0,
+        "round_trip_cost_pct": 0.3,
+        "trade_log": [
+          {
+            "forecast_id": "SQQQB|2026-10-14T13:00:00+00:00|BEARISH|6h",
+            "symbol": "SQQQB",
+            "entry_time": "2026-10-14T13:00:00+00:00",
+            "exit_time": "2026-10-14T19:00:00+00:00",
+            "notional": 1000.0,
+            "gross_return_pct": -3.937913,
+            "net_return_pct": -4.237913,
+            "pnl": -42.3791,
+            "equity_after_close": 9957.6209
+          }
+        ]
+      },
+      "purged_held_out_test": {
+        "trades_closed": 0,
+        "starting_equity": 10000.0,
+        "ending_equity": 10000.0,
+        "net_pnl": 0.0,
+        "net_return_pct": 0.0,
+        "net_win_rate": null,
+        "profit_factor": null,
+        "mean_net_trade_return_pct": null,
+        "mean_return_lower_bound_pct": null,
+        "max_drawdown_pct_of_initial_equity": 0.0,
+        "max_concurrent_positions": 5,
+        "allocation_fraction_per_position": 0.1,
+        "skipped_overlapping_same_symbol": 0,
+        "skipped_position_capacity": 0,
+        "round_trip_cost_pct": 0.3,
+        "trade_log": []
+      },
+      "status": "NOT_PROVEN",
+      "reason": "Insufficient evidence or held-out portfolio failed the predeclared net-profit, profit-factor, or lower-bound criteria."
+    },
+    "BULLISH|6h": {
+      "side": "BULLISH",
+      "horizon_hours": 6,
+      "total_candidates": 6,
+      "chronological_train": {
+        "trades_closed": 4,
+        "starting_equity": 10000.0,
+        "ending_equity": 9926.4732,
+        "net_pnl": -73.5268,
+        "net_return_pct": -0.73527,
+        "net_win_rate": 0.0,
+        "profit_factor": 0.0,
+        "mean_net_trade_return_pct": -1.83817,
+        "mean_return_lower_bound_pct": -3.282636,
+        "max_drawdown_pct_of_initial_equity": 0.73527,
+        "max_concurrent_positions": 5,
+        "allocation_fraction_per_position": 0.1,
+        "skipped_overlapping_same_symbol": 0,
+        "skipped_position_capacity": 0,
+        "round_trip_cost_pct": 0.3,
+        "trade_log": [
+          {
+            "forecast_id": "AAPLB|2026-10-14T13:00:00+00:00|BULLISH|6h",
+            "symbol": "AAPLB",
+            "entry_time": "2026-10-14T13:00:00+00:00",
+            "exit_time": "2026-10-14T19:00:00+00:00",
+            "notional": 1000.0,
+            "gross_return_pct": -0.252657,
+            "net_return_pct": -0.552657,
+            "pnl": -5.5266,
+            "equity_after_close": 9994.4734
+          },
+          {
+            "forecast_id": "ARB|2026-10-14T13:00:00+00:00|BULLISH|6h",
+            "symbol": "ARB",
+            "entry_time": "2026-10-14T13:00:00+00:00",
+            "exit_time": "2026-10-14T19:00:00+00:00",
+            "notional": 1000.0,
+            "gross_return_pct": -1.032048,
+            "net_return_pct": -1.332048,
+            "pnl": -13.3205,
+            "equity_after_close": 9981.1529
+          },
+          {
+            "forecast_id": "OGN|2026-10-14T13:00:00+00:00|BULLISH|6h",
+            "symbol": "OGN",
+            "entry_time": "2026-10-14T13:00:00+00:00",
+            "exit_time": "2026-10-14T19:00:00+00:00",
+            "notional": 1000.0,
+            "gross_return_pct": -2.632414,
+            "net_return_pct": -2.932414,
+            "pnl": -29.3241,
+            "equity_after_close": 9951.8288
+          },
+          {
+            "forecast_id": "PUMP|2026-10-14T13:00:00+00:00|BULLISH|6h",
+            "symbol": "PUMP",
+            "entry_time": "2026-10-14T13:00:00+00:00",
+            "exit_time": "2026-10-14T19:00:00+00:00",
+            "notional": 1000.0,
+            "gross_return_pct": -2.235562,
+            "net_return_pct": -2.535562,
+            "pnl": -25.3556,
+            "equity_after_close": 9926.4732
+          }
+        ]
+      },
+      "purged_held_out_test": {
+        "trades_closed": 0,
+        "starting_equity": 10000.0,
+        "ending_equity": 10000.0,
+        "net_pnl": 0.0,
+        "net_return_pct": 0.0,
+        "net_win_rate": null,
+        "profit_factor": null,
+        "mean_net_trade_return_pct": null,
+        "mean_return_lower_bound_pct": null,
+        "max_drawdown_pct_of_initial_equity": 0.0,
+        "max_concurrent_positions": 5,
+        "allocation_fraction_per_position": 0.1,
+        "skipped_overlapping_same_symbol": 0,
+        "skipped_position_capacity": 0,
+        "round_trip_cost_pct": 0.3,
+        "trade_log": []
+      },
+      "status": "NOT_PROVEN",
+      "reason": "Insufficient evidence or held-out portfolio failed the predeclared net-profit, profit-factor, or lower-bound criteria."
+    }
+  },
   "limitations": [
     "Every side/horizon is simulated as a separate policy; results must not be added together as one portfolio.",
     "Returns are price-return proxies from historical candles, not exchange-account fills or realized PnL.",
@@ -27,9 +171,9 @@
   ],
   "trade_or_publication_authorization": false,
   "source_file_evidence": {
-    "snapshot_ledger_sha256": "dbb9e2c3c86285539b2ced349ee5b8384228a3f55db5b7374fcfeb9d23abfaf3",
-    "outcome_ledger_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "snapshot_bytes": 372931,
-    "outcome_bytes": 0
+    "snapshot_ledger_sha256": "980037b338cc1f397e0931080ae49a97c75c19311e74f2c5e7cdebec14045222",
+    "outcome_ledger_sha256": "510220ab4f1a1eda919e08cf0900ac049c44601830e25764d71a05b930742437",
+    "snapshot_bytes": 504651,
+    "outcome_bytes": 23154
   }
 }
