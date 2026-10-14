@@ -195,7 +195,7 @@ def validate_artifact_integrity(snapshots, events, calibration, matrix):
             continue
         if horizon not in H:
             continue
-        if fid in terminal_ids and row.get("validation_status") == "PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN":
+        if fid in terminal_ids:
             resolved_rows.append(row)
 
     for row in resolved_rows:
