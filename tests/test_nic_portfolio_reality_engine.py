@@ -70,6 +70,24 @@ def test_duplicate_terminal_event_fails_closed():
         raise AssertionError("duplicate terminal outcomes must fail closed")
 
 
+def test_legacy_resolved_flag_without_terminal_event_is_not_used():
+    legacy = snapshot("legacy", "2026-01-01T00:00:00Z", "BTC")
+    legacy["resolved"] = True
+    legacy["signed_return"] = 99
+    assert m.join_resolved([legacy], []) == []
+
+def test_only_frozen_provenance_backed_cohort_rows_are_simulated():
+    source={"provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines",
+      "instrument":"BTCUSDT","interval":"1h","closed_candle_open_time":"2026-10-01T09:00:00Z",
+      "closed_candle_as_of":"2026-10-01T10:00:00Z","retrieved_at":"2026-10-01T10:00:01Z",
+      "strategy_spec_sha256":"a"*64}
+    snap=snapshot("prospective","2026-10-01T10:00:00Z","BTC")
+    snap.update({"validation_status":"PROSPECTIVE_FROZEN_SHADOW_COHORT_NOT_PROVEN","source_provenance":source})
+    assert len(m.join_resolved([snap],[event("prospective",1.0)])) == 1
+    bad=snapshot("bad","2026-10-01T10:00:00Z","BTC")
+    bad.update({"validation_status":"legacy","source_provenance":source})
+    assert m.join_resolved([bad],[event("bad",99.0)]) == []
+
 def test_empty_ledgers_never_prove_profitability():
     report = m.evaluate([], [])
     assert report["status"] == "NOT_PROVEN"
@@ -84,5 +102,7 @@ if __name__ == "__main__":
     test_same_symbol_overlap_and_capacity_are_skipped()
     test_orphan_terminal_event_fails_closed()
     test_duplicate_terminal_event_fails_closed()
+    test_legacy_resolved_flag_without_terminal_event_is_not_used()
+    test_only_frozen_provenance_backed_cohort_rows_are_simulated()
     test_empty_ledgers_never_prove_profitability()
     print("NIC Portfolio Reality Engine tests: PASS")
