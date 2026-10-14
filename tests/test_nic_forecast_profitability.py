@@ -166,3 +166,23 @@ if __name__ == "__main__":
     test_profitability_report_is_bound_to_exact_source_ledgers()
     test_stale_source_hash_is_rejected()
     print("NIC net profitability evaluation tests: PASS")
+
+
+def test_legacy_resolved_snapshot_without_terminal_event_is_ignored():
+    snapshot = {"forecast_id": "legacy", "resolved": True, "signed_return": 99,
+                "side": "BULLISH", "decision": "LONG_CANDIDATE", "horizon_hours": 6}
+    assert m.load_resolved([snapshot], []) == []
+
+
+def test_loaded_resolved_rows_without_complete_provenance_are_excluded_from_metrics():
+    snapshot = {"forecast_id": "f1", "timestamp": "2026-10-01T10:00:00Z",
+                "symbol": "BTC", "side": "BULLISH", "decision": "LONG_CANDIDATE",
+                "horizon_hours": 6, "source_provenance": {"url": "https://example.com"}}
+    event = {"event_type": "FORECAST_RESOLVED", "forecast_id": "f1", "signed_return": 2.0,
+             "resolved_at": "2026-10-01T16:00:00Z"}
+    rows = m.load_resolved([snapshot], [event])
+    report = m.evaluate(rows)
+    assert report["resolved_forecast_count"] == 1
+    assert report["sample_count"] == 0
+    assert report["excluded_missing_source_provenance_count"] == 1
+    assert report["status"] == "NOT_PROVEN"
