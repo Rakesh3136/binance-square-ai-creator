@@ -45,7 +45,7 @@ def test_autonomous_flow_reviews_only_the_final_gated_draft():
     assert human_gate > chart_gate
     assert autonomous.index("Preserve exact final draft and gate context for mandatory human review") > human_gate
     payload_section = autonomous[autonomous.index("Build final publication payload"):publisher]
-    assert "steps.publication_authorization.outputs.authorized == 'true'" in payload_section
+    assert "if: ${{ false }}" in payload_section  # final payload generation remains hard-disabled
     assert "steps.human_review.outputs.blocked != 'true'" not in payload_section
     assert human_gate < publisher
     assert "NIC editorial automatic-publication authorization" in autonomous
