@@ -108,6 +108,7 @@ def test_report_counts_cannot_disagree_with_joined_ledger():
 def test_missing_provenance_blocks_verification():
     snapshots, outcomes, report, sh, oh = fixture()
     snapshots[0].pop("source_provenance")
+    report["sample_count"] = 0
     result = m.evaluate_evidence(snapshots, outcomes, report, sh, oh)
     assert result["status"] == "BLOCKED"
     assert any("snapshot_missing_source_provenance:f-1" in warning for warning in result["warnings"])
