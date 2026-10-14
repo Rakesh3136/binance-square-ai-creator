@@ -18,7 +18,7 @@ def fixture():
             "side": "BULLISH",
             "decision": "LONG_CANDIDATE",
             "horizon_hours": 6,
-            "source_provenance": [{"url": "https://example.com/market-data", "observed_at": "2026-10-01T10:00:00Z"}],
+            "source_provenance": {"provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines","instrument":"BTCUSDT","interval":"1h","closed_candle_open_time":"2026-10-01T09:00:00Z","closed_candle_as_of":"2026-10-01T10:00:00Z","retrieved_at":"2026-10-01T10:00:01Z","strategy_spec_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
         },
         {
             "forecast_id": "f-2",
@@ -27,7 +27,7 @@ def fixture():
             "side": "BEARISH",
             "decision": "WAIT",
             "horizon_hours": 12,
-            "source_url": "https://example.com/eth",
+            "source_provenance": {**{"provider":"Binance Spot Market Data API","endpoint":"https://data-api.binance.vision/api/v3/klines","instrument":"BTCUSDT","interval":"1h","closed_candle_open_time":"2026-10-01T09:00:00Z","closed_candle_as_of":"2026-10-01T10:00:00Z","retrieved_at":"2026-10-01T10:00:01Z","strategy_spec_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "instrument": "ETHUSDT"},
         },
     ]
     outcomes = [
@@ -108,6 +108,7 @@ def test_report_counts_cannot_disagree_with_joined_ledger():
 def test_missing_provenance_blocks_verification():
     snapshots, outcomes, report, sh, oh = fixture()
     snapshots[0].pop("source_provenance")
+    report["sample_count"] = 0
     result = m.evaluate_evidence(snapshots, outcomes, report, sh, oh)
     assert result["status"] == "BLOCKED"
     assert any("snapshot_missing_source_provenance:f-1" in warning for warning in result["warnings"])
@@ -128,3 +129,22 @@ def test_malformed_jsonl_is_rejected(tmp_path):
     except m.EvidenceError:
         return
     raise AssertionError("malformed evidence JSONL must be rejected")
+
+
+def test_actionable_sample_requires_canonical_source_provenance():
+    snapshots, outcomes, report, sh, oh = fixture()
+    snapshots[0]["source_provenance"] = {"url": "https://example.com/only-a-url"}
+    report["sample_count"] = 0
+    result = m.evaluate_evidence(snapshots, outcomes, report, sh, oh)
+    assert result["status"] == "BLOCKED"
+    assert result["joined_resolved_forecast_count"] == 2
+    assert result["joined_actionable_sample_count"] == 0
+
+
+def test_legacy_url_does_not_count_as_source_provenance():
+    snapshots, outcomes, report, sh, oh = fixture()
+    snapshots[1].pop("source_provenance")
+    snapshots[1]["source_url"] = "https://example.com/eth"
+    result = m.evaluate_evidence(snapshots, outcomes, report, sh, oh)
+    assert result["status"] == "BLOCKED"
+    assert result["joined_actionable_sample_count"] == 1
