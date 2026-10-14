@@ -133,6 +133,7 @@ def test_malformed_jsonl_is_rejected(tmp_path):
 def test_actionable_sample_requires_canonical_source_provenance():
     snapshots, outcomes, report, sh, oh = fixture()
     snapshots[0]["source_provenance"] = {"url": "https://example.com/only-a-url"}
+    report["sample_count"] = 0
     result = m.evaluate_evidence(snapshots, outcomes, report, sh, oh)
     assert result["status"] == "BLOCKED"
     assert result["joined_resolved_forecast_count"] == 2
