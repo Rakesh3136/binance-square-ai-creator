@@ -12,7 +12,8 @@ def test_unresolved_not_trusted():
         resolver.MATRIX=ROOT/"data/live/_test_predictivity_matrix.json"
         resolver.rebuild(rows,[])
         import json
-        assert list(json.loads(resolver.MATRIX.read_text())["matrix"].values())[0]["trusted"] is False
+        matrix=json.loads(resolver.MATRIX.read_text())["matrix"]
+        assert matrix == {}  # legacy resolved flags cannot enter prospective learning
     finally:
         try: resolver.MATRIX.unlink()
         except FileNotFoundError: pass
@@ -29,6 +30,10 @@ def test_resolution_emits_event_without_mutating_snapshot():
     assert len(new)==1 and new[0]["event_type"]=="FORECAST_RESOLVED"
     assert new[0]["signed_return"]==1.0
 
+def test_legacy_resolved_snapshot_never_becomes_terminal_event():
+    snap={"forecast_id":"legacy","resolved":True,"signed_return":99,"side":"BULLISH","horizon_hours":6}
+    assert resolver.resolve([snap],now=datetime.now(timezone.utc),candle_fetcher=lambda *a: [],existing_events=[]) == []
+
 def test_duplicate_resolution_is_blocked():
     snap={"forecast_id":"A|2","timestamp":"2020-01-01T00:00:00+00:00","horizon_hours":24,
           "entry_price":100,"symbol":"TEST","side":"BEARISH"}
@@ -36,5 +41,5 @@ def test_duplicate_resolution_is_blocked():
     assert resolver.resolve([snap],now=datetime.now(timezone.utc),candle_fetcher=lambda *a: [],existing_events=existing)==[]
 
 if __name__=="__main__":
-    test_unresolved_not_trusted();test_resolution_emits_event_without_mutating_snapshot();test_duplicate_resolution_is_blocked()
+    test_unresolved_not_trusted();test_resolution_emits_event_without_mutating_snapshot();test_legacy_resolved_snapshot_never_becomes_terminal_event();test_duplicate_resolution_is_blocked()
     print("NIC forecast immutable outcome-event tests: PASS")
