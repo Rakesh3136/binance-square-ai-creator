@@ -85,7 +85,7 @@ def resolve(rows, now=None, candle_fetcher=None, existing_events=None):
         raw=(target/entry-1)*100; signed=raw if str(x.get("side","")).upper()=="BULLISH" else -raw
         benchmark=btc_benchmark_return(int(ts.timestamp()*1000),int(due.timestamp()*1000))
         ev={"event_type":"FORECAST_RESOLVED","event_id":fid+"|resolved","forecast_id":fid,
-            "resolved_at":now.isoformat(),"symbol":s,"side":x.get("side"),"regime":x.get("regime"),
+            "resolved_at":now.isoformat(),"symbol":s,"side":x.get("side"),"regime":x.get("regime"),"strategy_version":x.get("strategy_version"),"strategy_spec_sha256":x.get("strategy_spec_sha256"),"source_provenance":source,
             "feature":x.get("feature"),"horizon_hours":int(x["horizon_hours"]),"entry_price":entry,
             "outcome_price":target,"raw_return":round(raw,6),"signed_return":round(signed,6),
             "benchmark_symbol":"BTCUSDT","benchmark_btc_return_pct":benchmark,"hit":signed>0}
