@@ -27,8 +27,8 @@ def test_small_samples_are_shrunk():
     event = {"event_type": "FORECAST_RESOLVED", "forecast_id": "A", "signed_return": 10, "hit": True}
     try:
         m.LEDGER, m.EVENTS = ledger, events
-        ledger.write_text(json.dumps(snapshot) + "\\n")
-        events.write_text(json.dumps(event) + "\\n")
+        ledger.write_text(json.dumps(snapshot) + chr(10))
+        events.write_text(json.dumps(event) + chr(10))
         cell = m.calibrate()["BULLISH|RANGE|6h"]
         assert cell["calibrated_probability"] < 0.8
         assert cell["trusted"] is False
