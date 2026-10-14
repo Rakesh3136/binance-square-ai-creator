@@ -47,7 +47,9 @@ jobs:
         run: python -m pip install pytest
       - name: Test evidence reconciliation with controlled fixtures
         run: python -m pytest -q tests/test_nic_evidence_outcome_integrity.py tests/test_nic_forecast_laboratory.py tests/test_nic_forecast_profitability.py
-      - name: Audit committed evidence and profitability report
+      - name: Rebuild profitability report from exact persisted ledgers
+        run: python src/nic_forecast_profitability.py
+      - name: Audit evidence against the freshly rebuilt profitability report
         run: |
           set +e
           python src/nic_evidence_outcome_integrity.py
