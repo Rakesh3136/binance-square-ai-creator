@@ -37,7 +37,7 @@ def test_heldout_positive_edge_can_be_reported_but_never_authorizes_trading():
     group = report["groups"]["BULLISH|6h"]
     assert group["status"] == "EXPLORATORY_SUBGROUP_CANDIDATE_NOT_PROOF"
     assert report["status"] == "NOT_PROVEN"
-    assert report["portfolio_simulation_status"] == "NOT_IMPLEMENTED"
+    assert report["portfolio_simulation_status"] == "INSUFFICIENT_ELIGIBLE_TRADES"
     assert report["publication_or_trade_authorization"] is False
 
 
@@ -191,3 +191,41 @@ def test_loaded_resolved_rows_without_complete_provenance_are_excluded_from_metr
     assert report["sample_count"] == 0
     assert report["excluded_missing_source_provenance_count"] == 1
     assert report["status"] == "NOT_PROVEN"
+
+
+def test_shadow_portfolio_blocks_same_symbol_overlap_and_reports_equity_metrics():
+    rows = [
+        {"forecast_id": "btc-1", "timestamp": "2026-10-01T00:00:00Z", "symbol": "BTC",
+         "side": "BULLISH", "decision": "LONG_CANDIDATE", "horizon_hours": 6,
+         "signed_return_pct": 1.0, "source_provenance_complete": True},
+        {"forecast_id": "btc-overlap", "timestamp": "2026-10-01T03:00:00Z", "symbol": "BTC",
+         "side": "BULLISH", "decision": "LONG_CANDIDATE", "horizon_hours": 6,
+         "signed_return_pct": 9.0, "source_provenance_complete": True},
+        {"forecast_id": "eth-1", "timestamp": "2026-10-01T01:00:00Z", "symbol": "ETH",
+         "side": "BEARISH", "decision": "SHORT_CANDIDATE", "horizon_hours": 6,
+         "signed_return_pct": -0.5, "source_provenance_complete": True},
+        {"forecast_id": "legacy", "timestamp": "2026-10-01T00:00:00Z", "symbol": "SOL",
+         "side": "BULLISH", "decision": "LONG_CANDIDATE", "horizon_hours": 6,
+         "signed_return_pct": 99.0, "source_provenance_complete": False},
+    ]
+    report = m.simulate_non_overlapping_portfolio(rows, round_trip_cost_pct=0.3,
+                                                  initial_equity=10000, max_positions=2)
+    assert report["status"] == "SIMULATED_SHADOW_ONLY"
+    assert report["accepted_trade_count"] == 2
+    assert report["skipped_same_symbol_overlap_count"] == 1
+    assert report["skipped_missing_provenance_count"] == 1
+    assert report["final_equity"] == 9995.0
+    assert report["net_pnl"] == -5.0
+    assert report["profit_factor"] == 0.875
+    assert report["limitations"]
+
+
+def test_shadow_portfolio_does_not_mix_horizons_or_claim_profitability():
+    rows = [{"forecast_id": "long-24h", "timestamp": "2026-10-01T00:00:00Z", "symbol": "BTC",
+             "side": "BULLISH", "decision": "LONG_CANDIDATE", "horizon_hours": 24,
+             "signed_return_pct": 4.0, "source_provenance_complete": True}]
+    report = m.evaluate(rows)
+    assert report["status"] == "NOT_PROVEN"
+    assert report["shadow_portfolio_simulation"]["accepted_trade_count"] == 0
+    assert report["shadow_portfolio_simulation"]["skipped_other_horizon_count"] == 1
+    assert report["publication_or_trade_authorization"] is False
