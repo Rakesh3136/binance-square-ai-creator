@@ -37,7 +37,7 @@ def test_heldout_positive_edge_can_be_reported_but_never_authorizes_trading():
     group = report["groups"]["BULLISH|6h"]
     assert group["status"] == "EXPLORATORY_SUBGROUP_CANDIDATE_NOT_PROOF"
     assert report["status"] == "NOT_PROVEN"
-    assert report["portfolio_simulation_status"] == "NOT_IMPLEMENTED"
+    assert report["portfolio_simulation_status"] == "INSUFFICIENT_ELIGIBLE_TRADES"
     assert report["publication_or_trade_authorization"] is False
 
 
