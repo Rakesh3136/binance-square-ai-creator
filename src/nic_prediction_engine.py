@@ -334,9 +334,72 @@ def candidate_symbols(flow: dict, full_flow: dict) -> list[tuple[str, str]]:
         if x not in seen:
             seen.add(x)
             final.append(x)
-        if len(final) >= MAX_ASSETS:
-            break
     return final
+
+
+LEVERAGED_BASE_SUFFIXES = ("UP", "DOWN", "BULL", "BEAR")
+
+
+def validate_spot_candidates(candidates: list[tuple[str, str]], exchange_info: dict):
+    """Allow only explicitly verified, active Binance Spot USDT pairs.
+
+    Unknown metadata fails closed. Common leveraged-token suffixes are excluded
+    even if their spot wrapper is tradable, because they are not ordinary spot
+    assets and have different risk/decay characteristics.
+    """
+    symbols = exchange_info.get("symbols") if isinstance(exchange_info, dict) else None
+    if not isinstance(symbols, list) or not symbols:
+        return [], {"status": "BLOCKED_EXCHANGE_UNIVERSE_UNVERIFIED",
+                    "accepted": 0, "rejected": len(candidates),
+                    "reason": "Binance exchangeInfo did not provide a usable symbol list.",
+                    "rejections": {"missing_exchange_metadata": len(candidates)}}
+
+    metadata = {}
+    for row in symbols:
+        if isinstance(row, dict) and isinstance(row.get("symbol"), str):
+            metadata[row["symbol"].upper()] = row
+
+    accepted = []
+    rejections = {}
+    seen = set()
+    for raw_symbol, raw_side in candidates:
+        base = clean_symbol(raw_symbol)
+        side = str(raw_side or "").upper()
+        if not base or side not in {"LONG", "SHORT"}:
+            reason = "invalid_candidate"
+        elif base.endswith(LEVERAGED_BASE_SUFFIXES):
+            reason = "leveraged_token_excluded"
+        else:
+            row = metadata.get(base + "USDT")
+            if row is None:
+                reason = "not_listed_as_usdt_pair"
+            elif row.get("status") != "TRADING":
+                reason = "pair_not_trading"
+            elif row.get("quoteAsset") != "USDT":
+                reason = "quote_asset_not_usdt"
+            elif row.get("baseAsset") != base:
+                reason = "base_asset_mismatch"
+            elif row.get("isSpotTradingAllowed") is not True:
+                reason = "spot_trading_not_explicitly_allowed"
+            else:
+                reason = None
+        if reason:
+            rejections[reason] = rejections.get(reason, 0) + 1
+            continue
+        key = (base, side)
+        if key not in seen:
+            accepted.append(key)
+            seen.add(key)
+
+    return accepted[:MAX_ASSETS], {
+        "status": "VERIFIED" if accepted else "BLOCKED_NO_ELIGIBLE_SPOT_CANDIDATES",
+        "metadata_source": "Binance Spot /api/v3/exchangeInfo",
+        "accepted": min(len(accepted), MAX_ASSETS),
+        "rejected": sum(rejections.values()),
+        "rejections": rejections,
+        "leveraged_suffixes_excluded": list(LEVERAGED_BASE_SUFFIXES),
+        "policy": "Only explicitly TRADING, USDT-quoted, spot-enabled pairs may enter NIC forecast evaluation."
+    }
 
 
 def experience_for(doc: dict, setup_type: str, side: str, timeframe: str, regime: str) -> dict:
@@ -357,7 +420,19 @@ def build():
     market = load(MARKET, {})
     postmortem = load(POSTMORTEM, {})
     experience = load(EXPERIENCE, {})
-    candidates = candidate_symbols(flow, full_flow)
+    candidate_inputs = candidate_symbols(flow, full_flow)
+    try:
+        exchange_info = get_json("/api/v3/exchangeInfo", {})
+        candidates, universe_validation = validate_spot_candidates(candidate_inputs, exchange_info)
+    except Exception as exc:
+        candidates = []
+        universe_validation = {
+            "status": "BLOCKED_EXCHANGE_UNIVERSE_UNVERIFIED",
+            "accepted": 0,
+            "rejected": len(candidate_inputs),
+            "reason": f"Binance exchangeInfo request failed: {type(exc).__name__}",
+            "rejections": {"exchange_metadata_unavailable": len(candidate_inputs)}
+        }
     btc_frames = {}
     try:
         for interval in INTERVALS:
@@ -619,9 +694,10 @@ def build():
             })
 
     result = {
-        "version": "1.0-nic-walk-forward",
+        "version": "1.1-nic-verified-spot-universe",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "READY",
+        "status": "READY" if candidates else universe_validation.get("status", "BLOCKED_EXCHANGE_UNIVERSE_UNVERIFIED"),
+        "candidate_universe_validation": universe_validation,
         "minimum_walk_forward_events": MIN_EVENTS,
         "minimum_current_alignment": MIN_CURRENT_ALIGNMENT,
         "candidates": results,
@@ -637,6 +713,7 @@ def build():
             "Multi-timeframe disagreement lowers quality.",
             "BTC-relative strength is supporting context, not a causal law.",
             "This engine cannot override safety/publication gates or fabricate a market outcome.",
+            "Candidate assets must be verified as active Binance Spot USDT pairs; leveraged tokens and unknown exchange metadata fail closed.",
         ],
     }
     return result
@@ -657,7 +734,8 @@ def main() -> int:
         "policy": result["guardrails"],
     }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({
-        "status": "READY",
+        "status": result["status"],
+        "candidate_universe_validation": result.get("candidate_universe_validation", {}),
         "candidates": len(result["candidates"]),
         "passes": len(result["selected_passes"]),
         "waits": len(result["selected_waits"]),
