@@ -1,0 +1,40 @@
+name: NIC Forecast Evidence Reconciliation PR Checks
+
+on:
+  pull_request:
+    paths:
+      - 'src/nic_forecast_evidence_reconcile.py'
+      - 'tests/test_nic_forecast_evidence_reconcile.py'
+      - '.github/workflows/autonomous-market-creator.yml'
+      - '.github/workflows/nic-forecast-evidence-reconcile-pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile reconciliation module
+        run: python -m py_compile src/nic_forecast_evidence_reconcile.py
+      - name: Run reconciliation unit tests
+        run: python -m unittest discover -s tests -p 'test_nic_forecast_evidence_reconcile.py' -v
+      - name: Check whitespace
+        run: git diff --check
+      - name: Assert publication and trading remain paused
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path(".github/workflows/autonomous-market-creator.yml").read_text(encoding="utf-8")
+          assert "HARD SAFETY PAUSE" in text
+          assert "if: ${{ false }}" in text
+          assert "PUBLISHING_ENABLED: 'false'" in text
+          assert "NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY" in text
+          print("Publication remains disabled; no live-trade authorization added.")
+          PY
