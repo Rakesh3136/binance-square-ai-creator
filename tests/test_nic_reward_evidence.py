@@ -69,6 +69,7 @@ class RewardEvidenceTests(unittest.TestCase):
             perf = root / "square_performance.jsonl"
             rewards = root / "wte_reward_events.jsonl"
             live, intel = root / "live", root / "intelligence"
+            out, report = live / "nic_revenue_pattern_lab.json", intel / "nic_revenue_pattern_lab_report.json"
             write_jsonl(attr, [
                 {"canonical_post_id": "374795126927596", "category": "research", "format": "analysis", "hook_type": "mechanism", "revenue_verified": True, "revenue_amount": 99},
                 {"canonical_post_id": "374947394936090", "category": "research", "format": "analysis", "hook_type": "mechanism", "revenue_verified": True, "revenue_amount": 88},
@@ -84,7 +85,7 @@ class RewardEvidenceTests(unittest.TestCase):
                 "detail_status": "VERIFIED_REWARD_UNATTRIBUTED_POST",
             }
             write_jsonl(rewards, [legacy, valid_event()])
-            with patch.object(revenue_lab, "ATTR", attr), patch.object(revenue_lab, "PERF", perf), patch.object(revenue_lab, "REWARD_EVENTS", rewards), patch.object(revenue_lab, "LIVE", live), patch.object(revenue_lab, "INTEL", intel):
+            with patch.object(revenue_lab, "ATTR", attr), patch.object(revenue_lab, "PERF", perf), patch.object(revenue_lab, "REWARD_EVENTS", rewards), patch.object(revenue_lab, "LIVE", live), patch.object(revenue_lab, "INTEL", intel), patch.object(revenue_lab, "OUT", out), patch.object(revenue_lab, "REPORT", report):
                 revenue_lab.main()
             result = json.loads((live / "nic_revenue_pattern_lab.json").read_text())
             obs = result["observations"][0]
