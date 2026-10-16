@@ -33,7 +33,7 @@ jobs:
           from pathlib import Path
           text = Path(".github/workflows/autonomous-market-creator.yml").read_text(encoding="utf-8")
           assert "HARD SAFETY PAUSE" in text
-          assert "if: ${{ false }}" in text
+          assert "if: $" + "{{ false }}" in text
           assert "PUBLISHING_ENABLED: 'false'" in text
           assert "NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY" in text
           print("Publication remains disabled; no live-trade authorization added.")
