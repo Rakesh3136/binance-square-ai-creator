@@ -13,6 +13,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from src.nic_reward_evidence import canonical_post_id, is_verified_reward_event
+except ModuleNotFoundError:
+    from nic_reward_evidence import canonical_post_id, is_verified_reward_event
+
 ROOT = Path(__file__).resolve().parents[1]
 ANALYTICS = ROOT / "analytics"
 LIVE = ROOT / "data" / "live"
@@ -75,16 +80,14 @@ def number(row, *keys):
 
 
 def verified_revenue(row):
-    if not any(row.get(key) is True for key in REVENUE_FLAGS):
+    # Only the dedicated evidence validator can authorize revenue as a label.
+    if row.get("_verified_reward_event") is not True:
         return None
-    for key in REVENUE_VALUES:
-        try:
-            value = float(row.get(key))
-            if math.isfinite(value) and value >= 0:
-                return value
-        except (TypeError, ValueError):
-            pass
-    return None
+    try:
+        value = float(row.get("verified_revenue_amount"))
+        return value if math.isfinite(value) and value > 0 else None
+    except (TypeError, ValueError):
+        return None
 
 
 def verified_conversions(row):
@@ -107,8 +110,8 @@ def merge_rows():
     perf = load_jsonl(PERFORMANCE)
     rewards = {}
     for event in load_jsonl(REWARD_EVENTS):
-        post_id = pid(event)
-        if post_id and event.get("verified") is True and event.get("reward_amount_usdc") is not None:
+        post_id = canonical_post_id(event)
+        if post_id and is_verified_reward_event(event):
             rewards[post_id] = event
     outcomes = defaultdict(list)
     for x in load_jsonl(OUTCOMES):
@@ -123,9 +126,9 @@ def merge_rows():
         merged_row = {**attr[post], **row}
         reward = rewards.get(post)
         if reward is not None:
-            merged_row["revenue_verified"] = True
-            merged_row["verified_revenue"] = True
+            merged_row["_verified_reward_event"] = True
             merged_row["verified_revenue_amount"] = reward.get("reward_amount_usdc")
+            merged_row["reward_event_id"] = reward.get("event_id")
             merged_row["reward_event_source"] = reward.get("source")
         # Metadata must originate from publication attribution; performance can
         # update numeric observations without replacing identity.
@@ -201,13 +204,17 @@ def main():
         "generated_at": now,
         "status": "READY" if rows else "COLLECTING_DATA",
         "verified_data_policy": {
-            "revenue_requires_explicit_verified_flag": True,
+            "revenue_requires_exact_post_id_and_hashed_timestamped_evidence": True,
+            "legacy_verified_flags_without_reward_proof_are_ignored": True,
             "reader_trades_never_inferred": True,
             "revenue_never_inferred_from_views_or_engagement": True,
             "prediction_success_is_not_revenue": True,
             "missing_attribution_is_not_repaired_by_guessing": True,
         },
         "inputs": {
+            "reward_event_count": len(load_jsonl(REWARD_EVENTS)),
+            "accepted_verified_reward_events": sum(1 for e in load_jsonl(REWARD_EVENTS) if is_verified_reward_event(e)),
+            "rejected_reward_events": sum(1 for e in load_jsonl(REWARD_EVENTS) if not is_verified_reward_event(e)),
             "attributed_performance_rows": len(rows),
             "repeated_observations": len(observations),
             "monetized_observation_groups": len(monetized),
