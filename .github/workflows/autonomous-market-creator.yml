@@ -698,17 +698,17 @@ jobs:
               target.parent.mkdir(parents=True, exist_ok=True)
               target.write_text(committed(path), encoding="utf-8")
           PY
-                # Reconcile the laboratory report against the merged immutable truth ledger.
-                python - <<'PY'
-                import json
-                from pathlib import Path
-                root = Path("data/intelligence")
-                report_path = root / "nic_forecast_laboratory_report.json"
-                report = json.loads(report_path.read_text(encoding="utf-8"))
-                ledger_path = root / "nic_forecast_truth_ledger.jsonl"
-                report["persisted_snapshot_count"] = sum(1 for line in ledger_path.read_text(encoding="utf-8").splitlines() if line.strip())
-                report_path.write_text(json.dumps(report, indent=2) + "\\n", encoding="utf-8")
-                PY
+          # Reconcile the laboratory report against the merged immutable truth ledger.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("data/intelligence")
+          report_path = root / "nic_forecast_laboratory_report.json"
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          ledger_path = root / "nic_forecast_truth_ledger.jsonl"
+          report["persisted_snapshot_count"] = sum(1 for line in ledger_path.read_text(encoding="utf-8").splitlines() if line.strip())
+          report_path.write_text(json.dumps(report, indent=2) + "\\n", encoding="utf-8")
+          PY
                 # Rebuild every derived report only after both prospective ledgers are merged.
                 python src/nic_forecast_outcome_resolver.py
                 python src/nic_forecast_calibrator.py
