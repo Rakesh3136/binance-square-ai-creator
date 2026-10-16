@@ -1,0 +1,65 @@
+name: NIC Distillation Dataset Activation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - 'src/nic_distillation_lab.py'
+      - 'data/live/nic_distillation_teacher_examples.jsonl'
+      - 'data/live/nic_distillation_reviewed_examples.jsonl'
+      - '.github/workflows/nic-distillation-dataset-activation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build evidence-gated dataset
+        id: dataset
+        run: |
+          set +e
+          python src/nic_distillation_lab.py | tee nic-distillation-summary.json
+          code=${PIPESTATUS[0]}
+          echo "builder_exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+      - name: Validate report and split isolation
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("data/intelligence/nic_distillation_report.json")
+          if not p.exists():
+              raise SystemExit("Distillation report was not generated")
+          r = json.loads(p.read_text())
+          s = r.get("summary", {})
+          if s.get("split_group_overlap") is not False:
+              raise SystemExit("Train/evaluation source-group leakage detected")
+          if r.get("guardrails", {}).get("publication_authorized") is not False:
+              raise SystemExit("Publication guardrail changed unexpectedly")
+          if r.get("guardrails", {}).get("trade_authorized") is not False:
+              raise SystemExit("Trade guardrail changed unexpectedly")
+          print(json.dumps({"status":r.get("status"),"summary":s,"promotion_policy":r.get("promotion_policy")}, indent=2))
+          PY
+      - name: Upload auditable dataset report and partitions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic-distillation-dataset-audit
+          path: |
+            data/intelligence/nic_distillation_report.json
+            data/intelligence/nic_distillation_train.jsonl
+            data/intelligence/nic_distillation_eval.jsonl
+            nic-distillation-summary.json
+          if-no-files-found: warn
+          retention-days: 30
