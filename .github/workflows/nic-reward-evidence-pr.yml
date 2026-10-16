@@ -1,0 +1,41 @@
+name: NIC Verified Square Reward Evidence PR Checks
+
+on:
+  pull_request:
+    paths:
+      - 'src/nic_reward_evidence.py'
+      - 'src/nic_revenue_pattern_lab.py'
+      - 'src/revenue_content_director.py'
+      - 'tests/test_nic_reward_evidence.py'
+      - '.github/workflows/nic-reward-evidence-pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reward-evidence-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile reward evidence consumers
+        run: python -m py_compile src/nic_reward_evidence.py src/nic_revenue_pattern_lab.py src/revenue_content_director.py
+      - name: Run reward evidence regression tests
+        run: python -m unittest discover -s tests -p 'test_nic_reward_evidence.py' -v
+      - name: Keep automatic publishing disabled
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          workflow = Path(".github/workflows/autonomous-market-creator.yml").read_text(encoding="utf-8")
+          assert "NIC editorial automatic-publication authorization" in workflow
+          assert "Extract publication and submit to Binance Square" in workflow
+          guard = "if: " + "$" + "{{ false }}"
+          assert workflow.count(guard) >= 2, "Automatic publication guard must remain disabled in both steps"
+          print("Automatic publication remains disabled.")
+          PY
+      - name: Check whitespace
+        run: git diff --check

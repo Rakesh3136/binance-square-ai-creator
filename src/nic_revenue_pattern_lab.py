@@ -8,6 +8,10 @@ import json
 from collections import defaultdict
 from datetime import datetime,timezone
 from pathlib import Path
+try:
+    from src.nic_reward_evidence import canonical_post_id, is_verified_reward_event
+except ModuleNotFoundError:
+    from nic_reward_evidence import canonical_post_id, is_verified_reward_event
 ROOT=Path(__file__).resolve().parents[1]; AN=ROOT/"analytics"; LIVE=ROOT/"data/live"; INTEL=ROOT/"data/intelligence"
 ATTR=AN/"publication_attribution.jsonl"; PERF=AN/"square_performance.jsonl"; REWARD_EVENTS=AN/"wte_reward_events.jsonl"; OUT=LIVE/"nic_revenue_pattern_lab.json"; REPORT=INTEL/"nic_revenue_pattern_lab_report.json"
 def rows(p):
@@ -27,7 +31,9 @@ def num(x,*ks):
     return 0.0
 def main():
     attrs={pid(x):x for x in rows(ATTR) if pid(x)}; perf={pid(x):x for x in rows(PERF) if pid(x)}
-    rewards={pid(x):x for x in rows(REWARD_EVENTS) if pid(x) and x.get("verified") is True and x.get("reward_amount_usdc") is not None}
+    raw_reward_events=rows(REWARD_EVENTS)
+    valid_reward_events=[x for x in raw_reward_events if is_verified_reward_event(x)]
+    rewards={canonical_post_id(x):x for x in valid_reward_events}
     groups=defaultdict(lambda:{"posts":0,"views":0.0,"engagement":0.0,"verified_revenue":0.0,"verified_posts":0})
     for p,a in attrs.items():
         k=(str(a.get("content_lane") or a.get("category") or "unknown"),str(a.get("content_format") or a.get("format") or "unknown"),str(a.get("hook_type") or a.get("content_family") or "unknown"))
@@ -36,8 +42,7 @@ def main():
         reward=rewards.get(p)
         if reward is not None:
             g["verified_posts"]+=1; g["verified_revenue"]+=max(0,num(reward,"reward_amount_usdc"))
-        elif a.get("revenue_verified") is True:
-            g["verified_posts"]+=1; g["verified_revenue"]+=max(0,num(a,"revenue_amount","verified_revenue_amount","earnings_amount"))
+
     observations=[]
     for (cat,fmt,fam),g in groups.items():
         observations.append({"category":cat,"content_lane":cat,"format":fmt,"content_format":fmt,"hook_type":fam,"content_family":fam,"posts":g["posts"],"views":round(g["views"],2),"engagement_per_1000_views":round(g["engagement"]*1000/max(g["views"],1),4),"verified_posts":g["verified_posts"],"verified_revenue":round(g["verified_revenue"],8),"evidence":"OBSERVED_ONLY"})
@@ -45,7 +50,7 @@ def main():
     plan=[]
     for x in sorted(observations,key=lambda z:(z["verified_revenue"],z["engagement_per_1000_views"]),reverse=True)[:8]:
         plan.append({"test_family":x["content_family"],"format":x["format"],"hypothesis":"repeat only if fresh evidence supports the same content family","sample_rule":"minimum 3 comparable observations before changing policy","guardrail":"never infer revenue or causality from views alone"})
-    state={"version":"2.0","generated_at":datetime.now(timezone.utc).isoformat(),"status":"READY","verified_observation_groups":len(verified),"observations":observations[:100],"next_experiments":plan,"verified_revenue_only":True,"unattributed_rewards_must_remain_unattributed":True}
-    LIVE.mkdir(parents=True,exist_ok=True);INTEL.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(state,indent=2)+"\n",encoding="utf-8");REPORT.write_text(json.dumps({"status":"READY","verified_groups":len(verified),"output":str(OUT.relative_to(ROOT))},indent=2)+"\n",encoding="utf-8")
-    print(json.dumps({"status":"READY","verified_groups":len(verified),"observations":len(observations)}))
+    state={"version":"2.1","generated_at":datetime.now(timezone.utc).isoformat(),"status":"READY" if verified else "COLLECTING_VERIFIED_REWARD_EVIDENCE","verified_observation_groups":len(verified),"reward_event_count":len(raw_reward_events),"accepted_verified_reward_events":len(valid_reward_events),"rejected_reward_events":len(raw_reward_events)-len(valid_reward_events),"observations":observations[:100],"next_experiments":plan,"verified_revenue_only":True,"reward_requires_exact_post_id_and_hashed_timestamped_evidence":True,"unattributed_rewards_must_remain_unattributed":True}
+    LIVE.mkdir(parents=True,exist_ok=True);INTEL.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(state,indent=2)+"\n",encoding="utf-8");REPORT.write_text(json.dumps({"status":state["status"],"verified_groups":len(verified),"reward_event_count":len(raw_reward_events),"accepted_verified_reward_events":len(valid_reward_events),"rejected_reward_events":len(raw_reward_events)-len(valid_reward_events),"output":str(OUT.relative_to(ROOT))},indent=2)+"\n",encoding="utf-8")
+    print(json.dumps({"status":state["status"],"verified_groups":len(verified),"accepted_verified_reward_events":len(valid_reward_events),"rejected_reward_events":len(raw_reward_events)-len(valid_reward_events),"observations":len(observations)}))
 if __name__=="__main__":main()
