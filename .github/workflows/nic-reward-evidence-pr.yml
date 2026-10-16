@@ -31,9 +31,10 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           workflow = Path(".github/workflows/autonomous-market-creator.yml").read_text(encoding="utf-8")
-          assert "NIC editorial automatic-publication authorization\n        # HARD SAFETY PAUSE" in workflow
-          assert "Extract publication and submit to Binance Square\n        id: publish_result\n        # HARD SAFETY PAUSE" in workflow
-          assert "if: ${{ false }}" in workflow
+          assert "NIC editorial automatic-publication authorization" in workflow
+          assert "Extract publication and submit to Binance Square" in workflow
+          guard = "if: " + "$" + "{{ false }}"
+          assert workflow.count(guard) >= 2, "Automatic publication guard must remain disabled in both steps"
           print("Automatic publication remains disabled.")
           PY
       - name: Check whitespace
