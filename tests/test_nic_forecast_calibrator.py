@@ -248,7 +248,9 @@ def test_production_workflow_runs_forecast_lab_resolver_calibrator_in_order():
     assert "git rebase origin/main" in workflow
     assert "NIC_EVIDENCE_COMMIT" in workflow
     assert "Merge and reconcile NIC Forecast Laboratory evidence" in workflow
-    assert "lambda x: str(x.get(\"forecast_id\") or \"\")" in workflow
+    reconcile = (ROOT / "src" / "nic_forecast_evidence_reconcile.py").read_text()
+    assert "lambda row: str(row.get(\"forecast_id\") or \"\")" in reconcile
+    assert "python src/nic_forecast_evidence_reconcile.py" in workflow
     assert "python src/nic_forecast_outcome_resolver.py" in workflow
     assert "python src/nic_forecast_calibrator.py" in workflow
     fallback_calibrator = workflow.rindex("python src/nic_forecast_calibrator.py")
