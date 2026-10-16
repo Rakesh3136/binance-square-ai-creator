@@ -659,56 +659,7 @@ jobs:
                 git fetch origin main
                 git reset --hard origin/main
                 export NIC_EVIDENCE_COMMIT="$evidence_commit"
-                python - <<'PY'
-          import json, os, subprocess
-          from pathlib import Path
-          source = os.environ["NIC_EVIDENCE_COMMIT"]
-          root = Path(".")
-          def committed(path):
-              return subprocess.check_output(["git", "show", f"{source}:{path}"], text=True)
-          def rows(path):
-              p = root / path
-              if not p.exists(): return []
-              out = []
-              for line in p.read_text(encoding="utf-8").splitlines():
-                  if line.strip():
-                      value = json.loads(line)
-                      if not isinstance(value, dict): raise ValueError(f"Invalid row in {path}")
-                      out.append(value)
-              return out
-          def merge_jsonl(path, identity):
-              current = rows(path)
-              seen = {identity(x) for x in current}
-              for line in committed(path).splitlines():
-                  if not line.strip(): continue
-                  row = json.loads(line)
-                  key = identity(row)
-                  if key and key not in seen:
-                      current.append(row); seen.add(key)
-              target = root / path
-              target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_text("".join(json.dumps(x, separators=(",", ":")) + "\n" for x in current), encoding="utf-8")
-          merge_jsonl("data/intelligence/nic_forecast_truth_ledger.jsonl", lambda x: str(x.get("forecast_id") or ""))
-          merge_jsonl("data/intelligence/nic_forecast_outcome_events.jsonl", lambda x: str(x.get("event_id") or x.get("forecast_id") or ""))
-          merge_jsonl("data/intelligence/nic_forecast_prospective_cohort.jsonl", lambda x: str(x.get("forecast_id") or ""))
-          merge_jsonl("data/intelligence/nic_forecast_prospective_outcome_events.jsonl", lambda x: str(x.get("event_id") or x.get("forecast_id") or ""))
-          merge_jsonl("data/intelligence/nic_regime_history.jsonl", lambda x: "|".join(str(x.get(k) or "") for k in ("timestamp", "symbol", "regime")))
-          for path in ("data/intelligence/nic_forecast_laboratory_report.json", "data/live/nic_forecast_laboratory.json"):
-              target = root / path
-              target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_text(committed(path), encoding="utf-8")
-          PY
-          # Reconcile the laboratory report against the merged immutable truth ledger.
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          root = Path("data/intelligence")
-          report_path = root / "nic_forecast_laboratory_report.json"
-          report = json.loads(report_path.read_text(encoding="utf-8"))
-          ledger_path = root / "nic_forecast_truth_ledger.jsonl"
-          report["persisted_snapshot_count"] = sum(1 for line in ledger_path.read_text(encoding="utf-8").splitlines() if line.strip())
-          report_path.write_text(json.dumps(report, indent=2) + "\\n", encoding="utf-8")
-          PY
+                python src/nic_forecast_evidence_reconcile.py
                 # Rebuild every derived report only after both prospective ledgers are merged.
                 python src/nic_forecast_outcome_resolver.py
                 python src/nic_forecast_calibrator.py
