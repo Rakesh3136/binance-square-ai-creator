@@ -1,6 +1,13 @@
 name: NIC — Weekly Binance Square Creator Benchmark
 
 on:
+  pull_request:
+    paths:
+      - "src/square_creator_benchmark_collector.py"
+      - "src/creator_intelligence.py"
+      - "src/run_creator_intelligence.py"
+      - "tests/test_square_creator_benchmark_collector.py"
+      - ".github/workflows/nic-square-creator-benchmark.yml"
   schedule:
     - cron: "25 4 * * 1"
   workflow_dispatch:
@@ -26,9 +33,10 @@ jobs:
       - name: Validate collector and tests
         run: |
           set -euo pipefail
-          python -m py_compile src/square_creator_benchmark_collector.py
+          python -m py_compile src/square_creator_benchmark_collector.py src/creator_intelligence.py src/run_creator_intelligence.py
           python -m unittest tests.test_square_creator_benchmark_collector -v
       - name: Collect public creator examples
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           set -euo pipefail
           python src/square_creator_benchmark_collector.py
@@ -37,6 +45,7 @@ jobs:
           python -m json.tool data/intelligence/creator_patterns.json >/dev/null
           python -m json.tool data/live/square_creator_benchmark_report.json >/dev/null
       - name: Persist benchmark artifacts
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
