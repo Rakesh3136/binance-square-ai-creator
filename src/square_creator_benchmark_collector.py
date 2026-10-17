@@ -259,8 +259,8 @@ def main() -> int:
         "creator_benchmarks_with_minimum_samples": len(benchmark["creator_benchmarks"]),
         "earnings_claims_verified": 0,
         "earnings_inferred": False,
-        "examples_file": str(EXAMPLES.relative_to(ROOT)),
-        "benchmark_file": str(OUT.relative_to(ROOT)),
+        "examples_file": str(EXAMPLES.relative_to(ROOT)) if EXAMPLES.is_relative_to(ROOT) else str(EXAMPLES),
+        "benchmark_file": str(OUT.relative_to(ROOT)) if OUT.is_relative_to(ROOT) else str(OUT),
     })
     state = read_json(STATE, {})
     state.update({"last_run": generated_at, "last_public_posts": len(public_rows), "last_status": benchmark["status"], "seen_post_count": len(combined)})
