@@ -1,0 +1,32 @@
+name: NIC 22.3 Confirmation Routing PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/nic22_opportunity_diversity_engine.py"
+      - "tests/test_nic22_opportunity_diversity_engine.py"
+      - ".github/workflows/nic22-3-confirmation-routing-pr.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-confirmation-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile router
+        run: python -m py_compile src/nic22_opportunity_diversity_engine.py
+      - name: Run router regression tests
+        run: python tests/test_nic22_opportunity_diversity_engine.py
+      - name: Run NIC 22.3 confirmation tests
+        run: python tests/test_nic22_3_early_confirmation_engine.py
+      - name: Run publication alignment tests
+        run: python tests/test_nic22_3_publication_alignment_gate.py

@@ -15,6 +15,11 @@ PREFLIGHT=Path('data/live/editorial_preflight.json')
 PUBLICATIONS=Path('analytics/publication_log.jsonl')
 OUT=Path('data/live/nic22_opportunity_diversity.json')
 SELECTION_OUT=Path('data/live/nic22_opportunity_selection.json')
+CONFIRMATION_SELECTION=Path('data/live/nic22_3_confirmation_selection.json')
+TRADE_LANES={'technical_setup','high_volatility','top_gainers','top_losers',
+ 'capital_flow_long','capital_flow_short','flow','conditional_trade',
+ 'creator_signal_outcome','follow_up','next_gainer_candidate','next_loser_candidate',
+ 'early_setup'}
 ASSET_COOLDOWN_HOURS=72
 ASSET_HARD_BLOCK_COUNT=2
 
@@ -67,6 +72,22 @@ def story_history(rows):
         if c:charts[c]+=1
     return assets,types,charts
 
+def apply_confirmation_policy(eligible, confirmation):
+    """Keep trade candidates aligned to NIC 22.3; never promote an unconfirmed setup."""
+    status=str(confirmation.get('status') or '').upper()
+    selected=confirmation.get('selected_opportunity') if isinstance(confirmation.get('selected_opportunity'),dict) else {}
+    confirmed_symbol=norm(selected.get('symbol') or selected.get('topic'))
+    if status=='CONFIRMED' and confirmed_symbol:
+        aligned=[item for item in eligible
+                 if confirmed_symbol in symbols_from(item[1])]
+        return aligned, 'confirmed_symbol_authoritative' if aligned else 'confirmed_symbol_not_in_eligible_pool'
+    safe=[]
+    for score,candidate in eligible:
+        lanes={str(candidate.get(key) or '').strip().lower().replace(' ','_') for key in ('category','type')}
+        if not (lanes & TRADE_LANES):
+            safe.append((score,candidate))
+    return safe, 'no_confirmed_trade_candidate; editorial_only' if safe else 'no_confirmed_candidate; trade_publication_blocked'
+
 def choose_story(candidate, recent_types, recent_charts):
     lane=str(candidate.get('category') or candidate.get('type') or '').lower()
     move=float(candidate.get('price_change_percent') or 0)
@@ -98,15 +119,19 @@ def main():
         diversity-=min(15,types.get(str(c.get('category','')).lower(),0)*5)
         eligible.append((score+diversity,c))
     eligible.sort(key=lambda x:x[0],reverse=True)
+    confirmation=load(CONFIRMATION_SELECTION,{})
+    eligible, confirmation_reason=apply_confirmation_policy(eligible,confirmation)
     chosen=eligible[0][1] if eligible else None
-    reason='rotated_to_unused_or_underused_asset' if chosen else 'no_diverse_eligible_asset'
+    reason=('rotated_to_unused_or_underused_asset' if chosen else 'no_diverse_eligible_asset')
+    if confirmation_reason != 'confirmed_symbol_authoritative':
+        reason=confirmation_reason
     selected=None
     if chosen:
         story=choose_story(chosen,types,charts)
         selected={'category':chosen.get('category'),'symbol':chosen.get('topic') or chosen.get('symbol'),'reason':chosen.get('reason'),'lane':chosen.get('type'),'score':chosen.get('adjusted_score'),'story_type':story,'story_instruction':STORY_TYPES[story],'chart_profile':CHART_PROFILES[story],'asset_recent_count':assets.get(norm(chosen.get('topic') or chosen.get('symbol')),0),'editorial_structure_family':story,'instruction':('Use this frozen opportunity and story type. The post must teach a concrete market-reading idea, distinguish observations from scenarios, state what would invalidate the thesis, and avoid guarantees. Do not reuse a recent sentence, hook family, CTA pattern, or chart composition.')}
         for k in ('news_title','news_url','news_source','news_published_at','news_score','news_symbols','flow_side','flow_confidence','trade_setup','relative_strength_to_btc','flow_proxy_score','flow_notes'):
             if k in chosen:selected[k]=chosen[k]
-    result={'version':'22.1-opportunity-rotation','generated_at':datetime.now(timezone.utc).isoformat(),'status':'SELECTED' if selected else 'BLOCKED','reason':reason,'selected_opportunity':selected,'recent_asset_counts':dict(assets),'recent_story_types':dict(types),'recent_chart_profiles':dict(charts),'candidate_count':len(candidates),'eligible_count':len(eligible),'rules':{'asset_cooldown_hours':ASSET_COOLDOWN_HOURS,'asset_hard_block_count':ASSET_HARD_BLOCK_COUNT,'no_diverse_asset_fallback':True,'no_fact_invention':True,'no_publish_bypass':True}}
+    result={'version':'22.1-opportunity-rotation','generated_at':datetime.now(timezone.utc).isoformat(),'status':'SELECTED' if selected else 'BLOCKED','reason':reason,'selected_opportunity':selected,'recent_asset_counts':dict(assets),'recent_story_types':dict(types),'recent_chart_profiles':dict(charts),'candidate_count':len(candidates),'eligible_count':len(eligible),'rules':{'asset_cooldown_hours':ASSET_COOLDOWN_HOURS,'asset_hard_block_count':ASSET_HARD_BLOCK_COUNT,'no_diverse_asset_fallback':True,'no_fact_invention':True,'no_publish_bypass':True,'nic22_3_confirmation_authoritative':True,'confirmation_policy':confirmation_reason}}
     pre['selected_opportunity']=selected
     pre['run_ai']=bool(selected)
     pre['reason']='nic22_diverse_opportunity_selected' if selected else reason
