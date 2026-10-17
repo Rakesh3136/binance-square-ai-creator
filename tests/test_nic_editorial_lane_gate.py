@@ -45,5 +45,33 @@ class EditorialLaneGateTest(unittest.TestCase):
         c["decision"] = "TRADE"
         self.assertFalse(evaluate(e, r, c)["publish"])
 
+    def test_actionable_setup_levels_are_blocked(self):
+        e, r, c = self.fixtures()
+        draft = {"draft": {"post": "OSMO 1H entry: 0.0525, stop-loss: 0.036, target: 0.066."}}
+        market = {"generated_at": NOW, "top_gainers": [{"symbol": "OSMOUSDT", "price_change_percent": 2.0}]}
+        result = evaluate(e, r, c, draft=draft, market=market, symbol="OSMO")
+        self.assertFalse(result["publish"])
+        self.assertTrue(any("actionable trade" in reason for reason in result["reasons"]))
+
+    def test_extended_setup_like_editorial_is_blocked(self):
+        e, r, c = self.fixtures()
+        draft = {"draft": {"post": "OSMO is at a breakout; watch resistance and support."}}
+        market = {"generated_at": NOW, "top_gainers": [{"symbol": "OSMOUSDT", "price_change_percent": 18.0}]}
+        result = evaluate(e, r, c, draft=draft, market=market, symbol="OSMO")
+        self.assertFalse(result["publish"])
+        self.assertTrue(any("already extended" in reason for reason in result["reasons"]))
+
+    def test_setup_like_post_with_missing_market_evidence_is_blocked(self):
+        e, r, c = self.fixtures()
+        draft = {"draft": {"post": "OSMO breakout with support and resistance levels."}}
+        result = evaluate(e, r, c, draft=draft, market={}, symbol="OSMO")
+        self.assertFalse(result["publish"])
+
+    def test_non_setup_editorial_does_not_need_price_extension_data(self):
+        e, r, c = self.fixtures()
+        draft = {"draft": {"post": "What the latest governance proposal means for Cosmos users."}}
+        result = evaluate(e, r, c, draft=draft, market={}, symbol="OSMO")
+        self.assertTrue(result["publish"])
+
 if __name__ == "__main__":
     unittest.main()
