@@ -239,8 +239,9 @@ def main() -> int:
         if not isinstance(row, dict):
             continue
         key = normalize_id(row.get("post_id") or row.get("source_url") or row.get("source"))
-        if key:
-            by_id[key] = row
+        if not key:
+            key = "legacy:" + hashlib.sha256(json.dumps(row, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+        by_id[key] = row
     for row in public_rows:
         key = normalize_id(row.get("post_id"))
         if key:
