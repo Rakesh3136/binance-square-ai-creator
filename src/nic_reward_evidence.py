@@ -53,26 +53,36 @@ def has_hashed_timestamped_evidence(row: dict[str, Any]) -> bool:
     return False
 
 
-def is_verified_reward_event(row: dict[str, Any]) -> bool:
+def reward_event_rejection_reasons(row: dict[str, Any]) -> list[str]:
+    """Return stable, non-sensitive reasons a reward event is not admissible."""
     if not isinstance(row, dict):
-        return False
+        return ["event_not_object"]
+    reasons: list[str] = []
     if row.get("verified") is not True:
-        return False
+        reasons.append("verified_flag_missing")
     status = str(row.get("reward_status") or row.get("detail_status") or "").strip().upper()
     if status not in VERIFIED_REWARD_STATUSES:
-        return False
-    if not str(row.get("event_id") or "").strip() or not canonical_post_id(row):
-        return False
+        reasons.append("reward_status_not_paid_verified")
+    if not str(row.get("event_id") or "").strip():
+        reasons.append("event_id_missing")
+    if not canonical_post_id(row):
+        reasons.append("canonical_post_id_missing_or_invalid")
     if str(row.get("currency") or "").strip().upper() != "USDC":
-        return False
+        reasons.append("currency_not_usdc")
     try:
         amount = float(row.get("reward_amount_usdc"))
+        if not math.isfinite(amount) or amount <= 0:
+            reasons.append("reward_amount_not_positive_finite")
     except (TypeError, ValueError):
-        return False
-    if not math.isfinite(amount) or amount <= 0:
-        return False
+        reasons.append("reward_amount_missing_or_invalid")
     if parse_aware_time(row.get("observed_at")) is None:
-        return False
+        reasons.append("observed_at_missing_or_timezone_naive")
     if parse_aware_time(row.get("verified_at")) is None:
-        return False
-    return has_hashed_timestamped_evidence(row)
+        reasons.append("verified_at_missing_or_timezone_naive")
+    if not has_hashed_timestamped_evidence(row):
+        reasons.append("hashed_timestamped_evidence_ref_missing")
+    return reasons
+
+
+def is_verified_reward_event(row: dict[str, Any]) -> bool:
+    return not reward_event_rejection_reasons(row)
