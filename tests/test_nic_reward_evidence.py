@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.nic_reward_evidence import canonical_post_id, is_verified_reward_event
+from src.nic_reward_evidence import canonical_post_id, is_verified_reward_event, reward_event_rejection_reasons
 from src import nic_revenue_pattern_lab as revenue_lab
 from src import revenue_content_director as revenue_director
 
@@ -49,6 +49,10 @@ class RewardEvidenceTests(unittest.TestCase):
             "detail_status": "VERIFIED_REWARD_UNATTRIBUTED_POST",
         }
         self.assertFalse(is_verified_reward_event(event))
+        reasons = reward_event_rejection_reasons(event)
+        self.assertIn("reward_status_not_paid_verified", reasons)
+        self.assertIn("canonical_post_id_missing_or_invalid", reasons)
+        self.assertIn("hashed_timestamped_evidence_ref_missing", reasons)
 
     def test_rejects_missing_hash_or_timezone(self):
         event = valid_event()
