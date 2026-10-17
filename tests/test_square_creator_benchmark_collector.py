@@ -33,6 +33,20 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertEqual(report["creator_benchmarks"][0]["earnings_status"], "NOT_PUBLICLY_VERIFIED")
         self.assertFalse(report["earnings_policy"]["creator_income_inferred_from_views"])
 
+    def test_confidence_adjusted_engagement_ranks_quality_over_post_volume(self):
+        rows = []
+        # A high-volume creator with no visible interaction must not outrank
+        # a smaller creator whose posts repeatedly earn meaningful engagement.
+        for i in range(20):
+            rows.append({"creator": "VolumeOnly", "creator_id": "volume", "views": 1000,
+                         "likes": 0, "replies": 0, "shares": 0, "source_url": f"https://x/v{i}"})
+        for i in range(4):
+            rows.append({"creator": "Engaged", "creator_id": "engaged", "views": 1000,
+                         "likes": 20, "replies": 5, "shares": 3, "source_url": f"https://x/e{i}"})
+        report = collector.build_benchmark(rows, "2026-10-17T00:00:00+00:00")
+        self.assertEqual(report["creator_benchmarks"][0]["creator_id"], "engaged")
+        self.assertGreater(report["creator_benchmarks"][0]["confidence_adjusted_engagement_score"], 0)
+
     def test_run_preserves_existing_examples_and_writes_outputs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

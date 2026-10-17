@@ -196,18 +196,24 @@ def build_benchmark(rows: list[dict], generated_at: str) -> dict:
         rates = [rate for rate in rates if rate is not None]
         if len(posts) < 3 or not rates:
             continue
+        mean_rate = sum(rates) / len(rates)
+        # Shrink small samples toward zero so a single lucky post cannot
+        # outrank a consistently engaged creator on raw rate alone.
+        benchmark_score = mean_rate * len(rates) / (len(rates) + 5)
         leaders.append({
             "creator": next((p.get("creator") for p in posts if p.get("creator")), "unknown"),
             "creator_id": creator,
             "observed_posts": len(posts),
-            "mean_public_engagement_rate": round(sum(rates) / len(rates), 6),
+            "posts_with_visible_views": len(rates),
+            "mean_public_engagement_rate": round(mean_rate, 6),
+            "confidence_adjusted_engagement_score": round(benchmark_score, 6),
             "median_public_views": sorted(float(p.get("views") or 0) for p in posts)[len(posts) // 2],
             "evidence": "PUBLIC_ENGAGEMENT_OBSERVATION",
             "earnings_status": "NOT_PUBLICLY_VERIFIED",
             "interpretation": "directional public engagement benchmark only; not a payout or income ranking",
             "sample_urls": [p.get("source_url") for p in posts[:5]],
         })
-    leaders.sort(key=lambda row: (row["observed_posts"] >= 5, row["mean_public_engagement_rate"], row["observed_posts"]), reverse=True)
+    leaders.sort(key=lambda row: (row["confidence_adjusted_engagement_score"], row["mean_public_engagement_rate"], row["observed_posts"]), reverse=True)
     return {
         "schema_version": "1.0",
         "generated_at": generated_at,

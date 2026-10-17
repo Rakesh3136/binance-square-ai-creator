@@ -135,8 +135,13 @@ def main():
     creator_ranked=[]
     for creator,p in creator_performance.items():
         n=max(1,p["n"])
-        creator_ranked.append({"creator":creator,"samples":p["n"],"confidence":confidence(p["n"]),"avg_views":round(p["views"]/n,2),"avg_replies":round(p["replies"]/n,2),"avg_followers":round(p["followers"]/n,2),"reply_rate":round(p["replies"]/max(1,p["views"]),5),"follower_rate":round(p["followers"]/max(1,p["views"]),5)})
-    creator_ranked.sort(key=lambda x:(x["samples"]>=5,x["reply_rate"],x["follower_rate"]),reverse=True)
+        reply_rate = p["replies"] / max(1, p["views"])
+        follower_rate = p["followers"] / max(1, p["views"])
+        # Do not reward posting volume by itself: confidence-adjust the rates
+        # so a small sample can surface but does not dominate on one outlier.
+        confidence_weight = p["n"] / (p["n"] + 5)
+        creator_ranked.append({"creator":creator,"samples":p["n"],"confidence":confidence(p["n"]),"avg_views":round(p["views"]/n,2),"avg_replies":round(p["replies"]/n,2),"avg_followers":round(p["followers"]/n,2),"reply_rate":round(reply_rate,5),"follower_rate":round(follower_rate,5),"confidence_adjusted_score":round((reply_rate + 2 * follower_rate) * confidence_weight, 6)})
+    creator_ranked.sort(key=lambda x:(x["confidence_adjusted_score"],x["reply_rate"],x["follower_rate"],x["samples"]),reverse=True)
 
     our_by_format=defaultdict(lambda:{"n":0,"views":0,"likes":0,"replies":0,"followers":0})
     our_by_experiment=defaultdict(lambda:{"n":0,"views":0,"likes":0,"replies":0,"followers":0})
