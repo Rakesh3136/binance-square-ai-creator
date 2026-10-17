@@ -219,7 +219,7 @@ def main() -> int:
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     REPORT.write_text(json.dumps({
         "generated_at": now, "status": result["status"], "counts": result["counts"],
-        "output": str(OUT.relative_to(ROOT)),
+        "output": str(OUT.relative_to(ROOT) if OUT.is_relative_to(ROOT) else OUT),
     }, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"status": result["status"], "counts": result["counts"], "experiments": len(experiments)}))
     return 0
