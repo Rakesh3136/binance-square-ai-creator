@@ -6,6 +6,8 @@ on:
       - '.github/workflows/autonomous-market-creator.yml'
       - 'tests/test_nic_revenue_learning_wiring.py'
       - '.github/workflows/nic-revenue-learning-wiring-pr.yml'
+      - 'src/revenue_content_director.py'
+      - 'tests/test_revenue_readiness_truth_gate.py'
   workflow_dispatch:
 
 permissions:
@@ -24,5 +26,7 @@ jobs:
         run: python -m py_compile src/nic_reward_evidence.py src/nic_revenue_pattern_lab.py src/revenue_content_director.py
       - name: Verify production wiring and safety
         run: python -m unittest discover -s tests -p 'test_nic_revenue_learning_wiring.py' -v
+      - name: Verify monetization readiness truth gate
+        run: python -m unittest discover -s tests -p 'test_revenue_readiness_truth_gate.py' -v
       - name: Check workflow syntax and whitespace
         run: git diff --check
