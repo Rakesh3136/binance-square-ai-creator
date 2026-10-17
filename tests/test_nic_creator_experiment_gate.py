@@ -49,6 +49,15 @@ class CreatorExperimentGateTests(unittest.TestCase):
         self.assertFalse(result["publication_authorized"])
         self.assertFalse(result["strategy_auto_promoted"])
 
+    def test_zero_reward_amount_does_not_count_as_verified_revenue(self):
+        result = gate.evaluate_experiment({
+            "experiment_id": "zero-reward",
+            "control": arm(reward_count=1, reward_amount=0, refs=["sha256:control-proof"]),
+            "candidate": arm(reward_count=1, reward_amount=0.7, refs=["sha256:candidate-proof"]),
+        })
+        self.assertEqual(result["status"], "ENGAGEMENT_ONLY_NOT_MONETIZATION_PROVEN")
+        self.assertIsNone(result["control_verified_reward_amount_usdc"])
+
     def test_missing_experiment_id_fails_closed(self):
         result = gate.evaluate_experiment({
             "control": arm(),
