@@ -142,6 +142,15 @@ def group_key(row):
     return tuple(str(row.get(dim) or "unknown").strip().lower() for dim in DIMENSIONS)
 
 
+def readiness_status(accepted_verified_reward_events: int, rows: list[dict]) -> str:
+    """Separate observed analytics from verified monetization readiness."""
+    if accepted_verified_reward_events <= 0:
+        return "COLLECTING_VERIFIED_REWARD_EVIDENCE"
+    if not rows:
+        return "COLLECTING_ATTRIBUTED_PERFORMANCE_DATA"
+    return "READY"
+
+
 def main():
     now = datetime.now(timezone.utc).isoformat()
     rows = merge_rows()
@@ -199,10 +208,14 @@ def main():
     monetized = [x for x in observations if (x["verified_revenue_total_usdc"] or 0) > 0]
     tested = observations[:8]
 
+    raw_reward_events = load_jsonl(REWARD_EVENTS)
+    accepted_reward_count = sum(1 for event in raw_reward_events if is_verified_reward_event(event))
+    rejected_reward_count = len(raw_reward_events) - accepted_reward_count
+
     director = {
-        "version": "2.0",
+        "version": "2.1",
         "generated_at": now,
-        "status": "READY" if rows else "COLLECTING_DATA",
+        "status": readiness_status(accepted_reward_count, rows),
         "verified_data_policy": {
             "revenue_requires_exact_post_id_and_hashed_timestamped_evidence": True,
             "legacy_verified_flags_without_reward_proof_are_ignored": True,
@@ -212,9 +225,9 @@ def main():
             "missing_attribution_is_not_repaired_by_guessing": True,
         },
         "inputs": {
-            "reward_event_count": len(load_jsonl(REWARD_EVENTS)),
-            "accepted_verified_reward_events": sum(1 for e in load_jsonl(REWARD_EVENTS) if is_verified_reward_event(e)),
-            "rejected_reward_events": sum(1 for e in load_jsonl(REWARD_EVENTS) if not is_verified_reward_event(e)),
+            "reward_event_count": len(raw_reward_events),
+            "accepted_verified_reward_events": accepted_reward_count,
+            "rejected_reward_events": rejected_reward_count,
             "attributed_performance_rows": len(rows),
             "repeated_observations": len(observations),
             "monetized_observation_groups": len(monetized),
@@ -259,8 +272,10 @@ def main():
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(director, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     REPORT.write_text(json.dumps({
-        "version": "2.0",
+        "version": "2.1",
         "status": director["status"],
+        "accepted_verified_reward_events": accepted_reward_count,
+        "rejected_reward_events": rejected_reward_count,
         "attributed_performance_rows": len(rows),
         "repeated_observations": len(observations),
         "monetized_observation_groups": len(monetized),
@@ -268,7 +283,9 @@ def main():
     }, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({
         "status": director["status"],
-        "version": "2.0",
+        "version": "2.1",
+        "accepted_verified_reward_events": accepted_reward_count,
+        "rejected_reward_events": rejected_reward_count,
         "attributed_performance_rows": len(rows),
         "repeated_observations": len(observations),
         "monetized_observation_groups": len(monetized),
