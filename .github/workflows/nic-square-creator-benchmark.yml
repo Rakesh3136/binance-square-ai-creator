@@ -1,0 +1,66 @@
+name: NIC — Weekly Binance Square Creator Benchmark
+
+on:
+  pull_request:
+    paths:
+      - "src/square_creator_benchmark_collector.py"
+      - "src/creator_intelligence.py"
+      - "src/run_creator_intelligence.py"
+      - "tests/test_square_creator_benchmark_collector.py"
+      - ".github/workflows/nic-square-creator-benchmark.yml"
+  schedule:
+    - cron: "25 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nic-square-creator-benchmark
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate collector and tests
+        run: |
+          set -euo pipefail
+          python -m py_compile src/square_creator_benchmark_collector.py src/creator_intelligence.py src/run_creator_intelligence.py
+          python -m unittest tests.test_square_creator_benchmark_collector -v
+      - name: Collect public creator examples
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          set -euo pipefail
+          python src/square_creator_benchmark_collector.py
+          python src/creator_intelligence.py
+          python -m json.tool data/intelligence/square_creator_benchmark.json >/dev/null
+          python -m json.tool data/intelligence/creator_patterns.json >/dev/null
+          python -m json.tool data/live/square_creator_benchmark_report.json >/dev/null
+      - name: Persist benchmark artifacts
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json
+          if git diff --cached --quiet; then
+            echo "No creator benchmark changes to persist."
+            exit 0
+          fi
+          git commit -m "Refresh public Binance Square creator benchmarks"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main || { git rebase --abort; git reset --hard origin/main; python src/square_creator_benchmark_collector.py; python src/creator_intelligence.py; git add -- data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json; git commit -m "Rebuild public Square creator benchmarks on latest main"; }
+            if git push origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 2))
+          done
+          echo "::error::Could not persist weekly creator benchmark after retries."
+          exit 1
