@@ -23,6 +23,14 @@ def _positive_int(value):
         return 0
 
 
+def _positive_amount(value):
+    try:
+        amount = float(value)
+        return amount if amount > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _rate(arm, numerator, denominator):
     try:
         den = float(arm.get(denominator, 0) or 0)
@@ -61,10 +69,10 @@ def evaluate_experiment(experiment):
     # public engagement, or a boolean alone is not evidence.
     control_rewards = _positive_int(control.get("verified_reward_post_count"))
     candidate_rewards = _positive_int(candidate.get("verified_reward_post_count"))
-    control_reward_amount = control.get("verified_reward_amount_usdc")
-    candidate_reward_amount = candidate.get("verified_reward_amount_usdc")
-    control_reward_proof = bool(control.get("reward_evidence_refs")) and control_rewards > 0
-    candidate_reward_proof = bool(candidate.get("reward_evidence_refs")) and candidate_rewards > 0
+    control_reward_amount = _positive_amount(control.get("verified_reward_amount_usdc"))
+    candidate_reward_amount = _positive_amount(candidate.get("verified_reward_amount_usdc"))
+    control_reward_proof = isinstance(control.get("reward_evidence_refs"), list) and bool(control["reward_evidence_refs"]) and control_rewards > 0 and control_reward_amount is not None
+    candidate_reward_proof = isinstance(candidate.get("reward_evidence_refs"), list) and bool(candidate["reward_evidence_refs"]) and candidate_rewards > 0 and candidate_reward_amount is not None
 
     engagement_delta = None
     if control_engagement is not None and candidate_engagement is not None:
