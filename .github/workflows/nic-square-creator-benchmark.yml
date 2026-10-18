@@ -7,7 +7,10 @@ on:
       - "src/creator_intelligence.py"
       - "src/run_creator_intelligence.py"
       - "src/nic_creator_experiment_gate.py"
+      - "src/nic_creator_experiment_builder.py"
+      - "src/nic_reward_evidence.py"
       - "tests/test_nic_creator_experiment_gate.py"
+      - "tests/test_nic_creator_experiment_builder.py"
       - "tests/test_square_creator_benchmark_collector.py"
       - "tests/test_square_creator_benchmark_autorefresh.py"
       - ".github/workflows/nic-square-creator-benchmark.yml"
@@ -36,8 +39,9 @@ jobs:
       - name: Validate collector and tests
         run: |
           set -euo pipefail
-          python -m py_compile src/square_creator_benchmark_collector.py src/creator_intelligence.py src/run_creator_intelligence.py src/nic_creator_experiment_gate.py
+          python -m py_compile src/square_creator_benchmark_collector.py src/creator_intelligence.py src/run_creator_intelligence.py src/nic_creator_experiment_gate.py src/nic_creator_experiment_builder.py src/nic_reward_evidence.py
           python -m unittest discover -s tests -p "test_nic_creator_experiment_gate.py" -v
+          python -m unittest discover -s tests -p "test_nic_creator_experiment_builder.py" -v
           python -m unittest tests.test_square_creator_benchmark_collector tests.test_square_creator_benchmark_autorefresh -v
       - name: Collect public creator examples
         if: ${{ github.event_name != 'pull_request' }}
@@ -45,6 +49,8 @@ jobs:
           set -euo pipefail
           python src/square_creator_benchmark_collector.py
           python src/creator_intelligence.py
+          python src/nic_creator_experiment_builder.py
+          python -m json.tool analytics/creator_experiment_results.json >/dev/null
           python src/nic_creator_experiment_gate.py
           python -m json.tool data/intelligence/creator_experiment_gate.json >/dev/null
           python -m json.tool data/intelligence/square_creator_benchmark.json >/dev/null
@@ -56,7 +62,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json data/intelligence/creator_experiment_gate.json analytics/square_creator_benchmark_state.json
+          git add -- data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json data/intelligence/creator_experiment_gate.json analytics/creator_experiment_results.json analytics/square_creator_benchmark_state.json
           if git diff --cached --quiet; then
             echo "No creator benchmark changes to persist."
             exit 0
@@ -64,7 +70,7 @@ jobs:
           git commit -m "Refresh public Binance Square creator benchmarks"
           for attempt in 1 2 3; do
             git fetch origin main
-            git rebase origin/main || { git rebase --abort; git reset --hard origin/main; python src/square_creator_benchmark_collector.py; python src/creator_intelligence.py; python src/nic_creator_experiment_gate.py; git add -- data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json data/intelligence/creator_experiment_gate.json analytics/square_creator_benchmark_state.json; git commit -m "Rebuild public Square creator benchmarks on latest main"; }
+            git rebase origin/main || { git rebase --abort; git reset --hard origin/main; python src/square_creator_benchmark_collector.py; python src/creator_intelligence.py; python src/nic_creator_experiment_builder.py; python src/nic_creator_experiment_gate.py; git add -- data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json data/intelligence/creator_experiment_gate.json analytics/creator_experiment_results.json analytics/square_creator_benchmark_state.json; git commit -m "Rebuild public Square creator benchmarks on latest main"; }
             if git push origin HEAD:main; then exit 0; fi
             sleep $((attempt * 2))
           done
