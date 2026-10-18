@@ -80,9 +80,15 @@ def build_experiment_results(
     joined_posts: dict[str, str] = {}
     seen_attribution: dict[str, str] = {}
     conflicting_posts: set[str] = set()
+    rejected_attribution_rows: dict[str, int] = defaultdict(int)
 
     for row in attribution_rows:
         if str(row.get("experiment_id") or "").strip() != experiment_id:
+            continue
+        # An assigned arm is not evidence that the writer applied its treatment.
+        # Only publisher attribution explicitly confirmed APPLIED may enter learning.
+        if str(row.get("experiment_application_status") or "").strip().upper() != "APPLIED":
+            rejected_attribution_rows["experiment_application_not_confirmed"] += 1
             continue
         pid = _post_id(row)
         arm_name = _arm(row, control_value, treatment_value)
@@ -161,6 +167,7 @@ def build_experiment_results(
             "reward_rows": len(reward_rows),
             "experiment_attributed_posts_joined": len(joined_posts),
             "conflicting_arm_assignment_posts": len(conflicting_posts),
+            "rejected_attribution_reasons": dict(sorted(rejected_attribution_rows.items())),
             "rejected_reward_reasons": dict(sorted(rejected_rewards.items())),
         },
         "experiments": [{
