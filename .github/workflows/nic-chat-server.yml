@@ -1,4 +1,4 @@
-name: NIC — Conversational Chat Server
+name: NIC — Conversational Chat and Provider Evaluation
 
 on:
   pull_request:
@@ -6,6 +6,9 @@ on:
       - "src/nic_chat_server.py"
       - "dashboard/nic_chat.html"
       - "tests/test_nic_chat_server.py"
+      - "scripts/evaluate_nic_teachers.py"
+      - "data/benchmarks/nic_teacher_tasks.json"
+      - "docs/NIC_CHAT_PROVIDER_EVALUATION.md"
       - ".github/workflows/nic-chat-server.yml"
   workflow_dispatch:
 
@@ -21,8 +24,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile and test chat server
+      - name: Compile chat and evaluation runner
         run: |
           set -euo pipefail
-          python -m py_compile src/nic_chat_server.py
+          python -m py_compile src/nic_chat_server.py scripts/evaluate_nic_teachers.py
+      - name: Validate benchmark fixture
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          tasks = json.loads(Path("data/benchmarks/nic_teacher_tasks.json").read_text())
+          assert 1 <= len(tasks) <= 50
+          assert all(t.get("id") and t.get("prompt") and t.get("rubric") for t in tasks)
+          assert len({t["id"] for t in tasks}) == len(tasks)
+          print(f"Validated {len(tasks)} unique benchmark tasks")
+          PY
+      - name: Run deterministic chat tests (no external provider calls)
+        run: |
+          set -euo pipefail
           PYTHONPATH=src python -m unittest discover -s tests -p "test_nic_chat_server.py" -v
