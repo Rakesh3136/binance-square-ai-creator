@@ -1,0 +1,60 @@
+name: NIC — Market Flow and Founder Brief
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_market_flow_founder_intelligence.py"
+      - "tests/test_nic_market_flow_founder_intelligence.py"
+      - ".github/workflows/nic-market-flow-founder-brief.yml"
+  workflow_run:
+    workflows: ["Binance Square AI Creator — Single Autonomous Orchestrator"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nic-market-flow-founder-brief
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and test flow/founder brief
+        run: |
+          python -m py_compile src/nic_market_flow_founder_intelligence.py
+          python -m unittest discover -s tests -p "test_nic_market_flow_founder_intelligence.py" -v
+
+  refresh-brief:
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build freshness-gated report
+        run: |
+          set -euo pipefail
+          python -m py_compile src/nic_market_flow_founder_intelligence.py
+          python src/nic_market_flow_founder_intelligence.py
+          python -m json.tool data/live/nic_market_flow_founder_brief.json >/dev/null
+      - name: Upload report for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic-market-flow-founder-brief
+          path: data/live/nic_market_flow_founder_brief.json
+          if-no-files-found: error
+          retention-days: 30
