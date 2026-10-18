@@ -85,12 +85,10 @@ def duplicate_match(text,symbol,category,context,frozen):
     return "",None
 def append(row):
     ANALYTICS.mkdir(parents=True,exist_ok=True)
-    with LOG_PATH.open("a",encoding="utf-8") as h: h.write(json.dumps(row,ensure_ascii=False)+"
-")
+    with LOG_PATH.open("a",encoding="utf-8") as h: h.write(json.dumps(row,ensure_ascii=False)+"\n")
 def append_attribution(row):
     ANALYTICS.mkdir(parents=True,exist_ok=True)
-    with ATTRIBUTION_LOG_PATH.open("a",encoding="utf-8") as h: h.write(json.dumps(row,ensure_ascii=False)+"
-")
+    with ATTRIBUTION_LOG_PATH.open("a",encoding="utf-8") as h: h.write(json.dumps(row,ensure_ascii=False)+"\n")
 def preflight():
     required=[("publication_payload",PAYLOAD_PATH),("publication_context",CONTEXT_PATH),("authoritative_opportunity",FROZEN_PATH),("write_to_earn_eligibility",WTE_PATH),("content_craft",CRAFT_PATH)]
     missing=[f"{n}:{p}" for n,p in required if not p.exists()]
