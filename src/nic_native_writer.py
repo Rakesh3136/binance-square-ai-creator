@@ -165,35 +165,23 @@ def build(ctx):
         kept=list(parts)
         # Keep hook/evidence first; remove lower-priority prose before evidence.
         for drop in (3, 2):
-            if len("
-
-".join(kept + [question_text])) <= limit:
+            if len("\n\n".join(kept + [question_text])) <= limit:
                 break
             if 0 <= drop < len(kept):
                 kept.pop(drop)
-        if len("
-
-".join(kept + [question_text])) > limit:
-            while len("
-
-".join(kept + [question_text])) > limit and len(kept) > 2:
+        if len("\n\n".join(kept + [question_text])) > limit:
+            while len("\n\n".join(kept + [question_text])) > limit and len(kept) > 2:
                 kept.pop(-1)
-        post="
-
-".join(kept + [question_text]).strip()
+        post="\n\n".join(kept + [question_text]).strip()
         if len(post) > limit:
             base=[hook]
             for block in parts[1:]:
                 for sentence in re.split(r"(?<=[.!?])\\s+", str(block)):
                     sentence=sentence.strip()
-                    candidate="
-
-".join(base + [sentence, question_text])
+                    candidate="\n\n".join(base + [sentence, question_text])
                     if len(candidate) <= limit:
                         base.append(sentence)
-            post="
-
-".join(base + [question_text]).strip()
+            post="\n\n".join(base + [question_text]).strip()
         return post
     experiment_assignment=ctx.get("experiment_assignment") or {}
     formatted_parts,experiment_application_status=apply_experiment_format([hook,body if "body" in locals() else structure,middle,close],experiment_assignment)
