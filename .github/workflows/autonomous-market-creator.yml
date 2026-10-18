@@ -90,6 +90,7 @@ jobs:
           python tests/test_nic_profitability_admission_gate.py
           python tests/test_publishing_pause.py
           python tests/test_nic_editorial_lane_gate.py
+          python tests/test_nic21_originality_visual_truth.py
           python tests/test_nic24_2_evidence_content_integrity_gate.py
           python tests/test_nic24_3_early_entry_gate.py
           python -m py_compile src/nic24_3_early_entry_gate.py src/nic22_3_publication_alignment_gate.py
@@ -522,6 +523,8 @@ jobs:
       - name: NIC editorial-only publication gate
         id: editorial_lane
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_eligibility.outputs.mode == 'EDITORIAL' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
           set -euo pipefail
           python src/nic_editorial_lane_gate.py
@@ -564,10 +567,24 @@ jobs:
           fi
           echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
 
+      - name: Final NIC 21 and editorial revalidation
+        id: final_quality_gate
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_eligibility.outputs.mode == 'EDITORIAL' && steps.editorial_lane.outputs.publish == 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          set -euo pipefail
+          python src/nic21_originality_visual_truth.py
+          python -m json.tool data/live/nic21_gate.json >/dev/null
+          python src/nic_editorial_lane_gate.py
+          python -m json.tool data/live/nic_editorial_lane_gate.json >/dev/null
+          publish=$(python -c 'import json; print(str(json.load(open("data/live/nic_editorial_lane_gate.json")).get("publish", False)).lower())')
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          test "$publish" = "true"
+
       - name: NIC editorial automatic-publication authorization
         id: publication_authorization
-        # HARD SAFETY PAUSE: require an explicit future code review to re-enable automatic posting.
-        if: ${{ false }}
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.publication_eligibility.outputs.mode == 'EDITORIAL' && steps.final_quality_gate.outputs.publish == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -590,8 +607,7 @@ jobs:
           retention-days: 7
 
       - name: Build final publication payload
-        # HARD SAFETY PAUSE: do not prepare an auto-submission payload while publishing is paused.
-        if: ${{ false }}
+        if: ${{ steps.publication_authorization.outputs.authorized == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -601,12 +617,11 @@ jobs:
 
       - name: Extract publication and submit to Binance Square
         id: publish_result
-        # HARD SAFETY PAUSE: the publisher must not run until a separate reviewed release removes this guard.
-        if: ${{ false }}
+        if: ${{ steps.publication_authorization.outputs.authorized == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
-          PUBLISHING_ENABLED: 'false'
+          PUBLISHING_ENABLED: 'true'
           NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY
         run: python src/binance_square_publisher.py
 
