@@ -39,12 +39,16 @@ class RevenueLearningProductionWiringTests(unittest.TestCase):
             with self.subTest(output=output):
                 self.assertIn(output, ignored)
 
-    def test_publication_remains_hard_paused(self):
+    def test_publication_requires_exact_draft_authorization(self):
         text = WORKFLOW.read_text(encoding="utf-8")
+        auth = (ROOT / "src/nic_publication_authorization.py").read_text(encoding="utf-8")
+        publisher = (ROOT / "src/binance_square_publisher.py").read_text(encoding="utf-8")
         self.assertIn("NIC editorial automatic-publication authorization", text)
-        self.assertIn("Extract publication and submit to Binance Square", text)
-        guard = "if: " + "$" + "{{ false }}"
-        self.assertGreaterEqual(text.count(guard), 2)
+        self.assertIn("Final NIC 21 and editorial revalidation", text)
+        self.assertIn("steps.publication_authorization.outputs.authorized == 'true'", text)
+        self.assertIn("trade_signal_publication_authorized", auth)
+        self.assertIn("live_orders_authorized", auth)
+        self.assertIn("verify_quality_authorization", publisher)
 
 
 if __name__ == "__main__":

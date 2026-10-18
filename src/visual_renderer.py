@@ -1,9 +1,9 @@
 """Visual dispatcher for Binance Square with bounded chart-style diversity."""
 from __future__ import annotations
-import json, shutil, subprocess
+import hashlib, json, shutil, subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]; SRC=Path(__file__).resolve().parent
-TRADINGVIEW=SRC/'tradingview_renderer.mjs'; MEME=SRC/'meme_visual_renderer.py'; ANALYST=SRC/'analyst_square_chart_renderer.py'; SNAPSHOT=ROOT/'data/live/historical_setup_snapshot.json'; CONTEXT=ROOT/'data/live/publication_context.json'; FROZEN=ROOT/'data/live/authoritative_opportunity.json'
+TRADINGVIEW=SRC/'tradingview_renderer.mjs'; MEME=SRC/'meme_visual_renderer.py'; ANALYST=SRC/'analyst_square_chart_renderer.py'; SNAPSHOT=ROOT/'data/live/historical_setup_snapshot.json'; CONTEXT=ROOT/'data/live/publication_context.json'; FROZEN=ROOT/'data/live/authoritative_opportunity.json'; VISUAL=ROOT/'data/live/visual.png'; META=ROOT/'data/live/visual_metadata.json'
 def load(path):
     try:return json.loads(path.read_text(encoding='utf-8'))
     except Exception:return {}
@@ -25,6 +25,19 @@ def apply_chart_style():
         subprocess.run(['python',str(planner)],cwd=ROOT,check=True)
     if overlay.exists() and (ROOT/'data/live/visual.png').exists():
         subprocess.run(['python',str(overlay)],cwd=ROOT,check=True)
+def finalize_visual_metadata():
+    if not VISUAL.exists() or VISUAL.stat().st_size < 10_000:
+        raise SystemExit('Final visual missing or smaller than 10 KB; refusing publication visual proof')
+    meta=load(META)
+    if not meta:
+        raise SystemExit('Visual renderer did not write metadata; refusing publication visual proof')
+    # Hash only the final image after overlays/styles. Never invent the chart symbol/provider.
+    digest=hashlib.sha256(VISUAL.read_bytes()).hexdigest()
+    meta['sha256']=digest
+    meta['image_sha256']=digest
+    meta['finalized_at']=__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()
+    META.write_text(json.dumps(meta,indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
+
 def main():
     ctx=load(CONTEXT); frozen=load(FROZEN); cat=str(ctx.get('category') or '').lower()
     signal_lanes={'capital_flow_long','capital_flow_short','flow','technical_setup','creator_signal_outcome','follow_up'}
@@ -50,8 +63,12 @@ def main():
                 if overlay_rc!=0:
                     raise SystemExit('professional chart overlay failed; refusing unmarked setup visual')
             apply_chart_style()
+        if rc==0: finalize_visual_metadata()
         return rc
-    if cat=='crypto_meme':return subprocess.run(['python',str(MEME)],cwd=ROOT,check=False).returncode
+    if cat=='crypto_meme':
+        rc=subprocess.run(['python',str(MEME)],cwd=ROOT,check=False).returncode
+        if rc==0: finalize_visual_metadata()
+        return rc
     ensure_playwright(); rc=subprocess.run(['node',str(TRADINGVIEW)],cwd=ROOT,check=False).returncode
     if rc==0:
         # TradingView is the base market-data layer. Always apply the
@@ -63,5 +80,6 @@ def main():
             if overlay_rc!=0:
                 raise SystemExit('professional chart overlay failed; refusing unmarked setup visual')
         apply_chart_style()
+        finalize_visual_metadata()
     return rc
 if __name__=='__main__':raise SystemExit(main())

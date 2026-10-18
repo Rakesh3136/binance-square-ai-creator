@@ -27,14 +27,18 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_nic_forecast_evidence_reconcile.py' -v
       - name: Check whitespace
         run: git diff --check
-      - name: Assert publication and trading remain paused
+      - name: Assert editorial publishing is quality-gated and trading remains disabled
         run: |
           python - <<'PY'
           from pathlib import Path
-          text = Path(".github/workflows/autonomous-market-creator.yml").read_text(encoding="utf-8")
-          assert "HARD SAFETY PAUSE" in text
-          assert "if: $" + "{{ false }}" in text
-          assert "PUBLISHING_ENABLED: 'false'" in text
-          assert "NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY" in text
-          print("Publication remains disabled; no live-trade authorization added.")
+          workflow = Path(".github/workflows/autonomous-market-creator.yml").read_text(encoding="utf-8")
+          authorization = Path("src/nic_publication_authorization.py").read_text(encoding="utf-8")
+          publisher = Path("src/binance_square_publisher.py").read_text(encoding="utf-8")
+          assert "Final NIC 21 and editorial revalidation" in workflow
+          assert "steps.publication_authorization.outputs.authorized == 'true'" in workflow
+          assert "NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY" in workflow
+          assert "trade_signal_publication_authorized" in authorization
+          assert "live_orders_authorized" in authorization
+          assert "verify_quality_authorization" in publisher
+          print("Editorial publication requires quality authorization; live orders remain disabled.")
           PY

@@ -43,7 +43,7 @@ def draft_text(path):
         if isinstance(value,str) and value.strip(): return value.strip()
     return ""
 
-def evaluate(policy, eligibility, routing, lane, text, now=None):
+def evaluate(policy, eligibility, routing, lane, text, now=None, nic21=None):
     now=now or datetime.now(timezone.utc)
     reasons=[]
     if policy.get("editorial_auto_publication_enabled") is not True:
@@ -66,6 +66,13 @@ def evaluate(policy, eligibility, routing, lane, text, now=None):
         reasons.append("editorial lane gate did not explicitly pass")
     if lane.get("trade_authorized") is not False:
         reasons.append("editorial lane must explicitly deny trade authorization")
+    text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest() if text else ""
+    if lane.get("draft_sha256") != text_hash:
+        reasons.append("editorial lane result does not match the exact final draft")
+    if not isinstance(nic21, dict) or nic21.get("status") != "PASS":
+        reasons.append("NIC 21 originality/visual-truth gate did not explicitly pass")
+    elif nic21.get("draft_sha256") != text_hash:
+        reasons.append("NIC 21 result does not match the exact final draft")
     for label, artifact in (("eligibility",eligibility),("routing",routing),("editorial lane",lane)):
         if not fresh(artifact,now): reasons.append(f"{label} artifact is missing, stale, or future-dated")
     if not text.strip(): reasons.append("publishable draft text is missing")
@@ -93,7 +100,14 @@ def main():
     args=parser.parse_args()
     path=Path(args.draft_path)
     if not path.is_absolute(): path=ROOT/path
-    result=evaluate(load(POLICY_PATH),load(LIVE/"nic22_5_publication_eligibility.json"),load(LIVE/"signal_first_routing.json"),load(LIVE/"nic_editorial_lane_gate.json"),draft_text(path))
+    result=evaluate(
+        load(POLICY_PATH),
+        load(LIVE/"nic22_5_publication_eligibility.json"),
+        load(LIVE/"signal_first_routing.json"),
+        load(LIVE/"nic_editorial_lane_gate.json"),
+        draft_text(path),
+        nic21=load(LIVE/"nic21_gate.json"),
+    )
     LIVE.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print(json.dumps({k:result[k] for k in ("status","authorized","publication_mode","trade_signal_publication_authorized","live_orders_authorized","human_review_claimed","reasons")},indent=2))

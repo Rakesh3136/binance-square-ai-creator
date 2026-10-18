@@ -105,8 +105,11 @@ def latest_report() -> Path | None:
 
 
 def current_draft() -> tuple[str, dict]:
-    report = latest_report()
-    if not report:
+    raw = os.environ.get("DRAFT_PATH", "").strip()
+    report = Path(raw) if raw else latest_report()
+    if raw and not report.is_absolute():
+        report = Path.cwd() / report
+    if not report or not report.exists():
         return "", {}
     obj = load_json(report, {})
     draft = obj.get("draft") if isinstance(obj.get("draft"), dict) else {}
@@ -134,13 +137,20 @@ def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
     required = {"symbol": symbol}
     failures: list[str] = []
     warnings: list[str] = []
+    setup_like = bool(re.search(
+        r"\b(support|resistance|entry|stop[- ]?loss|invalidation|target|take[- ]?profit|breakout|technical setup)\b",
+        draft_text, re.I
+    ))
 
-    visual_symbol = str(meta.get("symbol") or meta.get("chart_symbol") or "").upper()
+    visual_symbol = str(meta.get("symbol") or meta.get("chart_symbol") or meta.get("base_symbol") or meta.get("tradingview_symbol") or "").upper()
     visual_symbol = visual_symbol.replace("BINANCE:", "").replace("USDT", "")
     if visual_symbol and symbol and visual_symbol != symbol:
         failures.append(f"visual symbol {visual_symbol} != draft symbol {symbol}")
     elif not visual_symbol:
-        warnings.append("visual metadata does not expose a chart symbol")
+        if setup_like:
+            failures.append("setup-like draft requires explicit chart symbol metadata")
+        else:
+            warnings.append("visual metadata does not expose a chart symbol")
 
     text_symbols = symbols_in(draft_text)
     if symbol and text_symbols and symbol not in text_symbols:
@@ -154,8 +164,8 @@ def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
     if visual_tf and timeframe_text and not any(visual_tf == x for x in re.findall(r"\b(?:\d+[mhdw])\b", timeframe_text)):
         warnings.append(f"visual timeframe {visual_tf} differs from explicit draft timeframe")
 
+    meta_hash = str(meta.get("sha256") or meta.get("image_sha256") or "")
     if VISUAL_FILE.exists():
-        meta_hash = str(meta.get("sha256") or meta.get("image_sha256") or "")
         actual_hash = hashlib.sha256(VISUAL_FILE.read_bytes()).hexdigest()
         if meta_hash and meta_hash != actual_hash:
             failures.append("visual metadata hash does not match visual.png")
@@ -163,6 +173,19 @@ def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
         failures.append("visual metadata exists but visual.png is missing")
     else:
         warnings.append("no visual package found; visual truth cannot be fully verified")
+
+    if setup_like:
+        if not VISUAL_FILE.exists() or VISUAL_FILE.stat().st_size < 10_000:
+            failures.append("setup-like draft requires a rendered visual larger than 10 KB")
+        if not visual_symbol:
+            failures.append("setup-like draft requires explicit chart symbol metadata")
+        visual_tf = str(meta.get("timeframe") or meta.get("interval") or "").strip()
+        if not visual_tf:
+            failures.append("setup-like draft requires explicit chart timeframe metadata")
+        if not meta_hash:
+            failures.append("setup-like draft requires a visual metadata SHA-256")
+        elif VISUAL_FILE.exists() and meta_hash != hashlib.sha256(VISUAL_FILE.read_bytes()).hexdigest():
+            failures.append("setup-like visual metadata SHA-256 does not match visual.png")
 
     # A visual may explicitly carry evidence/annotation fields. If present, make
     # their relationship to the draft auditable without pretending pixels prove prose.
