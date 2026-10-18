@@ -31,7 +31,9 @@ class ProblemDiscoveryTests(unittest.TestCase):
             {"problem_statement": "A real problem statement long enough", "source_url": "https://one.example.org/a", "source_name": "One"},
             {"problem_statement": "A real problem statement long enough", "source_url": "https://two.example.org/a", "source_name": "Two"},
         ]
-        self.assertEqual(cluster_problems(rows), [])
+        result = cluster_problems(rows)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["status"], "NEEDS_MORE_EVIDENCE")
 
 
 if __name__ == "__main__":
