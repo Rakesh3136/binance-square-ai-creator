@@ -1,6 +1,6 @@
 """Binance Square publisher with explicit verified/submitted/skipped states."""
 from __future__ import annotations
-import json, os, re, subprocess, urllib.error, urllib.request
+import json, os, hashlib, re, subprocess, urllib.error, urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
