@@ -28,6 +28,7 @@ SIMILARITY_BLOCK = 0.88
 HOOK_BLOCK = 0.92
 STRUCTURE_BLOCK = 0.90
 CTA_BLOCK = 0.92
+SETUP_TERMS = re.compile(r"\\b(support|resistance|entry|stop[- ]?loss|invalidation|target|take[- ]?profit|long bias|short bias|breakout|setup|TP[0-9]*)\\b", re.I)
 RECENT_POSTS = 12
 
 
@@ -132,6 +133,8 @@ def symbols_in(text: str) -> set[str]:
 def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
     meta = load_json(VISUAL_META, {})
     required = {"symbol": symbol}
+    setup_like = bool(SETUP_TERMS.search(draft_text))
+    setup_like = bool(SETUP_TERMS.search(draft_text))
     failures: list[str] = []
     warnings: list[str] = []
 
@@ -140,7 +143,10 @@ def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
     if visual_symbol and symbol and visual_symbol != symbol:
         failures.append(f"visual symbol {visual_symbol} != draft symbol {symbol}")
     elif not visual_symbol:
-        warnings.append("visual metadata does not expose a chart symbol")
+        if setup_like:
+            failures.append("setup-like draft requires chart metadata with an explicit symbol")
+        else:
+            warnings.append("visual metadata does not expose a chart symbol")
 
     text_symbols = symbols_in(draft_text)
     if symbol and text_symbols and symbol not in text_symbols:
