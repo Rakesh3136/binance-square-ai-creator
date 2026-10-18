@@ -48,6 +48,25 @@ def rng(item):
     return (min(lo),max(hi)) if hi and lo else (None,None)
 def price(v):
     return f"{num(v):.8g}" if num(v) else ""
+def apply_experiment_format(parts, assignment):
+    """Apply only the supported editorial-format treatment; otherwise fail closed."""
+    result = list(parts)
+    if not isinstance(assignment, dict) or assignment.get("assigned") is not True:
+        return result, "NOT_ASSIGNED"
+    if assignment.get("experiment_arm") == "control":
+        return result, "APPLIED"
+    if (assignment.get("experiment_arm") == "candidate"
+            and assignment.get("experiment_variable") == "experiment_format"
+            and assignment.get("experiment_treatment") == "data_driven_breakdown"):
+        if len(result) < 4:
+            return result, "NOT_APPLIED"
+        result[1] = "Evidence observed: " + str(result[1])
+        result[2] = "Interpretation: " + str(result[2])
+        result[3] = "What would change this view: " + str(result[3])
+        return result, "APPLIED"
+    return result, "NOT_APPLIED"
+
+
 def build(ctx):
     pre=ctx.get("preflight") or {};sel=pre.get("selected_opportunity") or {}
     pub=ctx.get("publication") or {};market=ctx.get("market") or {};news=ctx.get("news") or {}
@@ -164,6 +183,6 @@ def build(ctx):
                         base.append(sentence)
             post="\n\n".join(base + [question_text]).strip()
         return post
-    post=compact_post([hook,body if "body" in locals() else structure,middle,close],question)
+    experiment_assignment=ctx.get("experiment_assignment") or {}\n    formatted_parts,experiment_application_status=apply_experiment_format([hook,body if "body" in locals() else structure,middle,close],experiment_assignment)\n    post=compact_post(formatted_parts,question)
     if post.count("?")!=1 or dollar not in post or not 280<=len(post)<=700:raise RuntimeError("NIC Native Writer failed local publication contract")
-    return {"research":{"summary":f"NIC verified {dollar} using the frozen opportunity and supplied market evidence.","strongest_signal":s,"opportunity_score":num(sel.get("adjusted_score") or sel.get("raw_score") or 0),"source_mode":"NIC_NATIVE_EVIDENCE_SYNTHESIS"},"critique":{"summary":"Native NIC review bounds claims by supplied evidence and keeps uncertainty explicit.","alternative_hypothesis":"The observed move may be temporary rather than structural.","disconfirming_test":"A materially different next reaction or failed evidence condition weakens the thesis."},"draft":{"post":post,"text":post,"hook":hook,"discussion_question":question,"quality_score":84,"editorial_style":"NIC_NATIVE_WRITER","generation_mode":"NIC_NATIVE","symbol":s,"content_category":cat,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"visual_plan":{"type":"candlestick_chart" if cat not in {"crypto_meme","community","commentary","education"} else "none","use_visual":bool(it.get("candles_1h")),"purpose":"Show only the frozen asset and supplied evidence."},"native_writer":{"version":"1.0","provider":"NIC","external_text_model":False,"evidence_bound":True,"generated_at":datetime.now(timezone.utc).isoformat()}}
+    return {"research":{"summary":f"NIC verified {dollar} using the frozen opportunity and supplied market evidence.","strongest_signal":s,"opportunity_score":num(sel.get("adjusted_score") or sel.get("raw_score") or 0),"source_mode":"NIC_NATIVE_EVIDENCE_SYNTHESIS"},"critique":{"summary":"Native NIC review bounds claims by supplied evidence and keeps uncertainty explicit.","alternative_hypothesis":"The observed move may be temporary rather than structural.","disconfirming_test":"A materially different next reaction or failed evidence condition weakens the thesis."},"draft":{"post":post,"text":post,"hook":hook,"discussion_question":question,"quality_score":84,"editorial_style":"NIC_NATIVE_WRITER","generation_mode":"NIC_NATIVE","symbol":s,"content_category":cat,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"experiment_application_status":experiment_application_status,"visual_plan":{"type":"candlestick_chart" if cat not in {"crypto_meme","community","commentary","education"} else "none","use_visual":bool(it.get("candles_1h")),"purpose":"Show only the frozen asset and supplied evidence."},"native_writer":{"version":"1.0","provider":"NIC","external_text_model":False,"evidence_bound":True,"generated_at":datetime.now(timezone.utc).isoformat()}}
