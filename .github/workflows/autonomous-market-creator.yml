@@ -197,7 +197,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: intelligence-diagnostics-${{ github.run_id }}
-          path: data/live/intelligence_diagnostics/
+          path: |
+            data/live/intelligence_diagnostics/
+            data/live/nic_opportunity_desk.json
+            data/live/nic_problem_discovery_brief.json
           if-no-files-found: warn
           retention-days: 14
 
