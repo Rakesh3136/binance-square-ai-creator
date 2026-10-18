@@ -11,7 +11,8 @@ def plan():
 
 
 def attribution(pid, arm):
-    return {"post_id": pid, "experiment_id": "exp-1", "experiment_arm": arm}
+    return {"post_id": pid, "experiment_id": "exp-1", "experiment_arm": arm,
+            "experiment_application_status": "APPLIED"}
 
 
 def performance(pid):
@@ -43,6 +44,22 @@ class CreatorExperimentBuilderTests(unittest.TestCase):
         report = build_experiment_results([row], [performance("123456789")], [], plan())
         self.assertEqual(report["status"], "NO_EXPERIMENT_ATTRIBUTION")
         self.assertEqual(report["experiments"][0]["control"]["post_count"], 0)
+
+    def test_assignment_without_writer_confirmation_is_excluded(self):
+        row = attribution("123456789", "__baseline__")
+        row.pop("experiment_application_status")
+        report = build_experiment_results([row], [performance("123456789")], [reward("123456789")], plan())
+        arm = report["experiments"][0]["control"]
+        self.assertEqual(arm["post_count"], 0)
+        self.assertEqual(arm["verified_reward_post_count"], 0)
+        self.assertEqual(report["source_counts"]["rejected_attribution_reasons"]["experiment_application_not_confirmed"], 1)
+
+    def test_explicit_not_applied_treatment_is_excluded(self):
+        row = attribution("123456789", "data_driven_breakdown")
+        row["experiment_application_status"] = "NOT_APPLIED"
+        report = build_experiment_results([row], [performance("123456789")], [reward("123456789")], plan())
+        self.assertEqual(report["experiments"][0]["candidate"]["post_count"], 0)
+        self.assertEqual(report["experiments"][0]["candidate"]["verified_reward_post_count"], 0)
 
     def test_unverified_metrics_are_excluded(self):
         perf = performance("123456789")
