@@ -96,6 +96,16 @@ def rotation_candidates(document, market=None):
                 key = str(row.get("symbol") or "").upper().replace("USDT", "")
                 if key:
                     market_rows[key] = row
+    if not any(str(a.get("symbol") or "").upper().replace("USDT", "") == "BTC" for a in raw_assets if isinstance(a, dict)):
+        btc_market = market_rows.get("BTC") or {}
+        if btc_market:
+            raw_assets = list(raw_assets) + [{
+                "symbol": "BTC",
+                "market_context": {"spot_move_pct": number(btc_market.get("price_change_percent"))},
+                "multitimeframe": {"flow_proxy_score": 50.0, "confidence": None},
+                "timeframes": {"1h": {}},
+                "futures": {},
+            }]
     assets = []
     for raw in raw_assets:
         if not isinstance(raw, dict):
