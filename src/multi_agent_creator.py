@@ -7,7 +7,7 @@ from __future__ import annotations
 import json,os,re
 from datetime import datetime,timezone
 from pathlib import Path
-from nic_native_writer import build
+from nic_native_writer import build\nfrom nic_experiment_assignment import assign_experiment
 
 ROOT=Path(__file__).resolve().parents[1]
 OUTPUT_DIR=ROOT/"data/reports"
@@ -34,13 +34,13 @@ def decision_contract(preflight,publication,result):
       "editorial":{"category":draft.get("content_category"),"generation_mode":"NIC_NATIVE","writer":"nic_native_writer"},
       "visual":{"type":visual.get("type","none"),"use_visual":bool(visual.get("use_visual")),"purpose":visual.get("purpose")},
       "quality":{"draft_quality_score":draft.get("quality_score"),"private_reasoning_exposed":False,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},
-      "hard_invariants":["verified_evidence_only","no_private_chain_of_thought_publication","no_unsupported_claims","no_duplicate_thesis","no_gate_bypass","no_external_text_model_dependency"]
+      "experiment_assignment":result.get("experiment_assignment") or {"status":"NO_ACTIVE_EXPERIMENT","assigned":False},\n      "hard_invariants":["verified_evidence_only","no_private_chain_of_thought_publication","no_unsupported_claims","no_duplicate_thesis","no_gate_bypass","no_external_text_model_dependency"]
     }
 
 def main():
     preflight=load("data/live/editorial_preflight.json")
     publication=load("data/live/publication_context.json")
-    context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json"),"wte_strategy":load("data/live/wte_high_level_intelligence.json"),"wte_7day":load("data/live/write_to_earn_7day_status.json")}
+    context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json"),"wte_strategy":load("data/live/wte_high_level_intelligence.json"),"wte_7day":load("data/live/write_to_earn_7day_status.json")}\n    experiment_plan=load("analytics/creator_7_4_experiment_plan.json")\n    cycle_id=os.getenv("GITHUB_RUN_ID","").strip() or str(publication.get("cycle_id") or "").strip()\n    experiment_assignment=assign_experiment(experiment_plan,cycle_id)\n    context["experiment_assignment"]=experiment_assignment\n    if experiment_assignment.get("assigned"):\n        # Carry assignment with the same draft context; publisher remains separately gated.\n        publication.update({k:experiment_assignment[k] for k in ("experiment_id","experiment_arm","experiment_variable","experiment_treatment")})\n        publication["experiment_application_status"]="PENDING_WRITER_CONFIRMATION"\n        context["publication"]=publication
     selected=preflight.get("selected_opportunity") or {}
     instruction=os.getenv("TOPIC","").strip() or selected.get("instruction") or "Build the strongest evidence-based story for the frozen opportunity."
     context["instruction"]=instruction
