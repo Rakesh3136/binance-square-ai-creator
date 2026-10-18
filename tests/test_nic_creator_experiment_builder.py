@@ -58,6 +58,31 @@ class CreatorExperimentBuilderTests(unittest.TestCase):
         self.assertIsNone(arm["verified_reward_amount_usdc"])
         self.assertGreater(report["source_counts"]["rejected_reward_reasons"].get("verified_reward_not_joined_to_experiment_post", 0), 0)
 
+    def test_duplicate_attribution_does_not_inflate_metrics(self):
+        row = attribution("123456789", "__baseline__")
+        report = build_experiment_results([row, dict(row)], [performance("123456789")], [], plan())
+        arm = report["experiments"][0]["control"]
+        self.assertEqual(arm["post_count"], 1)
+        self.assertEqual(arm["views"], 100)
+
+    def test_conflicting_arm_assignment_is_excluded(self):
+        report = build_experiment_results(
+            [attribution("123456789", "__baseline__"), attribution("123456789", "data_driven_breakdown")],
+            [performance("123456789")], [], plan())
+        exp = report["experiments"][0]
+        self.assertEqual(exp["control"]["post_count"], 0)
+        self.assertEqual(exp["candidate"]["post_count"], 0)
+        self.assertEqual(report["source_counts"]["conflicting_arm_assignment_posts"], 1)
+
+    def test_duplicate_reward_event_id_counts_once(self):
+        event = reward("123456789")
+        report = build_experiment_results([attribution("123456789", "__baseline__")],
+            [performance("123456789")], [event, dict(event)], plan())
+        arm = report["experiments"][0]["control"]
+        self.assertEqual(arm["verified_reward_post_count"], 1)
+        self.assertEqual(arm["verified_reward_amount_usdc"], 0.25)
+        self.assertEqual(report["source_counts"]["rejected_reward_reasons"]["duplicate_reward_event_id"], 1)
+
     def test_invalid_reward_does_not_count(self):
         bad = reward("123456789")
         bad["verified"] = False
