@@ -29,6 +29,22 @@ class RotationDeskTests(unittest.TestCase):
         self.assertFalse(candidate["wallet_level_flow_verified"])
         self.assertTrue(any("not proof" in result["interpretation"].lower() for _ in [0]))
 
+    def test_production_v13_flow_schema_uses_market_snapshot_btc_reference(self):
+        flow = {
+            "leaders": [{"symbol": "SOLUSDT", "flow_score": 5.0, "volume_ratio_6h_vs_prior_12h": 1.4}],
+            "laggards": [],
+            "top_conditional_setups": [],
+        }
+        market = {"highest_volume": [
+            {"symbol": "BTCUSDT", "price_change_percent": -2.5},
+            {"symbol": "SOLUSDT", "price_change_percent": 1.0},
+        ]}
+        result = rotation_candidates(flow, market)
+        self.assertEqual(result["status"], "ROTATION_CANDIDATES_FOUND")
+        self.assertEqual(result["btc_move_24h_pct"], -2.5)
+        self.assertEqual(result["candidates"][0]["symbol"], "SOL")
+        self.assertEqual(result["candidates"][0]["state"], "EARLY_ROTATION_WATCH")
+
     def test_missing_btc_fails_closed(self):
         result = rotation_candidates({"assets": [asset("SOL", 3.0)]})
         self.assertEqual(result["status"], "INSUFFICIENT_BTC_REFERENCE")
