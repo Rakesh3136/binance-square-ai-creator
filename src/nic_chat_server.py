@@ -105,7 +105,7 @@ def _openai_compatible_reply(messages: list[dict[str, str]], env: dict[str, str]
         raise ChatError("The model returned no text response.")
     return {"reply":reply, "model":model, "provider":"openai-compatible"}
 
-""def _ollama_reply(messages: list[dict[str, str]], env: dict[str, str], opener: Callable[..., Any]) -> dict[str, Any]:
+def _ollama_reply(messages: list[dict[str, str]], env: dict[str, str], opener: Callable[..., Any]) -> dict[str, Any]:
     """Call a local Ollama server without an API key; never send to a remote host."""
     base_url = env.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/")
     model = env.get("OLLAMA_MODEL", "").strip()
