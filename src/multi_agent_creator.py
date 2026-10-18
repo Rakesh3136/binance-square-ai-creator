@@ -8,7 +8,7 @@ import json,os,re
 from datetime import datetime,timezone
 from pathlib import Path
 from nic_native_writer import build
-from nic_experiment_assignment import assign_experiment
+from nic_experiment_assignment import assign_experiment, mark_treatment_applied
 
 ROOT=Path(__file__).resolve().parents[1]
 OUTPUT_DIR=ROOT/"data/reports"
@@ -43,6 +43,8 @@ def main():
     preflight=load("data/live/editorial_preflight.json")
     publication=load("data/live/publication_context.json")
     context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json"),"wte_strategy":load("data/live/wte_high_level_intelligence.json"),"wte_7day":load("data/live/write_to_earn_7day_status.json")}
+    for key in ("experiment_id","experiment_arm","experiment_variable","experiment_treatment","experiment_application_status"):
+        publication.pop(key,None)
     experiment_plan=load("analytics/creator_7_4_experiment_plan.json")
     cycle_id=os.getenv("GITHUB_RUN_ID","").strip() or str(publication.get("cycle_id") or "").strip()
     experiment_assignment=assign_experiment(experiment_plan,cycle_id)
@@ -69,7 +71,8 @@ def main():
     symbol=str((result.get("draft") or {}).get("symbol") or selected.get("symbol") or "market-opportunity").lower()
     slug=re.sub(r"[^a-z0-9]+","-",symbol).strip("-") or "market-opportunity"
     out=OUTPUT_DIR/f"{slug}-multi-agent.json"
-    out.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+    out.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\
+",encoding="utf-8")
     print(json.dumps({"status":"DRAFT_ONLY_NOT_PUBLISHED","report":str(out.relative_to(ROOT)),"quality_score":(result.get("draft") or {}).get("quality_score",0),"generation_mode":"NIC_NATIVE","provider":"NIC","external_text_model":False,"writer":"nic_native_writer"},indent=2))
 
 if __name__=="__main__":
