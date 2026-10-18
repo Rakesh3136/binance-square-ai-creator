@@ -78,6 +78,8 @@ def build_experiment_results(
     }
     rejected_rewards: dict[str, int] = defaultdict(int)
     joined_posts: dict[str, str] = {}
+    seen_attribution: dict[str, str] = {}
+    conflicting_posts: set[str] = set()
 
     for row in attribution_rows:
         if str(row.get("experiment_id") or "").strip() != experiment_id:
@@ -89,6 +91,18 @@ def build_experiment_results(
         perf = performance_by_post[pid]
         if perf.get("metrics_verified") is not True:
             continue
+        if pid in conflicting_posts:
+            continue
+        previous_arm = seen_attribution.get(pid)
+        if previous_arm:
+            if previous_arm != arm_name:
+                # Conflicting arm assignments make the post unusable for either arm.
+                arms[previous_arm]["post_ids"].discard(pid)
+                joined_posts.pop(pid, None)
+                conflicting_posts.add(pid)
+            # Duplicate attribution rows must never inflate sample sizes or metrics.
+            continue
+        seen_attribution[pid] = arm_name
         arm = arms[arm_name]
         arm["post_ids"].add(pid)
         joined_posts[pid] = arm_name
@@ -99,7 +113,14 @@ def build_experiment_results(
         arm["engagements"] += engagements
 
     # Only validator-approved reward rows attached to a post in an arm count.
+    seen_reward_ids: set[str] = set()
     for row in reward_rows:
+        event_id = str(row.get("event_id") or "").strip()
+        if event_id and event_id in seen_reward_ids:
+            rejected_rewards["duplicate_reward_event_id"] += 1
+            continue
+        if event_id:
+            seen_reward_ids.add(event_id)
         pid = _post_id(row)
         reasons = reward_event_rejection_reasons(row)
         if reasons:
@@ -139,6 +160,7 @@ def build_experiment_results(
             "performance_rows": len(performance_rows),
             "reward_rows": len(reward_rows),
             "experiment_attributed_posts_joined": len(joined_posts),
+            "conflicting_arm_assignment_posts": len(conflicting_posts),
             "rejected_reward_reasons": dict(sorted(rejected_rewards.items())),
         },
         "experiments": [{
