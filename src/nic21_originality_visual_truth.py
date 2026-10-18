@@ -142,7 +142,7 @@ def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
         draft_text, re.I
     ))
 
-    visual_symbol = str(meta.get("symbol") or meta.get("chart_symbol") or "").upper()
+    visual_symbol = str(meta.get("symbol") or meta.get("chart_symbol") or meta.get("base_symbol") or meta.get("tradingview_symbol") or "").upper()
     visual_symbol = visual_symbol.replace("BINANCE:", "").replace("USDT", "")
     if visual_symbol and symbol and visual_symbol != symbol:
         failures.append(f"visual symbol {visual_symbol} != draft symbol {symbol}")
