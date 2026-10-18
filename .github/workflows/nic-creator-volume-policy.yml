@@ -1,0 +1,28 @@
+name: NIC — Creator Discovery and Volume Policy
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_creator_volume_policy.py"
+      - "tests/test_nic_creator_volume_policy.py"
+      - "docs/NIC_CREATOR_DISCOVERY_AND_VOLUME_PLAN.md"
+      - ".github/workflows/nic-creator-volume-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile policy and run tests
+        run: |
+          set -euo pipefail
+          python -m py_compile src/nic_creator_volume_policy.py
+          PYTHONPATH=src python -m unittest discover -s tests -p "test_nic_creator_volume_policy.py" -v
