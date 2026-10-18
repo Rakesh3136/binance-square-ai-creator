@@ -45,6 +45,20 @@ class RotationDeskTests(unittest.TestCase):
         self.assertEqual(result["candidates"][0]["symbol"], "SOL")
         self.assertEqual(result["candidates"][0]["state"], "EARLY_ROTATION_WATCH")
 
+    def test_full_universe_early_mover_adds_oi_funding_and_volume_evidence(self):
+        full = {"early_movers": [
+            {"symbol": "SOL", "price_change_percent": 1.0, "volume_acceleration": 1.8,
+             "oi_change_3h_pct": 2.5, "funding_rate": 0.0002, "discovery_score": 68,
+             "flow_state": "EARLY", "relative_strength_24h": 3.5}
+        ]}
+        market = {"highest_volume": [{"symbol": "BTCUSDT", "price_change_percent": -2.0}]}
+        result = rotation_candidates({}, market, full)
+        self.assertEqual(result["candidates"][0]["symbol"], "SOL")
+        self.assertEqual(result["candidates"][0]["state"], "EARLY_ROTATION_WATCH")
+        self.assertEqual(result["candidates"][0]["open_interest_change_6h_pct"], 2.5)
+        self.assertEqual(result["candidates"][0]["funding_rate"], 0.0002)
+        self.assertEqual(result["candidates"][0]["volume_ratio_1h"], 1.8)
+
     def test_missing_btc_fails_closed(self):
         result = rotation_candidates({"assets": [asset("SOL", 3.0)]})
         self.assertEqual(result["status"], "INSUFFICIENT_BTC_REFERENCE")
