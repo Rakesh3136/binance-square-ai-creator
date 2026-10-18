@@ -1,0 +1,28 @@
+name: NIC — Conversational Chat Server
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_chat_server.py"
+      - "dashboard/nic_chat.html"
+      - "tests/test_nic_chat_server.py"
+      - ".github/workflows/nic-chat-server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-chat-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and test chat server
+        run: |
+          set -euo pipefail
+          python -m py_compile src/nic_chat_server.py
+          PYTHONPATH=src python -m unittest discover -s tests -p "test_nic_chat_server.py" -v
