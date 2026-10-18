@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1]
 LIVE=ROOT/"data/live"; ANALYTICS=ROOT/"analytics"
 PAYLOAD_PATH=LIVE/"publication_payload.json"; LOG_PATH=ANALYTICS/"publication_log.jsonl"; RESULT_PATH=LIVE/"publication_result.json"
 CONTEXT_PATH=LIVE/"publication_context.json"; FROZEN_PATH=LIVE/"authoritative_opportunity.json"; WTE_PATH=LIVE/"write_to_earn_eligibility.json"
-MONETIZATION_OS_PATH=LIVE/"nic_monetization_contract.json"; STORY_DISCOVERY_PATH=LIVE/"nic_story_discovery.json"; CRAFT_PATH=LIVE/"nic_content_craft_9.json"
+MONETIZATION_OS_PATH=LIVE/"nic_monetization_contract.json"; STORY_DISCOVERY_PATH=LIVE/"nic_story_discovery.json"; CRAFT_PATH=LIVE/"nic_content_craft_9.json"; AUTH_PATH=LIVE/"nic_publication_authorization.json"; NIC21_PATH=LIVE/"nic21_gate.json"; LANE_GATE_PATH=LIVE/"nic_editorial_lane_gate.json"
 ATTRIBUTION_LOG_PATH=ANALYTICS/"publication_attribution.jsonl"; VISUAL=LIVE/"visual.png"
 ENDPOINT="https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
 NO_IMAGE_LANES={"education","commentary","community","text_only"}; DUPLICATE_HOURS=float(os.getenv("PUBLISH_DUPLICATE_HOURS","6"))
@@ -117,6 +117,26 @@ def editorial_only_publication_check(text, eligibility, mode):
         return False, "draft contains executable trade instructions or levels"
     return True, "editorial-only auto-publication checks passed"
 
+def verify_quality_authorization(text, authorization, nic21, lane):
+    """Require fresh gate artifacts to authorize the exact text before network submission."""
+    digest = hashlib.sha256(str(text or "").encode("utf-8")).hexdigest()
+    reasons = []
+    if authorization.get("authorized") is not True or authorization.get("publication_mode") != "EDITORIAL_ONLY":
+        reasons.append("editorial publication authorization is missing or blocked")
+    if authorization.get("trade_signal_publication_authorized") is not False:
+        reasons.append("trade-signal publication must remain disabled")
+    if authorization.get("live_orders_authorized") is not False:
+        reasons.append("live orders must remain disabled")
+    if authorization.get("draft_sha256") != digest:
+        reasons.append("authorization hash does not match exact publication text")
+    if nic21.get("status") != "PASS" or nic21.get("draft_sha256") != digest:
+        reasons.append("NIC 21 originality/visual-truth gate does not match exact publication text")
+    if lane.get("publish") is not True or lane.get("status") != "EDITORIAL_ELIGIBLE":
+        reasons.append("editorial lane gate did not pass")
+    if lane.get("trade_authorized") is not False or lane.get("draft_sha256") != digest:
+        reasons.append("editorial lane hash or trade-denial contract does not match exact publication text")
+    return not reasons, reasons
+
 def main():
     # Safety pause: do not publish automatically until NIC editorial, timing, and visual-truth gates are re-verified.
     # Publishing can be re-enabled deliberately with PUBLISHING_ENABLED=true after explicit review.
@@ -127,6 +147,9 @@ def main():
     if not key: return fail("BINANCE_SQUARE_OPENAPI_KEY/BINANCE_SQUARE_API_KEY is not configured","PUBLISHER_NOT_CONFIGURED")
     try:
         preflight(); text=text_payload(); context=load(CONTEXT_PATH); frozen=load(FROZEN_PATH); monetization_os=load(MONETIZATION_OS_PATH); story_discovery=load(STORY_DISCOVERY_PATH); craft=load(CRAFT_PATH)
+        quality_ok, quality_reasons = verify_quality_authorization(text, load(AUTH_PATH), load(NIC21_PATH), load(LANE_GATE_PATH))
+        if not quality_ok:
+            raise RuntimeError("final publication quality authorization blocked: " + "; ".join(quality_reasons))
         if os.getenv("NIC_AUTO_PUBLICATION_MODE", "").strip().upper() != "EDITORIAL_ONLY":
             raise RuntimeError("automatic publication requires NIC_AUTO_PUBLICATION_MODE=EDITORIAL_ONLY")
         eligibility=load(LIVE/"nic22_5_publication_eligibility.json")
