@@ -64,6 +64,8 @@ def main():
         publication.update({k:experiment_assignment[k] for k in ("experiment_id","experiment_arm","experiment_variable","experiment_treatment")})
         publication["experiment_application_status"]=experiment_assignment["application_status"]
         (ROOT/"data/live/publication_context.json").write_text(json.dumps(publication,indent=2,ensure_ascii=False),encoding="utf-8")
+    else:
+        (ROOT/"data/live/publication_context.json").write_text(json.dumps(publication,indent=2,ensure_ascii=False),encoding="utf-8")
     research=result.get("research") or {}
     research["deep_research_provider"]="NIC_NATIVE"
     research["deep_research_status"]="native"
