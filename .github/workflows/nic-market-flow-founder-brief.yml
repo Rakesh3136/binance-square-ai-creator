@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: nic-market-flow-founder-brief
@@ -34,7 +34,7 @@ jobs:
           python -m unittest discover -s tests -p "test_nic_market_flow_founder_intelligence.py" -v
 
   refresh-brief:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -51,16 +51,10 @@ jobs:
           python -m py_compile src/nic_market_flow_founder_intelligence.py
           python src/nic_market_flow_founder_intelligence.py
           python -m json.tool data/live/nic_market_flow_founder_brief.json >/dev/null
-      - name: Persist report
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live/nic_market_flow_founder_brief.json
-          if git diff --cached --quiet; then
-            echo "Market-flow/founder brief unchanged."
-            exit 0
-          fi
-          git commit -m "Refresh NIC market flow and founder brief"
-          git pull --rebase --autostash origin main
-          git push origin HEAD:main
+      - name: Upload report for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic-market-flow-founder-brief
+          path: data/live/nic_market_flow_founder_brief.json
+          if-no-files-found: error
+          retention-days: 30
