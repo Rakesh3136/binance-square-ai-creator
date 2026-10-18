@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FLOW_PATH = ROOT / "data/live/capital_flow_intelligence.json"
 PROJECT_EVIDENCE = ROOT / "data/intelligence/project_fundamentals.jsonl"
 MARKET_PATH = ROOT / "data/live/market_snapshot.json"
+FULL_UNIVERSE_PATH = ROOT / "data/live/full_universe_flow.json"
 OUT = ROOT / "data/live/nic_opportunity_desk.json"
 VALID_FUNDAMENTALS = {
     "adoption", "developer_activity", "tokenomics", "security",
@@ -65,17 +66,18 @@ def hourly_features(asset):
     frames = asset.get("timeframes") or {}
     h1 = frames.get("1h") or {}
     fut = asset.get("futures") or {}
+    full = asset.get("full_universe_evidence") or {}
     return {
         "flow_proxy_score": number((asset.get("multitimeframe") or {}).get("flow_proxy_score"), 50.0),
-        "volume_ratio": number(h1.get("volume_ratio")),
+        "volume_ratio": number(h1.get("volume_ratio"), number(full.get("volume_acceleration"))),
         "taker_buy_ratio": number(h1.get("taker_buy_ratio_20")),
-        "oi_change_6h_pct": number(fut.get("open_interest_change_6h_pct")),
-        "funding_rate": number(fut.get("funding_rate")),
+        "oi_change_6h_pct": number(fut.get("open_interest_change_6h_pct"), number(full.get("oi_change_3h_pct"))),
+        "funding_rate": number(fut.get("funding_rate"), number(full.get("funding_rate"))),
         "confidence": number((asset.get("multitimeframe") or {}).get("confidence")),
     }
 
 
-def rotation_candidates(document, market=None):
+def rotation_candidates(document, market=None, full_universe=None):
     # Creator 23.0 uses assets; the scheduled production scanner writes v1.3
     # leaders/laggards/top_conditional_setups. Normalize both contracts.
     raw_assets = document.get("assets", [])
@@ -89,6 +91,16 @@ def rotation_candidates(document, market=None):
                         seen[key] = row
         raw_assets = list(seen.values())
     market = market if isinstance(market, dict) else {}
+    full_universe = full_universe if isinstance(full_universe, dict) else {}
+    full_rows = {}
+    for group in ("early_movers", "top_flow_candidates"):
+        for row in full_universe.get(group, []) or []:
+            if isinstance(row, dict):
+                key = str(row.get("symbol") or "").upper().replace("USDT", "")
+                if key:
+                    full_rows[key] = row
+                    if not any(str(a.get("symbol") or "").upper().replace("USDT", "") == key for a in raw_assets if isinstance(a, dict)):
+                        raw_assets = list(raw_assets) + [row]
     market_rows = {}
     for group in ("top_content_signals", "top_gainers", "top_losers", "highest_volume", "new_listing_market"):
         for row in market.get(group, []) or []:
@@ -112,9 +124,11 @@ def rotation_candidates(document, market=None):
             continue
         item = dict(raw)
         symbol = str(item.get("symbol") or "").upper().replace("USDT", "")
+        full = full_rows.get(symbol) or {}
         context = dict(item.get("market_context") or {})
         if context.get("spot_move_pct") is None:
-            context["spot_move_pct"] = number((market_rows.get(symbol) or {}).get("price_change_percent"))
+            context["spot_move_pct"] = number(full.get("price_change_percent"), number((market_rows.get(symbol) or {}).get("price_change_percent")))
+        item["full_universe_evidence"] = full
         item["market_context"] = context
         if not item.get("multitimeframe"):
             score = number(item.get("flow_score"), 0.0)
@@ -241,8 +255,8 @@ def long_term_watchlist(rows):
     return output[:10]
 
 
-def build(flow_document, fundamentals, market=None):
-    rotation = rotation_candidates(flow_document, market)
+def build(flow_document, fundamentals, market=None, full_universe=None):
+    rotation = rotation_candidates(flow_document, market, full_universe)
     long_term = long_term_watchlist(fundamentals)
     return {
         "schema_version": "NIC-OPPORTUNITY-DESK-1.0",
@@ -263,7 +277,8 @@ def main():
     flow_document = read_json(FLOW_PATH, {})
     fundamentals = read_jsonl(PROJECT_EVIDENCE)
     market = read_json(MARKET_PATH, {})
-    report = build(flow_document, fundamentals, market)
+    full_universe = read_json(FULL_UNIVERSE_PATH, {})
+    report = build(flow_document, fundamentals, market, full_universe)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({
