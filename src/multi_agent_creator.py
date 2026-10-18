@@ -8,7 +8,7 @@ import json,os,re
 from datetime import datetime,timezone
 from pathlib import Path
 from nic_native_writer import build
-from nic_experiment_assignment import assign_experiment, mark_treatment_applied
+from nic_experiment_assignment import assign_experiment, mark_treatment_applied, mark_treatment_applied
 
 ROOT=Path(__file__).resolve().parents[1]
 OUTPUT_DIR=ROOT/"data/reports"
@@ -58,6 +58,12 @@ def main():
     instruction=os.getenv("TOPIC","").strip() or selected.get("instruction") or "Build the strongest evidence-based story for the frozen opportunity."
     context["instruction"]=instruction
     result=build(context)
+    if experiment_assignment.get("assigned"):
+        experiment_assignment=mark_treatment_applied(experiment_assignment,result.get("experiment_application_status")=="APPLIED")
+        result["experiment_assignment"]=experiment_assignment
+        publication.update({k:experiment_assignment[k] for k in ("experiment_id","experiment_arm","experiment_variable","experiment_treatment")})
+        publication["experiment_application_status"]=experiment_assignment["application_status"]
+        (ROOT/"data/live/publication_context.json").write_text(json.dumps(publication,indent=2,ensure_ascii=False),encoding="utf-8")
     research=result.get("research") or {}
     research["deep_research_provider"]="NIC_NATIVE"
     research["deep_research_status"]="native"
@@ -71,8 +77,7 @@ def main():
     symbol=str((result.get("draft") or {}).get("symbol") or selected.get("symbol") or "market-opportunity").lower()
     slug=re.sub(r"[^a-z0-9]+","-",symbol).strip("-") or "market-opportunity"
     out=OUTPUT_DIR/f"{slug}-multi-agent.json"
-    out.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\
-",encoding="utf-8")
+    out.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
     print(json.dumps({"status":"DRAFT_ONLY_NOT_PUBLISHED","report":str(out.relative_to(ROOT)),"quality_score":(result.get("draft") or {}).get("quality_score",0),"generation_mode":"NIC_NATIVE","provider":"NIC","external_text_model":False,"writer":"nic_native_writer"},indent=2))
 
 if __name__=="__main__":
