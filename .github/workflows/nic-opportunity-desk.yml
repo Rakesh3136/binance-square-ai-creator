@@ -1,0 +1,29 @@
+name: NIC — Opportunity Desk Evidence Checks
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_opportunity_desk.py"
+      - "src/nic_problem_discovery_desk.py"
+      - "tests/test_nic_opportunity_desk.py"
+      - "tests/test_nic_problem_discovery_desk.py"
+      - ".github/workflows/nic-opportunity-desk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  opportunity-desk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile opportunity desk
+        run: python -m py_compile src/nic_opportunity_desk.py src/nic_problem_discovery_desk.py
+      - name: Test rotation and long-term evidence
+        run: python -m unittest discover -s tests -p "test_nic_opportunity_desk.py" -v
+      - name: Test problem discovery and founder conversation
+        run: python -m unittest discover -s tests -p "test_nic_problem_discovery_desk.py" -v
