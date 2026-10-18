@@ -68,5 +68,28 @@ class NicChatTests(unittest.TestCase):
             generate_reply([{"role":"user","content":"hello"}],
                 environ={"ANTHROPIC_API_KEY":"dummy"},opener=lambda *a,**k:FakeResponse({"content":[]}))
 
+
+    def test_local_ollama_needs_no_api_key_and_parses_reply(self):
+        seen={}
+        def opener(request,timeout):
+            seen["url"]=request.full_url
+            seen["headers"]={k.lower():v for k,v in request.header_items()}
+            seen["body"]=json.loads(request.data.decode())
+            return FakeResponse({"message":{"role":"assistant","content":"Local NIC reply"}})
+        result=generate_reply([{"role":"user","content":"hello"}],
+            environ={"OLLAMA_MODEL":"qwen3:8b"},opener=opener)
+        self.assertEqual(result["reply"],"Local NIC reply")
+        self.assertEqual(result["provider"],"ollama-local")
+        self.assertEqual(seen["url"],"http://127.0.0.1:11434/api/chat")
+        self.assertNotIn("authorization",seen["headers"])
+        self.assertEqual(seen["body"]["stream"],False)
+    def test_local_ollama_requires_model_name(self):
+        with self.assertRaisesRegex(ChatError,"OLLAMA_MODEL"):
+            generate_reply([{"role":"user","content":"hello"}],environ={})
+    def test_local_ollama_refuses_remote_endpoint_in_no_key_mode(self):
+        with self.assertRaisesRegex(ChatError,"loopback"):
+            generate_reply([{"role":"user","content":"hello"}],environ={
+                "OLLAMA_BASE_URL":"https://example.com","OLLAMA_MODEL":"model"})
+
 if __name__ == "__main__":
     unittest.main()
