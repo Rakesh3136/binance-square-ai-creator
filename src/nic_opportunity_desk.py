@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 FLOW_PATH = ROOT / "data/live/capital_flow_intelligence.json"
 PROJECT_EVIDENCE = ROOT / "data/intelligence/project_fundamentals.jsonl"
+MARKET_PATH = ROOT / "data/live/market_snapshot.json"
 OUT = ROOT / "data/live/nic_opportunity_desk.json"
 VALID_FUNDAMENTALS = {
     "adoption", "developer_activity", "tokenomics", "security",
@@ -74,8 +75,48 @@ def hourly_features(asset):
     }
 
 
-def rotation_candidates(document):
-    assets = [a for a in document.get("assets", []) if isinstance(a, dict)]
+def rotation_candidates(document, market=None):
+    # Creator 23.0 uses assets; the scheduled production scanner writes v1.3
+    # leaders/laggards/top_conditional_setups. Normalize both contracts.
+    raw_assets = document.get("assets", [])
+    if not raw_assets:
+        seen = {}
+        for group in ("leaders", "laggards", "top_conditional_setups"):
+            for row in document.get(group, []) or []:
+                if isinstance(row, dict):
+                    key = str(row.get("symbol") or "").upper().replace("USDT", "")
+                    if key:
+                        seen[key] = row
+        raw_assets = list(seen.values())
+    market = market if isinstance(market, dict) else {}
+    market_rows = {}
+    for group in ("top_content_signals", "top_gainers", "top_losers", "highest_volume", "new_listing_market"):
+        for row in market.get(group, []) or []:
+            if isinstance(row, dict):
+                key = str(row.get("symbol") or "").upper().replace("USDT", "")
+                if key:
+                    market_rows[key] = row
+    assets = []
+    for raw in raw_assets:
+        if not isinstance(raw, dict):
+            continue
+        item = dict(raw)
+        symbol = str(item.get("symbol") or "").upper().replace("USDT", "")
+        context = dict(item.get("market_context") or {})
+        if context.get("spot_move_pct") is None:
+            context["spot_move_pct"] = number((market_rows.get(symbol) or {}).get("price_change_percent"))
+        item["market_context"] = context
+        if not item.get("multitimeframe"):
+            score = number(item.get("flow_score"), 0.0)
+            item["multitimeframe"] = {
+                "flow_proxy_score": max(0.0, min(100.0, 50.0 + score * 2.0)),
+                "confidence": number(item.get("flow_confidence")),
+            }
+        if not item.get("timeframes"):
+            item["timeframes"] = {"1h": {"volume_ratio": item.get("volume_ratio_6h_vs_prior_12h"),
+                                            "taker_buy_ratio_20": None}}
+        item.setdefault("futures", {})
+        assets.append(item)
     btc = next((a for a in assets if str(a.get("symbol", "")).upper() in {"BTC", "BTCUSDT"}), None)
     if not btc:
         return {
@@ -190,8 +231,8 @@ def long_term_watchlist(rows):
     return output[:10]
 
 
-def build(flow_document, fundamentals):
-    rotation = rotation_candidates(flow_document)
+def build(flow_document, fundamentals, market=None):
+    rotation = rotation_candidates(flow_document, market)
     long_term = long_term_watchlist(fundamentals)
     return {
         "schema_version": "NIC-OPPORTUNITY-DESK-1.0",
@@ -211,7 +252,8 @@ def build(flow_document, fundamentals):
 def main():
     flow_document = read_json(FLOW_PATH, {})
     fundamentals = read_jsonl(PROJECT_EVIDENCE)
-    report = build(flow_document, fundamentals)
+    market = read_json(MARKET_PATH, {})
+    report = build(flow_document, fundamentals, market)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({
