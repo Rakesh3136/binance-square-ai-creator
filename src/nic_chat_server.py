@@ -1,7 +1,8 @@
-"""NIC chat API with explicit Anthropic and OpenAI-compatible provider adapters.
+"""NIC chat API with local Ollama default and optional remote provider adapters.
 
 Run: PYTHONPATH=src python -m nic_chat_server
-Default provider is Anthropic. No external actions or publishing tools are exposed.
+Default provider is local Ollama; no API key is needed for local inference.
+No external actions or publishing tools are exposed.
 """
 from __future__ import annotations
 import json
@@ -104,17 +105,38 @@ def _openai_compatible_reply(messages: list[dict[str, str]], env: dict[str, str]
         raise ChatError("The model returned no text response.")
     return {"reply":reply, "model":model, "provider":"openai-compatible"}
 
+""def _ollama_reply(messages: list[dict[str, str]], env: dict[str, str], opener: Callable[..., Any]) -> dict[str, Any]:
+    """Call a local Ollama server without an API key; never send to a remote host."""
+    base_url = env.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/")
+    model = env.get("OLLAMA_MODEL", "").strip()
+    parsed = urlparse(base_url)
+    if parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        raise ChatError("Ollama no-key mode is restricted to a local HTTP loopback address.")
+    if not model:
+        raise ChatError("Set OLLAMA_MODEL to a model installed in your local Ollama runtime.")
+    payload = {"model": model, "messages": [{"role":"system","content":SYSTEM_PROMPT}, *messages], "stream": False}
+    request = Request(base_url + "/api/chat", data=json.dumps(payload).encode(),
+        headers={"content-type":"application/json"}, method="POST")
+    body = _read_provider_response(request, opener)
+    message = body.get("message", {})
+    reply = message.get("content", "").strip() if isinstance(message, dict) else ""
+    if not reply:
+        raise ChatError("The local model returned no text response.")
+    return {"reply":reply, "model":model, "provider":"ollama-local"}
+
 def generate_reply(messages: Any, environ: dict[str, str] | None = None,
-                   opener: Callable[..., Any] = urlopen) -> dict[str, Any]:
+                   opener: Callable[..., Any] = urlopen):
     """Dispatch to a configured provider. The opener is injectable for offline tests."""
     env = os.environ if environ is None else environ
     clean = _validate_messages(messages)
-    provider = env.get("NIC_CHAT_PROVIDER", "anthropic").strip().lower()
+    provider = env.get("NIC_CHAT_PROVIDER", "ollama").strip().lower()
+    if provider in {"ollama", "local", "local-ollama"}:
+        return _ollama_reply(clean, env, opener)
     if provider == "anthropic":
         return _anthropic_reply(clean, env, opener)
     if provider in {"muse", "openai-compatible", "openai_compatible"}:
         return _openai_compatible_reply(clean, env, opener)
-    raise ChatError("Unknown NIC_CHAT_PROVIDER; use 'anthropic' or 'muse'.")
+    raise ChatError("Unknown NIC_CHAT_PROVIDER; use 'ollama', 'anthropic', or 'muse'.")
 
 def make_handler(environ: dict[str, str] | None = None,
                  reply_fn: Callable[..., dict[str, Any]] = generate_reply):
@@ -130,8 +152,9 @@ def make_handler(environ: dict[str, str] | None = None,
         def do_GET(self) -> None:
             if self.path == "/health":
                 env = os.environ if environ is None else environ
-                provider = env.get("NIC_CHAT_PROVIDER", "anthropic").strip().lower()
-                configured = (bool(env.get("ANTHROPIC_API_KEY")) if provider == "anthropic" else
+                provider = env.get("NIC_CHAT_PROVIDER", "ollama").strip().lower()
+                configured = (bool(env.get("OLLAMA_MODEL")) if provider in {"ollama","local","local-ollama"} else
+                    bool(env.get("ANTHROPIC_API_KEY")) if provider == "anthropic" else
                     all(env.get(k) for k in ("MUSE_AI_BASE_URL","MUSE_AI_API_KEY","MUSE_AI_MODEL")))
                 self._send(200, json.dumps({"status":"ok","provider":provider,"model_configured":configured}).encode(),
                            "application/json; charset=utf-8")
