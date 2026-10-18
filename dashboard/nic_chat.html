@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat with NIC</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#10131a;color:#edf1f7}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px}
+main{width:min(860px,100%);height:min(900px,94vh);display:flex;flex-direction:column;border:1px solid #303847;border-radius:18px;overflow:hidden;background:#171c26}
+header{padding:18px 20px;border-bottom:1px solid #303847}h1{font-size:1.2rem;margin:0 0 5px}.sub{color:#aab4c5;font-size:.9rem}
+#messages{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:88%;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;padding:12px 14px;border-radius:14px}
+.user{align-self:flex-end;background:#264d72}.assistant{align-self:flex-start;background:#242c39}.system{align-self:center;color:#b8c3d4;font-size:.9rem;text-align:center}
+form{display:flex;gap:10px;padding:14px;border-top:1px solid #303847}textarea{flex:1;resize:vertical;min-height:48px;max-height:180px;background:#0e1219;color:#edf1f7;border:1px solid #3b4657;border-radius:12px;padding:12px;font:inherit}
+button{border:0;border-radius:12px;padding:0 18px;background:#e8edf5;color:#111722;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+footer{padding:0 16px 12px;color:#8f9bad;font-size:.78rem}
+</style>
+</head>
+<body>
+<main>
+<header><h1>NIC · Your research partner</h1><div class="sub">Ask questions, explore ideas, and challenge the analysis. Research tools and posting are not enabled in this first chat build.</div></header>
+<section id="messages" aria-live="polite"><div class="msg assistant">Hi! I’m NIC. What would you like to work on today?</div></section>
+<form id="chat-form"><textarea id="prompt" aria-label="Message NIC" placeholder="Message NIC…" required maxlength="8000"></textarea><button id="send" type="submit">Send</button></form>
+<footer>Do not send passwords, API keys, seed phrases, or other secrets. Conversations are kept in this page's memory only and are not saved to a NIC database.</footer>
+</main>
+<script>
+(() => {
+ const form=document.getElementById('chat-form'), input=document.getElementById('prompt'), send=document.getElementById('send'), box=document.getElementById('messages');
+ const history=[];
+ function add(text,role){const el=document.createElement('div');el.className='msg '+role;el.textContent=text;box.appendChild(el);box.scrollTop=box.scrollHeight;return el;}
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();const text=input.value.trim();if(!text||send.disabled)return;
+  history.push({role:'user',content:text});add(text,'user');input.value='';send.disabled=true;send.textContent='…';
+  const pending=add('Thinking…','system');
+  try{
+   const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:history.slice(-20)})});
+   const data=await response.json();pending.remove();
+   if(!response.ok)throw new Error(data.error||'NIC could not answer this message.');
+   history.push({role:'assistant',content:data.reply});add(data.reply,'assistant');
+  }catch(error){pending.remove();add(error.message||'Could not connect to NIC.','system');history.pop();}
+  finally{send.disabled=false;send.textContent='Send';input.focus();}
+ });
+ input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();form.requestSubmit();}});
+})();
+</script>
+</body>
+</html>
