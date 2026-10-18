@@ -1,0 +1,28 @@
+name: NIC — Applied Experiment Learning Integrity
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_creator_experiment_builder.py"
+      - "src/nic_reward_evidence.py"
+      - "tests/test_nic_creator_experiment_builder.py"
+      - ".github/workflows/nic-experiment-applied-learning.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  applied-experiment-learning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile evidence assembly modules
+        run: |
+          set -euo pipefail
+          python -m py_compile src/nic_creator_experiment_builder.py src/nic_reward_evidence.py
+      - name: Verify applied-only evidence assembly
+        run: python -m unittest discover -s tests -p "test_nic_creator_experiment_builder.py" -v
