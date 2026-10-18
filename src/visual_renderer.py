@@ -36,7 +36,7 @@ def finalize_visual_metadata():
     meta['sha256']=digest
     meta['image_sha256']=digest
     meta['finalized_at']=__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()
-    META.write_text(json.dumps(meta,indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
+    META.write_text(json.dumps(meta,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
 
 def main():
     ctx=load(CONTEXT); frozen=load(FROZEN); cat=str(ctx.get('category') or '').lower()
