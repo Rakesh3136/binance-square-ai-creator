@@ -17,7 +17,7 @@ def main() -> int:
     parser.add_argument("--live", action="store_true", help="explicitly allow paid provider calls")
     parser.add_argument("--tasks", default=str(ROOT / "data/benchmarks/nic_teacher_tasks.json"))
     parser.add_argument("--output", default=str(ROOT / "data/reports/nic_teacher_eval.json"))
-    parser.add_argument("--providers", default="anthropic,muse", help="comma-separated provider names")
+    parser.add_argument("--providers", default="ollama", help="comma-separated provider names; Ollama runs locally without a key")
     args = parser.parse_args()
     if not args.live:
         parser.error("Refusing provider calls without explicit --live (these calls may incur cost).")
