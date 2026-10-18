@@ -74,7 +74,7 @@ class PublishingPauseTest(unittest.TestCase):
         def step_block(name):
             marker = f"      - name: {name}"
             start = workflow.index(marker)
-            end = workflow.find("\\n      - name:", start + len(marker))
+            end = workflow.find("\n      - name:", start + len(marker))
             return workflow[start:] if end < 0 else workflow[start:end]
 
         authorization = step_block("NIC editorial automatic-publication authorization")
