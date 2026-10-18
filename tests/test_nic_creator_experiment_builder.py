@@ -1,9 +1,10 @@
+import sys
 import unittest
+from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from nic_creator_experiment_builder import build_experiment_results
 
-
-def plan():
     return {"current_experiment": {"experiment_id": "exp-1", "control_value": "__baseline__", "treatment_value": "data_driven_breakdown"}}
 
 
@@ -61,6 +62,8 @@ class CreatorExperimentBuilderTests(unittest.TestCase):
         report = build_experiment_results([attribution("123456789", "__baseline__")],
             [performance("123456789")], [bad], plan())
         self.assertEqual(report["experiments"][0]["control"]["verified_reward_post_count"], 0)
+
+
 
 
 if __name__ == "__main__":
