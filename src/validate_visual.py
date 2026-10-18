@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -12,6 +13,14 @@ FROZEN = Path("data/live/authoritative_opportunity.json")
 
 
 def latest_report() -> Path:
+    raw = os.environ.get("DRAFT_PATH", "").strip()
+    if raw:
+        path = Path(raw)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        if not path.exists():
+            raise SystemExit(f"Explicit DRAFT_PATH does not exist: {path}")
+        return path
     reports = sorted(REPORT_DIR.glob("*-multi-agent.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not reports:
         raise SystemExit("No fresh multi-agent report found")
