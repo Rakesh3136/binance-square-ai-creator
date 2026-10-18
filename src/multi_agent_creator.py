@@ -8,6 +8,7 @@ import json,os,re
 from datetime import datetime,timezone
 from pathlib import Path
 from nic_native_writer import build
+from nic_experiment_assignment import assign_experiment, mark_treatment_applied, mark_treatment_applied
 
 ROOT=Path(__file__).resolve().parents[1]
 OUTPUT_DIR=ROOT/"data/reports"
@@ -34,6 +35,7 @@ def decision_contract(preflight,publication,result):
       "editorial":{"category":draft.get("content_category"),"generation_mode":"NIC_NATIVE","writer":"nic_native_writer"},
       "visual":{"type":visual.get("type","none"),"use_visual":bool(visual.get("use_visual")),"purpose":visual.get("purpose")},
       "quality":{"draft_quality_score":draft.get("quality_score"),"private_reasoning_exposed":False,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},
+      "experiment_assignment":result.get("experiment_assignment") or {"status":"NO_ACTIVE_EXPERIMENT","assigned":False},
       "hard_invariants":["verified_evidence_only","no_private_chain_of_thought_publication","no_unsupported_claims","no_duplicate_thesis","no_gate_bypass","no_external_text_model_dependency"]
     }
 
@@ -41,10 +43,29 @@ def main():
     preflight=load("data/live/editorial_preflight.json")
     publication=load("data/live/publication_context.json")
     context={"market":load("data/live/market_snapshot.json"),"news":load("data/live/news_snapshot.json"),"preflight":preflight,"publication":publication,"memory":load("analytics/strategy_memory.json"),"wte_strategy":load("data/live/wte_high_level_intelligence.json"),"wte_7day":load("data/live/write_to_earn_7day_status.json")}
+    for key in ("experiment_id","experiment_arm","experiment_variable","experiment_treatment","experiment_application_status"):
+        publication.pop(key,None)
+    experiment_plan=load("analytics/creator_7_4_experiment_plan.json")
+    cycle_id=os.getenv("GITHUB_RUN_ID","").strip() or str(publication.get("cycle_id") or "").strip()
+    experiment_assignment=assign_experiment(experiment_plan,cycle_id)
+    context["experiment_assignment"]=experiment_assignment
+    if experiment_assignment.get("assigned"):
+        # Carry assignment with the same draft context; publisher remains separately gated.
+        publication.update({k:experiment_assignment[k] for k in ("experiment_id","experiment_arm","experiment_variable","experiment_treatment")})
+        publication["experiment_application_status"]="PENDING_WRITER_CONFIRMATION"
+        context["publication"]=publication
     selected=preflight.get("selected_opportunity") or {}
     instruction=os.getenv("TOPIC","").strip() or selected.get("instruction") or "Build the strongest evidence-based story for the frozen opportunity."
     context["instruction"]=instruction
     result=build(context)
+    if experiment_assignment.get("assigned"):
+        experiment_assignment=mark_treatment_applied(experiment_assignment,result.get("experiment_application_status")=="APPLIED")
+        result["experiment_assignment"]=experiment_assignment
+        publication.update({k:experiment_assignment[k] for k in ("experiment_id","experiment_arm","experiment_variable","experiment_treatment")})
+        publication["experiment_application_status"]=experiment_assignment["application_status"]
+        (ROOT/"data/live/publication_context.json").write_text(json.dumps(publication,indent=2,ensure_ascii=False),encoding="utf-8")
+    else:
+        (ROOT/"data/live/publication_context.json").write_text(json.dumps(publication,indent=2,ensure_ascii=False),encoding="utf-8")
     research=result.get("research") or {}
     research["deep_research_provider"]="NIC_NATIVE"
     research["deep_research_status"]="native"
@@ -58,7 +79,7 @@ def main():
     symbol=str((result.get("draft") or {}).get("symbol") or selected.get("symbol") or "market-opportunity").lower()
     slug=re.sub(r"[^a-z0-9]+","-",symbol).strip("-") or "market-opportunity"
     out=OUTPUT_DIR/f"{slug}-multi-agent.json"
-    out.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+    out.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
     print(json.dumps({"status":"DRAFT_ONLY_NOT_PUBLISHED","report":str(out.relative_to(ROOT)),"quality_score":(result.get("draft") or {}).get("quality_score",0),"generation_mode":"NIC_NATIVE","provider":"NIC","external_text_model":False,"writer":"nic_native_writer"},indent=2))
 
 if __name__=="__main__":
