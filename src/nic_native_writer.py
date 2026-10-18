@@ -53,7 +53,9 @@ def apply_experiment_format(parts, assignment):
     result = list(parts)
     if not isinstance(assignment, dict) or assignment.get("assigned") is not True:
         return result, "NOT_ASSIGNED"
-    if assignment.get("experiment_arm") == "control":
+    if (assignment.get("experiment_arm") == "control"
+            and assignment.get("experiment_variable") == "experiment_format"
+            and assignment.get("experiment_treatment") == "__baseline__"):
         return result, "APPLIED"
     if (assignment.get("experiment_arm") == "candidate"
             and assignment.get("experiment_variable") == "experiment_format"
