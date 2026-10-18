@@ -1,0 +1,32 @@
+name: NIC — Draft-time Experiment Assignment Checks
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_experiment_assignment.py"
+      - "src/multi_agent_creator.py"
+      - "src/nic_native_writer.py"
+      - "tests/test_nic_experiment_assignment.py"
+      - "tests/test_nic_native_writer_experiment.py"
+      - ".github/workflows/nic-experiment-assignment-pr.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  experiment-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile changed production modules
+        run: |
+          set -euo pipefail
+          python -m py_compile src/nic_experiment_assignment.py src/multi_agent_creator.py src/nic_native_writer.py
+      - name: Verify assignment and treatment regression tests
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_nic_experiment_assignment tests.test_nic_native_writer_experiment -v
