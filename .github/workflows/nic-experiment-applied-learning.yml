@@ -1,0 +1,38 @@
+name: NIC — Applied Experiment Learning Integrity
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_creator_experiment_builder.py"
+      - "src/nic_reward_evidence.py"
+      - "src/nic_experiment_assignment.py"
+      - "src/nic_native_writer.py"
+      - "src/multi_agent_creator.py"
+      - "src/binance_square_publisher.py"
+      - "tests/test_nic_creator_experiment_builder.py"
+      - "tests/test_nic_experiment_assignment.py"
+      - "tests/test_nic_native_writer_experiment.py"
+      - ".github/workflows/nic-experiment-applied-learning.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  applied-experiment-learning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile experiment handoff modules
+        run: |
+          set -euo pipefail
+          python -m py_compile src/nic_creator_experiment_builder.py src/nic_reward_evidence.py src/nic_experiment_assignment.py src/nic_native_writer.py src/multi_agent_creator.py src/binance_square_publisher.py
+      - name: Verify applied-only evidence assembly
+        run: python -m unittest discover -s tests -p "test_nic_creator_experiment_builder.py" -v
+      - name: Verify draft assignment and writer treatment
+        run: |
+          python -m unittest discover -s tests -p "test_nic_experiment_assignment.py" -v
+          python -m unittest discover -s tests -p "test_nic_native_writer_experiment.py" -v
