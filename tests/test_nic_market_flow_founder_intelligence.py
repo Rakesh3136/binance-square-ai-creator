@@ -21,7 +21,7 @@ class FlowFounderTests(unittest.TestCase):
         self.predictions = {"generated_at": stamp, "candidates": []}
 
     def test_fresh_btc_weakness_is_only_a_screen(self):
-        report = build(self.market, self.flow, self.capital, self.now)
+        report = build(self.market, self.flow, self.capital, self.predictions, self.now)
         self.assertEqual(report["status"], "READY")
         self.assertEqual(report["flow_conclusion"], "BTC_WEAKNESS_ROTATION_SCREEN")
         self.assertEqual([x["symbol"] for x in report["early_screen_candidates"]], ["AAA"])
@@ -31,22 +31,22 @@ class FlowFounderTests(unittest.TestCase):
 
     def test_stale_input_blocks_ranking(self):
         self.market["generated_at"] = (self.now - timedelta(hours=3)).isoformat()
-        report = build(self.market, self.flow, self.capital, self.now)
+        report = build(self.market, self.flow, self.capital, self.predictions, self.now)
         self.assertEqual(report["status"], "MARKET_ANALYSIS_BLOCKED_STALE_INPUTS")
         self.assertEqual(report["early_screen_candidates"], [])
 
     def test_missing_timestamp_fails_closed(self):
         self.flow.pop("generated_at")
-        report = build(self.market, self.flow, self.capital, self.now)
+        report = build(self.market, self.flow, self.capital, self.predictions, self.now)
         self.assertFalse(report["freshness"]["full_universe_flow"]["fresh"])
         self.assertEqual(report["early_screen_candidates"], [])
 
     def test_long_term_projects_require_fundamentals(self):
-        report = build(self.market, self.flow, self.capital, self.now)
+        report = build(self.market, self.flow, self.capital, self.predictions, self.now)
         self.assertEqual(report["long_term_project_research"]["status"], "FUNDAMENTAL_EVIDENCE_REQUIRED")
 
     def test_founder_ideas_are_hypotheses(self):
-        report = build(self.market, self.flow, self.capital, self.now)
+        report = build(self.market, self.flow, self.capital, self.predictions, self.now)
         founder = report["founder_opportunity_brief"]
         self.assertEqual(founder["status"], "HYPOTHESES_TO_VALIDATE_NOT_MARKET_FACTS")
         self.assertGreaterEqual(len(founder["opportunity_hypotheses"]), 3)
