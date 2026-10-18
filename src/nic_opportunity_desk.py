@@ -131,9 +131,12 @@ def rotation_candidates(document, market=None, full_universe=None):
         item["full_universe_evidence"] = full
         item["market_context"] = context
         if not item.get("multitimeframe"):
-            score = number(item.get("flow_score"), number(full.get("discovery_score"), 0.0))
+            if item.get("flow_score") is not None:
+                proxy_score = 50.0 + number(item.get("flow_score"), 0.0) * 2.0
+            else:
+                proxy_score = number(full.get("discovery_score"), 50.0)
             item["multitimeframe"] = {
-                "flow_proxy_score": max(0.0, min(100.0, 50.0 + score * 2.0)),
+                "flow_proxy_score": max(0.0, min(100.0, proxy_score)),
                 "confidence": number(item.get("flow_confidence")),
             }
         if not item.get("timeframes"):
