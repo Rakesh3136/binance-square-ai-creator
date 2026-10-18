@@ -1,4 +1,5 @@
 """Regression test: automatic publishing must remain paused by default."""
+import hashlib
 import importlib.util
 import json
 import os
@@ -67,26 +68,41 @@ class PublishingPauseTest(unittest.TestCase):
         )
         self.assertFalse(ok)
 
-    def test_autonomous_workflow_hard_disables_publication_steps(self):
+    def test_workflow_reactivates_only_after_final_quality_authorization(self):
         workflow = (ROOT / ".github" / "workflows" / "autonomous-market-creator.yml").read_text(encoding="utf-8")
 
         def step_block(name):
             marker = f"      - name: {name}"
             start = workflow.index(marker)
-            end = workflow.find("\n      - name:", start + len(marker))
+            end = workflow.find("\\n      - name:", start + len(marker))
             return workflow[start:] if end < 0 else workflow[start:end]
 
         authorization = step_block("NIC editorial automatic-publication authorization")
         payload = step_block("Build final publication payload")
         publisher_step = step_block("Extract publication and submit to Binance Square")
-        review_artifact = step_block("Preserve exact final draft and gate context for mandatory human review")
+        final_gate = step_block("Final NIC 21 and editorial revalidation")
 
-        self.assertIn("if: ${{ false }}", authorization)
-        self.assertIn("if: ${{ false }}", payload)
-        self.assertIn("if: ${{ false }}", publisher_step)
-        self.assertIn("PUBLISHING_ENABLED: 'false'", publisher_step)
-        self.assertIn("mandatory human review", review_artifact)
-        self.assertIn("steps.cadence.outputs.publish == 'true'", review_artifact)
+        self.assertNotIn("if: ${{ false }}", authorization)
+        self.assertNotIn("if: ${{ false }}", payload)
+        self.assertNotIn("if: ${{ false }}", publisher_step)
+        self.assertIn("steps.final_quality_gate.outputs.publish == 'true'", authorization)
+        self.assertIn("steps.publication_authorization.outputs.authorized == 'true'", payload)
+        self.assertIn("steps.publication_authorization.outputs.authorized == 'true'", publisher_step)
+        self.assertIn("PUBLISHING_ENABLED: 'true'", publisher_step)
+        self.assertIn("DRAFT_PATH:", final_gate)
+
+    def test_publisher_requires_exact_text_hashes_from_all_quality_gates(self):
+        text = "Verified editorial research without trade instructions."
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        authorization = {"authorized": True, "publication_mode": "EDITORIAL_ONLY",
+                         "trade_signal_publication_authorized": False, "live_orders_authorized": False,
+                         "draft_sha256": digest}
+        nic21 = {"status": "PASS", "draft_sha256": digest}
+        lane = {"publish": True, "status": "EDITORIAL_ELIGIBLE",
+                "trade_authorized": False, "draft_sha256": digest}
+        self.assertTrue(publisher.verify_quality_authorization(text, authorization, nic21, lane)[0])
+        nic21["status"] = "BLOCKED"
+        self.assertFalse(publisher.verify_quality_authorization(text, authorization, nic21, lane)[0])
 
 if __name__ == "__main__":
     unittest.main()
