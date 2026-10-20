@@ -37,8 +37,12 @@ def evaluate(routing, frozen, eligibility, preflight, now=None):
         reasons.append("current publication eligibility is not editorial-eligible")
     if eligibility.get("trade_authorized") is not False:
         reasons.append("editorial handoff requires explicit trade_authorized=false")
+    eligible_selected = eligibility.get("selected") if isinstance(eligibility.get("selected"), dict) else {}
+    eligible_symbol = str(eligible_selected.get("symbol") or "").upper().replace("USDT", "").replace("$", "").strip()
     if not route_symbol or not frozen_symbol or route_symbol != frozen_symbol:
         reasons.append("frozen asset does not match current Signal-First selected asset")
+    if eligible_symbol and eligible_symbol != frozen_symbol:
+        reasons.append("publication eligibility asset does not match frozen opportunity")
     if not fresh(routing, now):
         reasons.append("Signal-First decision is missing or stale")
     if not fresh(eligibility, now):
@@ -52,12 +56,34 @@ def evaluate(routing, frozen, eligibility, preflight, now=None):
     ok = not reasons
     updated = dict(preflight) if isinstance(preflight, dict) else {}
     if ok:
-        # Frozen opportunity is authoritative; do not carry stale symbol/thesis fields forward.
-        updated["selected_opportunity"] = dict(frozen)
+        # Freeze the asset, but use the current eligibility lane as the authority
+        # for editorial intent. A stale technical_setup category must not survive
+        # when the current-cycle router has downgraded an extended asset to research.
+        authoritative = dict(frozen)
+        eligible_category = str(eligible_selected.get("category") or "").strip().lower()
+        if eligible_category:
+            authoritative["category"] = eligible_category
+            authoritative["lane"] = eligible_category
+        timing_state = str(eligible_selected.get("timing_state") or "").strip().upper()
+        if timing_state == "EXHAUSTED":
+            authoritative["category"] = "research_insight"
+            authoritative["lane"] = "research_insight"
+            authoritative["reason"] = str(eligible_selected.get("timing_reason") or
+                "Market move is extended; preserve as research context, not a fresh entry.")
+            authoritative["instruction"] = (
+                "Explain the observed market move and the evidence gaps. State that timing is "
+                "exhausted for a fresh entry; do not provide entry, stop-loss, or target levels "
+                "or imply the move is actionable."
+            )
+            for key in ("trade_setup", "entry_trigger", "tp1", "tp2", "sl", "direction", "confidence"):
+                authoritative.pop(key, None)
+        updated["selected_opportunity"] = authoritative
         updated.pop("creator_brain_decision", None)
         updated["editorial_authoritative_handoff"] = {
             "status": "SYNCED",
             "symbol": frozen_symbol,
+            "category": authoritative.get("category"),
+            "timing_state": timing_state or None,
             "decision_id": str(routing.get("decision_id") or ""),
             "frozen_at": frozen_time.isoformat(),
             "synced_at": now.isoformat(),
