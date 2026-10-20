@@ -651,7 +651,7 @@ jobs:
       - name: Extract publication and submit to Binance Square
         id: publish_result
         # Independent hard stop: authorization artifacts alone must not resume publishing.
-        if: ${{ false }}
+        if: ${{ steps.publication_authorization.outputs.authorized == 'true' && false }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
