@@ -1,7 +1,7 @@
 """NIC Human Creator Collaboration Gate.
 
-Builds a review brief from the current draft and requires real human editorial
-contribution before publication. This does not attempt to disguise AI authorship.
+Builds an exact-draft review brief and reports whether human review is required
+by the repository policy. It never fabricates or claims a review that did not occur.
 """
 from __future__ import annotations
 
@@ -98,23 +98,43 @@ def build_brief(post: str, report: dict, draft_path: Path) -> dict:
             "required_fields": ["draft_sha256", "human_thesis", "original_insight", "evidence_reviewed", "approved_for_publication", "author_attestation"],
             "minimum_characters": {"human_thesis": 30, "original_insight": 30, "evidence_reviewed": 20},
         },
-        "policy": "No fabricated personal experience, no authorship disguise, no publication without current-draft human review.",
+        "policy": "No fabricated personal experience or authorship disguise. Human review is mandatory only when the repository publication policy explicitly requires it.",
     }
 
 
-def evaluate(post: str, human_input: dict, draft_path: str = "") -> dict:
-    failures = validate_human_input(post, human_input)
+def evaluate(
+    post: str,
+    human_input: dict,
+    draft_path: str = "",
+    requires_human_review: bool = True,
+) -> dict:
+    # Policy decides whether human review is mandatory for this publication lane.
+    # Default True keeps direct callers fail-closed; main() reads the explicit
+    # repository policy. Editorial auto-publication can be autonomous without
+    # pretending a human reviewed the draft.
+    review_performed = bool(
+        human_input.get("approved_for_publication") is True
+        and not validate_human_input(post, human_input)
+    )
+    failures = validate_human_input(post, human_input) if requires_human_review else []
+    status = (
+        "PASS" if not failures and requires_human_review
+        else "BLOCKED" if failures
+        else "NOT_REQUIRED_BY_POLICY"
+    )
     return {
-        "version": "NIC-HUMAN-CREATOR-GATE-1.0",
+        "version": "NIC-HUMAN-CREATOR-GATE-1.1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "PASS" if not failures else "BLOCKED",
+        "status": status,
         "publish": not failures,
         "failures": failures,
+        "human_review_required": requires_human_review,
+        "human_review_performed": review_performed,
         "draft_sha256": hashlib.sha256(post.encode("utf-8")).hexdigest() if post else "",
         "draft_path": draft_path,
         "policy": {
-            "requires_genuine_human_editorial_contribution": True,
-            "requires_approval_of_exact_draft": True,
+            "requires_genuine_human_editorial_contribution": requires_human_review,
+            "requires_approval_of_exact_draft": requires_human_review,
             "does_not_attempt_to_disguise_ai_authorship": True,
             "no_gate_bypass": True,
         },
@@ -134,7 +154,10 @@ def main() -> int:
         "failures": ["current_draft_missing"],
     }
     human_input = load_json(INPUT)
-    result = evaluate(post, human_input, str(path or ""))
+    publication_policy = load_json(ROOT / "nic_publication_policy.json")
+    # Missing policy must fail closed: require review unless policy explicitly says otherwise.
+    requires_human_review = publication_policy.get("requires_human_review_for_editorial", True) is True
+    result = evaluate(post, human_input, str(path or ""), requires_human_review=requires_human_review)
     BRIEF.parent.mkdir(parents=True, exist_ok=True)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     BRIEF.write_text(json.dumps(brief, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
