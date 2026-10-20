@@ -147,5 +147,45 @@ class RewardEvidenceTests(unittest.TestCase):
                 self.assertAlmostEqual(revenue_director.verified_revenue(rows[0]), 0.201)
 
 
+    def test_revenue_lab_reads_nested_square_metrics(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            attr, perf, rewards = root / "publication_attribution.jsonl", root / "square_performance.jsonl", root / "wte_reward_events.jsonl"
+            live, intel = root / "live", root / "intelligence"
+            out, report = live / "nic_revenue_pattern_lab.json", intel / "nic_revenue_pattern_lab_report.json"
+            write_jsonl(attr, [{"canonical_post_id": "374795126927596", "category": "research", "format": "analysis", "hook_type": "mechanism"}])
+            write_jsonl(perf, [{"canonical_post_id": "374795126927596", "metrics": {"views": 5100, "likes": 51, "comments": 7, "shares": 3}}])
+            write_jsonl(rewards, [])
+            with patch.object(revenue_lab, "ATTR", attr), patch.object(revenue_lab, "PERF", perf), patch.object(revenue_lab, "REWARD_EVENTS", rewards), patch.object(revenue_lab, "LIVE", live), patch.object(revenue_lab, "INTEL", intel), patch.object(revenue_lab, "OUT", out), patch.object(revenue_lab, "REPORT", report), patch.object(revenue_lab, "ROOT", root):
+                revenue_lab.main()
+            obs = json.loads(out.read_text())["observations"][0]
+            self.assertEqual(obs["views"], 5100)
+            self.assertGreater(obs["engagement_per_1000_views"], 0)
+
+    def test_director_reads_nested_metrics_and_preserves_attribution_metadata(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            attr, perf, rewards, outcomes = (root / n for n in ("attribution.jsonl", "performance.jsonl", "rewards.jsonl", "outcomes.jsonl"))
+            write_jsonl(attr, [
+                {"canonical_post_id": "374795126927596", "category": "research", "format": "analysis", "visual_attached": True},
+                {"canonical_post_id": "374947394936090", "category": "research", "format": "analysis", "visual_attached": False},
+            ])
+            write_jsonl(perf, [
+                {"canonical_post_id": "374795126927596", "category": None, "metrics": {"views": 5100, "likes": 51, "comments": 7, "shares": 3}},
+                {"canonical_post_id": "374947394936090", "category": None, "metrics": {"views": 2000, "likes": 20, "comments": 4, "shares": 2}},
+            ])
+            write_jsonl(rewards, [])
+            write_jsonl(outcomes, [])
+            with patch.object(revenue_director, "ATTRIBUTION", attr), patch.object(revenue_director, "PERFORMANCE", perf), patch.object(revenue_director, "REWARD_EVENTS", rewards), patch.object(revenue_director, "OUTCOMES", outcomes):
+                rows = revenue_director.merge_rows()
+            self.assertEqual(rows[0]["category"], "research")
+            self.assertEqual(revenue_director.number(rows[0], "views"), 5100)
+            score, views = revenue_director.engagement(rows[0])
+            self.assertEqual(views, 5100)
+            self.assertGreater(score, 0)
+            self.assertEqual(revenue_director.group_key(rows[0])[0], "research")
+            self.assertEqual(revenue_director.group_key(rows[0])[1], "analysis")
+
+
 if __name__ == "__main__":
     unittest.main()
