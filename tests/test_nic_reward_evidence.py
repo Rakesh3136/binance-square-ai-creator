@@ -98,6 +98,36 @@ class RewardEvidenceTests(unittest.TestCase):
             self.assertEqual(result["accepted_verified_reward_events"], 1)
             self.assertEqual(result["rejected_reward_events"], 1)
 
+    def test_revenue_lab_sums_distinct_rewards_and_ignores_duplicate_event_ids(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            attr = root / "publication_attribution.jsonl"
+            perf = root / "square_performance.jsonl"
+            rewards = root / "wte_reward_events.jsonl"
+            live, intel = root / "live", root / "intelligence"
+            out, report = live / "nic_revenue_pattern_lab.json", intel / "nic_revenue_pattern_lab_report.json"
+            write_jsonl(attr, [
+                {"canonical_post_id": "374795126927596", "category": "research", "format": "analysis", "hook_type": "mechanism"}
+            ])
+            write_jsonl(perf, [])
+            first = valid_event(amount=0.201)
+            second = valid_event(amount=0.100)
+            second["event_id"] = "reward-event-002"
+            second["observed_at"] = "2026-10-17T10:00:00+00:00"
+            second["verified_at"] = "2026-10-17T10:05:00+00:00"
+            duplicate = dict(first)
+            write_jsonl(rewards, [first, second, duplicate])
+            with patch.object(revenue_lab, "ATTR", attr), patch.object(revenue_lab, "PERF", perf), patch.object(revenue_lab, "REWARD_EVENTS", rewards), patch.object(revenue_lab, "LIVE", live), patch.object(revenue_lab, "INTEL", intel), patch.object(revenue_lab, "OUT", out), patch.object(revenue_lab, "REPORT", report), patch.object(revenue_lab, "ROOT", root):
+                revenue_lab.main()
+            result = json.loads(out.read_text())
+            obs = result["observations"][0]
+            self.assertEqual(obs["verified_posts"], 1)
+            self.assertAlmostEqual(obs["verified_revenue"], 0.301)
+            self.assertEqual(result["accepted_verified_reward_events"], 2)
+            self.assertEqual(result["duplicate_reward_event_ids_ignored"], 1)
+            self.assertEqual(result["rejected_reward_events"], 0)
+
+
     def test_revenue_director_requires_verified_reward_event(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
