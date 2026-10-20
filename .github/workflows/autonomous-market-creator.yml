@@ -639,7 +639,8 @@ jobs:
           retention-days: 7
 
       - name: Build final publication payload
-        if: ${{ steps.publication_authorization.outputs.authorized == 'true' }}
+        # Emergency pause: keep automatic publication disabled until explicitly re-enabled in a reviewed change.
+        if: ${{ false }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -649,11 +650,12 @@ jobs:
 
       - name: Extract publication and submit to Binance Square
         id: publish_result
-        if: ${{ steps.publication_authorization.outputs.authorized == 'true' }}
+        # Independent hard stop: authorization artifacts alone must not resume publishing.
+        if: ${{ false }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
-          PUBLISHING_ENABLED: 'true'
+          PUBLISHING_ENABLED: 'false'
           NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY
         run: python src/binance_square_publisher.py
 
