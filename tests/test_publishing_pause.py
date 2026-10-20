@@ -117,5 +117,22 @@ class PublishingPauseTest(unittest.TestCase):
         self.assertLess(step.index(gate), step.index(staging))
         self.assertIn("set -euo pipefail", step)
 
+
+    def test_production_evidence_gate_rechecks_shared_main_after_successful_push(self):
+        workflow = (ROOT / ".github" / "workflows" / "autonomous-market-creator.yml").read_text(encoding="utf-8")
+        marker = "      - name: Persist Forecast Laboratory evidence ledgers"
+        start = workflow.index(marker)
+        end = workflow.find("\\n      - name:", start + len(marker))
+        step = workflow[start:] if end < 0 else workflow[start:end]
+        push = step.index("if git push origin HEAD:main; then")
+        fetch = step.index("git fetch origin main", push)
+        reset = step.index("git reset --hard origin/main", fetch)
+        gate = step.index("python src/nic_evidence_reconciliation_gate.py", reset)
+        success = step.index("Forecast evidence persisted and post-push main reconciled", gate)
+        self.assertLess(push, fetch)
+        self.assertLess(fetch, reset)
+        self.assertLess(reset, gate)
+        self.assertLess(gate, success)
+
 if __name__ == "__main__":
     unittest.main()

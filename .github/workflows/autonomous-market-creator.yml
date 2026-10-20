@@ -740,7 +740,12 @@ jobs:
               fi
             fi
             if git push origin HEAD:main; then
-              echo "Forecast evidence persisted successfully on attempt ${attempt}."
+              # Verify the exact shared main state, not only this runner's pre-push checkout.
+              # A concurrent workflow must not leave derived metrics stale after this push.
+              git fetch origin main
+              git reset --hard origin/main
+              python src/nic_evidence_reconciliation_gate.py
+              echo "Forecast evidence persisted and post-push main reconciled on attempt ${attempt}."
               exit 0
             fi
             echo "Forecast evidence push raced with another main update (attempt ${attempt}/3); retrying."
