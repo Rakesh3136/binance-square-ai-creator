@@ -69,13 +69,17 @@ def pid(row):
 
 
 def number(row, *keys):
-    for key in keys:
-        try:
-            value = float(row.get(key))
-            if math.isfinite(value):
-                return value
-        except (TypeError, ValueError):
-            pass
+    # The public Square collector's canonical schema nests counters in metrics.
+    # Prefer explicit top-level values when present, then use nested counters.
+    metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+    for source in (row, metrics):
+        for key in keys:
+            try:
+                value = float(source.get(key))
+                if math.isfinite(value):
+                    return value
+            except (TypeError, ValueError):
+                pass
     return 0.0
 
 
@@ -124,6 +128,13 @@ def merge_rows():
         if not post or post not in attr:
             continue
         merged_row = {**attr[post], **row}
+        # Public performance rows may carry null category/symbol fields; do not
+        # let those nulls erase the richer, exact-post publication attribution.
+        for field in ("symbol", "category", "content_lane", "format", "content_format",
+                      "experiment_format", "experiment_id", "direction", "visual_type",
+                      "hook_type", "reader_payoff_type", "style", "visual_attached"):
+            if merged_row.get(field) in (None, "") and attr[post].get(field) not in (None, ""):
+                merged_row[field] = attr[post][field]
         reward = rewards.get(post)
         if reward is not None:
             merged_row["_verified_reward_event"] = True
@@ -139,7 +150,21 @@ def merge_rows():
 
 
 def group_key(row):
-    return tuple(str(row.get(dim) or "unknown").strip().lower() for dim in DIMENSIONS)
+    # Attribution schema predates the richer content dimensions; use fields
+    # actually recorded there rather than collapsing all posts into "unknown".
+    lane = row.get("content_lane") or row.get("category")
+    fmt = row.get("format") or row.get("content_format") or row.get("experiment_format")
+    if not fmt and "visual_attached" in row:
+        fmt = "visual_attached" if row.get("visual_attached") is True else "text_only"
+    values = {
+        "content_lane": lane,
+        "format": fmt,
+        "hook_type": row.get("hook_type") or row.get("content_family") or row.get("style"),
+        "visual_type": row.get("visual_type"),
+        "reader_payoff_type": row.get("reader_payoff_type"),
+        "experiment_id": row.get("experiment_id"),
+    }
+    return tuple(str(values.get(dim) or "unknown").strip().lower() for dim in DIMENSIONS)
 
 
 def readiness_status(accepted_verified_reward_events: int, rows: list[dict]) -> str:
