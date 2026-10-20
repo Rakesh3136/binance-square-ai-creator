@@ -31,8 +31,10 @@ def num(x,*ks):
     metrics=x.get("metrics") if isinstance(x.get("metrics"),dict) else {}
     for source in (x,metrics):
         for k in ks:
+            if k not in source:
+                continue
             try:
-                value=float(source.get(k,0) or 0)
+                value=float(source.get(k) or 0)
                 if value == value and abs(value) != float("inf"): return value
             except Exception: pass
     return 0.0
