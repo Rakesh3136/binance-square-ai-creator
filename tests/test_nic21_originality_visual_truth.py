@@ -53,9 +53,35 @@ def test_setup_like_post_requires_matching_chart_metadata_and_hash(monkeypatch, 
 def test_setup_like_post_without_chart_is_blocked(monkeypatch, tmp_path):
     monkeypatch.setattr(n, "VISUAL_META", tmp_path / "missing.json")
     monkeypatch.setattr(n, "VISUAL_FILE", tmp_path / "missing.png")
-    result = n.visual_truth("$BTC breakout is being watched.", {"symbol": "BTC"}, "BTC")
+    result = n.visual_truth("$BTC setup is being watched.\nEntry trigger: 100\nTP1: 110\nTP2: 120\nSL / invalidation: 95", {"symbol": "BTC"}, "BTC")
     assert result["status"] == "FAIL"
     assert any("requires a rendered visual" in x for x in result["failures"])
+
+
+def test_editorial_prose_about_support_does_not_require_a_chart(monkeypatch, tmp_path):
+    monkeypatch.setattr(n, "ROOT", tmp_path)
+    context = tmp_path / "publication_context.json"
+    context.write_text(json.dumps({"category": "weekly_synthesis"}), encoding="utf-8")
+    monkeypatch.setattr(n, "VISUAL_META", tmp_path / "missing.json")
+    monkeypatch.setattr(n, "VISUAL_FILE", tmp_path / "missing.png")
+    result = n.visual_truth(
+        "A useful weekly synthesis explains support and resistance as context, not as a trade entry.",
+        {"symbol": "BTC"}, "BTC"
+    )
+    assert result["status"] == "PASS"
+    assert not any("requires a rendered visual" in x for x in result["failures"])
+
+
+def test_originality_only_defers_visual_truth(monkeypatch, tmp_path):
+    draft_path = tmp_path / "draft.json"
+    draft_path.write_text(json.dumps({"draft": {"post": "A unique editorial post about market structure.", "symbol": "BTC"}}), encoding="utf-8")
+    monkeypatch.setenv("DRAFT_PATH", str(draft_path))
+    monkeypatch.setattr(n, "OUT", tmp_path / "nic21_gate.json")
+    monkeypatch.setattr(n, "PUBLICATION_LOG", tmp_path / "empty-publication-log.jsonl")
+    assert n.run(originality_only=True) == 0
+    result = json.loads((tmp_path / "nic21_gate.json").read_text(encoding="utf-8"))
+    assert result["status"] == "PASS"
+    assert result["visual_truth"]["status"] == "DEFERRED"
 
 
 def test_current_draft_uses_explicit_draft_path(monkeypatch, tmp_path):
