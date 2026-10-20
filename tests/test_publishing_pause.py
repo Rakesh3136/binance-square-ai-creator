@@ -103,5 +103,19 @@ class PublishingPauseTest(unittest.TestCase):
         nic21["status"] = "BLOCKED"
         self.assertFalse(publisher.verify_quality_authorization(text, authorization, nic21, lane)[0])
 
+
+    def test_production_evidence_gate_runs_before_forecast_artifacts_are_staged(self):
+        workflow = (ROOT / ".github" / "workflows" / "autonomous-market-creator.yml").read_text(encoding="utf-8")
+        marker = "      - name: Persist Forecast Laboratory evidence ledgers"
+        start = workflow.index(marker)
+        end = workflow.find("\n      - name:", start + len(marker))
+        step = workflow[start:] if end < 0 else workflow[start:end]
+        gate = "python src/nic_evidence_reconciliation_gate.py"
+        staging = "git add -- data/intelligence/nic_forecast_truth_ledger.jsonl"
+        self.assertIn(gate, step)
+        self.assertIn(staging, step)
+        self.assertLess(step.index(gate), step.index(staging))
+        self.assertIn("set -euo pipefail", step)
+
 if __name__ == "__main__":
     unittest.main()
