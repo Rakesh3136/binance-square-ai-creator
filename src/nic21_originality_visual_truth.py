@@ -137,10 +137,21 @@ def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
     required = {"symbol": symbol}
     failures: list[str] = []
     warnings: list[str] = []
-    setup_like = bool(re.search(
-        r"\b(support|resistance|entry|stop[- ]?loss|invalidation|target|take[- ]?profit|breakout|technical setup)\b",
-        draft_text, re.I
+    # Require a chart for an actual signal/setup, not editorial prose that
+    # merely discusses support, resistance, entries, or breakouts. The earlier
+    # broad keyword heuristic blocked weekly synthesis drafts before the workflow
+    # had even decided whether the current post needed a visual.
+    context = load_json(ROOT / "publication_context.json", {})
+    category = str(context.get("category") or draft.get("category") or "").strip().lower()
+    signal_categories = {
+        "capital_flow_long", "capital_flow_short", "flow", "technical_setup",
+        "creator_signal_outcome", "follow_up",
+    }
+    explicit_levels = bool(re.search(
+        r"(?im)^\s*(?:entry trigger|tp1|tp2|sl\s*/\s*invalidation)\s*:",
+        draft_text
     ))
+    setup_like = category in signal_categories or explicit_levels
 
     visual_symbol = str(meta.get("symbol") or meta.get("chart_symbol") or meta.get("base_symbol") or meta.get("tradingview_symbol") or "").upper()
     visual_symbol = visual_symbol.replace("BINANCE:", "").replace("USDT", "")
