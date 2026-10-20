@@ -271,7 +271,7 @@ def release_lock(owner: str) -> bool:
         return True
 
 
-def run(acquire: bool = False, release: bool = False) -> int:
+def run(acquire: bool = False, release: bool = False, originality_only: bool = False) -> int:
     owner = f"{os.getpid()}:{time.time_ns()}"
     if release:
         return 0 if release_lock(owner) else 1
@@ -282,8 +282,14 @@ def run(acquire: bool = False, release: bool = False) -> int:
         return 1
     symbol = selected_symbol(draft)
     orig = originality(text, symbol)
-    visual = visual_truth(text, draft, symbol)
-    failures = list(orig["failures"]) + list(visual["failures"])
+    if originality_only:
+        # This early workflow stage runs before the visual decision/renderer.
+        # Defer visual checks until the current post's image has been rendered.
+        visual = {"status": "DEFERRED", "failures": [],
+                  "reason": "visual_truth_is_checked_after_visual_decision_and_render"}
+    else:
+        visual = visual_truth(text, draft, symbol)
+    failures = list(orig["failures"]) + list(visual.get("failures", []))
     lock = {"status": "NOT_REQUESTED"}
     if acquire and not failures:
         ok, reason = acquire_lock(owner)
@@ -306,5 +312,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--acquire-lock", action="store_true")
     parser.add_argument("--release-lock", action="store_true")
-    raise SystemExit(run(acquire=parser.parse_args().acquire_lock,
-                         release=parser.parse_args().release_lock))
+    parser.add_argument("--originality-only", action="store_true",
+                        help="Run the early originality check and defer visual truth until rendering has completed.")
+    args = parser.parse_args()
+    raise SystemExit(run(acquire=args.acquire_lock, release=args.release_lock,
+                         originality_only=args.originality_only))
