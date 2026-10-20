@@ -12,7 +12,11 @@ try:
     from src.nic_reward_evidence import canonical_post_id, is_verified_reward_event, reward_event_rejection_reasons
 except ModuleNotFoundError:
     from nic_reward_evidence import canonical_post_id, is_verified_reward_event, reward_event_rejection_reasons
-try:\n    from src.nic_owner_reported_rewards import load_owner_reported_rewards\nexcept ModuleNotFoundError:\n    from nic_owner_reported_rewards import load_owner_reported_rewards\nROOT=Path(__file__).resolve().parents[1]; AN=ROOT/"analytics"; LIVE=ROOT/"data/live"; INTEL=ROOT/"data/intelligence"
+try:
+    from src.nic_owner_reported_rewards import load_owner_reported_rewards
+except ModuleNotFoundError:
+    from nic_owner_reported_rewards import load_owner_reported_rewards
+ROOT=Path(__file__).resolve().parents[1]; AN=ROOT/"analytics"; LIVE=ROOT/"data/live"; INTEL=ROOT/"data/intelligence"
 ATTR=AN/"publication_attribution.jsonl"; PERF=AN/"square_performance.jsonl"; REWARD_EVENTS=AN/"wte_reward_events.jsonl"; OUT=LIVE/"nic_revenue_pattern_lab.json"; REPORT=INTEL/"nic_revenue_pattern_lab_report.json"
 def rows(p):
     out=[]
