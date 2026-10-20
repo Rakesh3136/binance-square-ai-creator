@@ -51,5 +51,23 @@ class RevenueLearningProductionWiringTests(unittest.TestCase):
         self.assertIn("verify_quality_authorization", publisher)
 
 
+
+    def test_owner_reported_reward_learning_is_explicitly_separate_from_verified_revenue(self):
+        helper = (ROOT / "src" / "nic_owner_reported_rewards.py").read_text(encoding="utf-8")
+        lab = (ROOT / "src" / "nic_revenue_pattern_lab.py").read_text(encoding="utf-8")
+        director = (ROOT / "src" / "revenue_content_director.py").read_text(encoding="utf-8")
+        self.assertIn("OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED", helper + lab + director)
+        self.assertIn("analytics/wte_owner_reported_reward_events.jsonl", helper + lab)
+        self.assertIn("owner_reported_revenue_total_usdc", director)
+        self.assertIn("revenue_requires_exact_post_id_and_hashed_timestamped_evidence", director)
+        self.assertIn("is_verified_reward_event(event)", director)
+
+    def test_owner_reported_reward_learning_does_not_change_verified_reward_gate(self):
+        reward = (ROOT / "src" / "nic_reward_evidence.py").read_text(encoding="utf-8")
+        director = (ROOT / "src" / "revenue_content_director.py").read_text(encoding="utf-8")
+        self.assertIn("def is_verified_reward_event", reward)
+        self.assertIn("accepted_verified_reward_events", director)
+        self.assertIn("owner_reported_revenue_is_separate_and_not_independently_verified", director)
+
 if __name__ == "__main__":
     unittest.main()
