@@ -71,6 +71,9 @@ def main():
         reward=rewards.get(p,0.0)
         if reward > 0:
             g["verified_posts"]+=1; g["verified_revenue"]+=reward
+        owner_reward=owner_rewards.get(p)
+        if owner_reward:
+            g["owner_reported_posts"]+=1; g["owner_reported_revenue"]+=owner_reward["amount_usdc"]
 
     observations=[]
     for (cat,fmt,fam),g in groups.items():
