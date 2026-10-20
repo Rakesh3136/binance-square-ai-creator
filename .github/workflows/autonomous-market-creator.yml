@@ -434,12 +434,13 @@ jobs:
           python src/nic21_2_hook_preflight.py
           python -m json.tool data/live/nic21_2_hook_preflight.json >/dev/null
 
-      - name: NIC 21 Originality and Visual Truth
+      - name: NIC 21 Originality Preflight
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
-          python src/nic21_originality_visual_truth.py
+          # Visual truth is deliberately deferred until visual_decision and rendering finish.
+          python src/nic21_originality_visual_truth.py --originality-only
           python -m json.tool data/live/nic21_gate.json >/dev/null
 
       - name: Reader value and authoritative quality gates
@@ -484,6 +485,16 @@ jobs:
           python src/validate_tradingview_visual.py data/live/visual.png
           python src/validate_trade_visual_contract.py
           python src/pipeline_stage.py visual success 'Visual package rendered and validated'
+
+      - name: NIC 21 Final Visual Truth Validation
+        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
+        env:
+          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
+        run: |
+          # Runs after the visual decision and any required render. Setup-like drafts
+          # still fail closed if a required chart package is absent or mismatched.
+          python src/nic21_originality_visual_truth.py
+          python -m json.tool data/live/nic21_gate.json >/dev/null
 
       - name: NIC 24.3 Early-entry and post-extension gate
         id: early_entry
