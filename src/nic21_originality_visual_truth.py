@@ -152,6 +152,17 @@ def visual_truth(draft_text: str, draft: dict, symbol: str) -> dict:
         draft_text
     ))
     setup_like = category in signal_categories or explicit_levels
+    if not setup_like:
+        # Editorial posts may legitimately have no chart. Ignore any visual
+        # left over from a prior cycle; it is not evidence for this draft.
+        return {
+            "status": "PASS",
+            "required": required,
+            "failures": [],
+            "warnings": ["chart truth not required for this editorial draft"],
+            "visual_metadata_present": bool(meta),
+            "visual_file_present": VISUAL_FILE.exists(),
+        }
 
     visual_symbol = str(meta.get("symbol") or meta.get("chart_symbol") or meta.get("base_symbol") or meta.get("tradingview_symbol") or "").upper()
     visual_symbol = visual_symbol.replace("BINANCE:", "").replace("USDT", "")
