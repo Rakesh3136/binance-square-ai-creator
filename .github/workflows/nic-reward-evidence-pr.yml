@@ -26,16 +26,23 @@ jobs:
         run: python -m py_compile src/nic_reward_evidence.py src/nic_revenue_pattern_lab.py src/revenue_content_director.py
       - name: Run reward evidence regression tests
         run: python -m unittest discover -s tests -p 'test_nic_reward_evidence.py' -v
-      - name: Keep automatic publishing disabled
+      - name: Verify policy-gated editorial publishing
         run: |
           python - <<'PY'
+          import json
           from pathlib import Path
           workflow = Path(".github/workflows/autonomous-market-creator.yml").read_text(encoding="utf-8")
+          policy = json.loads(Path("nic_publication_policy.json").read_text(encoding="utf-8"))
           assert "NIC editorial automatic-publication authorization" in workflow
-          assert "Extract publication and submit to Binance Square" in workflow
-          guard = "if: " + "$" + "{{ false }}"
-          assert workflow.count(guard) >= 2, "Automatic publication guard must remain disabled in both steps"
-          print("Automatic publication remains disabled.")
+          assert "id: publication_authorization" in workflow
+          assert workflow.count("steps.publication_authorization.outputs.authorized == 'true'") >= 2, "Payload construction and publishing must both require explicit authorization"
+          assert "NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY" in workflow
+          assert policy.get("editorial_auto_publication_enabled") is True
+          assert policy.get("editorial_mode") == "EDITORIAL_ONLY"
+          assert policy.get("trade_signal_publication_enabled") is False
+          assert policy.get("live_orders_enabled") is False
+          assert "NIC 21 and editorial revalidation" in workflow
+          print("Editorial publishing is explicitly authorized and gated; trade signals and live orders remain disabled.")
           PY
       - name: Check whitespace
         run: git diff --check
