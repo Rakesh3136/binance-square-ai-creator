@@ -51,9 +51,16 @@ def fmt(x): return f"{x:.8g}"
 def main():
     frozen=load(AUTHORITATIVE,{})
     pre=load(PREFLIGHT,{})
-    selected=frozen or (pre.get('selected_opportunity') or {})
+    # The synchronized preflight is the current-cycle editorial authority. The frozen
+    # opportunity preserves asset identity, but may retain a stale technical_setup lane.
+    pre_selected = pre.get('selected_opportunity') if isinstance(pre.get('selected_opportunity'), dict) else {}
+    selected = pre_selected or frozen
     symbol=str(selected.get('symbol') or '').upper().replace('USDT','')
     category=str(selected.get('category') or '').lower()
+    timing_state=str(selected.get('timing_state') or '').upper()
+    if timing_state == 'EXHAUSTED' or category in {'research_insight', 'research_only', 'no_trade'}:
+        print(json.dumps({'status':'SKIP','reason':'research-only editorial context; technical trade levels suppressed','symbol':symbol,'category':category,'timing_state':timing_state or None}))
+        return
     if category not in TECH_LANES or not symbol:
         print(json.dumps({'status':'SKIP','reason':'non-chart editorial lane'})); return
 

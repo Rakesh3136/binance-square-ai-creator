@@ -1,5 +1,9 @@
 import importlib.util
 import unittest
+import contextlib
+import io
+import json
+import tempfile
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -81,6 +85,33 @@ class EditorialContextSyncTests(unittest.TestCase):
         eligibility["trade_authorized"] = True
         result = evaluate(routing, frozen, eligibility, preflight, now)
         self.assertFalse(result["publish"])
+
+    def test_technical_enricher_respects_synced_research_only_lane(self):
+        tech_spec = importlib.util.spec_from_file_location("technical_enricher", ROOT / "src" / "technical_enricher.py")
+        tech = importlib.util.module_from_spec(tech_spec)
+        tech_spec.loader.exec_module(tech)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            preflight_path = root / "editorial_preflight.json"
+            frozen_path = root / "authoritative_opportunity.json"
+            preflight_path.write_text(json.dumps({"selected_opportunity": {
+                "symbol": "GNS", "category": "research_insight", "lane": "research_insight",
+                "timing_state": "EXHAUSTED",
+                "instruction": "Explain the move; do not provide trade levels."
+            }}), encoding="utf-8")
+            frozen_path.write_text(json.dumps({"symbol": "GNS", "category": "technical_setup",
+                "lane": "technical_setup", "trade_setup": {"entry": 0.5, "sl": 0.4, "tp1": 0.6}}), encoding="utf-8")
+            tech.PREFLIGHT = preflight_path
+            tech.AUTHORITATIVE = frozen_path
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                tech.main()
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["status"], "SKIP")
+            self.assertEqual(result["category"], "research_insight")
+            self.assertEqual(result["timing_state"], "EXHAUSTED")
+            self.assertIn("trade levels suppressed", result["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()
