@@ -25,9 +25,16 @@ def rows(p):
     return out
 def pid(x): return str(x.get("canonical_post_id") or x.get("post_id") or x.get("publication_id") or "").strip().lower()
 def num(x,*ks):
-    for k in ks:
-        try:return float(x.get(k,0) or 0)
-        except Exception:pass
+    # Square's collector stores metrics under a nested "metrics" object.
+    # Keep direct-field support for older/imported rows, but fall back to the
+    # canonical nested shape instead of silently recording every metric as 0.
+    metrics=x.get("metrics") if isinstance(x.get("metrics"),dict) else {}
+    for source in (x,metrics):
+        for k in ks:
+            try:
+                value=float(source.get(k,0) or 0)
+                if value == value and abs(value) != float("inf"): return value
+            except Exception: pass
     return 0.0
 def main():
     attrs={pid(x):x for x in rows(ATTR) if pid(x)}; perf={pid(x):x for x in rows(PERF) if pid(x)}
