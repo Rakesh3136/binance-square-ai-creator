@@ -27,6 +27,37 @@ class EditorialContextSyncTests(unittest.TestCase):
         self.assertNotIn("creator_brain_decision", result["preflight"])
         self.assertFalse(result["trade_authorized"])
 
+
+    def test_exhausted_timing_downgrades_stale_setup_to_research(self):
+        now, routing, frozen, eligibility, preflight = self.fixtures()
+        frozen.update({
+            "category": "technical_setup", "lane": "technical_setup",
+            "trade_setup": {"entry": 10, "sl": 9, "tp1": 12},
+            "entry_trigger": 10, "tp1": 12, "sl": 9, "direction": "LONG",
+        })
+        eligibility["selected"] = {
+            "symbol": "MAGIC", "category": "research_insight",
+            "timing_state": "EXHAUSTED",
+            "timing_reason": "move is too extended for a fresh entry",
+        }
+        result = evaluate(routing, frozen, eligibility, preflight, now)
+        self.assertTrue(result["publish"])
+        selected = result["preflight"]["selected_opportunity"]
+        self.assertEqual(selected["category"], "research_insight")
+        self.assertEqual(selected["lane"], "research_insight")
+        self.assertNotIn("trade_setup", selected)
+        self.assertNotIn("entry_trigger", selected)
+        self.assertNotIn("tp1", selected)
+        self.assertNotIn("sl", selected)
+        self.assertIn("timing is exhausted", selected["instruction"])
+
+    def test_eligibility_asset_mismatch_blocks_sync(self):
+        now, routing, frozen, eligibility, preflight = self.fixtures()
+        eligibility["selected"] = {"symbol": "QNT", "category": "research_insight"}
+        result = evaluate(routing, frozen, eligibility, preflight, now)
+        self.assertFalse(result["publish"])
+        self.assertIn("publication eligibility asset does not match frozen opportunity", result["reasons"])
+
     def test_asset_mismatch_blocks(self):
         now, routing, frozen, eligibility, preflight = self.fixtures()
         frozen["symbol"] = "QNT"
