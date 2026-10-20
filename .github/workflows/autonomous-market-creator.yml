@@ -541,8 +541,20 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
           set -euo pipefail
+          set +e
           python src/nic_editorial_lane_gate.py
+          gate_rc=$?
+          set -e
           python -m json.tool data/live/nic_editorial_lane_gate.json >/dev/null
+          # Exit 24 is the gate's intentional "not eligible" result. Treat it as a
+          # successful no-publish decision only when the emitted artifact is a valid,
+          # explicit BLOCKED result; unexpected runtime errors remain hard failures.
+          if [ "$gate_rc" -eq 24 ]; then
+            python -c 'import json,sys; x=json.load(open("data/live/nic_editorial_lane_gate.json")); ok=x.get("schema") == "NIC-EDITORIAL-LANE-1.2" and x.get("status") == "BLOCKED" and x.get("publish") is False and isinstance(x.get("reasons"), list) and len(x["reasons"]) > 0; print("Validated safe editorial block:", "; ".join(x.get("reasons", []))); sys.exit(0 if ok else 1)'
+          elif [ "$gate_rc" -ne 0 ]; then
+            echo "::error::Editorial lane gate crashed with exit code $gate_rc."
+            exit "$gate_rc"
+          fi
           publish=$(python -c 'import json; print(str(json.load(open("data/live/nic_editorial_lane_gate.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           if [ "$publish" = "true" ]; then
@@ -550,8 +562,7 @@ jobs:
           else
             echo "Editorial lane safely blocked publication; downstream publisher steps must remain skipped."
           fi
-          # A well-formed BLOCKED decision is a successful safety outcome, not a CI error.
-          # The explicit publish=false output keeps all publication-dependent steps disabled.
+          # Only an explicit, schema-valid publish=true can enable downstream publication.
 
       - name: NIC 24.2 Evidence-to-Content Integrity — authoritative publication gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
