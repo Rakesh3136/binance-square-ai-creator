@@ -83,8 +83,8 @@ class PublishingPauseTest(unittest.TestCase):
         final_gate = step_block("Final NIC 21 and editorial revalidation")
 
         self.assertIn("steps.final_quality_gate.outputs.publish == 'true'", authorization)
-        self.assertIn("if: ${{ false }}", payload)
-        self.assertIn("if: ${{ false }}", publisher_step)
+        self.assertIn("steps.publication_authorization.outputs.authorized == 'true' && false", payload)
+        self.assertIn("steps.publication_authorization.outputs.authorized == 'true' && false", publisher_step)
         self.assertIn("PUBLISHING_ENABLED: 'false'", publisher_step)
         self.assertIn("Emergency pause", payload)
         self.assertIn("Independent hard stop", publisher_step)
