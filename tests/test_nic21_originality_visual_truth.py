@@ -30,7 +30,7 @@ def test_visual_truth_rejects_symbol_mismatch(monkeypatch, tmp_path):
     meta.write_text(json.dumps({"symbol": "BINANCE:ETHUSDT"}), encoding="utf-8")
     monkeypatch.setattr(n, "VISUAL_META", meta)
     monkeypatch.setattr(n, "VISUAL_FILE", tmp_path / "missing.png")
-    result = n.visual_truth("$BTC is being watched.", {"symbol": "BTC"}, "BTC")
+    result = n.visual_truth("$BTC setup.\\nEntry trigger: 100\\nTP1: 110\\nTP2: 120\\nSL / invalidation: 95", {"symbol": "BTC"}, "BTC")
     assert result["status"] == "FAIL"
     assert any("visual symbol" in x for x in result["failures"])
 
