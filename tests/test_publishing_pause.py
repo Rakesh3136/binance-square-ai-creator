@@ -82,13 +82,12 @@ class PublishingPauseTest(unittest.TestCase):
         publisher_step = step_block("Extract publication and submit to Binance Square")
         final_gate = step_block("Final NIC 21 and editorial revalidation")
 
-        self.assertNotIn("if: ${{ false }}", authorization)
-        self.assertNotIn("if: ${{ false }}", payload)
-        self.assertNotIn("if: ${{ false }}", publisher_step)
         self.assertIn("steps.final_quality_gate.outputs.publish == 'true'", authorization)
-        self.assertIn("steps.publication_authorization.outputs.authorized == 'true'", payload)
-        self.assertIn("steps.publication_authorization.outputs.authorized == 'true'", publisher_step)
-        self.assertIn("PUBLISHING_ENABLED: 'true'", publisher_step)
+        self.assertIn("if: ${{ false }}", payload)
+        self.assertIn("if: ${{ false }}", publisher_step)
+        self.assertIn("PUBLISHING_ENABLED: 'false'", publisher_step)
+        self.assertIn("Emergency pause", payload)
+        self.assertIn("Independent hard stop", publisher_step)
         self.assertIn("DRAFT_PATH:", final_gate)
 
     def test_publisher_requires_exact_text_hashes_from_all_quality_gates(self):
