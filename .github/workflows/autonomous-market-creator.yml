@@ -165,8 +165,10 @@ jobs:
           from pathlib import Path
           root = Path("data/intelligence")
           report = json.loads((root / "nic_portfolio_reality.json").read_text(encoding="utf-8"))
-          snapshots_path = root / "nic_forecast_truth_ledger.jsonl"
-          outcomes_path = root / "nic_forecast_outcome_events.jsonl"
+          # Portfolio Reality is calculated from the frozen prospective shadow cohort,
+          # not the separate broad truth ledger. Validate hashes/counts against its true inputs.
+          snapshots_path = root / "nic_forecast_prospective_cohort.jsonl"
+          outcomes_path = root / "nic_forecast_prospective_outcome_events.jsonl"
           snapshots = [json.loads(line) for line in snapshots_path.read_text(encoding="utf-8").splitlines() if line.strip()]
           outcomes = [json.loads(line) for line in outcomes_path.read_text(encoding="utf-8").splitlines() if line.strip()]
           files = report.get("source_file_evidence") or {}
