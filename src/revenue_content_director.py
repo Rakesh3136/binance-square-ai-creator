@@ -18,7 +18,12 @@ try:
 except ModuleNotFoundError:
     from nic_reward_evidence import canonical_post_id, is_verified_reward_event
 
-try:\n    from src.nic_owner_reported_rewards import load_owner_reported_rewards\nexcept ModuleNotFoundError:\n    from nic_owner_reported_rewards import load_owner_reported_rewards\n\nROOT = Path(__file__).resolve().parents[1]
+try:
+    from src.nic_owner_reported_rewards import load_owner_reported_rewards
+except ModuleNotFoundError:
+    from nic_owner_reported_rewards import load_owner_reported_rewards
+
+ROOT = Path(__file__).resolve().parents[1]
 ANALYTICS = ROOT / "analytics"
 LIVE = ROOT / "data" / "live"
 INTEL = ROOT / "data" / "intelligence"
@@ -117,7 +122,8 @@ def merge_rows():
         post_id = canonical_post_id(event)
         if post_id and is_verified_reward_event(event):
             rewards[post_id] = event
-    owner_rewards = load_owner_reported_rewards()\n    outcomes = defaultdict(list)
+    owner_rewards = load_owner_reported_rewards()
+    outcomes = defaultdict(list)
     for x in load_jsonl(OUTCOMES):
         if pid(x):
             outcomes[pid(x)].append(x)
@@ -187,7 +193,8 @@ def main():
     for key, items in groups.items():
         if len(items) < 2:
             continue
-        revenues = [r for r in (verified_revenue(x) for x in items) if r is not None]\n        owner_reported_revenues = [number(x, "_owner_reported_reward_amount_usdc") for x in items if number(x, "_owner_reported_reward_amount_usdc") > 0]
+        revenues = [r for r in (verified_revenue(x) for x in items) if r is not None]
+        owner_reported_revenues = [number(x, "_owner_reported_reward_amount_usdc") for x in items if number(x, "_owner_reported_reward_amount_usdc") > 0]
         conversions = [verified_conversions(x) for x in items if verified_conversions(x) > 0]
         engagement_scores = []
         views = []
@@ -206,7 +213,10 @@ def main():
             "dimensions": dict(zip(DIMENSIONS, key)),
             "samples": len(items),
             "verified_revenue_total_usdc": round(sum(revenues), 8) if revenues else None,
-            "verified_revenue_observations": len(revenues),\n            "owner_reported_revenue_total_usdc": round(sum(owner_reported_revenues), 8) if owner_reported_revenues else None,\n            "owner_reported_reward_observations": sum(int(x.get("_owner_reported_reward_event_count") or 0) for x in items),\n            "owner_reported_revenue_evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED" if owner_reported_revenues else None,
+            "verified_revenue_observations": len(revenues),
+            "owner_reported_revenue_total_usdc": round(sum(owner_reported_revenues), 8) if owner_reported_revenues else None,
+            "owner_reported_reward_observations": sum(int(x.get("_owner_reported_reward_event_count") or 0) for x in items),
+            "owner_reported_revenue_evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED" if owner_reported_revenues else None,
             "verified_conversions_total": round(sum(conversions), 6) if conversions else None,
             "avg_engagement_score": round(sum(engagement_scores) / len(engagement_scores), 6) if engagement_scores else None,
             "avg_views": round(sum(views) / len(views), 2) if views else None,
@@ -217,7 +227,8 @@ def main():
     # Revenue is only an evidence flag/tie-breaker. No revenue-based causal
     # claim is made and small samples remain exploration candidates.
     def rank(x):
-        rev = x["verified_revenue_total_usdc"] or 0.0\n        owner_reported_rev = x["owner_reported_revenue_total_usdc"] or 0.0
+        rev = x["verified_revenue_total_usdc"] or 0.0
+        owner_reported_rev = x["owner_reported_revenue_total_usdc"] or 0.0
         conv = x["verified_conversions_total"] or 0.0
         eng = x["avg_engagement_score"] or 0.0
         outcome = x["avg_outcome_score"] or 0.0
@@ -242,7 +253,8 @@ def main():
         "generated_at": now,
         "status": readiness_status(accepted_reward_count, rows),
         "verified_data_policy": {
-            "revenue_requires_exact_post_id_and_hashed_timestamped_evidence": True,\n            "owner_reported_revenue_is_separate_and_not_independently_verified": True,
+            "revenue_requires_exact_post_id_and_hashed_timestamped_evidence": True,
+            "owner_reported_revenue_is_separate_and_not_independently_verified": True,
             "legacy_verified_flags_without_reward_proof_are_ignored": True,
             "reader_trades_never_inferred": True,
             "revenue_never_inferred_from_views_or_engagement": True,
@@ -250,7 +262,9 @@ def main():
             "missing_attribution_is_not_repaired_by_guessing": True,
         },
         "inputs": {
-            "reward_event_count": len(raw_reward_events),\n            "owner_reported_reward_events_loaded": sum(x["event_count"] for x in load_owner_reported_rewards().values()),\n            "owner_reported_revenue_is_not_verified": True,
+            "reward_event_count": len(raw_reward_events),
+            "owner_reported_reward_events_loaded": sum(x["event_count"] for x in load_owner_reported_rewards().values()),
+            "owner_reported_revenue_is_not_verified": True,
             "accepted_verified_reward_events": accepted_reward_count,
             "rejected_reward_events": rejected_reward_count,
             "attributed_performance_rows": len(rows),
