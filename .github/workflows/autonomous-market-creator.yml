@@ -545,7 +545,13 @@ jobs:
           python -m json.tool data/live/nic_editorial_lane_gate.json >/dev/null
           publish=$(python -c 'import json; print(str(json.load(open("data/live/nic_editorial_lane_gate.json")).get("publish", False)).lower())')
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          test "$publish" = "true"
+          if [ "$publish" = "true" ]; then
+            echo "Editorial lane explicitly authorized publication."
+          else
+            echo "Editorial lane safely blocked publication; downstream publisher steps must remain skipped."
+          fi
+          # A well-formed BLOCKED decision is a successful safety outcome, not a CI error.
+          # The explicit publish=false output keeps all publication-dependent steps disabled.
 
       - name: NIC 24.2 Evidence-to-Content Integrity — authoritative publication gate
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' && steps.early_entry.outputs.publish == 'true' && steps.publication_eligibility.outputs.mode == 'TRADE' }}
