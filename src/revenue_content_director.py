@@ -141,6 +141,10 @@ def merge_rows():
                       "hook_type", "reader_payoff_type", "style", "visual_attached"):
             if merged_row.get(field) in (None, "") and attr[post].get(field) not in (None, ""):
                 merged_row[field] = attr[post][field]
+        owner_reward = owner_rewards.get(post)
+        if owner_reward is not None:
+            merged_row["_owner_reported_reward_amount_usdc"] = owner_reward["amount_usdc"]
+            merged_row["_owner_reported_reward_event_count"] = owner_reward["event_count"]
         reward = rewards.get(post)
         if reward is not None:
             merged_row["_verified_reward_event"] = True
