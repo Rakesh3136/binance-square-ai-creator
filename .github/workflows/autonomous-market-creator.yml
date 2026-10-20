@@ -640,7 +640,7 @@ jobs:
 
       - name: Build final publication payload
         # Emergency pause: keep automatic publication disabled until explicitly re-enabled in a reviewed change.
-        if: ${{ false }}
+        if: ${{ steps.publication_authorization.outputs.authorized == 'true' && false }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
