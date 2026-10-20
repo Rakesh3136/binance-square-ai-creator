@@ -55,10 +55,29 @@ def test_missing_attestation_blocks():
     assert "author_attestation_missing" in result["failures"]
 
 
+def test_policy_allows_editorial_autopublish_without_claiming_human_review():
+    post = "A research note on market participation and volatility."
+    result = gate.evaluate(post, {}, requires_human_review=False)
+    assert result["status"] == "NOT_REQUIRED_BY_POLICY"
+    assert result["publish"] is True
+    assert result["human_review_required"] is False
+    assert result["human_review_performed"] is False
+    assert result["failures"] == []
+
+
+def test_missing_policy_default_remains_fail_closed():
+    result = gate.evaluate("Editorial draft.", {})
+    assert result["status"] == "BLOCKED"
+    assert result["publish"] is False
+    assert result["human_review_required"] is True
+
+
 if __name__ == "__main__":
     test_valid_human_review_passes()
     test_missing_human_input_blocks()
     test_stale_review_hash_blocks()
     test_short_generic_contribution_blocks()
     test_missing_attestation_blocks()
+    test_policy_allows_editorial_autopublish_without_claiming_human_review()
+    test_missing_policy_default_remains_fail_closed()
     print("NIC human creator contribution tests passed")
