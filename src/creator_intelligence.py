@@ -90,8 +90,42 @@ def load_our_recent_results():
     return rows
 
 
+def rolling_archetypes(rows, days, now):
+    grouped=defaultdict(lambda:{"samples":0,"views":0.0,"likes":0.0,"replies":0.0,"shares":0.0})
+    dated_count=0; creators=set()
+    for row in rows:
+        raw=row.get("posted_at") or row.get("published_at") or row.get("created_at")
+        if not raw: continue
+        try:
+            stamp=datetime.fromisoformat(str(raw).replace("Z","+00:00"))
+            if stamp.tzinfo is None: continue
+            age=(now-stamp.astimezone(timezone.utc)).total_seconds()/86400
+            if age < -0.25 or age > days: continue
+        except (ValueError,TypeError): continue
+        dated_count+=1
+        creator=str(row.get("creator_id") or row.get("creator") or "").strip()
+        if creator and creator.lower()!="unknown": creators.add(creator)
+        text=str(row.get("text") or row.get("post") or "")
+        name=str(row.get("archetype") or classify(text))
+        item=grouped[name]; item["samples"]+=1
+        for key in ("views","likes","replies","shares"): item[key]+=metric(row,key)
+    ranking=[]
+    for name,item in grouped.items():
+        n=item["samples"]; views=item["views"]
+        if n<3: continue
+        ranking.append({"archetype":name,"samples":n,"avg_views":round(views/n,2),
+          "avg_replies":round(item["replies"]/n,2),"avg_shares":round(item["shares"]/n,2),
+          "reply_rate":round(item["replies"]/max(1,views),5),
+          "engagement_rate":round((item["likes"]+2*item["replies"]+3*item["shares"])/max(1,views),5),
+          "confidence":"medium" if n>=10 else "tentative"})
+    ranking.sort(key=lambda x:(x["engagement_rate"],x["reply_rate"],x["samples"]),reverse=True)
+    return {"window_days":days,"dated_posts":dated_count,"distinct_creators":len(creators),
+      "performance_by_archetype":ranking[:10],"earnings_status":"PUBLIC_METRICS_ONLY_NOT_EARNINGS"}
+
+
 def main():
     examples=load_examples(); our_results=load_our_recent_results()
+    now=datetime.now(timezone.utc)
     archetype_counts=Counter(); format_counts=Counter(); length_buckets=Counter(); question_patterns=Counter(); visual_patterns=Counter()
     creator_counts=Counter(); source_counts=Counter(); performance=defaultdict(lambda:{"n":0,"views":0,"likes":0,"replies":0,"shares":0,"followers":0})
     creator_performance=defaultdict(lambda:{"n":0,"replies":0,"followers":0,"likes":0,"shares":0,"views":0})
@@ -166,6 +200,8 @@ def main():
         "archetype_counts":dict(archetype_counts),"format_counts":dict(format_counts),"length_buckets":dict(length_buckets),
         "question_patterns":question_patterns.most_common(20),"visual_patterns":visual_patterns.most_common(20),
         "performance_by_archetype":ranked,"creator_benchmarks":creator_ranked[:30],
+        "rolling_learning_windows":{"seven_day":rolling_archetypes(examples,7,now),"fourteen_day":rolling_archetypes(examples,14,now)},
+        "research_limits":{"undated_posts_excluded_from_rolling_windows":True,"public_metrics_are_not_earnings":True,"verified_reward_events_required_for_earnings_claims":True},
         "our_account_performance_by_format":our_ranked,"our_account_performance_by_experiment":our_experiment_ranked,
         "our_baseline":{"samples":len(our_results),"avg_views":round(baseline_views,2),"avg_replies":round(baseline_replies,2),"avg_followers":round(baseline_followers,2)},
         "reusable_rules":[

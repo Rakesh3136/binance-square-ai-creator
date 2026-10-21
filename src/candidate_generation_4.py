@@ -40,6 +40,7 @@ def build_public_pattern_brief(patterns: dict) -> dict:
         float(row.get("follower_rate") or 0),
         float(row.get("avg_shares") or 0),
     ), reverse=True)
+    rolling = patterns.get("rolling_learning_windows") if isinstance(patterns.get("rolling_learning_windows"), dict) else {}
     formats = patterns.get("format_counts") if isinstance(patterns.get("format_counts"), dict) else {}
     format_summary = [
         {"format": str(name)[:60], "samples": int(count)}
@@ -55,6 +56,14 @@ def build_public_pattern_brief(patterns: dict) -> dict:
         "creator_count": int(patterns.get("creator_count") or 0),
         "top_archetypes_by_observed_reply_and_follower_rate": eligible[:5],
         "observed_format_counts": format_summary,
+        "rolling_learning_windows": {
+            "seven_day": rolling.get("seven_day") if isinstance(rolling.get("seven_day"), dict) else {},
+            "fourteen_day": rolling.get("fourteen_day") if isinstance(rolling.get("fourteen_day"), dict) else {},
+        },
+        "research_limits": patterns.get("research_limits") if isinstance(patterns.get("research_limits"), dict) else {
+            "public_metrics_are_not_earnings": True,
+            "undated_posts_excluded_from_rolling_windows": True,
+        },
         "our_account_baseline": patterns.get("our_baseline") if isinstance(patterns.get("our_baseline"), dict) else {},
         "guardrails": [
             "Public metrics are observational, not causal or earnings evidence.",

@@ -19,7 +19,7 @@ def benchmark_refresh_due(now=None, state_path=BENCHMARK_STATE):
         last_run = datetime.fromisoformat(str(state.get('last_run', '')).replace('Z', '+00:00'))
         if last_run.tzinfo is None:
             return True
-        interval = timedelta(hours=24) if state.get('last_status') == 'PUBLIC_FEED_UNAVAILABLE_OR_EMPTY' else timedelta(days=7)
+        interval = timedelta(hours=24)
         return now - last_run.astimezone(timezone.utc) >= interval
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return True
