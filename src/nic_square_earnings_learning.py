@@ -292,7 +292,10 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     reward_summary = collect_verified_rewards(reward_events, now)
     own_summary = summarize_own_content(now, own_attribution or [], own_performance or [])
 
-    creator_study_queue = []
+    # Build a balanced research queue across creator styles and discovery signals.
+    # A single high-engagement archetype must not crowd out educational, chart,
+    # news, on-chain, macro or discussion-focused creators.
+    creator_candidates_by_archetype = defaultdict(list)
     seen_creators = set()
     for window_name, window in (("fourteen_day", fourteen), ("seven_day", seven)):
         for ranking in ("top_by_public_engagement", "top_by_discussion_and_shares", "top_by_median_reach"):
@@ -303,31 +306,59 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
                 if not cid or cid in seen_creators or int(creator.get("posts") or 0) < 3:
                     continue
                 seen_creators.add(cid)
-                creator_study_queue.append({
+                archetypes = [str(x).strip() for x in creator.get("dominant_archetypes", []) if str(x).strip() and str(x).lower() != "unknown"]
+                item = {
                     "creator": str(creator.get("creator") or "unknown"),
                     "creator_id": cid,
                     "discovery_window": int(window.get("window_days") or (14 if window_name == "fourteen_day" else 7)),
                     "posts_observed": int(creator.get("posts") or 0),
-                    "dominant_archetypes": creator.get("dominant_archetypes", []),
+                    "dominant_archetypes": archetypes,
                     "public_engagement_rate": creator.get("mean_public_engagement_rate"),
                     "median_views": creator.get("median_views"),
                     "reply_rate": creator.get("reply_rate"),
                     "share_rate": creator.get("share_rate"),
                     "sample_urls": (creator.get("sample_urls") or [])[:5],
                     "earnings_status": "NOT_PUBLICLY_VERIFIED",
-                    "study_objective": "Study repeatable structures across multiple posts; do not copy text or infer private rewards.",
-                })
-                if len(creator_study_queue) >= 24:
-                    break
-            if len(creator_study_queue) >= 24:
-                break
-        if len(creator_study_queue) >= 24:
-            break
+                    "discovery_signal": ranking,
+                    "study_objective": "Study repeated structures across multiple posts; do not copy wording or infer private rewards.",
+                }
+                for archetype_name in (archetypes or ["general"]):
+                    creator_candidates_by_archetype[archetype_name].append(item)
+    # Round-robin archetypes; stable ordering makes CI and research runs reproducible.
+    creator_study_queue = []
+    selected_ids = set()
+    archetype_names = sorted(creator_candidates_by_archetype)
+    while archetype_names and len(creator_study_queue) < 24:
+        next_round = []
+        for archetype_name in archetype_names:
+            candidates = creator_candidates_by_archetype[archetype_name]
+            while candidates and candidates[0]["creator_id"] in selected_ids:
+                candidates.pop(0)
+            if candidates and len(creator_study_queue) < 24:
+                item = candidates.pop(0)
+                selected_ids.add(item["creator_id"])
+                creator_study_queue.append(item)
+            if candidates:
+                next_round.append(archetype_name)
+        archetype_names = next_round
+
+    # Keep public earnings claims as a separate lead list. These claims are
+    # useful for discovering creators to study, but they are never treated as
+    # verified income or merged into the public-performance ranking.
+    public_claim_research = analyze_public_reward_claims(public_examples or [], now)
+    claim_study_queue = [{
+        "creator": row.get("creator", "unknown"),
+        "creator_id": row.get("creator_id", ""),
+        "sample_urls": row.get("sample_urls", [])[:5],
+        "claim_posts_14d": row.get("claim_posts_14d", 0),
+        "discovery_window": 14,
+        "earnings_status": "UNVERIFIED_PUBLIC_SELF_REPORT",
+        "study_objective": "Review public claim context and repeated content formats; never treat the claim as payout proof.",
+    } for row in public_claim_research.get("claims", [])[:20]]
 
     benchmark_state = str(benchmark.get("status") or "UNKNOWN")
     older_count = int((fourteen.get("coverage") or {}).get("posts_age_8_to_14_days") or 0)
     coverage_status = "FULL_7_AND_14_DAY_COVERAGE" if older_count > 0 else "14_DAY_SAMPLE_GAP_KEEP_COLLECTING"
-    public_claim_research = analyze_public_reward_claims(public_examples or [], now)
     return {
         "schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0",
         "generated_at": now.isoformat(),
@@ -364,7 +395,15 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "public_views_or_engagement_are_earnings_evidence": False,
         },
         "creator_study_queue": creator_study_queue,
+        "creator_research_coverage": {
+            "window_days": [7, 14],
+            "selected_creator_count": len(creator_study_queue),
+            "represented_archetypes": sorted({name for creator in creator_study_queue for name in creator.get("dominant_archetypes", [])}),
+            "selection_signals": ["public_engagement", "discussion_and_shares", "median_reach"],
+            "selection_policy": "Archetype-stratified round-robin; public performance is not proof of earnings.",
+        },
         "public_self_reported_earnings_claims": public_claim_research,
+        "self_reported_earnings_creator_study_queue": claim_study_queue,
         "best_public_format_hypotheses": hypotheses,
         "own_account_performance": own_summary,
         "historical_own_account_baseline": patterns.get("our_baseline") if isinstance(patterns.get("our_baseline"), dict) else {},
