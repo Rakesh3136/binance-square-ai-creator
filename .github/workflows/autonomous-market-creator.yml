@@ -25,6 +25,10 @@ on:
       - 'data/intelligence/square_creator_benchmark.json'
       - 'data/intelligence/creator_patterns.json'
       - 'data/live/square_creator_benchmark_report.json'
+      - 'analytics/square_creator_benchmark_history.jsonl'
+      - 'analytics/nic_square_earnings_learning_memory.json'
+      - 'data/live/nic_square_earnings_learning.json'
+      - 'data/intelligence/nic_square_earnings_learning_report.json'
       - 'analytics/square_creator_benchmark_state.json'
   schedule:
     - cron: '*/20 * * * *'
@@ -191,6 +195,10 @@ jobs:
           run_component cross_asset_impact_engine python src/cross_asset_impact_engine.py
           run_component original_research_engine python src/original_research_engine.py
           run_component run_creator_intelligence python src/run_creator_intelligence.py
+          # Build the 7/14-day public creator study queue after benchmark refresh and before the writer selects its content strategy.
+          run_component nic_square_earnings_learning python src/nic_square_earnings_learning.py
+          if [ -s data/live/nic_square_earnings_learning.json ]; then python -m json.tool data/live/nic_square_earnings_learning.json >/dev/null || { echo "FAILED nic_square_earnings_learning_json_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_square_earnings_learning_artifact_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
+          if [ -s data/intelligence/nic_square_earnings_learning_report.json ]; then python -m json.tool data/intelligence/nic_square_earnings_learning_report.json >/dev/null || { echo "FAILED nic_square_earnings_learning_report_validation" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); }; else echo "FAILED nic_square_earnings_learning_report_missing" | tee -a data/live/intelligence_diagnostics/summary.txt; failures=$((failures+1)); fi
           run_component editorial_preflight python src/editorial_preflight.py
           cat data/live/intelligence_diagnostics/summary.txt
           if [ "$failures" -ne 0 ]; then echo "Intelligence refresh failed in $failures component(s). Publication remains blocked; inspect diagnostics."; exit 1; fi
@@ -698,7 +706,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Fail closed before staging: derived metrics must match the exact prospective ledgers.
           python src/nic_evidence_reconciliation_gate.py
-          git add -- data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_forecast_prospective_cohort.jsonl data/intelligence/nic_forecast_prospective_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_profitability.json data/intelligence/nic_portfolio_reality.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_regime_history.jsonl data/live/nic_forecast_laboratory.json data/live/nic_revenue_pattern_lab.json data/intelligence/nic_revenue_pattern_lab_report.json data/live/revenue_content_director.json data/intelligence/revenue_content_director_report.json data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json
+          git add -- data/intelligence/nic_forecast_truth_ledger.jsonl data/intelligence/nic_forecast_outcome_events.jsonl data/intelligence/nic_forecast_prospective_cohort.jsonl data/intelligence/nic_forecast_prospective_outcome_events.jsonl data/intelligence/nic_signal_predictivity_matrix.json data/intelligence/nic_forecast_calibration.json data/intelligence/nic_forecast_profitability.json data/intelligence/nic_portfolio_reality.json data/intelligence/nic_forecast_laboratory_report.json data/intelligence/nic_regime_history.jsonl data/live/nic_forecast_laboratory.json data/live/nic_revenue_pattern_lab.json data/intelligence/nic_revenue_pattern_lab_report.json data/live/revenue_content_director.json data/intelligence/revenue_content_director_report.json data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json  analytics/square_creator_benchmark_history.jsonl analytics/nic_square_earnings_learning_memory.json data/live/nic_square_earnings_learning.json data/intelligence/nic_square_earnings_learning_report.json  analytics/square_creator_benchmark_history.jsonl analytics/nic_square_earnings_learning_memory.json data/live/nic_square_earnings_learning.json data/intelligence/nic_square_earnings_learning_report.json data/intelligence/public_square_examples.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json
           if git diff --cached --quiet; then
             echo "No Forecast Laboratory evidence changes to persist."
             exit 0
