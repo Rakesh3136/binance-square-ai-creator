@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 from src.nic_square_profile_research import (
-    build_candidates, profile_username, post_id_from_url, research_profiles,
+    build_candidates, profile_username, post_id_from_url, research_profiles, _parse_profile_post,
 )
 
 NOW = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
@@ -27,6 +27,48 @@ class SquareProfileResearchTests(unittest.TestCase):
         self.assertEqual(sum(1 for c in candidates if (c.get("username") or c["creator"]).casefold() == "alpha"), 1)
         self.assertEqual(candidates[0]["earnings_status"], "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT")
         self.assertEqual(next(c for c in candidates if c["creator"] == "Alpha")["username"], "Alpha")
+
+    def test_daily_rotation_changes_benchmark_creator_batch_but_keeps_leads_first(self):
+        benchmark = {"creator_benchmarks": [
+            {"creator": f"Creator{i:02d}", "sample_urls": [f"https://www.binance.com/en/square/post/{10000+i}"], "mean_public_engagement_rate": 0.1}
+            for i in range(30)
+        ]}
+        one = build_candidates([], benchmark, {"entries": []}, datetime(2026, 10, 21, 12, tzinfo=timezone.utc), limit=5)
+        two = build_candidates([], benchmark, {"entries": []}, datetime(2026, 10, 22, 12, tzinfo=timezone.utc), limit=5)
+        self.assertEqual(len(one), 5)
+        self.assertEqual(len(two), 5)
+        self.assertNotEqual([x["creator"] for x in one], [x["creator"] for x in two])
+        lead_benchmark = {"creator_benchmarks": benchmark["creator_benchmarks"]}
+        observed = {"entries": [{"creator": "VerifiedLead", "creator_profile_url": "https://www.binance.com/en/square/profile/VerifiedLead", "displayed_amount": 500, "currency": "USDC"}]}
+        selected = build_candidates([], lead_benchmark, observed, datetime(2026, 10, 21, 12, tzinfo=timezone.utc), limit=5)
+        self.assertEqual(selected[0]["creator"], "VerifiedLead")
+        self.assertEqual(len(selected), 5)
+
+    def test_suspicious_comment_counters_are_unknown_not_used_as_engagement(self):
+        profile = {"creator": "Alpha", "username": "Alpha", "square_uid": "uid-alpha",
+                   "creator_profile_url": "https://www.binance.com/en/square/profile/Alpha"}
+        suspicious = _parse_profile_post({
+            "id": "bad-count", "createTime": int(NOW.timestamp() * 1000) - 3600_000,
+            "bodyTextOnly": "An educational post discussing liquidity and market structure.",
+            "viewCount": 431, "likeCount": 20, "commentCount": 431, "shareCount": 4,
+        }, profile, NOW)
+        absent = _parse_profile_post({
+            "id": "no-comments", "createTime": int(NOW.timestamp() * 1000) - 3600_000,
+            "bodyTextOnly": "Another educational post discussing volume and market structure.",
+            "viewCount": 200, "likeCount": 5, "shareCount": 1,
+        }, profile, NOW)
+        genuine_zero = _parse_profile_post({
+            "id": "zero-comments", "createTime": int(NOW.timestamp() * 1000) - 3600_000,
+            "bodyTextOnly": "An original post about risk and portfolio construction.",
+            "viewCount": 200, "likeCount": 5, "commentCount": 0, "shareCount": 1,
+        }, profile, NOW)
+        self.assertIsNone(suspicious["replies"])
+        self.assertEqual(suspicious["reply_metric_status"], "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS")
+        self.assertFalse(suspicious["replies_observed"])
+        self.assertIsNone(absent["replies"])
+        self.assertEqual(absent["reply_metric_status"], "MISSING_COUNTER")
+        self.assertEqual(genuine_zero["replies"], 0)
+        self.assertEqual(genuine_zero["reply_metric_status"], "OBSERVED")
 
     def test_profile_research_uses_public_post_and_profile_endpoints_and_counts_7_14_day_windows(self):
         def fake_request(url, method="GET", payload=None, timeout=15.0):

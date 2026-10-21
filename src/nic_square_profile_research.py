@@ -13,7 +13,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -280,7 +280,27 @@ def build_candidates(examples: list[dict], benchmark: dict, observed: dict,
     }
     candidates.sort(key=lambda row: (source_rank.get(row["discovery_source"], 9),
                                     -float(row["priority"][1]), row["creator"].casefold()))
-    return candidates[:max(0, limit)]
+
+    # Always retain actual observed-leaderboard and public-claim leads first.
+    # Rotate the much larger performance-benchmark pool by day so NIC does not
+    # research the same 12 creators forever. A week-based cursor stored nowhere
+    # is reproducible from UTC date and safe to rerun.
+    limit = max(0, int(limit))
+    lead_candidates = [row for row in candidates if source_rank.get(row["discovery_source"], 9) < 3]
+    benchmark_candidates = [row for row in candidates if source_rank.get(row["discovery_source"], 9) >= 3]
+    selected = lead_candidates[:limit]
+    remaining = limit - len(selected)
+    if remaining > 0 and benchmark_candidates:
+        anchor = date(2020, 1, 1)
+        rotation_day = max(0, (now.astimezone(timezone.utc).date() - anchor).days)
+        offset = (rotation_day * remaining) % len(benchmark_candidates)
+        rotated = benchmark_candidates[offset:] + benchmark_candidates[:offset]
+        selected.extend(rotated[:remaining])
+        for row in rotated[:remaining]:
+            row["rotation_batch_offset"] = offset
+            row["benchmark_candidate_pool_size"] = len(benchmark_candidates)
+            row["rotation_day_utc"] = now.astimezone(timezone.utc).date().isoformat()
+    return selected
 
 
 def _resolve_user(candidate: dict, request_json=public_json_request) -> tuple[dict, str]:
@@ -359,6 +379,25 @@ def _resolve_user(candidate: dict, request_json=public_json_request) -> tuple[di
     }, uid)
 
 
+def _observed_metric(row: dict, *keys: str) -> tuple[float | None, str | None]:
+    """Return a public counter only when its source field is present and numeric."""
+    containers = [row]
+    for key in ("stats", "statistics", "metrics", "interaction", "engagement"):
+        if isinstance(row.get(key), dict):
+            containers.append(row[key])
+    for container in containers:
+        for key in keys:
+            if key not in container or container.get(key) is None:
+                continue
+            try:
+                value = float(container[key])
+                if value >= 0:
+                    return value, key
+            except (TypeError, ValueError, OverflowError):
+                continue
+    return None, None
+
+
 def _parse_profile_post(row: dict, profile: dict, now: datetime) -> dict | None:
     pid = normalize_id(row.get("id") or row.get("postId") or row.get("contentId") or row.get("articleId"))
     if not pid:
@@ -373,8 +412,18 @@ def _parse_profile_post(row: dict, profile: dict, now: datetime) -> dict | None:
         return None
     views = metric(row, "viewCount", "views", "view_num", "viewNum")
     likes = metric(row, "likeCount", "likes", "like_num", "likeNum")
-    replies = metric(row, "commentCount", "comments", "replyCount", "replyNum", "commentNum")
+    replies_raw, reply_source_key = _observed_metric(row, "commentCount", "comments", "replyCount", "replyNum", "commentNum")
     shares = metric(row, "shareCount", "shares", "shareNum")
+    reply_status = "OBSERVED"
+    replies = replies_raw
+    if replies_raw is None:
+        reply_status = "MISSING_COUNTER"
+    elif views >= 20 and replies_raw >= views:
+        # The first live crawl exposed suspicious rows where comment/reply count
+        # equalled the entire view count (e.g. 431 views and 431 replies).
+        # Do not feed these counters into engagement learning as real comments.
+        replies = None
+        reply_status = "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS"
     return {
         "source_type": "creator_profile_public_observation",
         "post_id": pid,
@@ -389,6 +438,9 @@ def _parse_profile_post(row: dict, profile: dict, now: datetime) -> dict | None:
         "archetype": archetype(text),
         "format": str(row.get("contentType") or row.get("cardType") or "unknown")[:80],
         "views": views, "likes": likes, "replies": replies, "shares": shares,
+        "reply_metric_status": reply_status,
+        "reply_metric_source_key": reply_source_key,
+        "replies_observed": reply_status == "OBSERVED",
         "followers_gained": None,
         "observed_at": now.isoformat(),
         "metrics_scope": "public_profile_post_metrics_only; follower_delta_and_write_to_earn_reward_not_publicly_available",
@@ -471,8 +523,20 @@ def _merge_example_rows(existing: list[dict], incoming: list[dict]) -> list[dict
                 if field not in merged or merged.get(field) in (None, "", {}, []):
                     merged[field] = value
         for field in ("views", "likes", "replies", "shares"):
-            if not merged.get(field) and row.get(field):
+            if not merged.get(field) and row.get(field) is not None:
                 merged[field] = row[field]
+        # A checked-but-suspicious reply metric must override an older scraped
+        # value for the same post; otherwise an earlier bad counter would persist.
+        if row.get("reply_metric_status") in {
+            "MISSING_COUNTER", "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS"
+        }:
+            merged["replies"] = None
+            merged["reply_metric_status"] = row["reply_metric_status"]
+            merged["replies_observed"] = False
+        elif row.get("reply_metric_status") == "OBSERVED":
+            merged["reply_metric_status"] = "OBSERVED"
+            merged["reply_metric_source_key"] = row.get("reply_metric_source_key")
+            merged["replies_observed"] = True
         merged["creator_profile_url"] = merged.get("creator_profile_url") or row.get("creator_profile_url")
         merged["research_sources"] = list(dict.fromkeys((merged.get("research_sources") or []) + ["profile-directed-public-fetch"]))
         by_id[key] = merged
@@ -540,6 +604,10 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
         "profile_target_limit": MAX_PROFILE_TARGETS,
         "post_page_limit_per_profile": MAX_PAGES_PER_PROFILE,
         "candidate_count": min(len(candidates), MAX_PROFILE_TARGETS),
+        "rotation_strategy": "daily round-robin over public performance benchmarks; observed leaderboard leads and public claims take priority",
+        "rotation_day_utc": now.date().isoformat(),
+        "benchmark_candidate_pool_size": max((int(c.get("benchmark_candidate_pool_size") or 0) for c in candidates), default=0),
+        "rotation_batch_offset": max((int(c.get("rotation_batch_offset") or 0) for c in candidates), default=0),
         "profiles_resolved": len(profiles),
         "profile_resolution_failures": len(failures),
         "posts_collected_7d": seven_count,

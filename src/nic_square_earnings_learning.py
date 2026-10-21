@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.parse
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -28,6 +29,7 @@ BENCHMARK = INTEL / "square_creator_benchmark.json"
 PATTERNS = INTEL / "creator_patterns.json"
 EXAMPLES = INTEL / "public_square_examples.json"
 REWARD_EVENTS = ANALYTICS / "wte_reward_events.jsonl"
+OWNER_REPORTED_REWARDS = ANALYTICS / "wte_owner_reported_reward_events.jsonl"
 ATTRIBUTION = ANALYTICS / "publication_attribution.jsonl"
 PERFORMANCE = ANALYTICS / "square_performance.jsonl"
 OUT = LIVE / "nic_square_earnings_learning.json"
@@ -120,11 +122,16 @@ def summarize_own_content(now: datetime, attribution_rows: list[dict], performan
             if not published or published < cutoff or published > now:
                 continue
             category = str(publication.get("category") or "unknown")
+            metrics = perf.get("metrics") if isinstance(perf.get("metrics"), dict) else {}
+            follow_keys = ("follows", "new_follows", "followers_gained")
+            follows_observed = any(key in perf or key in metrics for key in follow_keys)
             sample = {
                 "views": number(perf, "views", "view_count", "impressions"),
                 "likes": number(perf, "likes", "like_count"),
                 "replies": number(perf, "comments", "replies", "reply_count"),
                 "shares": number(perf, "shares", "share_count"),
+                "follows": number(perf, *follow_keys) if follows_observed else None,
+                "follows_observed": follows_observed,
             }
             eligible.append(sample)
             groups[category].append(sample)
@@ -134,6 +141,8 @@ def summarize_own_content(now: datetime, attribution_rows: list[dict], performan
             likes = sum(x["likes"] for x in samples)
             replies = sum(x["replies"] for x in samples)
             shares = sum(x["shares"] for x in samples)
+            observed_follow_rows = [x for x in samples if x.get("follows_observed")]
+            follows = sum(x["follows"] for x in observed_follow_rows)
             return {
                 "posts": n,
                 "avg_views": round(views / n, 2) if n else None,
@@ -141,6 +150,10 @@ def summarize_own_content(now: datetime, attribution_rows: list[dict], performan
                 "reply_rate_per_view": round(replies / max(1, views), 6),
                 "share_rate_per_view": round(shares / max(1, views), 6),
                 "weighted_engagement_per_1000_views": round((likes + 2 * replies + 3 * shares) * 1000 / max(1, views), 4),
+                "total_follows": follows if observed_follow_rows else None,
+                "follow_metric_coverage_posts": len(observed_follow_rows),
+                "follow_rate_per_view": round(follows / max(1, views), 6) if observed_follow_rows else None,
+                "weighted_engagement_formula": "internal proxy: likes + 2*comments + 3*shares; follows tracked separately because Binance's proprietary weights are not public",
                 "evidence": "OWN_ACCOUNT_PUBLIC_METRICS_NOT_REVENUE",
             }
         per_window[str(days) + "_day"] = {
@@ -185,6 +198,98 @@ def collect_verified_rewards(events: list[dict], now: datetime) -> dict:
         "rejection_reason_counts": dict(reasons),
         "exact_post_attribution_required": True,
         "public_metrics_used_as_revenue": False,
+    }
+
+
+def summarize_owner_reported_reward_feedback(events: list[dict], now: datetime) -> dict:
+    """Summarize exact-post reward reports supplied by the account owner without upgrading their verification status."""
+    cutoff_7d = now - timedelta(days=7)
+    cutoff_14d = now - timedelta(days=14)
+    seen_event_ids = set()
+    accepted = []
+    rejected = 0
+    duplicates = 0
+    for event in events:
+        if not isinstance(event, dict):
+            rejected += 1
+            continue
+        event_id = str(event.get("event_id") or "").strip()
+        post_id = canonical_post_id(event)
+        reported_at = aware_time(event.get("reported_at"))
+        currency = str(event.get("currency") or "").strip().upper()
+        amount_raw = event.get("reward_amount_usdc")
+        try:
+            amount = float(amount_raw)
+        except (TypeError, ValueError, OverflowError):
+            rejected += 1
+            continue
+        if (not event_id or event_id in seen_event_ids or not post_id or not reported_at
+                or reported_at > now or amount < 0 or currency != "USDC"):
+            if event_id and event_id in seen_event_ids:
+                duplicates += 1
+            else:
+                rejected += 1
+            continue
+        seen_event_ids.add(event_id)
+        meta = event.get("content_metadata") if isinstance(event.get("content_metadata"), dict) else {}
+        url = str(meta.get("public_post_url") or event.get("public_post_url") or "").strip()
+        parsed_url = urllib.parse.urlparse(url) if url else None
+        host = (parsed_url.hostname or "").lower() if parsed_url else ""
+        official_host = host == "binance.com" or host.endswith(".binance.com")
+        url_match = re.search(r"/(?:en/)?square/post/([A-Za-z0-9_-]+)", parsed_url.path, re.I) if parsed_url else None
+        if not parsed_url or parsed_url.scheme != "https" or not official_host or not url_match or url_match.group(1) != post_id:
+            url = None
+        accepted.append({
+            "event_id": event_id,
+            "post_id": post_id,
+            "public_post_url": url,
+            "reported_at": reported_at.isoformat(),
+            "reported_reward_usdc": round(amount, 8),
+            "currency": currency,
+            "report_source": str(event.get("report_source") or "ACCOUNT_OWNER_REPORTED")[:80],
+            "owner_reported_views": number(meta, "owner_reported_views") if meta.get("owner_reported_views") is not None else None,
+            "content_lane": str(meta.get("content_lane") or "unknown")[:100],
+            "content_format": str(meta.get("content_format") or "unknown")[:100],
+            "hook_type": str(meta.get("hook_type") or "unknown")[:120],
+            "summary": str(meta.get("summary") or "")[:1000],
+            "verification_status": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED",
+            "evidence_type": "ACCOUNT_OWNER_REPORTED_EXACT_POST_REWARD",
+        })
+    accepted.sort(key=lambda row: row["reported_at"], reverse=True)
+    recent_7d = [row for row in accepted if cutoff_7d <= aware_time(row["reported_at"]) <= now]
+    recent_14d = [row for row in accepted if cutoff_14d <= aware_time(row["reported_at"]) <= now]
+
+    def aggregate(rows: list[dict]) -> dict:
+        by_lane = defaultdict(list)
+        for row in rows:
+            by_lane[row["content_lane"]].append(row)
+        return {
+            "reported_event_count": len(rows),
+            "post_count": len({row["post_id"] for row in rows}),
+            "reported_usdc": round(sum(row["reported_reward_usdc"] for row in rows), 8) if rows else None,
+            "rows_with_reported_views": sum(1 for row in rows if row["owner_reported_views"] is not None),
+            "total_owner_reported_views": sum(row["owner_reported_views"] or 0 for row in rows) if any(row["owner_reported_views"] is not None for row in rows) else None,
+            "by_content_lane": [{
+                "content_lane": lane,
+                "reported_event_count": len(values),
+                "post_count": len({row["post_id"] for row in values}),
+                "reported_usdc": round(sum(row["reported_reward_usdc"] for row in values), 8),
+                "evidence_type": "OWNER_REPORTED_FEEDBACK_NOT_INDEPENDENTLY_VERIFIED",
+            } for lane, values in sorted(by_lane.items(), key=lambda item: sum(row["reported_reward_usdc"] for row in item[1]), reverse=True)],
+        }
+    return {
+        "status": "OWNER_REPORTED_FEEDBACK_AVAILABLE_NOT_INDEPENDENTLY_VERIFIED" if accepted else "NO_OWNER_REPORTED_FEEDBACK",
+        "evidence_type": "ACCOUNT_OWNER_REPORTED_EXACT_POST_REWARD",
+        "independently_verified": False,
+        "included_in_verified_reward_totals": False,
+        "public_metrics_used_as_reward_proof": False,
+        "accepted_report_count": len(accepted),
+        "rejected_report_count": rejected,
+        "duplicate_event_ids_ignored": duplicates,
+        "7_day": aggregate(recent_7d),
+        "14_day": aggregate(recent_14d),
+        "entries": accepted[:100],
+        "policy": "Use as owner-reported directional learning feedback only; do not label as independently verified or mix into verified payout totals.",
     }
 
 
@@ -330,7 +435,8 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
                         now: datetime | None = None, target_usdc: float | None = None,
                         public_examples: list[dict] | None = None,
                         observed_leaderboard_entries: list[dict] | None = None,
-                        creator_profile_research: dict | None = None) -> dict:
+                        creator_profile_research: dict | None = None,
+                        owner_reported_reward_events: list[dict] | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -341,6 +447,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     fourteen = windows.get("fourteen_day") if isinstance(windows.get("fourteen_day"), dict) else {}
     hypotheses = _window_hypotheses(benchmark)
     reward_summary = collect_verified_rewards(reward_events, now)
+    owner_reported_feedback = summarize_owner_reported_reward_feedback(owner_reported_reward_events or [], now)
     own_summary = summarize_own_content(now, own_attribution or [], own_performance or [])
     profile_research = creator_profile_research if isinstance(creator_profile_research, dict) else {}
     researched_profiles = profile_research.get("profiles") if isinstance(profile_research.get("profiles"), list) else []
@@ -489,7 +596,18 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
 
     benchmark_state = str(benchmark.get("status") or "UNKNOWN")
     older_count = int((fourteen.get("coverage") or {}).get("posts_age_8_to_14_days") or 0)
-    coverage_status = "FULL_7_AND_14_DAY_COVERAGE" if older_count > 0 else "14_DAY_SAMPLE_GAP_KEEP_COLLECTING"
+    public_feed_coverage_status = "FULL_7_AND_14_DAY_COVERAGE" if older_count > 0 else "14_DAY_SAMPLE_GAP_KEEP_COLLECTING"
+    profile_posts_7d = int(profile_research.get("posts_collected_7d") or 0)
+    profile_posts_8_to_14d = int(profile_research.get("posts_collected_8_to_14d") or 0)
+    profile_coverage_observed = (
+        bool(profile_research.get("seven_day_coverage_observed"))
+        and bool(profile_research.get("fourteen_day_coverage_observed"))
+        and profile_posts_7d > 0 and profile_posts_8_to_14d > 0
+    )
+    coverage_status = (
+        "FULL_7_AND_14_DAY_PROFILE_COVERAGE" if profile_coverage_observed
+        else public_feed_coverage_status
+    )
     return {
         "schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0",
         "generated_at": now.isoformat(),
@@ -516,6 +634,11 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         },
         "research_coverage": {
             "status": coverage_status,
+            "public_feed_status": public_feed_coverage_status,
+            "profile_research_status": str(profile_research.get("status") or "NOT_RUN"),
+            "profile_coverage_observed": profile_coverage_observed,
+            "profile_posts_7d": profile_posts_7d,
+            "profile_posts_8_to_14d": profile_posts_8_to_14d,
             "benchmark_status": benchmark_state,
             "collected_posts_last_run": int(benchmark.get("public_posts_collected_this_run") or 0),
             "public_posts_retained": int(benchmark.get("public_posts_observed") or 0),
@@ -568,6 +691,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "own_account_performance": own_summary,
         "historical_own_account_baseline": patterns.get("our_baseline") if isinstance(patterns.get("our_baseline"), dict) else {},
         "verified_reward_evidence": reward_summary,
+        "owner_reported_reward_feedback": owner_reported_feedback,
         "recommended_content_playbook": [
             "Lead with one timely, specific insight that the evidence supports; avoid generic ticker-first templates.",
             "Explain the mechanism and reader payoff, not just a price move or copied headline.",
@@ -593,11 +717,45 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     }
 
 
+def build_learning_memory_entry(plan: dict, now: datetime) -> dict:
+    """Persist small audit metrics for autonomous learning across daily cycles."""
+    owner = plan.get("owner_reported_reward_feedback") if isinstance(plan.get("owner_reported_reward_feedback"), dict) else {}
+    owner_7d = owner.get("7_day") if isinstance(owner.get("7_day"), dict) else {}
+    coverage = plan.get("research_coverage") if isinstance(plan.get("research_coverage"), dict) else {}
+    profile = plan.get("creator_profile_research") if isinstance(plan.get("creator_profile_research"), dict) else {}
+    weekly = plan.get("weekly_earnings_goal") if isinstance(plan.get("weekly_earnings_goal"), dict) else {}
+    verified = plan.get("verified_reward_evidence") if isinstance(plan.get("verified_reward_evidence"), dict) else {}
+    hypotheses = plan.get("best_public_format_hypotheses") if isinstance(plan.get("best_public_format_hypotheses"), list) else []
+    creator_queue = plan.get("creator_study_queue") if isinstance(plan.get("creator_study_queue"), list) else []
+    leaderboard_queue = plan.get("public_earnings_leaderboard_study_queue") if isinstance(plan.get("public_earnings_leaderboard_study_queue"), list) else []
+    return {
+        "date": now.date().isoformat(),
+        "generated_at": now.isoformat(),
+        "coverage_status": str(coverage.get("status") or "UNKNOWN"),
+        "profile_research_status": str(profile.get("status") or "NOT_RUN"),
+        "creator_profiles_resolved": int(profile.get("profiles_resolved") or 0),
+        "profile_posts_7d": int(profile.get("posts_collected_7d") or 0),
+        "profile_posts_8_to_14d": int(profile.get("posts_collected_8_to_14d") or 0),
+        "weekly_goal_usdc": weekly.get("target_usdc"),
+        "verified_usdc_7d": weekly.get("actual_verified_usdc_7d"),
+        "verified_reward_events_7d": int(verified.get("accepted_unique_reward_events_7d") or 0),
+        "owner_reported_usdc_7d": owner_7d.get("reported_usdc"),
+        "owner_reported_reward_events_7d": int(owner_7d.get("reported_event_count") or 0),
+        "owner_reported_reward_posts_7d": int(owner_7d.get("post_count") or 0),
+        "owner_reported_feedback_status": str(owner.get("status") or "NO_OWNER_REPORTED_FEEDBACK"),
+        "creator_study_count": len(creator_queue),
+        "leaderboard_creator_study_count": len(leaderboard_queue),
+        "hypothesis_archetypes": [str(row.get("archetype") or "unknown")[:60] for row in hypotheses if isinstance(row, dict)],
+        "owner_reported_feedback_is_not_verified": True,
+    }
+
+
 def main() -> int:
     now = datetime.now(timezone.utc)
     benchmark = load_json(BENCHMARK, {})
     patterns = load_json(PATTERNS, {})
     rewards = load_jsonl(REWARD_EVENTS)
+    owner_reported_rewards = load_jsonl(OWNER_REPORTED_REWARDS)
     attribution = load_jsonl(ATTRIBUTION)
     performance = load_jsonl(PERFORMANCE)
     examples = load_json(EXAMPLES, [])
@@ -616,7 +774,7 @@ def main() -> int:
     plan = build_learning_plan(
         benchmark, patterns, rewards, attribution, performance, now,
         public_examples=examples, observed_leaderboard_entries=observed_leaderboard_entries,
-        creator_profile_research=profile_research,
+        creator_profile_research=profile_research, owner_reported_reward_events=owner_reported_rewards,
     )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     INTEL.mkdir(parents=True, exist_ok=True)
@@ -626,15 +784,7 @@ def main() -> int:
     history = previous.get("history") if isinstance(previous.get("history"), list) else []
     today = now.date().isoformat()
     history = [row for row in history if isinstance(row, dict) and str(row.get("date") or "") != today]
-    history.append({
-        "date": today,
-        "generated_at": now.isoformat(),
-        "coverage_status": plan["research_coverage"]["status"],
-        "weekly_goal_usdc": plan["weekly_earnings_goal"]["target_usdc"],
-        "verified_usdc_7d": plan["weekly_earnings_goal"]["actual_verified_usdc_7d"],
-        "creator_study_count": len(plan["creator_study_queue"]),
-        "hypothesis_archetypes": [row["archetype"] for row in plan["best_public_format_hypotheses"]],
-    })
+    history.append(build_learning_memory_entry(plan, now))
     memory = {"schema": "NIC-SQUARE-EARNINGS-LEARNING-MEMORY-1.0", "updated_at": now.isoformat(), "history": history[-30:]}
     MEMORY.write_text(json.dumps(memory, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     report = {
@@ -647,6 +797,9 @@ def main() -> int:
         "public_archetype_hypotheses": len(plan["best_public_format_hypotheses"]),
         "verified_reward_events_7d": plan["verified_reward_evidence"]["accepted_unique_reward_events_7d"],
         "verified_usdc_7d": plan["weekly_earnings_goal"]["actual_verified_usdc_7d"],
+        "owner_reported_usdc_7d": plan["owner_reported_reward_feedback"]["7_day"]["reported_usdc"],
+        "owner_reported_events_7d": plan["owner_reported_reward_feedback"]["7_day"]["reported_event_count"],
+        "owner_reported_feedback_status": plan["owner_reported_reward_feedback"]["status"],
         "coverage_status": plan["research_coverage"]["status"],
         "creator_profiles_resolved": plan["creator_profile_research"]["profiles_resolved"],
         "profile_posts_collected_14d": plan["creator_profile_research"]["posts_collected_14d"],

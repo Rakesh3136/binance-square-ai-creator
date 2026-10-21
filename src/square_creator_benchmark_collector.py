@@ -117,6 +117,25 @@ def metric(row: dict, *keys: str) -> float:
     return 0.0
 
 
+def metric_observation(row: dict, *keys: str) -> tuple[float | None, str | None]:
+    """Read an explicitly present public counter; missing is unknown, not zero."""
+    containers = [row]
+    for key in ("stats", "statistics", "metrics", "interaction", "engagement"):
+        if isinstance(row.get(key), dict):
+            containers.append(row[key])
+    for container in containers:
+        for key in keys:
+            if key not in container or container.get(key) is None:
+                continue
+            try:
+                value = float(container[key])
+                if value >= 0:
+                    return value, key
+            except (TypeError, ValueError, OverflowError):
+                continue
+    return None, None
+
+
 def post_url(pid: str, row: dict) -> str:
     for key in ("webLink", "shareUrl", "share_url", "url", "link"):
         url = row.get(key)
@@ -300,6 +319,17 @@ def fetch_public_posts() -> tuple[list[dict], list[str]]:
         if not text:
             continue
         name, uid = author(item)
+        views = metric(item, "viewCount", "views", "view_num", "viewNum")
+        likes = metric(item, "likeCount", "likes", "like_num", "likeNum")
+        replies_raw, reply_source_key = metric_observation(item, "commentCount", "comments", "replyCount", "replyNum", "commentNum")
+        reply_status = "OBSERVED"
+        replies = replies_raw
+        if replies_raw is None:
+            reply_status = "MISSING_COUNTER"
+        elif views >= 20 and replies_raw >= views:
+            replies = None
+            reply_status = "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS"
+        shares = metric(item, "shareCount", "shares", "shareNum")
         rows.append({
             "source_type": "public_square_creator_observation",
             "post_id": pid,
@@ -312,13 +342,16 @@ def fetch_public_posts() -> tuple[list[dict], list[str]]:
             "posted_at": posted_at(item),
             "archetype": archetype(text),
             "format": str(item.get("contentType") or item.get("cardType") or "unknown")[:80],
-            "views": metric(item, "viewCount", "views", "view_num", "viewNum"),
-            "likes": metric(item, "likeCount", "likes", "like_num", "likeNum"),
-            "replies": metric(item, "commentCount", "comments", "replyCount", "replyNum", "commentNum"),
-            "shares": metric(item, "shareCount", "shares", "shareNum"),
-            "followers_gained": 0,
+            "views": views,
+            "likes": likes,
+            "replies": replies,
+            "reply_metric_status": reply_status,
+            "reply_metric_source_key": reply_source_key,
+            "replies_observed": reply_status == "OBSERVED",
+            "shares": shares,
+            "followers_gained": None,
             "observed_at": observed_at,
-            "metrics_scope": "public_post_metrics_only",
+            "metrics_scope": "public_post_metrics_only; per-post follower gains and missing/suspicious reply counts remain unknown",
             "earnings_status": "NOT_PUBLICLY_VERIFIED",
             "collection_feed": str(item.get("_nic_collection_feed") or "unknown"),
             "collection_feeds": list(item.get("_nic_collection_feeds") or [str(item.get("_nic_collection_feed") or "unknown")]),
@@ -330,7 +363,11 @@ def engagement_rate(row: dict) -> float | None:
     views = float(row.get("views") or 0)
     if views <= 0:
         return None
-    interactions = float(row.get("likes") or 0) + 2 * float(row.get("replies") or 0) + 3 * float(row.get("shares") or 0)
+    interactions = float(row.get("likes") or 0) + 3 * float(row.get("shares") or 0)
+    # Unknown or suspicious comment counters must not be silently counted as zero
+    # or be allowed to distort the interaction rate.
+    if row.get("replies") is not None:
+        interactions += 2 * float(row.get("replies") or 0)
     return interactions / views
 
 
@@ -392,9 +429,11 @@ def update_metric_history(existing: list[dict], public_rows: list[dict], observe
             "format": str(row.get("format") or "unknown")[:80],
             "views": float(row.get("views") or 0),
             "likes": float(row.get("likes") or 0),
-            "replies": float(row.get("replies") or 0),
+            "replies": row.get("replies"),
+            "reply_metric_status": row.get("reply_metric_status") or ("OBSERVED" if row.get("replies") is not None else "MISSING_COUNTER"),
+            "replies_observed": row.get("replies") is not None and row.get("reply_metric_status") != "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS",
             "shares": float(row.get("shares") or 0),
-            "metrics_scope": "public_post_metrics_only",
+            "metrics_scope": "public_post_metrics_only; missing and suspicious reply counters are unknown",
             "earnings_status": "NOT_PUBLICLY_VERIFIED",
         }
 
@@ -498,7 +537,9 @@ def build_benchmark(rows: list[dict], generated_at: str, metric_history: list[di
             rates = [engagement_rate(p) for p in posts]; rates = [x for x in rates if x is not None]
             if len(posts) < 3 or not rates: continue
             total_views = sum(float(p.get("views") or 0) for p in posts)
-            total_replies = sum(float(p.get("replies") or 0) for p in posts)
+            reply_observed_posts = [p for p in posts if p.get("replies") is not None and p.get("reply_metric_status") != "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS"]
+            reply_observed_views = sum(float(p.get("views") or 0) for p in reply_observed_posts)
+            total_replies = sum(float(p.get("replies") or 0) for p in reply_observed_posts)
             total_shares = sum(float(p.get("shares") or 0) for p in posts)
             by_type = defaultdict(int)
             for p in posts:
@@ -516,20 +557,23 @@ def build_benchmark(rows: list[dict], generated_at: str, metric_history: list[di
                 "mean_public_engagement_rate": round(sum(rates)/len(rates), 6),
                 "median_views": sorted(float(p.get("views") or 0) for p in posts)[len(posts)//2],
                 "avg_views": round(total_views/len(posts), 2),
-                "reply_rate": round(total_replies/max(1,total_views), 6),
+                "reply_rate": round(total_replies/max(1,reply_observed_views), 6) if reply_observed_posts else None,
+                "reply_metric_coverage_posts": len(reply_observed_posts),
+                "reply_metric_coverage": round(len(reply_observed_posts)/len(posts), 4) if posts else 0.0,
                 "share_rate": round(total_shares/max(1,total_views), 6),
                 "dominant_archetypes": [name for name, _ in sorted(by_type.items(), key=lambda item: item[1], reverse=True)[:3]],
                 "sample_urls": [p.get("source_url") for p in posts[:5]],
                 "earnings_status": "NOT_PUBLICLY_VERIFIED"
             })
-        creators.sort(key=lambda x: (x["mean_public_engagement_rate"], x["posts"], x["reply_rate"]), reverse=True)
+        creators.sort(key=lambda x: (x["mean_public_engagement_rate"], x["posts"], x["reply_rate"] if x["reply_rate"] is not None else -1), reverse=True)
         creators_by_reach = sorted(creators, key=lambda x: (x["median_views"], x["avg_views"], x["posts"]), reverse=True)
-        creators_by_discussion = sorted(creators, key=lambda x: (x["reply_rate"], x["share_rate"], x["posts"]), reverse=True)
+        creators_by_discussion = sorted(creators, key=lambda x: (x["reply_rate"] if x["reply_rate"] is not None else -1, x["share_rate"], x["posts"]), reverse=True)
         families = []
         for name, posts in family_groups.items():
             rates = [engagement_rate(p) for p in posts]; rates = [x for x in rates if x is not None]
             if len(posts) < 3 or not rates: continue
-            families.append({"archetype": name, "samples": len(posts), "mean_public_engagement_rate": round(sum(rates)/len(rates), 6), "avg_views": round(sum(float(p.get("views") or 0) for p in posts)/len(posts), 2), "avg_replies": round(sum(float(p.get("replies") or 0) for p in posts)/len(posts), 2), "confidence": "medium" if len(posts) >= 10 else "tentative"})
+            reply_rows = [p for p in posts if p.get("replies") is not None and p.get("reply_metric_status") != "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS"]
+            families.append({"archetype": name, "samples": len(posts), "mean_public_engagement_rate": round(sum(rates)/len(rates), 6), "avg_views": round(sum(float(p.get("views") or 0) for p in posts)/len(posts), 2), "avg_replies": round(sum(float(p.get("replies") or 0) for p in reply_rows)/len(reply_rows), 2) if reply_rows else None, "reply_metric_coverage_samples": len(reply_rows), "reply_metric_coverage": round(len(reply_rows)/len(posts), 4) if posts else 0.0, "confidence": "medium" if len(posts) >= 10 else "tentative"})
         families.sort(key=lambda x: (x["mean_public_engagement_rate"], x["samples"]), reverse=True)
         prior_week = [row for row, age in dated if age <= 7]
         older_week = [row for row, age in dated if 7 < age <= 14]

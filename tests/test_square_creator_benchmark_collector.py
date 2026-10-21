@@ -24,6 +24,31 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertIsNone(collector.creator_profile_url({"authorName": "CreatorThree", "authorId": "123"}))
         self.assertIsNone(collector.creator_profile_url({"author": {"profileUrl": "https://example.com/square/profile/not-binance"}}))
 
+    def test_metric_observation_keeps_missing_counters_unknown(self):
+        self.assertEqual(collector.metric_observation({"commentCount": 0}, "commentCount"), (0.0, "commentCount"))
+        self.assertEqual(collector.metric_observation({"viewCount": 100}, "commentCount"), (None, None))
+        self.assertAlmostEqual(collector.engagement_rate({"views": 100, "likes": 4, "replies": None, "shares": 1}), 0.07)
+
+    def test_public_posts_do_not_fabricate_follower_gains_or_trust_suspicious_replies(self):
+        latest = {
+            "p-suspicious": {"postId": "p-suspicious", "content": "An educational post about market structure.",
+                             "authorName": "PublicCreator", "viewCount": 431, "likeCount": 20,
+                             "commentCount": 431, "shareCount": 4},
+            "p-missing": {"postId": "p-missing", "content": "Another useful explanation about liquidity.",
+                          "authorName": "PublicCreator", "viewCount": 200, "likeCount": 5, "shareCount": 1},
+        }
+        with patch.object(collector, "_collect_feed", side_effect=[latest, {}, {}]):
+            rows, _ = collector.fetch_public_posts()
+        suspicious = next(row for row in rows if row["post_id"] == "p-suspicious")
+        missing = next(row for row in rows if row["post_id"] == "p-missing")
+        self.assertIsNone(suspicious["replies"])
+        self.assertEqual(suspicious["reply_metric_status"], "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS")
+        self.assertFalse(suspicious["replies_observed"])
+        self.assertIsNone(missing["replies"])
+        self.assertEqual(missing["reply_metric_status"], "MISSING_COUNTER")
+        self.assertIsNone(suspicious["followers_gained"])
+        self.assertIsNone(missing["followers_gained"])
+
     def test_engagement_rate_requires_visible_views(self):
         self.assertIsNone(collector.engagement_rate({"views": 0, "likes": 4}))
         self.assertAlmostEqual(collector.engagement_rate({"views": 100, "likes": 4, "replies": 2, "shares": 1}), 0.11)

@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims
+from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims, summarize_owner_reported_reward_feedback, build_learning_memory_entry
 
 
 def valid_reward_event():
@@ -82,6 +82,41 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertFalse(plan["research_coverage"]["public_views_or_engagement_are_earnings_evidence"])
         self.assertEqual(plan["historical_own_account_baseline"]["samples"], 8)
 
+    def test_owner_reported_exact_post_reward_feeds_learning_but_not_verified_totals(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        event = {
+            "event_id": "owner-report-374795126927596-20261021-01",
+            "post_id": "374795126927596",
+            "reward_amount_usdc": 0.201,
+            "currency": "USDC",
+            "reported_at": "2026-10-21T11:16:00+05:30",
+            "report_source": "ACCOUNT_OWNER_REPORTED",
+            "verification_status": "OWNER_REPORTED",
+            "content_metadata": {
+                "content_lane": "long_term_thesis",
+                "content_format": "text_plus_image",
+                "hook_type": "long_term_conviction_with_target",
+                "summary": "QNT long-term thesis",
+                "owner_reported_views": 5100,
+                "public_post_url": "https://www.binance.com/en/square/post/374795126927596",
+            },
+        }
+        feedback = summarize_owner_reported_reward_feedback([event], now)
+        self.assertEqual(feedback["status"], "OWNER_REPORTED_FEEDBACK_AVAILABLE_NOT_INDEPENDENTLY_VERIFIED")
+        self.assertAlmostEqual(feedback["7_day"]["reported_usdc"], 0.201)
+        self.assertEqual(feedback["7_day"]["post_count"], 1)
+        self.assertFalse(feedback["independently_verified"])
+        self.assertFalse(feedback["included_in_verified_reward_totals"])
+        self.assertEqual(feedback["entries"][0]["post_id"], "374795126927596")
+        self.assertEqual(feedback["entries"][0]["owner_reported_views"], 5100)
+
+        plan = build_learning_plan(
+            benchmark_fixture(), {}, [], now=now, owner_reported_reward_events=[event],
+        )
+        self.assertIsNone(plan["verified_reward_evidence"]["verified_usdc_7d"])
+        self.assertEqual(plan["verified_reward_evidence"]["accepted_unique_reward_events_7d"], 0)
+        self.assertAlmostEqual(plan["owner_reported_reward_feedback"]["7_day"]["reported_usdc"], 0.201)
+
     def test_only_exact_post_source_backed_paid_events_count_as_verified_earnings(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
         unattributed = {
@@ -121,14 +156,26 @@ class SquareEarningsLearningTests(unittest.TestCase):
     def test_own_account_metrics_use_nested_square_performance_schema(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
         attribution = [{"canonical_post_id": "374795126927596", "published_at": "2026-10-18T10:00:00+00:00", "category": "research"}]
-        performance = [{"canonical_post_id": "374795126927596", "collected_at": "2026-10-21T10:00:00+00:00", "metrics": {"views": 5100, "likes": 51, "comments": 7, "shares": 3}}]
+        performance = [{"canonical_post_id": "374795126927596", "collected_at": "2026-10-21T10:00:00+00:00", "metrics": {"views": 5100, "likes": 51, "comments": 7, "shares": 3, "follows": 2}}]
         summary = summarize_own_content(now, attribution, performance)
         seven = summary["7_day"]
         self.assertEqual(seven["posts"], 1)
         self.assertEqual(seven["total_views"], 5100)
         self.assertGreater(seven["weighted_engagement_per_1000_views"], 0)
+        self.assertEqual(seven["total_follows"], 2)
+        self.assertEqual(seven["follow_metric_coverage_posts"], 1)
+        self.assertIsNotNone(seven["follow_rate_per_view"])
 
 
+
+    def test_missing_follow_metrics_are_unknown_not_zero(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        attribution = [{"canonical_post_id": "374795126927596", "published_at": "2026-10-18T10:00:00+00:00", "category": "research"}]
+        performance = [{"canonical_post_id": "374795126927596", "collected_at": "2026-10-21T10:00:00+00:00", "metrics": {"views": 100, "likes": 3, "comments": 1, "shares": 0}}]
+        summary = summarize_own_content(now, attribution, performance)["7_day"]
+        self.assertIsNone(summary["total_follows"])
+        self.assertIsNone(summary["follow_rate_per_view"])
+        self.assertEqual(summary["follow_metric_coverage_posts"], 0)
 
     def test_public_earnings_claims_are_discovered_but_never_verified_as_payouts(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
@@ -254,12 +301,39 @@ class SquareEarningsLearningTests(unittest.TestCase):
         )
         self.assertEqual(plan["creator_profile_research"]["status"], "PROFILE_RESEARCH_COMPLETE")
         self.assertEqual(plan["creator_profile_research"]["profiles_resolved"], 1)
+        self.assertEqual(plan["research_coverage"]["status"], "FULL_7_AND_14_DAY_PROFILE_COVERAGE")
+        self.assertEqual(plan["research_coverage"]["public_feed_status"], "FULL_7_AND_14_DAY_COVERAGE")
+        self.assertTrue(plan["research_coverage"]["profile_coverage_observed"])
         profile_queue = plan["creator_profile_study_queue"]
         self.assertEqual(profile_queue[0]["creator_profile_url"], "https://www.binance.com/en/square/profile/public_creator")
         public_queue = plan["creator_study_queue"]
         self.assertEqual(public_queue[0]["creator_profile_url"], "https://www.binance.com/en/square/profile/public_creator")
         self.assertFalse(plan["creator_profile_research"]["authenticated_session_used"])
         self.assertEqual(profile_queue[0]["evidence_type"], "PUBLIC_PROFILE_RESEARCH_NOT_EARNINGS")
+
+    def test_learning_memory_persists_owner_feedback_and_profile_coverage_separately(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        plan = build_learning_plan(
+            benchmark_fixture(), {}, [], now=now,
+            owner_reported_reward_events=[{
+                "event_id": "owner-report-1", "post_id": "374795126927596",
+                "reward_amount_usdc": 0.201, "currency": "USDC",
+                "reported_at": "2026-10-21T11:16:00+05:30",
+                "content_metadata": {"content_lane": "long_term_thesis",
+                    "public_post_url": "https://www.binance.com/en/square/post/374795126927596"},
+            }],
+            creator_profile_research={
+                "status": "PROFILE_RESEARCH_COMPLETE", "profiles_resolved": 12,
+                "posts_collected_7d": 172, "posts_collected_8_to_14d": 38,
+            },
+        )
+        row = build_learning_memory_entry(plan, now)
+        self.assertEqual(row["creator_profiles_resolved"], 12)
+        self.assertEqual(row["profile_posts_8_to_14d"], 38)
+        self.assertAlmostEqual(row["owner_reported_usdc_7d"], 0.201)
+        self.assertEqual(row["owner_reported_reward_events_7d"], 1)
+        self.assertTrue(row["owner_reported_feedback_is_not_verified"])
+        self.assertIsNone(row["verified_usdc_7d"])
 
     def test_new_write_to_earn_rules_have_separate_october_19_cohort(self):
         plan = build_learning_plan(benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc))

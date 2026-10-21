@@ -96,6 +96,49 @@ def test_earnings_learning_is_sanitized_before_reaching_writer():
 
 
 
+def test_owner_reported_reward_feedback_reaches_writer_only_as_anonymized_exploration_signal():
+    learning = {
+        "schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0",
+        "owner_reported_reward_feedback": {
+            "status": "OWNER_REPORTED_FEEDBACK_AVAILABLE_NOT_INDEPENDENTLY_VERIFIED",
+            "independently_verified": False,
+            "included_in_verified_reward_totals": False,
+            "7_day": {
+                "reported_event_count": 1,
+                "post_count": 1,
+                "reported_usdc": 0.201,
+                "total_owner_reported_views": 5100,
+                "by_content_lane": [{
+                    "content_lane": "long_term_thesis",
+                    "reported_event_count": 1,
+                    "post_count": 1,
+                    "reported_usdc": 0.201,
+                    "evidence_type": "OWNER_REPORTED_FEEDBACK_NOT_INDEPENDENTLY_VERIFIED",
+                }],
+                "entries": [{
+                    "post_id": "374795126927596",
+                    "public_post_url": "https://www.binance.com/en/square/post/374795126927596",
+                    "summary": "PRIVATE_OWNER_SUMMARY",
+                    "reported_reward_usdc": 0.201,
+                }],
+            },
+        },
+    }
+    safe = module.build_earnings_learning_brief(learning)
+    feedback = safe["owner_reported_reward_feedback"]
+    assert feedback["reported_event_count_7d"] == 1
+    assert feedback["reported_post_count_7d"] == 1
+    assert feedback["usable_for_low_confidence_exploration"] is True
+    assert feedback["usable_as_confirmatory_reward_evidence"] is False
+    assert feedback["content_lane_observations"][0]["content_lane"] == "long_term_thesis"
+    serialized = json.dumps(safe)
+    assert "0.201" not in serialized
+    assert "5100" not in serialized
+    assert "374795126927596" not in serialized
+    assert "PRIVATE_OWNER_SUMMARY" not in serialized
+    assert "binance.com/en/square/post" not in serialized
+
+
 def test_rolling_window_hides_individual_creator_rows_from_writer():
     source = {
         "sample_count": 50,
