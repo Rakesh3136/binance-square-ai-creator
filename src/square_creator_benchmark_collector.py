@@ -23,13 +23,17 @@ BASES = [
     "https://www.binance.com/bapi/composite/v2/friendly/pgc/content/article/list",
     "https://www.binance.com/bapi/composite/v1/friendly/pgc/content/article/list",
 ]
+NEWS_FEED = "https://www.binance.com/bapi/composite/v4/friendly/pgc/feed/news/list"
 EXAMPLES = ROOT / "data/intelligence/public_square_examples.json"
 OUT = ROOT / "data/intelligence/square_creator_benchmark.json"
 REPORT = ROOT / "data/live/square_creator_benchmark_report.json"
 STATE = ROOT / "analytics/square_creator_benchmark_state.json"
 HISTORY = ROOT / "analytics/square_creator_benchmark_history.jsonl"
-MAX_PAGES = 60  # Scan deeper history; stop early when pagination yields no new posts.
-PAGE_SIZE = 30
+MAX_PAGES = 50  # Current public latest feed is typically limited to about 50 pages.
+NEWS_MAX_PAGES = 80  # Supplementary news feed supports deeper public pagination.
+TRENDING_MAX_PAGES = 9
+PAGE_SIZE = 20  # Current public API docs cap pageSize at 20.
+REQUEST_DELAY_SECONDS = 0.5
 MAX_TEXT = 700
 MAX_EXAMPLES = 8000
 MAX_HISTORY_SNAPSHOTS = 25000
@@ -180,28 +184,95 @@ def author(row: dict) -> tuple[str, str]:
     return str(name).strip()[:120], str(uid).strip()[:120]
 
 
+def _collect_feed(base: str, fixed_params: dict, source_name: str,
+                  max_pages: int, attempts: list[str]) -> dict[str, dict]:
+    """Read one public feed with conservative pagination and empty-page stopping."""
+    for page_key in ("pageIndex", "pageNo", "page"):
+        local: dict[str, dict] = {}
+        consecutive_empty = 0
+        page_one_failed_or_empty = False
+        for page in range(1, max_pages + 1):
+            params = {page_key: page, "pageSize": PAGE_SIZE, **fixed_params}
+            url = f"{base}?{urllib.parse.urlencode(params)}"
+            attempts.append(url)
+            try:
+                payload = fetch_json(url)
+            except Exception:
+                if page == 1:
+                    page_one_failed_or_empty = True
+                break
+            before = len(local)
+            walk_posts(payload, local)
+            new_count = len(local) - before
+            if new_count <= 0:
+                consecutive_empty += 1
+                if page == 1:
+                    page_one_failed_or_empty = True
+                    break
+                if consecutive_empty >= 3:
+                    break
+            else:
+                consecutive_empty = 0
+            time.sleep(REQUEST_DELAY_SECONDS)
+        if local:
+            for item in local.values():
+                item["_nic_collection_feed"] = source_name
+            return local
+        if not page_one_failed_or_empty:
+            break
+    return {}
+
+
+def _merge_feed_rows(found: dict[str, dict], incoming: dict[str, dict], source_name: str) -> None:
+    """Merge duplicate public post IDs, preserving richer visible metrics."""
+    for pid, item in incoming.items():
+        if pid not in found:
+            found[pid] = item
+            found[pid]["_nic_collection_feeds"] = [source_name]
+            continue
+        old = found[pid]
+        sources = list(old.get("_nic_collection_feeds") or [str(old.get("_nic_collection_feed") or "unknown")])
+        if source_name not in sources:
+            sources.append(source_name)
+        old_score = sum(metric(old, *keys) for keys in (
+            ("viewCount", "views", "view_num", "viewNum"),
+            ("likeCount", "likes", "like_num", "likeNum"),
+            ("commentCount", "comments", "replyCount", "replyNum", "commentNum"),
+            ("shareCount", "shares", "shareNum"),
+        ))
+        new_score = sum(metric(item, *keys) for keys in (
+            ("viewCount", "views", "view_num", "viewNum"),
+            ("likeCount", "likes", "like_num", "likeNum"),
+            ("commentCount", "comments", "replyCount", "replyNum", "commentNum"),
+            ("shareCount", "shares", "shareNum"),
+        ))
+        preferred, other = (item, old) if new_score > old_score else (old, item)
+        merged = dict(other)
+        merged.update({key: value for key, value in preferred.items() if value not in (None, "", {}, [])})
+        merged["_nic_collection_feed"] = str(old.get("_nic_collection_feed") or source_name)
+        merged["_nic_collection_feeds"] = sources
+        found[pid] = merged
+
+
 def fetch_public_posts() -> tuple[list[dict], list[str]]:
     attempts: list[str] = []
+    found: dict[str, dict] = {}
+
+    # Latest chronological content supplies the primary recent sample. Older
+    # API versions are fallbacks only, avoiding redundant scans when v3 works.
+    latest: dict[str, dict] = {}
     for base in BASES:
-        found: dict[str, dict] = {}
-        for page_key in ("pageIndex", "pageNo", "page"):
-            for page in range(1, MAX_PAGES + 1):
-                query = urllib.parse.urlencode({page_key: page, "pageSize": PAGE_SIZE, "type": 2})
-                url = f"{base}?{query}"
-                attempts.append(url)
-                try:
-                    payload = fetch_json(url)
-                except Exception:
-                    break
-                before = len(found)
-                walk_posts(payload, found)
-                if page > 1 and len(found) == before:
-                    break
-                time.sleep(0.08)
-            if found:
-                break
-        if found:
+        latest = _collect_feed(base, {"type": 2}, "latest", MAX_PAGES, attempts)
+        if latest:
             break
+    _merge_feed_rows(found, latest, "latest")
+
+    # Broaden the sample with a trending cohort and a separate news-feed endpoint.
+    # These feeds are deduped by post ID; public counters are not payout proof.
+    trending = _collect_feed(BASES[0], {"type": 1}, "trending", TRENDING_MAX_PAGES, attempts)
+    _merge_feed_rows(found, trending, "trending")
+    news = _collect_feed(NEWS_FEED, {}, "news", NEWS_MAX_PAGES, attempts)
+    _merge_feed_rows(found, news, "news")
 
     observed_at = datetime.now(timezone.utc).isoformat()
     rows = []
@@ -228,7 +299,9 @@ def fetch_public_posts() -> tuple[list[dict], list[str]]:
             "followers_gained": 0,
             "observed_at": observed_at,
             "metrics_scope": "public_post_metrics_only",
-            "earnings_verified": False,
+            "earnings_status": "NOT_PUBLICLY_VERIFIED",
+            "collection_feed": str(item.get("_nic_collection_feed") or "unknown"),
+            "collection_feeds": list(item.get("_nic_collection_feeds") or [str(item.get("_nic_collection_feed") or "unknown")]),
         })
     return rows, attempts
 
