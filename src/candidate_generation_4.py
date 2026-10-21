@@ -8,6 +8,66 @@ def load(p):
     try:
         x=json.loads(p.read_text(encoding='utf-8')); return x if isinstance(x,dict) else {}
     except Exception:return {}
+def sanitize_rolling_window(window: dict) -> dict:
+    """Keep rolling aggregate signals while excluding individual creator names and URLs."""
+    if not isinstance(window, dict):
+        return {}
+    performance = []
+    for row in window.get("performance_by_archetype", []) if isinstance(window.get("performance_by_archetype"), list) else []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            samples = int(row.get("samples") or 0)
+        except (TypeError, ValueError):
+            samples = 0
+        if samples < 3:
+            continue
+        performance.append({
+            "archetype": str(row.get("archetype") or "unknown")[:60],
+            "samples": samples,
+            "confidence": str(row.get("confidence") or "tentative")[:20],
+            "avg_views": row.get("avg_views"),
+            "avg_replies": row.get("avg_replies"),
+            "avg_shares": row.get("avg_shares"),
+            "mean_public_engagement_rate": row.get("mean_public_engagement_rate"),
+            "reply_rate": row.get("reply_rate"),
+        })
+    coverage = window.get("coverage") if isinstance(window.get("coverage"), dict) else {}
+    trajectory = window.get("metric_trajectory") if isinstance(window.get("metric_trajectory"), dict) else {}
+    by_archetype = []
+    for row in trajectory.get("by_archetype", []) if isinstance(trajectory.get("by_archetype"), list) else []:
+        if not isinstance(row, dict):
+            continue
+        by_archetype.append({
+            "archetype": str(row.get("archetype") or "unknown")[:60],
+            "posts_with_repeat_observations": int(row.get("posts_with_repeat_observations") or 0),
+            "avg_views_growth": row.get("avg_views_growth"),
+            "avg_replies_growth": row.get("avg_replies_growth"),
+            "avg_shares_growth": row.get("avg_shares_growth"),
+            "evidence": "OBSERVED_METRIC_CHANGE_NOT_REVENUE",
+        })
+    return {
+        "window_days": int(window.get("window_days") or 0),
+        "dated_posts": int(window.get("dated_posts") or 0),
+        "distinct_creators": int(window.get("distinct_creators") or 0),
+        "performance_by_archetype": performance[:10],
+        "coverage": {
+            "posts_age_0_to_7_days": int(coverage.get("posts_age_0_to_7_days") or 0),
+            "posts_age_8_to_14_days": int(coverage.get("posts_age_8_to_14_days") or 0),
+            "older_window_has_distinct_samples": bool(coverage.get("older_window_has_distinct_samples", False)),
+            "status": str(coverage.get("status") or "UNKNOWN"),
+        },
+        "metric_trajectory": {
+            "window_days": int(trajectory.get("window_days") or window.get("window_days") or 0),
+            "posts_seen": int(trajectory.get("posts_seen") or 0),
+            "posts_with_repeat_observations": int(trajectory.get("posts_with_repeat_observations") or 0),
+            "by_archetype": by_archetype[:8],
+            "earnings_status": "PUBLIC_METRIC_TRAJECTORY_NOT_EARNINGS",
+        },
+        "earnings_status": "PUBLIC_METRICS_ONLY_NOT_EARNINGS",
+    }
+
+
 def build_earnings_learning_brief(learning: dict) -> dict:
     """Sanitize the earnings-learning report into aggregate content guidance.
 
@@ -120,8 +180,8 @@ def build_public_pattern_brief(patterns: dict, earnings_learning: dict | None = 
         "top_archetypes_by_observed_reply_and_follower_rate": eligible[:5],
         "observed_format_counts": format_summary,
         "rolling_learning_windows": {
-            "seven_day": rolling.get("seven_day") if isinstance(rolling.get("seven_day"), dict) else {},
-            "fourteen_day": rolling.get("fourteen_day") if isinstance(rolling.get("fourteen_day"), dict) else {},
+            "seven_day": sanitize_rolling_window(rolling.get("seven_day", {})),
+            "fourteen_day": sanitize_rolling_window(rolling.get("fourteen_day", {})),
         },
         "research_limits": patterns.get("research_limits") if isinstance(patterns.get("research_limits"), dict) else {
             "public_metrics_are_not_earnings": True,
