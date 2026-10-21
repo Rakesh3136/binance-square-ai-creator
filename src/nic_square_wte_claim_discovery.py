@@ -164,6 +164,10 @@ def normalize_public_claim_post(payload: Any, pid: str, hashtag: str,
     if not WTE_CONTEXT.search(text) and hashtag_context not in WTE_HASHTAG_SLUGS:
         return None
     stamp = posted_at(row)
+    # The collector corpus uses the canonical `posted_at` field, while the raw
+    # API normalizer intentionally prioritizes API timestamp aliases.
+    if not stamp and row.get("posted_at") not in (None, ""):
+        stamp = posted_at({"published_at": row.get("posted_at")})
     if not stamp:
         return None
     try:
@@ -206,9 +210,82 @@ def normalize_public_claim_post(payload: Any, pid: str, hashtag: str,
     return normalized
 
 
+def _public_corpus_claim(row: dict, now: datetime) -> dict | None:
+    """Identify recent public reward claims already present in the collector's feed corpus."""
+    text = _body_text(row.get("text") or row.get("bodyTextOnly") or row.get("content") or "")
+    if len(text) < 20 or not AMOUNT_CONTEXT.search(text) or not CLAIM_ACTION.search(text):
+        return None
+    if not WTE_CONTEXT.search(text):
+        return None
+    stamp = posted_at(row)
+    # The normalized collector corpus stores its timestamp in `posted_at`,
+    # while the raw API timestamp helper recognizes API aliases like published_at.
+    if not stamp and row.get("posted_at") not in (None, ""):
+        stamp = posted_at({"published_at": row.get("posted_at")})
+    if not stamp:
+        return None
+    try:
+        posted = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    now = now.astimezone(timezone.utc)
+    if posted.tzinfo is None or posted > now or posted < now - timedelta(days=14):
+        return None
+
+    source_url = str(row.get("source_url") or row.get("source") or "").strip()
+    parsed = urllib.parse.urlparse(source_url)
+    host = (parsed.hostname or "").lower()
+    official_host = host == "binance.com" or host.endswith(".binance.com")
+    match = POST_ID_PATTERN.search(source_url)
+    pid = normalize_id(row.get("post_id") or row.get("postId") or (match.group(1) if match else ""))
+    if not pid:
+        return None
+    if not official_host or parsed.scheme != "https" or not match or normalize_id(match.group(1)) != pid:
+        source_url = f"{BASE}/en/square/post/{urllib.parse.quote(pid, safe='')}"
+
+    creator = str(row.get("creator") or row.get("authorName") or "unknown").strip()
+    username = str(row.get("creator_username") or row.get("username") or row.get("userName") or "").strip()
+    profile_url = str(row.get("creator_profile_url") or "").strip()
+    if not profile_url and username and username.lower() not in {"unknown", "null", "none"}:
+        profile_url = f"{BASE}/en/square/profile/{urllib.parse.quote(username, safe='')}"
+    profile = {
+        "creator": creator or "unknown",
+        "username": username or None,
+        "square_uid": str(row.get("creator_id") or row.get("squareUid") or row.get("authorId") or "") or None,
+        "creator_profile_url": profile_url or None,
+    }
+    post_row = dict(row)
+    post_row.update({
+        "id": pid, "bodyTextOnly": text, "posted_at": posted.isoformat(),
+        "published_at": posted.isoformat(), "source_url": source_url,
+    })
+    # Adapt already-normalized collector rows back to the public API metric keys
+    # expected by the shared parser, preserving known zero versus unknown.
+    if row.get("views") is not None:
+        post_row.setdefault("viewCount", row.get("views"))
+    if row.get("likes") is not None:
+        post_row.setdefault("likeCount", row.get("likes"))
+    if row.get("replies") is not None and row.get("reply_metric_status") != "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS":
+        post_row.setdefault("commentCount", row.get("replies"))
+    if row.get("shares") is not None:
+        post_row.setdefault("shareCount", row.get("shares"))
+    normalized = _parse_profile_post(post_row, profile, now)
+    if not normalized:
+        return None
+    normalized.update({
+        "source_type": "public_creator_feed_claim_observation",
+        "discovery_hashtag": "existing_public_feed_corpus",
+        "earnings_status": "UNVERIFIED_PUBLIC_SELF_REPORT",
+        "evidence_type": "PUBLIC_SELF_REPORTED_WRITE_TO_EARN_CLAIM",
+        "metrics_scope": "public_post_metrics_only; reward claim is not independently verified",
+    })
+    return normalized
+
+
 def collect_public_claim_posts(now: datetime | None = None, page_fetch=_public_page,
                                detail_fetch=public_json_request, sleep_fn=time.sleep,
-                               hashtag_slugs: tuple[str, ...] = HASHTAG_SLUGS) -> dict:
+                               hashtag_slugs: tuple[str, ...] = HASHTAG_SLUGS,
+                               public_examples: list[dict] | None = None) -> dict:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     page_rows, page_errors = [], []
     seen_ids: set[str] = set()
@@ -243,6 +320,26 @@ def collect_public_claim_posts(now: datetime | None = None, page_fetch=_public_p
         if index + 1 < len(ids_to_check):
             sleep_fn(REQUEST_DELAY_SECONDS)
 
+    # Hashtag HTML often loads client-side without server-rendered post links.
+    # The daily feed collector has already harvested hundreds of public posts, so
+    # scan its dated corpus as a robust fallback instead of reporting zero leads
+    # just because a hashtag page exposed no anchor IDs.
+    corpus_checked = 0
+    corpus_matched = 0
+    seen_claim_ids = {normalize_id(row.get("post_id")) for row in normalized_posts if isinstance(row, dict)}
+    for source_row in public_examples if isinstance(public_examples, list) else []:
+        if not isinstance(source_row, dict):
+            continue
+        corpus_checked += 1
+        post = _public_corpus_claim(source_row, now)
+        if not post:
+            continue
+        corpus_matched += 1
+        pid = normalize_id(post.get("post_id"))
+        if pid and pid not in seen_claim_ids:
+            normalized_posts.append(post)
+            seen_claim_ids.add(pid)
+
     claim_report = analyze_public_reward_claims(normalized_posts, now)
     claimed_urls = set()
     for claim in claim_report.get("claims", []) if isinstance(claim_report.get("claims"), list) else []:
@@ -268,6 +365,8 @@ def collect_public_claim_posts(now: datetime | None = None, page_fetch=_public_p
         "hashtag_page_errors": page_errors,
         "post_detail_requests": len(ids_to_check),
         "post_detail_errors": detail_errors,
+        "public_corpus_rows_checked": corpus_checked,
+        "public_corpus_claim_matches_before_deduplication": corpus_matched,
         "normalized_recent_claim_post_count": len(normalized_posts),
         "retained_recent_claim_post_count": len(retained_claims),
         "public_claim_creators_found": len({str(row.get("creator") or "").casefold() for row in retained_claims}),
@@ -314,16 +413,18 @@ def merge_examples(existing: list[dict], incoming: list[dict]) -> list[dict]:
 
 def main() -> int:
     now = datetime.now(timezone.utc)
-    result = collect_public_claim_posts(now)
-    write_json(OUT, result)
     examples = read_json(EXAMPLES, [])
     if not isinstance(examples, list):
         examples = []
+    result = collect_public_claim_posts(now, public_examples=examples)
+    write_json(OUT, result)
     write_json(EXAMPLES, merge_examples(examples, result.get("claims", [])))
     print(json.dumps({
         "status": result["status"],
         "hashtag_pages_checked": len(result["hashtag_pages_checked"]),
         "post_detail_requests": result["post_detail_requests"],
+        "public_corpus_rows_checked": result["public_corpus_rows_checked"],
+        "public_corpus_claim_matches": result["public_corpus_claim_matches_before_deduplication"],
         "recent_claim_posts": result["retained_recent_claim_post_count"],
         "claim_creators": result["public_claim_creators_found"],
         "authenticated_session_used": result["authenticated_session_used"],
