@@ -63,7 +63,7 @@ def main():
     rewards=defaultdict(float)
     for event in valid_reward_events:
         rewards[canonical_post_id(event)]+=max(0,num(event,"reward_amount_usdc"))
-    groups=defaultdict(lambda:{"posts":0,"views":0.0,"engagement":0.0,"verified_revenue":0.0,"verified_posts":0,"owner_reported_revenue":0.0,"owner_reported_posts":0})
+    groups=defaultdict(lambda:{"posts":0,"views":0.0,"engagement":0.0,"verified_revenue":0.0,"verified_posts":0,"owner_reported_revenue":0.0,"owner_reported_posts":0,"owner_reported_views":0.0,"owner_reported_examples":[]})
     for p,a in attrs.items():
         fmt = a.get("content_format") or a.get("format") or a.get("portfolio_format")
         if not fmt and a.get("visual_attached") is True:
@@ -79,7 +79,16 @@ def main():
             g["verified_posts"]+=1; g["verified_revenue"]+=reward
         owner_reward=owner_rewards.get(p)
         if owner_reward:
-            g["owner_reported_posts"]+=1; g["owner_reported_revenue"]+=owner_reward["amount_usdc"]
+            metadata = owner_reward.get("content_metadata") or {}
+            g["owner_reported_posts"] += 1
+            g["owner_reported_revenue"] += owner_reward["amount_usdc"]
+            g["owner_reported_views"] += num(metadata, "owner_reported_views")
+            g["owner_reported_examples"].append({
+                "post_id": p,
+                "summary": metadata.get("summary"),
+                "public_post_url": metadata.get("public_post_url"),
+                "evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED",
+            })
 
     # Include manually published owner-reported reward examples that have no NIC attribution row.
     # They remain owner-reported, not independently verified.
@@ -95,7 +104,7 @@ def main():
         g["owner_reported_posts"] += 1
         g["owner_reported_revenue"] += owner_reward["amount_usdc"]
         g["owner_reported_views"] += num(meta, "owner_reported_views")
-        g.setdefault("owner_reported_examples", []).append({"post_id": post_id, "summary": meta.get("summary"), "public_post_url": meta.get("public_post_url"), "evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED"})
+        g["owner_reported_examples"].append({"post_id": post_id, "summary": meta.get("summary"), "public_post_url": meta.get("public_post_url"), "evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED"})
 
     observations=[]
     for (cat,fmt,fam),g in groups.items():
