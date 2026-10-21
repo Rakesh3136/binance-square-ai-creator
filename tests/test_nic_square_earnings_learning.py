@@ -254,6 +254,9 @@ class SquareEarningsLearningTests(unittest.TestCase):
         )
         self.assertEqual(plan["creator_profile_research"]["status"], "PROFILE_RESEARCH_COMPLETE")
         self.assertEqual(plan["creator_profile_research"]["profiles_resolved"], 1)
+        self.assertEqual(plan["research_coverage"]["status"], "FULL_7_AND_14_DAY_PROFILE_COVERAGE")
+        self.assertEqual(plan["research_coverage"]["public_feed_status"], "14_DAY_SAMPLE_GAP_KEEP_COLLECTING")
+        self.assertTrue(plan["research_coverage"]["profile_coverage_observed"])
         profile_queue = plan["creator_profile_study_queue"]
         self.assertEqual(profile_queue[0]["creator_profile_url"], "https://www.binance.com/en/square/profile/public_creator")
         public_queue = plan["creator_study_queue"]
