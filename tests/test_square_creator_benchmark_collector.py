@@ -127,6 +127,11 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertEqual(report["rolling_learning_windows"]["fourteen_day"]["coverage"]["posts_age_8_to_14_days"], 0)
         self.assertEqual(report["rolling_learning_windows"]["fourteen_day"]["coverage"]["status"], "NO_DISTINCT_POSTS_IN_DAYS_8_TO_14")
 
+    def test_daily_collector_scans_deep_enough_for_two_week_research(self):
+        self.assertGreaterEqual(collector.MAX_PAGES, 50)
+        self.assertGreaterEqual(collector.MAX_EXAMPLES, 5000)
+        self.assertGreaterEqual(collector.HISTORY_DAYS, 14)
+
 
 
 if __name__ == "__main__":
