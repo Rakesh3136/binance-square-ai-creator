@@ -13,7 +13,7 @@ import time
 import urllib.parse
 import urllib.request
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,10 +27,13 @@ EXAMPLES = ROOT / "data/intelligence/public_square_examples.json"
 OUT = ROOT / "data/intelligence/square_creator_benchmark.json"
 REPORT = ROOT / "data/live/square_creator_benchmark_report.json"
 STATE = ROOT / "analytics/square_creator_benchmark_state.json"
-MAX_PAGES = 6
+HISTORY = ROOT / "analytics/square_creator_benchmark_history.jsonl"
+MAX_PAGES = 15
 PAGE_SIZE = 30
 MAX_TEXT = 700
-MAX_EXAMPLES = 1200
+MAX_EXAMPLES = 8000
+MAX_HISTORY_SNAPSHOTS = 25000
+HISTORY_DAYS = 21
 
 
 def fetch_json(url: str) -> Any:
@@ -238,10 +241,147 @@ def engagement_rate(row: dict) -> float | None:
     return interactions / views
 
 
-def build_benchmark(rows: list[dict], generated_at: str) -> dict:
+def read_jsonl(path: Path) -> list[dict]:
+    result = []
+    if not path.exists():
+        return result
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            row = json.loads(line)
+            if isinstance(row, dict):
+                result.append(row)
+        except json.JSONDecodeError:
+            continue
+    return result
+
+
+def update_metric_history(existing: list[dict], public_rows: list[dict], observed_at: str) -> list[dict]:
+    """Keep one latest public metric snapshot per post per UTC day for trend analysis."""
+    now = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+    day = now.date().isoformat()
+    cutoff = now - timedelta(days=HISTORY_DAYS)
+    keyed: dict[tuple[str, str], dict] = {}
+
+    for row in existing:
+        if not isinstance(row, dict):
+            continue
+        post_id = normalize_id(row.get("post_id"))
+        date = str(row.get("observation_date") or "")[:10]
+        if not post_id or not date:
+            continue
+        try:
+            stamp = datetime.fromisoformat(str(row.get("observed_at") or date).replace("Z", "+00:00"))
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=timezone.utc)
+            if stamp.astimezone(timezone.utc) < cutoff:
+                continue
+        except (ValueError, TypeError):
+            continue
+        keyed[(date, post_id)] = row
+
+    for row in public_rows:
+        post_id = normalize_id(row.get("post_id") or row.get("source_url"))
+        if not post_id:
+            continue
+        keyed[(day, post_id)] = {
+            "observation_date": day,
+            "observed_at": now.isoformat(),
+            "post_id": post_id,
+            "creator": str(row.get("creator") or "unknown")[:120],
+            "creator_id": row.get("creator_id"),
+            "source_url": row.get("source_url") or row.get("source"),
+            "posted_at": row.get("posted_at"),
+            "archetype": row.get("archetype") or archetype(str(row.get("text") or "")),
+            "format": str(row.get("format") or "unknown")[:80],
+            "views": float(row.get("views") or 0),
+            "likes": float(row.get("likes") or 0),
+            "replies": float(row.get("replies") or 0),
+            "shares": float(row.get("shares") or 0),
+            "metrics_scope": "public_post_metrics_only",
+            "earnings_status": "NOT_PUBLICLY_VERIFIED",
+        }
+
+    result = sorted(keyed.values(), key=lambda row: (str(row.get("observation_date") or ""), str(row.get("post_id") or "")))
+    return result[-MAX_HISTORY_SNAPSHOTS:]
+
+
+def _snapshot_trajectory(history: list[dict], days: int, generated_at: str) -> dict:
+    now = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+    by_post: dict[str, list[dict]] = defaultdict(list)
+    for row in history:
+        try:
+            stamp = datetime.fromisoformat(str(row.get("observed_at") or "").replace("Z", "+00:00"))
+            if stamp.tzinfo is None:
+                continue
+            age = (now - stamp.astimezone(timezone.utc)).total_seconds() / 86400
+            if 0 <= age <= days:
+                post_id = str(row.get("post_id") or "").strip()
+                if post_id:
+                    by_post[post_id].append(row)
+        except (ValueError, TypeError):
+            continue
+
+    deltas = []
+    for post_id, snapshots in by_post.items():
+        snapshots.sort(key=lambda row: str(row.get("observed_at") or ""))
+        if len(snapshots) < 2:
+            continue
+        first, last = snapshots[0], snapshots[-1]
+        deltas.append({
+            "post_id": post_id,
+            "creator": str(last.get("creator") or first.get("creator") or "unknown"),
+            "archetype": str(last.get("archetype") or first.get("archetype") or "general"),
+            "observations": len(snapshots),
+            "views_delta": float(last.get("views") or 0) - float(first.get("views") or 0),
+            "likes_delta": float(last.get("likes") or 0) - float(first.get("likes") or 0),
+            "replies_delta": float(last.get("replies") or 0) - float(first.get("replies") or 0),
+            "shares_delta": float(last.get("shares") or 0) - float(first.get("shares") or 0),
+        })
+
+    def group_summary(key_name: str) -> list[dict]:
+        groups: dict[str, list[dict]] = defaultdict(list)
+        for row in deltas:
+            key = str(row.get(key_name) or "unknown").strip()
+            if key and key.lower() != "unknown":
+                groups[key].append(row)
+        result = []
+        for key, items in groups.items():
+            if len(items) < 3:
+                continue
+            n = len(items)
+            result.append({
+                key_name: key,
+                "posts_with_repeat_observations": n,
+                "avg_views_growth": round(sum(x["views_delta"] for x in items) / n, 2),
+                "avg_likes_growth": round(sum(x["likes_delta"] for x in items) / n, 2),
+                "avg_replies_growth": round(sum(x["replies_delta"] for x in items) / n, 2),
+                "avg_shares_growth": round(sum(x["shares_delta"] for x in items) / n, 2),
+                "evidence": "OBSERVED_METRIC_CHANGE_NOT_REVENUE",
+            })
+        result.sort(key=lambda x: (x["avg_replies_growth"] + x["avg_shares_growth"], x["avg_views_growth"], x["posts_with_repeat_observations"]), reverse=True)
+        return result[:10]
+
+    return {
+        "window_days": days,
+        "posts_seen": len(by_post),
+        "posts_with_repeat_observations": len(deltas),
+        "by_creator": group_summary("creator"),
+        "by_archetype": group_summary("archetype"),
+        "earnings_status": "PUBLIC_METRIC_TRAJECTORY_NOT_EARNINGS",
+    }
+
+
+def build_benchmark(rows: list[dict], generated_at: str, metric_history: list[dict] | None = None) -> dict:
     generated = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
     if generated.tzinfo is None: generated = generated.replace(tzinfo=timezone.utc)
     generated = generated.astimezone(timezone.utc)
+    metric_history = metric_history or []
     dated = []
     for row in rows:
         try:
@@ -263,15 +403,53 @@ def build_benchmark(rows: list[dict], generated_at: str) -> dict:
         for key, posts in creator_groups.items():
             rates = [engagement_rate(p) for p in posts]; rates = [x for x in rates if x is not None]
             if len(posts) < 3 or not rates: continue
-            creators.append({"creator": next((p.get("creator") for p in posts if p.get("creator")), "unknown"), "creator_id": key, "posts": len(posts), "mean_public_engagement_rate": round(sum(rates)/len(rates), 6), "sample_urls": [p.get("source_url") for p in posts[:5]], "earnings_status": "NOT_PUBLICLY_VERIFIED"})
-        creators.sort(key=lambda x: (x["posts"] >= 5, x["mean_public_engagement_rate"], x["posts"]), reverse=True)
+            total_views = sum(float(p.get("views") or 0) for p in posts)
+            total_replies = sum(float(p.get("replies") or 0) for p in posts)
+            total_shares = sum(float(p.get("shares") or 0) for p in posts)
+            by_type = defaultdict(int)
+            for p in posts:
+                by_type[str(p.get("archetype") or archetype(str(p.get("text") or "")))] += 1
+            creators.append({
+                "creator": next((p.get("creator") for p in posts if p.get("creator")), "unknown"),
+                "creator_id": key, "posts": len(posts),
+                "mean_public_engagement_rate": round(sum(rates)/len(rates), 6),
+                "median_views": sorted(float(p.get("views") or 0) for p in posts)[len(posts)//2],
+                "avg_views": round(total_views/len(posts), 2),
+                "reply_rate": round(total_replies/max(1,total_views), 6),
+                "share_rate": round(total_shares/max(1,total_views), 6),
+                "dominant_archetypes": [name for name, _ in sorted(by_type.items(), key=lambda item: item[1], reverse=True)[:3]],
+                "sample_urls": [p.get("source_url") for p in posts[:5]],
+                "earnings_status": "NOT_PUBLICLY_VERIFIED"
+            })
+        creators.sort(key=lambda x: (x["mean_public_engagement_rate"], x["posts"], x["reply_rate"]), reverse=True)
+        creators_by_reach = sorted(creators, key=lambda x: (x["median_views"], x["avg_views"], x["posts"]), reverse=True)
+        creators_by_discussion = sorted(creators, key=lambda x: (x["reply_rate"], x["share_rate"], x["posts"]), reverse=True)
         families = []
         for name, posts in family_groups.items():
             rates = [engagement_rate(p) for p in posts]; rates = [x for x in rates if x is not None]
             if len(posts) < 3 or not rates: continue
             families.append({"archetype": name, "samples": len(posts), "mean_public_engagement_rate": round(sum(rates)/len(rates), 6), "avg_views": round(sum(float(p.get("views") or 0) for p in posts)/len(posts), 2), "avg_replies": round(sum(float(p.get("replies") or 0) for p in posts)/len(posts), 2), "confidence": "medium" if len(posts) >= 10 else "tentative"})
         families.sort(key=lambda x: (x["mean_public_engagement_rate"], x["samples"]), reverse=True)
-        return {"window_days": days, "dated_posts": len(selected), "distinct_creators": len(creator_groups), "creator_candidates": creators[:20], "performance_by_archetype": families[:12], "earnings_status": "PUBLIC_METRICS_ONLY_NOT_EARNINGS"}
+        prior_week = [row for row, age in dated if age <= 7]
+        older_week = [row for row, age in dated if 7 < age <= 14]
+        return {
+            "window_days": days,
+            "dated_posts": len(selected),
+            "distinct_creators": len(creator_groups),
+            "creator_candidates": creators[:20],
+            "top_by_public_engagement": creators[:10],
+            "top_by_median_reach": creators_by_reach[:10],
+            "top_by_discussion_and_shares": creators_by_discussion[:10],
+            "performance_by_archetype": families[:12],
+            "coverage": {
+                "posts_age_0_to_7_days": len(prior_week),
+                "posts_age_8_to_14_days": len(older_week),
+                "older_window_has_distinct_samples": bool(older_week),
+                "status": "SUFFICIENT_DATE_SPREAD" if days == 7 or older_week else "NO_DISTINCT_POSTS_IN_DAYS_8_TO_14",
+            },
+            "metric_trajectory": _snapshot_trajectory(metric_history, days, generated_at),
+            "earnings_status": "PUBLIC_METRICS_ONLY_NOT_EARNINGS"
+        }
     by_creator: dict[str, list[dict]] = defaultdict(list)
     for row in rows:
         creator = str(row.get("creator_id") or row.get("creator") or "").strip()
@@ -337,7 +515,16 @@ def main() -> int:
         if key:
             by_id[key] = row
     combined = list(by_id.values())[-MAX_EXAMPLES:]
-    benchmark = build_benchmark(combined, generated_at)
+    metric_history = update_metric_history(read_jsonl(HISTORY), public_rows, generated_at)
+    HISTORY.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY.write_text("".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in metric_history), encoding="utf-8")
+    benchmark = build_benchmark(combined, generated_at, metric_history)
+    benchmark["metric_history"] = {
+        "path": "analytics/square_creator_benchmark_history.jsonl",
+        "observations_retained": len(metric_history),
+        "retention_days": HISTORY_DAYS,
+        "one_snapshot_per_post_per_utc_day": True,
+    }
     benchmark["source_attempt_count"] = len(attempts)
     benchmark["public_posts_collected_this_run"] = len(public_rows)
     write_json(EXAMPLES, combined)
@@ -354,7 +541,7 @@ def main() -> int:
         "benchmark_file": str(OUT.relative_to(ROOT)) if OUT.is_relative_to(ROOT) else str(OUT),
     })
     state = read_json(STATE, {})
-    state.update({"last_run": generated_at, "last_public_posts": len(public_rows), "last_status": benchmark["status"], "seen_post_count": len(combined)})
+    state.update({"last_run": generated_at, "last_public_posts": len(public_rows), "last_status": benchmark["status"], "seen_post_count": len(combined), "metric_history_rows": len(metric_history), "history_retention_days": HISTORY_DAYS})
     write_json(STATE, state)
     print(json.dumps({"status": benchmark["status"], "public_posts_observed": len(public_rows), "distinct_public_creators": benchmark["distinct_public_creators"], "benchmarks": len(benchmark["creator_benchmarks"]), "earnings_claims_verified": 0}, indent=2))
     return 0

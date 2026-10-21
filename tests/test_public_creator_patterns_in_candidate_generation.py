@@ -52,7 +52,79 @@ def test_public_pattern_brief_exposes_rolling_creator_research_without_earnings_
     assert brief["rolling_learning_windows"]["fourteen_day"]["window_days"] == 14
     assert brief["research_limits"]["public_metrics_are_not_earnings"] is True
 
+
+def test_earnings_learning_is_sanitized_before_reaching_writer():
+    earnings = {
+        "schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0",
+        "weekly_earnings_goal": {"target_usdc": 200, "actual_verified_usdc_7d": 50.0},
+        "creator_study_queue": [{
+            "creator": "PRIVATE_CREATOR_NAME_MUST_NOT_REACH_WRITER",
+            "sample_urls": ["https://private.example/post/123"],
+        }],
+        "best_public_format_hypotheses": [{
+            "archetype": "education_explainer",
+            "sample_count": 12,
+            "window_days": 14,
+            "avg_views": 450,
+            "mean_public_engagement_rate": 0.04,
+            "reply_rate": 0.01,
+            "evidence_type": "PUBLIC_OBSERVATION_NOT_EARNINGS",
+        }],
+        "current_program_mechanics": {
+            "relevant_trade_attribution": "Use a relevant verified cashtag or real widget.",
+            "trade_commission_reward_window_days": 7,
+            "text_content_engagement_bonus_window_days": 30,
+            "engagement_bonus_signal": "Genuine comments, likes, follows and shares.",
+            "anti_abuse_rule": "No artificial engagement.",
+            "source_url": "https://www.binance.com/en/square/profile/binance_square_official",
+        },
+        "recommended_content_playbook": ["Write original, evidence-led content."],
+    }
+    brief = module.build_public_pattern_brief({"sample_count": 0}, earnings)
+    safe = brief["earnings_learning"]
+    assert safe["public_archetype_hypotheses"][0]["archetype"] == "education_explainer"
+    assert safe["program_mechanics"]["trade_commission_reward_window_days"] == 7
+    assert safe["program_mechanics"]["text_engagement_bonus_window_days"] == 30
+    assert "PRIVATE_CREATOR_NAME_MUST_NOT_REACH_WRITER" not in str(safe)
+    assert "private.example" not in str(safe)
+    assert "weekly_earnings_goal" not in str(safe)
+    assert "actual_verified_usdc_7d" not in str(safe)
+
+
+
+def test_rolling_window_hides_individual_creator_rows_from_writer():
+    source = {
+        "sample_count": 50,
+        "creator_count": 10,
+        "format_counts": {"analysis": 15},
+        "rolling_learning_windows": {
+            "seven_day": {
+                "window_days": 7,
+                "dated_posts": 20,
+                "distinct_creators": 8,
+                "creator_candidates": [{
+                    "creator": "DO_NOT_LEAK_CREATOR_NAME",
+                    "creator_id": "private-user-id",
+                    "sample_urls": ["https://example.invalid/private-post"],
+                }],
+                "performance_by_archetype": [{
+                    "archetype": "education_explainer", "samples": 12, "avg_views": 450, "reply_rate": 0.02,
+                }],
+            },
+            "fourteen_day": {"window_days": 14, "dated_posts": 40, "distinct_creators": 12},
+        },
+    }
+    brief = module.build_public_pattern_brief(source)
+    rolling = brief["rolling_learning_windows"]
+    assert rolling["seven_day"]["performance_by_archetype"][0]["archetype"] == "education_explainer"
+    assert "DO_NOT_LEAK_CREATOR_NAME" not in str(brief)
+    assert "private-user-id" not in str(brief)
+    assert "example.invalid/private-post" not in str(brief)
+
+
 if __name__ == "__main__":
     test_public_pattern_brief_uses_repeated_aggregate_patterns_only()
     test_missing_public_patterns_fail_soft_without_inventing_evidence()
     test_public_pattern_brief_exposes_rolling_creator_research_without_earnings_claims()
+    test_earnings_learning_is_sanitized_before_reaching_writer()
+    test_rolling_window_hides_individual_creator_rows_from_writer()

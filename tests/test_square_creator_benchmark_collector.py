@@ -80,5 +80,54 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
             self.assertEqual(summary["earnings_claims_verified"], 0)
 
 
+
+    def test_metric_history_keeps_latest_daily_snapshot_and_drops_expired_rows(self):
+        now = "2026-10-21T12:00:00+00:00"
+        existing = [
+            {"observation_date": "2026-09-01", "observed_at": "2026-09-01T12:00:00+00:00", "post_id": "expired", "views": 999},
+            {"observation_date": "2026-10-21", "observed_at": "2026-10-21T08:00:00+00:00", "post_id": "123456", "views": 100},
+        ]
+        fresh = [
+            {"post_id": "123456", "creator": "A", "creator_id": "a", "posted_at": "2026-10-20T10:00:00+00:00",
+             "source_url": "https://www.binance.com/en/square/post/123456", "archetype": "education_explainer",
+             "views": 250, "likes": 20, "replies": 3, "shares": 1, "format": "text"},
+            {"post_id": "234567", "creator": "B", "creator_id": "b", "posted_at": "2026-10-20T11:00:00+00:00",
+             "source_url": "https://www.binance.com/en/square/post/234567", "archetype": "technical_chart",
+             "views": 50, "likes": 2, "replies": 0, "shares": 0, "format": "text"},
+        ]
+        history = collector.update_metric_history(existing, fresh, now)
+        self.assertEqual(len(history), 2)
+        self.assertEqual(next(row for row in history if row["post_id"] == "123456")["views"], 250)
+        self.assertNotIn("expired", [row["post_id"] for row in history])
+
+    def test_metric_history_reports_creator_growth_only_after_repeated_observations(self):
+        history = []
+        for day, views in (("2026-10-19", 100), ("2026-10-20", 150), ("2026-10-21", 225)):
+            for index in range(3):
+                history.append({
+                    "post_id": f"12345{index}", "creator": "A", "creator_id": "a",
+                    "archetype": "education_explainer", "observed_at": day + "T12:00:00+00:00",
+                    "views": views + index, "likes": views // 10, "replies": index, "shares": 1,
+                })
+        result = collector._snapshot_trajectory(history, 7, "2026-10-21T13:00:00+00:00")
+        self.assertEqual(result["posts_with_repeat_observations"], 3)
+        self.assertEqual(result["by_creator"][0]["creator"], "A")
+        self.assertGreater(result["by_creator"][0]["avg_views_growth"], 0)
+        self.assertEqual(result["earnings_status"], "PUBLIC_METRIC_TRAJECTORY_NOT_EARNINGS")
+
+    def test_fourteen_day_window_exposes_missing_older_week_coverage(self):
+        now = datetime(2026, 10, 21, tzinfo=timezone.utc)
+        rows = [
+            {"creator": "A", "creator_id": "a", "posted_at": (now - timedelta(days=age)).isoformat(),
+             "archetype": "education_explainer", "views": 100, "likes": 10, "replies": 4,
+             "shares": 2, "source_url": "https://x/" + str(age)}
+            for age in (1, 2, 3)
+        ]
+        report = collector.build_benchmark(rows, now.isoformat())
+        self.assertEqual(report["rolling_learning_windows"]["fourteen_day"]["coverage"]["posts_age_8_to_14_days"], 0)
+        self.assertEqual(report["rolling_learning_windows"]["fourteen_day"]["coverage"]["status"], "NO_DISTINCT_POSTS_IN_DAYS_8_TO_14")
+
+
+
 if __name__ == "__main__":
     unittest.main()

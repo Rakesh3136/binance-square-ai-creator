@@ -3,12 +3,135 @@ from __future__ import annotations
 import json, subprocess, sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; NEWS=ROOT/'data/live/news_snapshot.json'; CONTEXT=ROOT/'data/live/publication_context.json'; CORE=ROOT/'data/live/superhuman_creator_core.json'; NOTES=ROOT/'docs/BINANCE_SQUARE_TOP_CREATOR_DEEP_RESEARCH_NOTES.md'; RESEARCH=ROOT/'data/live/original_research.json'; STRATEGY=ROOT/'data/live/agent_strategy.json'; PORTFOLIO=ROOT/'data/live/content_portfolio_plan.json'; DISCOVERY=ROOT/'data/live/nic_story_discovery.json'; CRAFT=ROOT/'data/live/nic_content_craft_9.json'; MASTER=ROOT/'data/live/nic_content_master_10.json'; CREATIVE=ROOT/'data/live/nic_creative_evolution_11.json'; AUDIENCE12=ROOT/'data/live/nic_audience_response_12.json'; LEARNING15=ROOT/'data/live/nic_creative_learning_15.json'; EXP16=ROOT/'data/live/nic_creative_experiment_16.json'; PORTFOLIO17=ROOT/'data/live/nic_creative_portfolio_17.json'
+PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; NEWS=ROOT/'data/live/news_snapshot.json'; CONTEXT=ROOT/'data/live/publication_context.json'; CORE=ROOT/'data/live/superhuman_creator_core.json'; NOTES=ROOT/'docs/BINANCE_SQUARE_TOP_CREATOR_DEEP_RESEARCH_NOTES.md'; RESEARCH=ROOT/'data/live/original_research.json'; STRATEGY=ROOT/'data/live/agent_strategy.json'; PORTFOLIO=ROOT/'data/live/content_portfolio_plan.json'; DISCOVERY=ROOT/'data/live/nic_story_discovery.json'; CRAFT=ROOT/'data/live/nic_content_craft_9.json'; MASTER=ROOT/'data/live/nic_content_master_10.json'; CREATIVE=ROOT/'data/live/nic_creative_evolution_11.json'; AUDIENCE12=ROOT/'data/live/nic_audience_response_12.json'; LEARNING15=ROOT/'data/live/nic_creative_learning_15.json'; EXP16=ROOT/'data/live/nic_creative_experiment_16.json'; PORTFOLIO17=ROOT/'data/live/nic_creative_portfolio_17.json'; EARNINGS_LEARNING=ROOT/'data/live/nic_square_earnings_learning.json'
 def load(p):
     try:
         x=json.loads(p.read_text(encoding='utf-8')); return x if isinstance(x,dict) else {}
     except Exception:return {}
-def build_public_pattern_brief(patterns: dict) -> dict:
+def sanitize_rolling_window(window: dict) -> dict:
+    """Keep rolling aggregate signals while excluding individual creator names and URLs."""
+    if not isinstance(window, dict):
+        return {}
+    performance = []
+    for row in window.get("performance_by_archetype", []) if isinstance(window.get("performance_by_archetype"), list) else []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            samples = int(row.get("samples") or 0)
+        except (TypeError, ValueError):
+            samples = 0
+        if samples < 3:
+            continue
+        performance.append({
+            "archetype": str(row.get("archetype") or "unknown")[:60],
+            "samples": samples,
+            "confidence": str(row.get("confidence") or "tentative")[:20],
+            "avg_views": row.get("avg_views"),
+            "avg_replies": row.get("avg_replies"),
+            "avg_shares": row.get("avg_shares"),
+            "mean_public_engagement_rate": row.get("mean_public_engagement_rate"),
+            "reply_rate": row.get("reply_rate"),
+        })
+    coverage = window.get("coverage") if isinstance(window.get("coverage"), dict) else {}
+    trajectory = window.get("metric_trajectory") if isinstance(window.get("metric_trajectory"), dict) else {}
+    by_archetype = []
+    for row in trajectory.get("by_archetype", []) if isinstance(trajectory.get("by_archetype"), list) else []:
+        if not isinstance(row, dict):
+            continue
+        by_archetype.append({
+            "archetype": str(row.get("archetype") or "unknown")[:60],
+            "posts_with_repeat_observations": int(row.get("posts_with_repeat_observations") or 0),
+            "avg_views_growth": row.get("avg_views_growth"),
+            "avg_replies_growth": row.get("avg_replies_growth"),
+            "avg_shares_growth": row.get("avg_shares_growth"),
+            "evidence": "OBSERVED_METRIC_CHANGE_NOT_REVENUE",
+        })
+    return {
+        "window_days": int(window.get("window_days") or 0),
+        "dated_posts": int(window.get("dated_posts") or 0),
+        "distinct_creators": int(window.get("distinct_creators") or 0),
+        "performance_by_archetype": performance[:10],
+        "coverage": {
+            "posts_age_0_to_7_days": int(coverage.get("posts_age_0_to_7_days") or 0),
+            "posts_age_8_to_14_days": int(coverage.get("posts_age_8_to_14_days") or 0),
+            "older_window_has_distinct_samples": bool(coverage.get("older_window_has_distinct_samples", False)),
+            "status": str(coverage.get("status") or "UNKNOWN"),
+        },
+        "metric_trajectory": {
+            "window_days": int(trajectory.get("window_days") or window.get("window_days") or 0),
+            "posts_seen": int(trajectory.get("posts_seen") or 0),
+            "posts_with_repeat_observations": int(trajectory.get("posts_with_repeat_observations") or 0),
+            "by_archetype": by_archetype[:8],
+            "earnings_status": "PUBLIC_METRIC_TRAJECTORY_NOT_EARNINGS",
+        },
+        "earnings_status": "PUBLIC_METRICS_ONLY_NOT_EARNINGS",
+    }
+
+
+def build_earnings_learning_brief(learning: dict) -> dict:
+    """Sanitize the earnings-learning report into aggregate content guidance.
+
+    Never pass individual creator identities, post links, raw text, or account
+    earnings amounts to the content writer.
+    """
+    if not isinstance(learning, dict):
+        learning = {}
+    hypotheses = learning.get("best_public_format_hypotheses")
+    if not isinstance(hypotheses, list):
+        hypotheses = []
+    safe_hypotheses = []
+    for row in hypotheses:
+        if not isinstance(row, dict):
+            continue
+        try:
+            samples = int(row.get("sample_count") or 0)
+        except (TypeError, ValueError):
+            samples = 0
+        if samples < 3:
+            continue
+        safe_hypotheses.append({
+            "archetype": str(row.get("archetype") or "unknown")[:60],
+            "sample_count": samples,
+            "window_days": int(row.get("window_days") or 14),
+            "confidence": str(row.get("confidence") or "tentative")[:20],
+            "avg_views": row.get("avg_views"),
+            "public_engagement_rate": row.get("mean_public_engagement_rate"),
+            "reply_rate": row.get("reply_rate"),
+            "evidence_type": "PUBLIC_OBSERVATION_NOT_EARNINGS",
+        })
+    mechanics = learning.get("current_program_mechanics") if isinstance(learning.get("current_program_mechanics"), dict) else {}
+    coverage = learning.get("research_coverage") if isinstance(learning.get("research_coverage"), dict) else {}
+    own_playbook = learning.get("recommended_content_playbook")
+    if not isinstance(own_playbook, list):
+        own_playbook = []
+    return {
+        "status": str(learning.get("schema") or "NO_EARNINGS_LEARNING_DATA"),
+        "research_coverage": {
+            "status": str(coverage.get("status") or "UNKNOWN"),
+            "seven_day_dated_posts": int(coverage.get("seven_day_dated_posts") or 0),
+            "fourteen_day_dated_posts": int(coverage.get("fourteen_day_dated_posts") or 0),
+            "posts_age_8_to_14_days": int(coverage.get("posts_age_8_to_14_days") or 0),
+        },
+        "public_archetype_hypotheses": safe_hypotheses[:6],
+        "program_mechanics": {
+            "relevant_cashtag_or_real_native_widget_supports_trade_attribution": bool(mechanics.get("relevant_trade_attribution")),
+            "trade_commission_reward_window_days": mechanics.get("trade_commission_reward_window_days"),
+            "text_engagement_bonus_window_days": mechanics.get("text_content_engagement_bonus_window_days"),
+            "genuine_engagement_matters": bool(mechanics.get("engagement_bonus_signal")),
+            "anti_abuse_rule": str(mechanics.get("anti_abuse_rule") or "Use only genuine engagement.")[:240],
+            "source": "Binance Square Official",
+        },
+        "recommended_content_playbook": [str(rule)[:240] for rule in own_playbook[:8]],
+        "guardrails": [
+            "Public performance is a hypothesis, not proof of earnings or causality.",
+            "Do not copy individual creators or reproduce their text.",
+            "Only verified exact-post reward events count as earnings evidence.",
+            "The weekly earnings number is a goal, not a forecast or guarantee.",
+        ],
+    }
+
+
+def build_public_pattern_brief(patterns: dict, earnings_learning: dict | None = None) -> dict:
     """Return compact aggregate creator lessons; never pass public post text to the writer."""
     if not isinstance(patterns, dict):
         patterns = {}
@@ -57,8 +180,8 @@ def build_public_pattern_brief(patterns: dict) -> dict:
         "top_archetypes_by_observed_reply_and_follower_rate": eligible[:5],
         "observed_format_counts": format_summary,
         "rolling_learning_windows": {
-            "seven_day": rolling.get("seven_day") if isinstance(rolling.get("seven_day"), dict) else {},
-            "fourteen_day": rolling.get("fourteen_day") if isinstance(rolling.get("fourteen_day"), dict) else {},
+            "seven_day": sanitize_rolling_window(rolling.get("seven_day", {})),
+            "fourteen_day": sanitize_rolling_window(rolling.get("fourteen_day", {})),
         },
         "research_limits": patterns.get("research_limits") if isinstance(patterns.get("research_limits"), dict) else {
             "public_metrics_are_not_earnings": True,
@@ -72,6 +195,7 @@ def build_public_pattern_brief(patterns: dict) -> dict:
             "Do not force a format when the selected story/evidence does not support it.",
         ],
         "reusable_rules": [str(rule)[:240] for rule in rules[:8]],
+        "earnings_learning": build_earnings_learning_brief(earnings_learning or {}),
     }
 
 
@@ -84,7 +208,7 @@ def main():
     run_script('nic_creative_experiment_16.py')
     run_script('nic_creative_portfolio_17.py')
     run_script('original_research_engine.py'); run_script('creator_agent_supervisor.py'); run_script('agent_strategy_bridge.py'); run_script('nic_story_discovery_5.py'); run_script('nic_content_craft_intelligence_9.py')
-    p=load(PREFLIGHT); d=p.get('content_director_4') or {}; s=p.get('script_director_4') or {}; news=load(NEWS); ctx=load(CONTEXT); core=load(CORE); research=load(RESEARCH); strategy=load(STRATEGY); portfolio=load(PORTFOLIO); monetization_os=load(ROOT/'data/live/nic_monetization_contract.json'); discovery=load(DISCOVERY); craft=load(CRAFT); master=load(MASTER); creative=load(CREATIVE); audience12=load(AUDIENCE12); learning15=load(LEARNING15); exp16=load(EXP16); portfolio17=load(PORTFOLIO17); public_patterns=load(ROOT/'data/intelligence/creator_patterns.json'); public_pattern_brief=build_public_pattern_brief(public_patterns)
+    p=load(PREFLIGHT); d=p.get('content_director_4') or {}; s=p.get('script_director_4') or {}; news=load(NEWS); ctx=load(CONTEXT); core=load(CORE); research=load(RESEARCH); strategy=load(STRATEGY); portfolio=load(PORTFOLIO); monetization_os=load(ROOT/'data/live/nic_monetization_contract.json'); discovery=load(DISCOVERY); craft=load(CRAFT); master=load(MASTER); creative=load(CREATIVE); audience12=load(AUDIENCE12); learning15=load(LEARNING15); exp16=load(EXP16); portfolio17=load(PORTFOLIO17); public_patterns=load(ROOT/'data/intelligence/creator_patterns.json'); earnings_learning=load(EARNINGS_LEARNING); public_pattern_brief=build_public_pattern_brief(public_patterns, earnings_learning)
     fmt=str(d.get('recommended_format') or 'TOP MOVERS'); sym=str(ctx.get('symbol') or s.get('primary_symbol') or (d.get('primary_story') or {}).get('symbol','')).upper().replace('USDT','').replace('$','').strip(); selected=p.get('selected_opportunity') or {}; story=d.get('primary_story') or {}; treatment=str(monetization_os.get('content_lane') or portfolio.get('selected_treatment') or 'market_setup')
     if not sym: raise SystemExit('Candidate generation: authoritative asset missing')
     # Repair the producer/consumer contract before safe_creator_runner. The
@@ -109,7 +233,7 @@ def main():
     news_context=[{'title':a.get('title'),'source':a.get('source'),'url':a.get('url'),'published_at':a.get('published_at'),'summary':str(a.get('summary') or '')[:500],'symbols':a.get('symbols') or [],'news_score':a.get('news_score')} for a in (news.get('articles') or [])[:12] if isinstance(a,dict)]
     try: research_notes=NOTES.read_text(encoding='utf-8')[:24000]
     except Exception: research_notes=''
-    prompt={'version':'7.0','story_discovery_version':discovery.get('version','5.0'),'story_discovery':discovery,'content_craft_9':craft,'content_master_10':master,'creative_evolution_11':creative,'creative_experiment_16':exp16,'creative_portfolio_17':portfolio17,'public_creator_pattern_brief':public_pattern_brief,'superhuman_core_version':core.get('version','1.0'),'symbol':sym,'format':fmt,'portfolio_treatment':treatment,'portfolio_treatment_contract':contracts.get(treatment,''),'monetization_os_contract':monetization_os,'content_lane':monetization_os.get('content_lane') or treatment,'content_format':monetization_os.get('content_format') or fmt,'hook_type':monetization_os.get('hook_type'),'visual_type':monetization_os.get('visual_type'),'reader_payoff_type':monetization_os.get('reader_payoff_type'),'experiment_id':monetization_os.get('experiment_id'),'experiment_variable':monetization_os.get('experiment_variable'),'experiment_treatment':monetization_os.get('experiment_treatment'),'cycle_id':monetization_os.get('cycle_id'),'authoritative_context':ctx,'agent_strategy':strategy,'original_research':research,'primary_story':story,'selected_opportunity':selected,'fresh_news':news_context,'research_notes_loaded':bool(research_notes),'instruction':f'''You are the senior editorial intelligence system for a world-class Binance Square creator. STORY DISCOVERY IS FIRST: the selected story type is {discovery.get('selected_lane','unknown')!r}. Build the post around the most useful verified insight, not around a default technical template. The discovery layer is a ranking aid, not permission to invent facts. If its evidence is insufficient, return WAIT. The frozen opportunity, publication context, strategy, evidence and gates remain authoritative.\n\nSTORY DISCOVERY:\n{json.dumps(discovery,ensure_ascii=False)}\n\nCREATIVE EVOLUTION 11 CONTRACT:\n{json.dumps(creative,ensure_ascii=False)}\n\nAUDIENCE RESPONSE 12 ADAPTIVE BRIEF:\n{json.dumps(audience12,ensure_ascii=False)}\n\nMANDATORY CREATIVE ADAPTATION: honor audience_response_12.selected_directive when non-empty. If adaptive_brief.force_new_hook_family/force_new_format/force_new_visual is true, do not reuse the recent dominant dimension. Diversity must be visible in the finished candidate, not merely metadata.\n\nCONTENT CRAFT 9 CONTRACT:\n{json.dumps(craft,ensure_ascii=False)}\n\nThe selected portfolio treatment is {treatment!r}. Use its contract as an editorial lens. CONTENT MASTER 10 is a bounded learning signal only: prefer a learned pattern only when it has explicit VERIFIED_REWARD evidence; UNKNOWN is neutral and must never be treated as failure. Preserve exploration and do not let Content Master override Signal-First, Story Discovery, Craft 9, safety, truthfulness or publication gates.\n\nPUBLIC CREATOR PATTERN INTELLIGENCE (AGGREGATED ONLY):\n{json.dumps(public_pattern_brief,ensure_ascii=False)}\nUse this as a small hypothesis source for original hook/archetype/format choices. Prefer repeated patterns over outliers; public views and engagement are not earnings proof and do not establish causality. NIC's own verified outcomes outrank public observations. Never copy example wording, signature phrasing, creator identity, or branding. If no aggregate data is available, proceed using the evidence-led story contract without inventing patterns. Create genuinely different candidates, not rewrites. Technical levels belong only when they are part of the discovered story. Never force price/support/resistance/targets into a data, news, macro, research or learning story just because they exist.\n\nOUTPUT: create 5 genuinely different finished candidates centered on the discovered insight: early-discovery thesis; data/mechanism thesis; contrarian/failure thesis; portfolio-treatment thesis; concise high-energy thesis. Select the strongest.\n\nCONTENT STANDARD: follow Content Craft 9 as the authoritative design contract. Use its hook_type, evidence_order, reader_payoff, checkpoint_type and visual_proof_type. Specific story hook; 1-3 strongest supplied facts; mechanism before scenario implication; concrete confirmation or falsification condition; meaningful counterpoint; exactly ONE specific question. Reject generic ticker openings, price-volume-range-levels boilerplate, and structural collision with recent posts.\n\nLANE-SPECIFIC STORY SHAPE: market_setup=thesis/evidence/confirmation/invalidation/scenario; data_investigation=surprise/data/mechanism/limitation/test; breaking_news=verified event/source/transmission/asset/confirmation; world_macro=macro fact/transmission/exposure/second-order/falsifier; research_lesson=finding/evidence/significance/takeaway/limitation; education=mechanism/example/misconception/takeaway; contrarian=consensus/contrary evidence/alternative/falsifier/risk; follow_up=previous thesis/outcome/changed view/checkpoint; outcome_accountability=prior call/result/lesson/rule/test; weekly_synthesis=observations/common thread/lesson/watchlist.\n\nHUMAN QUALITY: natural rhythm, varied sentence lengths, precise verbs, clear POV. No generic market-check filler, fake experience, fake trades, fake outcomes, internal telemetry or invented facts. EVIDENCE: use only supplied verified evidence. ORIGINALITY: if the ticker/event can be swapped and the post still works, fail it. VISUAL: when appropriate, specify exactly what the visual proves using real supplied data. QUESTION: exactly one story-specific question at the end. If evidence is insufficient, return WAIT. Never expose private reasoning or hidden chain-of-thought.''','selection_criteria':['information_advantage','story_novelty','mechanism_strength','evidence_density','originality','reader_value','visual_information_value','conversation_quality','human_voice','risk_discipline','portfolio_diversity']}
+    prompt={'version':'7.0','story_discovery_version':discovery.get('version','5.0'),'story_discovery':discovery,'content_craft_9':craft,'content_master_10':master,'creative_evolution_11':creative,'creative_experiment_16':exp16,'creative_portfolio_17':portfolio17,'public_creator_pattern_brief':public_pattern_brief,'superhuman_core_version':core.get('version','1.0'),'symbol':sym,'format':fmt,'portfolio_treatment':treatment,'portfolio_treatment_contract':contracts.get(treatment,''),'monetization_os_contract':monetization_os,'content_lane':monetization_os.get('content_lane') or treatment,'content_format':monetization_os.get('content_format') or fmt,'hook_type':monetization_os.get('hook_type'),'visual_type':monetization_os.get('visual_type'),'reader_payoff_type':monetization_os.get('reader_payoff_type'),'experiment_id':monetization_os.get('experiment_id'),'experiment_variable':monetization_os.get('experiment_variable'),'experiment_treatment':monetization_os.get('experiment_treatment'),'cycle_id':monetization_os.get('cycle_id'),'authoritative_context':ctx,'agent_strategy':strategy,'original_research':research,'primary_story':story,'selected_opportunity':selected,'fresh_news':news_context,'research_notes_loaded':bool(research_notes),'instruction':f'''You are the senior editorial intelligence system for a world-class Binance Square creator. STORY DISCOVERY IS FIRST: the selected story type is {discovery.get('selected_lane','unknown')!r}. Build the post around the most useful verified insight, not around a default technical template. The discovery layer is a ranking aid, not permission to invent facts. If its evidence is insufficient, return WAIT. The frozen opportunity, publication context, strategy, evidence and gates remain authoritative.\n\nSTORY DISCOVERY:\n{json.dumps(discovery,ensure_ascii=False)}\n\nCREATIVE EVOLUTION 11 CONTRACT:\n{json.dumps(creative,ensure_ascii=False)}\n\nAUDIENCE RESPONSE 12 ADAPTIVE BRIEF:\n{json.dumps(audience12,ensure_ascii=False)}\n\nMANDATORY CREATIVE ADAPTATION: honor audience_response_12.selected_directive when non-empty. If adaptive_brief.force_new_hook_family/force_new_format/force_new_visual is true, do not reuse the recent dominant dimension. Diversity must be visible in the finished candidate, not merely metadata.\n\nCONTENT CRAFT 9 CONTRACT:\n{json.dumps(craft,ensure_ascii=False)}\n\nThe selected portfolio treatment is {treatment!r}. Use its contract as an editorial lens. CONTENT MASTER 10 is a bounded learning signal only: prefer a learned pattern only when it has explicit VERIFIED_REWARD evidence; UNKNOWN is neutral and must never be treated as failure. Preserve exploration and do not let Content Master override Signal-First, Story Discovery, Craft 9, safety, truthfulness or publication gates.\n\nPUBLIC CREATOR PATTERN + EARNINGS LEARNING (AGGREGATED ONLY):\n{json.dumps(public_pattern_brief,ensure_ascii=False)}\nUse this as a small hypothesis source for original hook/archetype/format choices. Prefer repeated patterns over outliers; public views and engagement are not earnings proof and do not establish causality. NIC's own verified outcomes outrank public observations. Never copy example wording, signature phrasing, creator identity, or branding. If no aggregate data is available, proceed using the evidence-led story contract without inventing patterns. Create genuinely different candidates, not rewrites. Technical levels belong only when they are part of the discovered story. Never force price/support/resistance/targets into a data, news, macro, research or learning story just because they exist.\n\nOUTPUT: create 5 genuinely different finished candidates centered on the discovered insight: early-discovery thesis; data/mechanism thesis; contrarian/failure thesis; portfolio-treatment thesis; concise high-energy thesis. Select the strongest.\n\nCONTENT STANDARD: follow Content Craft 9 as the authoritative design contract. Use its hook_type, evidence_order, reader_payoff, checkpoint_type and visual_proof_type. Specific story hook; 1-3 strongest supplied facts; mechanism before scenario implication; concrete confirmation or falsification condition; meaningful counterpoint; exactly ONE specific question. Reject generic ticker openings, price-volume-range-levels boilerplate, and structural collision with recent posts.\n\nLANE-SPECIFIC STORY SHAPE: market_setup=thesis/evidence/confirmation/invalidation/scenario; data_investigation=surprise/data/mechanism/limitation/test; breaking_news=verified event/source/transmission/asset/confirmation; world_macro=macro fact/transmission/exposure/second-order/falsifier; research_lesson=finding/evidence/significance/takeaway/limitation; education=mechanism/example/misconception/takeaway; contrarian=consensus/contrary evidence/alternative/falsifier/risk; follow_up=previous thesis/outcome/changed view/checkpoint; outcome_accountability=prior call/result/lesson/rule/test; weekly_synthesis=observations/common thread/lesson/watchlist.\n\nHUMAN QUALITY: natural rhythm, varied sentence lengths, precise verbs, clear POV. No generic market-check filler, fake experience, fake trades, fake outcomes, internal telemetry or invented facts. EVIDENCE: use only supplied verified evidence. ORIGINALITY: if the ticker/event can be swapped and the post still works, fail it. VISUAL: when appropriate, specify exactly what the visual proves using real supplied data. QUESTION: exactly one story-specific question at the end. If evidence is insufficient, return WAIT. Never expose private reasoning or hidden chain-of-thought.''','selection_criteria':['information_advantage','story_novelty','mechanism_strength','evidence_density','originality','reader_value','visual_information_value','conversation_quality','human_voice','risk_discipline','portfolio_diversity']}
     p['agent_strategy']=strategy; p['content_portfolio_plan']=portfolio; p['nic_story_discovery']=discovery; p['nic_content_craft_9']=craft; p['nic_content_master_10']=master; p['candidate_generation_4']=prompt; PREFLIGHT.write_text(json.dumps(p,indent=2,ensure_ascii=False),encoding='utf-8')
     run_script('nic_story_provenance_gate.py')
     print(json.dumps({'status':'OK','version':'7.0','story_discovery':discovery.get('selected_lane'),'symbol':sym,'candidate_count':5},indent=2))
