@@ -9,6 +9,7 @@ on:
       - "src/run_creator_intelligence.py"
       - "src/nic_square_earnings_learning.py"
       - "src/nic_square_profile_research.py"
+      - "src/nic_wte_leaderboard_evidence.py"
       - "src/candidate_generation_4.py"
       - ".github/workflows/nic-square-creator-benchmark.yml"
   pull_request:
@@ -17,12 +18,15 @@ on:
       - "src/creator_intelligence.py"
       - "src/run_creator_intelligence.py"
       - "src/nic_square_earnings_learning.py"
+      - "src/nic_square_profile_research.py"
+      - "src/nic_wte_leaderboard_evidence.py"
       - "src/candidate_generation_4.py"
       - "tests/test_public_creator_patterns_in_candidate_generation.py"
       - "tests/test_square_creator_benchmark_collector.py"
       - "tests/test_square_creator_benchmark_autorefresh.py"
       - "tests/test_nic_square_earnings_learning.py"
       - "tests/test_nic_square_profile_research.py"
+      - "tests/test_nic_wte_leaderboard_evidence.py"
       - ".github/workflows/nic-square-creator-benchmark.yml"
   schedule:
     - cron: "25 4 * * *"
@@ -49,7 +53,7 @@ jobs:
       - name: Validate collector and tests
         run: |
           set -euo pipefail
-          python -m py_compile src/square_creator_benchmark_collector.py src/creator_intelligence.py src/run_creator_intelligence.py src/candidate_generation_4.py src/nic_square_earnings_learning.py
+          python -m py_compile src/square_creator_benchmark_collector.py src/creator_intelligence.py src/run_creator_intelligence.py src/candidate_generation_4.py src/nic_square_earnings_learning.py src/nic_square_profile_research.py src/nic_wte_leaderboard_evidence.py
           python -m unittest tests.test_square_creator_benchmark_collector tests.test_square_creator_benchmark_autorefresh tests.test_nic_square_earnings_learning tests.test_nic_square_profile_research -v
           python tests/test_public_creator_patterns_in_candidate_generation.py
       - name: Collect public creator examples
