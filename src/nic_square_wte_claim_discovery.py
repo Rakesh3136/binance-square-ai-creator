@@ -44,15 +44,21 @@ MAX_POST_DETAILS_PER_RUN = 60
 REQUEST_DELAY_SECONDS = 0.25
 MAX_EXAMPLES = 8000
 WTE_CONTEXT = re.compile(
-    r"write\s*[- ]?to\s*[- ]?earn|write2earn|w2e|creator\s+rewards?|"
-    r"weekly\s+(?:rewards?|earnings?)|earned\s+(?:\$|\d)|"
-    r"earnings?\s+(?:of|up to|over|above|:)",
+    r"write\s*[- ]?to\s*[- ]?earn|write2earn|\bw2e\b|"
+    r"creator\s+rewards?|weekly\s+(?:rewards?|earnings?)",
     re.I,
 )
 AMOUNT_CONTEXT = re.compile(
     r"(?:\$\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|USD)\b)",
     re.I,
 )
+CLAIM_ACTION = re.compile(
+    r"\b(?:i|we|my|our)\s+(?:earned|made|received|got\s+paid|was\s+paid|"
+    r"reward\w*|payout\w*)\b|\b(?:payout|reward(?:ed|s)?|commission(?:s)?|"
+    r"bonus(?:es)?)\b.{0,50}(?:\$\s?\d|\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|USD))",
+    re.I,
+)
+WTE_HASHTAG_SLUGS = {"writetoearn", "write2earn", "binancew2e"}
 POST_ID_PATTERN = re.compile(
     r"(?:https?://(?:www\.)?binance\.com)?/(?:[a-z]{2}(?:-[A-Z]{2})?/)?square/post/([A-Za-z0-9_-]+)",
     re.I,
@@ -152,7 +158,10 @@ def normalize_public_claim_post(payload: Any, pid: str, hashtag: str,
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     row = _post_object(payload, pid)
     text = _body_text(row)
-    if len(text) < 20 or not WTE_CONTEXT.search(text) or not AMOUNT_CONTEXT.search(text):
+    if len(text) < 20 or not AMOUNT_CONTEXT.search(text) or not CLAIM_ACTION.search(text):
+        return None
+    hashtag_context = str(hashtag or "").strip().lower().replace("-", "").replace("_", "")
+    if not WTE_CONTEXT.search(text) and hashtag_context not in WTE_HASHTAG_SLUGS:
         return None
     stamp = posted_at(row)
     if not stamp:
