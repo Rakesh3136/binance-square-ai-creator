@@ -251,6 +251,16 @@ def _public_corpus_claim(row: dict, now: datetime) -> dict | None:
         "id": pid, "bodyTextOnly": text, "posted_at": posted.isoformat(),
         "source_url": source_url,
     })
+    # Adapt already-normalized collector rows back to the public API metric keys
+    # expected by the shared parser, preserving known zero versus unknown.
+    if row.get("views") is not None:
+        post_row.setdefault("viewCount", row.get("views"))
+    if row.get("likes") is not None:
+        post_row.setdefault("likeCount", row.get("likes"))
+    if row.get("replies") is not None and row.get("reply_metric_status") != "SUSPICIOUS_COUNTER_EQUALS_OR_EXCEEDS_VIEWS":
+        post_row.setdefault("commentCount", row.get("replies"))
+    if row.get("shares") is not None:
+        post_row.setdefault("shareCount", row.get("shares"))
     normalized = _parse_profile_post(post_row, profile, now)
     if not normalized:
         return None
@@ -266,7 +276,8 @@ def _public_corpus_claim(row: dict, now: datetime) -> dict | None:
 
 def collect_public_claim_posts(now: datetime | None = None, page_fetch=_public_page,
                                detail_fetch=public_json_request, sleep_fn=time.sleep,
-                               hashtag_slugs: tuple[str, ...] = HASHTAG_SLUGS,\n                               public_examples: list[dict] | None = None) -> dict:
+                               hashtag_slugs: tuple[str, ...] = HASHTAG_SLUGS,
+                               public_examples: list[dict] | None = None) -> dict:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     page_rows, page_errors = [], []
     seen_ids: set[str] = set()
