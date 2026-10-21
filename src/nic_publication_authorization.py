@@ -93,7 +93,7 @@ def evaluate(policy, eligibility, routing, lane, text, now=None, nic21=None):
         "reasons":reasons,
         "draft_sha256":hashlib.sha256(text.encode("utf-8")).hexdigest() if text else "",
         "policy":str(POLICY_PATH.relative_to(ROOT)),
-        "note":"Automatic publishing must remain disabled until explicit creator re-authorization and a separate human-review approval workflow exists. This gate never claims a human reviewed the draft."
+        "note":"Creator has explicitly re-authorized guarded editorial-only background publishing. This gate never claims a human reviewed the draft; it authorizes only the exact draft that passes every current-cycle gate."
     }
 
 def main():

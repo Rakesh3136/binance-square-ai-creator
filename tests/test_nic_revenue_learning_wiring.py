@@ -82,7 +82,9 @@ class RevenueLearningProductionWiringTests(unittest.TestCase):
         self.assertLess(text.index(learning), text.index(preflight))
         learning_source = (ROOT / "src/nic_square_earnings_learning.py").read_text(encoding="utf-8")
         self.assertIn('"window_days": [7, 14]', learning_source)
-        self.assertIn('"automatic_posting_enabled": False', learning_source)
+        self.assertIn('"automatic_posting_enabled": bool(load_json(ROOT / "nic_publication_policy.json"', learning_source)
+        self.assertIn('"format_reward_map"', learning_source)
+        self.assertIn('"creator_format_strategy"', learning_source)
 
     def test_creator_learning_outputs_are_validated_ignored_for_push_trigger_and_persisted(self):
         text = WORKFLOW.read_text(encoding="utf-8")

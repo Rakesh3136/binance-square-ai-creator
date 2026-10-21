@@ -69,16 +69,19 @@ class EditorialAuthorizationTests(unittest.TestCase):
         self.assertFalse(result["authorized"])
         self.assertTrue(any("mandatory human review is outstanding" in reason for reason in result["reasons"]))
 
-    def test_current_repository_policy_keeps_automatic_publication_disabled(self):
+    def test_current_repository_policy_authorizes_only_guarded_editorial_autonomy(self):
         policy = json.loads((ROOT / "nic_publication_policy.json").read_text(encoding="utf-8"))
-        self.assertFalse(policy["editorial_auto_publication_enabled"])
-        self.assertTrue(policy["requires_human_review_for_editorial"])
+        self.assertTrue(policy["editorial_auto_publication_enabled"])
+        self.assertFalse(policy["requires_human_review_for_editorial"])
+        self.assertFalse(policy["trade_signal_publication_enabled"])
+        self.assertFalse(policy["live_orders_enabled"])
         values = list(self.fixtures())
         values[0] = policy
         result = self.run_auth(values)
-        self.assertFalse(result["authorized"])
-        self.assertTrue(any("standing editorial auto-publication authorization is disabled" in reason for reason in result["reasons"]))
-        self.assertTrue(any("mandatory human review is outstanding" in reason for reason in result["reasons"]))
+        self.assertTrue(result["authorized"])
+        self.assertFalse(result["trade_signal_publication_authorized"])
+        self.assertFalse(result["live_orders_authorized"])
+        self.assertFalse(result["human_review_claimed"])
 
     def test_disabled_policy_blocks(self):
         values = list(self.fixtures())

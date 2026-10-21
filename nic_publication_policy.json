@@ -1,30 +1,32 @@
 {
-  "schema": "NIC-PUBLICATION-POLICY-1.0",
-  "editorial_auto_publication_enabled": false,
+  "schema": "NIC-PUBLICATION-POLICY-1.1",
+  "editorial_auto_publication_enabled": true,
   "editorial_mode": "EDITORIAL_ONLY",
   "trade_signal_publication_enabled": false,
   "live_orders_enabled": false,
-  "requires_human_review_for_editorial": true,
-  "authorization_basis": "Current creator instruction on 2026-10-21: automatic Binance Square publishing must remain disabled until creator quality, visual correctness, and learning from verified outcomes are demonstrated.",
+  "requires_human_review_for_editorial": false,
+  "authorization_basis": "Creator instruction on 2026-10-21 explicitly re-authorizes background automatic Binance Square editorial publishing, restricted to the existing final quality, originality, evidence, WTE eligibility, visual-truth, duplicate, asset-cooldown, and editorial-only gates.",
   "scope": [
-    "draft generation and research only",
-    "prepare review packages only"
+    "autonomous original editorial content only",
+    "publish only after every current-cycle quality and eligibility gate passes",
+    "continuous background research and outcome learning"
   ],
   "must_not_claim": [
     "human review that did not occur",
     "verified publication without current-run post ID",
-    "profitable forecasting without held-out evidence"
+    "profitable forecasting without held-out evidence",
+    "verified creator earnings from public metrics or unsupported claims"
   ],
   "guardrails": [
-    "Automatic editorial publication is disabled by creator instruction.",
-    "A human must explicitly review and approve each draft before any future publication.",
-    "The current hard workflow stop on payload building and submission must remain in place.",
-    "Current-cycle EDITORIAL eligibility and trade_authorized=false remain mandatory if publication is ever explicitly re-enabled.",
-    "Signal-First and the editorial lane gate must explicitly permit any future publication.",
-    "Actionable entry/stop/target instructions and trade calls are forbidden in editorial mode.",
-    "All editorial, originality, quality, and required visual validation steps must pass.",
-    "Duplicate and asset cooldown checks remain active.",
+    "Only EDITORIAL_ONLY content may publish; actionable entry/stop/target instructions and trade calls are forbidden.",
+    "Every publication requires fresh current-cycle eligibility, Signal-First permission, NIC 21 originality/visual-truth PASS, editorial lane PASS, and exact final-draft hash agreement.",
+    "The WTE eligibility gate must pass; missing or explicitly ineligible results fail closed.",
+    "Required visuals must have verified asset, timeframe, data and labels; never invent or mismatch chart symbols.",
+    "Duplicate and 72-hour asset cooldown checks remain active; no repeat unless explicit follow-up with genuinely new evidence.",
+    "Automatic publishing is rate-limited by the cadence controller; do not publish on every scheduler tick.",
     "Live orders and trade-signal publication remain disabled.",
-    "Public views, comments, likes, follows and creator payout claims are not proof of earnings."
+    "Public views, comments, likes, follows and creator payout claims are not proof of earnings.",
+    "Optimize for genuine reader value and discussion; manufactured engagement, follow-for-follow, repetitive engagement bait, and copied wording are prohibited.",
+    "Every attempted publication must be audited; only current-run post ID and link count as confirmed publication."
   ]
 }

@@ -635,7 +635,7 @@ jobs:
           echo "authorized=$authorized" >> "$GITHUB_OUTPUT"
           echo "NIC publication authorization: $authorized"
 
-      - name: Preserve exact final draft and gate context for mandatory human review
+      - name: Preserve exact final draft and gate context for publication audit
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         uses: actions/upload-artifact@v4
         with:
@@ -647,8 +647,8 @@ jobs:
           retention-days: 7
 
       - name: Build final publication payload
-        # Emergency pause: keep automatic publication disabled until explicitly re-enabled in a reviewed change.
-        if: ${{ steps.publication_authorization.outputs.authorized == 'true' && false }}
+        # Publication is enabled only after current-cycle authorization and all final quality gates pass.
+        if: ${{ steps.publication_authorization.outputs.authorized == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
@@ -658,12 +658,12 @@ jobs:
 
       - name: Extract publication and submit to Binance Square
         id: publish_result
-        # Independent hard stop: authorization artifacts alone must not resume publishing.
-        if: ${{ steps.publication_authorization.outputs.authorized == 'true' && false }}
+        # Independent final guard: publisher rechecks exact-draft hashes, editorial mode, and trade denial.
+        if: ${{ steps.publication_authorization.outputs.authorized == 'true' }}
         env:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
           BINANCE_SQUARE_OPENAPI_KEY: ${{ secrets.BINANCE_SQUARE_OPENAPI_KEY || secrets.BINANCE_SQUARE_API_KEY }}
-          PUBLISHING_ENABLED: 'false'
+          PUBLISHING_ENABLED: 'true'
           NIC_AUTO_PUBLICATION_MODE: EDITORIAL_ONLY
         run: python src/binance_square_publisher.py
 
