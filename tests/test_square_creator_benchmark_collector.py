@@ -133,6 +133,52 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertGreaterEqual(collector.HISTORY_DAYS, 14)
 
 
+    def test_public_collector_combines_latest_trending_and_news_feeds(self):
+        def post(post_id, views, creator):
+            return {"postId": post_id, "content": ("A concrete post explaining a verified market or creator insight. " * 2),
+                    "authorName": creator, "viewCount": views, "likeCount": 5, "commentCount": 2, "shareCount": 1,
+                    "date": 1792540800000, "webLink": f"https://www.binance.com/en/square/post/{post_id}"}
+
+        latest = post("111111", 100, "Creator A")
+        trend = post("222222", 200, "Creator B")
+        higher_metric_duplicate = post("111111", 900, "Creator A")
+        news = post("333333", 300, "Creator C")
+        attempts = []
+
+        def fake_fetch(url):
+            from urllib.parse import parse_qs, urlsplit
+            parsed = urlsplit(url)
+            params = parse_qs(parsed.query)
+            page = int((params.get("pageIndex") or params.get("pageNo") or params.get("page") or ["1"])[0])
+            kind = params.get("type", [""])[0]
+            if "article/list" in parsed.path and kind == "2":
+                return {"data": [latest]} if page == 1 else {"data": []}
+            if "article/list" in parsed.path and kind == "1":
+                return {"data": [trend, higher_metric_duplicate]} if page == 1 else {"data": []}
+            if "feed/news/list" in parsed.path:
+                return {"data": [news, higher_metric_duplicate]} if page == 1 else {"data": []}
+            raise AssertionError(f"unexpected feed URL: {url}")
+
+        with patch.object(collector, "fetch_json", side_effect=fake_fetch), patch.object(collector.time, "sleep"):
+            rows, attempts = collector.fetch_public_posts()
+        by_id = {row["post_id"]: row for row in rows}
+        self.assertEqual(set(by_id), {"111111", "222222", "333333"})
+        self.assertEqual(by_id["111111"]["views"], 900)
+        self.assertEqual(by_id["111111"]["collection_feed"], "latest")
+        self.assertEqual(set(by_id["111111"]["collection_feeds"]), {"latest", "trending", "news"})
+        self.assertEqual(by_id["222222"]["collection_feed"], "trending")
+        self.assertEqual(by_id["333333"]["collection_feed"], "news")
+        self.assertTrue(any("article/list" in url and "type=2" in url for url in attempts))
+        self.assertTrue(any("article/list" in url and "type=1" in url for url in attempts))
+        self.assertTrue(any("feed/news/list" in url for url in attempts))
+
+    def test_collector_respects_public_api_page_size_cap(self):
+        self.assertEqual(collector.PAGE_SIZE, 20)
+        self.assertGreaterEqual(collector.MAX_PAGES, 45)
+        self.assertGreaterEqual(collector.NEWS_MAX_PAGES, 80)
+        self.assertGreaterEqual(collector.HISTORY_DAYS, 14)
+
+
 
 if __name__ == "__main__":
     unittest.main()
