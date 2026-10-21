@@ -26,6 +26,7 @@ class SquareProfileResearchTests(unittest.TestCase):
         self.assertEqual(candidates[0]["discovery_source"], "observed_write_to_earn_leaderboard")
         self.assertEqual(sum(1 for c in candidates if (c.get("username") or c["creator"]).casefold() == "alpha"), 1)
         self.assertEqual(candidates[0]["earnings_status"], "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT")
+        self.assertEqual(next(c for c in candidates if c["creator"] == "Alpha")["username"], "Alpha")
 
     def test_profile_research_uses_public_post_and_profile_endpoints_and_counts_7_14_day_windows(self):
         def fake_request(url, method="GET", payload=None, timeout=15.0):
