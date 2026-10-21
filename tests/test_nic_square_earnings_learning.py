@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims, summarize_owner_reported_reward_feedback
+from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims, summarize_owner_reported_reward_feedback, build_learning_memory_entry
 
 
 def valid_reward_event():
@@ -310,6 +310,30 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(public_queue[0]["creator_profile_url"], "https://www.binance.com/en/square/profile/public_creator")
         self.assertFalse(plan["creator_profile_research"]["authenticated_session_used"])
         self.assertEqual(profile_queue[0]["evidence_type"], "PUBLIC_PROFILE_RESEARCH_NOT_EARNINGS")
+
+    def test_learning_memory_persists_owner_feedback_and_profile_coverage_separately(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        plan = build_learning_plan(
+            benchmark_fixture(), {}, [], now=now,
+            owner_reported_reward_events=[{
+                "event_id": "owner-report-1", "post_id": "374795126927596",
+                "reward_amount_usdc": 0.201, "currency": "USDC",
+                "reported_at": "2026-10-21T11:16:00+05:30",
+                "content_metadata": {"content_lane": "long_term_thesis",
+                    "public_post_url": "https://www.binance.com/en/square/post/374795126927596"},
+            }],
+            creator_profile_research={
+                "status": "PROFILE_RESEARCH_COMPLETE", "profiles_resolved": 12,
+                "posts_collected_7d": 172, "posts_collected_8_to_14d": 38,
+            },
+        )
+        row = build_learning_memory_entry(plan, now)
+        self.assertEqual(row["creator_profiles_resolved"], 12)
+        self.assertEqual(row["profile_posts_8_to_14d"], 38)
+        self.assertAlmostEqual(row["owner_reported_usdc_7d"], 0.201)
+        self.assertEqual(row["owner_reported_reward_events_7d"], 1)
+        self.assertTrue(row["owner_reported_feedback_is_not_verified"])
+        self.assertIsNone(row["verified_usdc_7d"])
 
     def test_new_write_to_earn_rules_have_separate_october_19_cohort(self):
         plan = build_learning_plan(benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
