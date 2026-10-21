@@ -24,6 +24,8 @@ BASES = [
     "https://www.binance.com/bapi/composite/v1/friendly/pgc/content/article/list",
 ]
 NEWS_FEED = "https://www.binance.com/bapi/composite/v4/friendly/pgc/feed/news/list"
+USER_PROFILE_URL = "https://www.binance.com/bapi/composite/v3/friendly/pgc/user/client"
+USER_POSTS_URL = "https://www.binance.com/bapi/composite/v2/friendly/pgc/content/queryUserProfilePageContentsWithFilter"
 EXAMPLES = ROOT / "data/intelligence/public_square_examples.json"
 OUT = ROOT / "data/intelligence/square_creator_benchmark.json"
 REPORT = ROOT / "data/live/square_creator_benchmark_report.json"
@@ -34,6 +36,10 @@ NEWS_MAX_PAGES = 80  # Supplementary news feed supports deeper public pagination
 TRENDING_MAX_PAGES = 9
 PAGE_SIZE = 20  # Current public API docs cap pageSize at 20.
 REQUEST_DELAY_SECONDS = 0.5
+PROFILE_STUDY_CREATORS = 10
+PROFILE_MAX_PAGES = 8
+PROFILE_HISTORY_DAYS = 14
+PROFILE_HISTORY_STATS = {}
 MAX_TEXT = 700
 MAX_EXAMPLES = 8000
 MAX_HISTORY_SNAPSHOTS = 25000
@@ -70,7 +76,7 @@ def normalize_id(value: Any) -> str:
 
 
 def text_value(row: dict) -> str:
-    for key in ("content", "text", "body", "description", "summary", "title"):
+    for key in ("bodyTextOnly", "content", "text", "body", "description", "summary", "title", "subTitle"):
         value = row.get(key)
         if isinstance(value, str) and value.strip():
             clean = re.sub(r"<[^>]+>", " ", value)
@@ -129,7 +135,7 @@ def posted_at(row: dict) -> str | None:
     """Normalize publication time from varied public-feed shapes; never guess unknown dates."""
     priority = ("publishTime", "publishedAt", "published_at", "publish_time", "publishedTime",
                 "createTime", "createdAt", "created_at", "createdTime", "create_time",
-                "releaseTime", "release_time", "postTime", "post_time", "createDate",
+                "releaseTime", "release_time", "firstReleaseTime", "postTime", "post_time", "createDate",
                 "createdDate", "publishDate", "publish_date", "createdTimestamp",
                 "createTimestamp", "timestamp", "date")
     candidates = []
@@ -177,11 +183,14 @@ def archetype(text: str) -> str:
     score, name = max(scored, default=(0, "general"))
     return name if score else "general"
 
-def author(row: dict) -> tuple[str, str]:
+def author(row: dict) -> tuple[str, str, str]:
     value = row.get("author") if isinstance(row.get("author"), dict) else {}
-    name = row.get("authorName") or row.get("nickName") or row.get("nickname") or value.get("name") or value.get("nickName") or ""
-    uid = row.get("authorId") or row.get("uid") or value.get("userId") or value.get("id") or ""
-    return str(name).strip()[:120], str(uid).strip()[:120]
+    name = (row.get("displayName") or row.get("authorName") or row.get("nickName") or row.get("nickname")
+            or value.get("displayName") or value.get("name") or value.get("nickName") or "")
+    uid = (row.get("squareUid") or row.get("squareAuthorId") or row.get("authorId") or row.get("uid")
+           or value.get("squareUid") or value.get("squareAuthorId") or value.get("userId") or value.get("id") or "")
+    username = row.get("username") or row.get("authorUsername") or value.get("username") or ""
+    return str(name).strip()[:120], str(uid).strip()[:160], str(username).strip()[:120]
 
 
 def _collect_feed(base: str, fixed_params: dict, source_name: str,
