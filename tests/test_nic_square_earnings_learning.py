@@ -195,6 +195,33 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertGreaterEqual(len(plan["public_earnings_leaderboard_study_queue"]), 2)
         self.assertTrue(plan["leaderboard_research_coverage"]["amounts_are_not_payout_proof"])
 
+    def test_observed_leaderboard_entries_flow_into_creator_study_queue(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        observed = [{
+            "creator": "LeaderboardCreator",
+            "creator_profile_url": "https://www.binance.com/en/square/profile/LeaderboardCreator",
+            "rank": 3,
+            "displayed_amount": 800.0,
+            "currency": "USDC",
+            "period_start": "2026-10-12T00:00:00+00:00",
+            "period_end": "2026-10-18T23:59:00+00:00",
+            "observed_at": "2026-10-21T10:00:00+00:00",
+            "source_url": "https://www.binance.com/en/square/WriteToEarn",
+            "evidence_ref": "capture://leaderboard-row-3",
+            "earnings_status": "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT",
+        }]
+        plan = build_learning_plan(
+            benchmark_fixture(), {}, [], now=now, observed_leaderboard_entries=observed,
+        )
+        queue = plan["public_earnings_leaderboard_study_queue"]
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["creator"], "LeaderboardCreator")
+        self.assertEqual(queue[0]["claimed_amount"], 800.0)
+        self.assertEqual(queue[0]["creator_profile_url"], "https://www.binance.com/en/square/profile/LeaderboardCreator")
+        self.assertEqual(queue[0]["evidence_ref"], "capture://leaderboard-row-3")
+        self.assertEqual(queue[0]["earnings_status"], "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT")
+        self.assertTrue(plan["leaderboard_research_coverage"]["amounts_are_not_payout_proof"])
+
     def test_new_write_to_earn_rules_have_separate_october_19_cohort(self):
         plan = build_learning_plan(benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
         mechanics = plan["current_program_mechanics"]

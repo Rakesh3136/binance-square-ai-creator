@@ -15,8 +15,10 @@ from typing import Any
 
 try:
     from src.nic_reward_evidence import is_verified_reward_event, canonical_post_id, reward_event_rejection_reasons
+    from src.nic_wte_leaderboard_evidence import normalize_observations
 except ModuleNotFoundError:
     from nic_reward_evidence import is_verified_reward_event, canonical_post_id, reward_event_rejection_reasons
+    from nic_wte_leaderboard_evidence import normalize_observations
 
 ROOT = Path(__file__).resolve().parents[1]
 ANALYTICS = ROOT / "analytics"
@@ -326,7 +328,8 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
                         own_attribution: list[dict] | None = None,
                         own_performance: list[dict] | None = None,
                         now: datetime | None = None, target_usdc: float | None = None,
-                        public_examples: list[dict] | None = None) -> dict:
+                        public_examples: list[dict] | None = None,
+                        observed_leaderboard_entries: list[dict] | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -393,6 +396,37 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     # useful for discovering creators to study, but they are never treated as
     # verified income or merged into the public-performance ranking.
     public_claim_research = analyze_public_reward_claims(public_examples or [], now)
+    # Explicit observations from the authenticated Write-to-Earn page are kept
+    # separate from public creator claims and public engagement metrics.
+    observed_rows = observed_leaderboard_entries if isinstance(observed_leaderboard_entries, list) else []
+    existing_keys = {
+        (str(row.get("claimed_creator") or "").casefold(), str(row.get("source_url") or ""), str(row.get("claimed_amount") or ""))
+        for row in public_claim_research.get("public_leaderboard_entries", []) if isinstance(row, dict)
+    }
+    for observed in observed_rows:
+        if not isinstance(observed, dict):
+            continue
+        creator_name = str(observed.get("creator") or "").strip()
+        if not creator_name:
+            continue
+        key = (creator_name.casefold(), str(observed.get("source_url") or ""), str(observed.get("displayed_amount") or ""))
+        if key in existing_keys:
+            continue
+        public_claim_research.setdefault("public_leaderboard_entries", []).append({
+            "claimed_creator": creator_name,
+            "creator_profile_url": observed.get("creator_profile_url"),
+            "claimed_amount": observed.get("displayed_amount"),
+            "claimed_currency": observed.get("currency"),
+            "rank": observed.get("rank"),
+            "source_url": observed.get("source_url"),
+            "evidence_ref": observed.get("evidence_ref"),
+            "observed_at": observed.get("observed_at"),
+            "period_start": observed.get("period_start"),
+            "period_end": observed.get("period_end"),
+            "earnings_status": "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT",
+            "evidence_type": "OBSERVED_WRITE_TO_EARN_LEADERBOARD_ROW",
+        })
+        existing_keys.add(key)
     leaderboard_creator_public_content = summarize_leaderboard_creator_posts(public_examples or [], public_claim_research.get("public_leaderboard_entries", []), now)
     claim_study_queue = [{
         "creator": row.get("creator", "unknown"),
@@ -411,8 +445,14 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "source_post_id": row.get("source_post_id"),
         "claimed_amount": row.get("claimed_amount"),
         "claimed_currency": row.get("claimed_currency"),
+        "creator_profile_url": row.get("creator_profile_url"),
+        "rank": row.get("rank"),
+        "evidence_ref": row.get("evidence_ref"),
+        "observed_at": row.get("observed_at"),
+        "period_start": row.get("period_start"),
+        "period_end": row.get("period_end"),
         "discovery_window": 14,
-        "earnings_status": "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED",
+        "earnings_status": row.get("earnings_status") or "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED",
         "study_objective": "Study listed creator public posts from the last 7/14 days; do not copy wording or treat listed amounts as independently verified.",
     } for row in public_claim_research.get("public_leaderboard_entries", [])[:50]]
 
@@ -507,7 +547,17 @@ def main() -> int:
     examples = load_json(EXAMPLES, [])
     if not isinstance(examples, list):
         examples = []
-    plan = build_learning_plan(benchmark, patterns, rewards, attribution, performance, now, public_examples=examples)
+    leaderboard_input_path = INTEL / "wte_leaderboard_observations.json"
+    leaderboard_input = load_json(leaderboard_input_path, {"entries": []})
+    normalized_leaderboard = normalize_observations(leaderboard_input, now)
+    observed_leaderboard_entries = normalized_leaderboard.get("entries", [])
+    (INTEL / "wte_leaderboard_observed.json").write_text(
+        json.dumps(normalized_leaderboard, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8"
+    )
+    plan = build_learning_plan(
+        benchmark, patterns, rewards, attribution, performance, now,
+        public_examples=examples, observed_leaderboard_entries=observed_leaderboard_entries,
+    )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     INTEL.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
