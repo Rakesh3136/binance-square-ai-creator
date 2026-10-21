@@ -600,6 +600,7 @@ def main() -> int:
     }
     benchmark["source_attempt_count"] = len(attempts)
     benchmark["public_posts_collected_this_run"] = len(public_rows)
+    benchmark["collection_feed_counts"] = dict(sorted(Counter(str(row.get("collection_feed") or "unknown") for row in public_rows).items()))
     write_json(EXAMPLES, combined)
     write_json(OUT, benchmark)
     write_json(REPORT, {
@@ -610,13 +611,15 @@ def main() -> int:
         "creator_benchmarks_with_minimum_samples": len(benchmark["creator_benchmarks"]),
         "earnings_claims_verified": 0,
         "earnings_inferred": False,
+        "source_attempt_count": len(attempts),
+        "collection_feed_counts": benchmark["collection_feed_counts"],
         "examples_file": str(EXAMPLES.relative_to(ROOT)) if EXAMPLES.is_relative_to(ROOT) else str(EXAMPLES),
         "benchmark_file": str(OUT.relative_to(ROOT)) if OUT.is_relative_to(ROOT) else str(OUT),
     })
     state = read_json(STATE, {})
     state.update({"last_run": generated_at, "last_public_posts": len(public_rows), "last_status": benchmark["status"], "seen_post_count": len(combined), "metric_history_rows": len(metric_history), "history_retention_days": HISTORY_DAYS})
     write_json(STATE, state)
-    print(json.dumps({"status": benchmark["status"], "public_posts_observed": len(public_rows), "distinct_public_creators": benchmark["distinct_public_creators"], "benchmarks": len(benchmark["creator_benchmarks"]), "earnings_claims_verified": 0}, indent=2))
+    print(json.dumps({"status": benchmark["status"], "public_posts_observed": len(public_rows), "distinct_public_creators": benchmark["distinct_public_creators"], "benchmarks": len(benchmark["creator_benchmarks"]), "collection_feed_counts": benchmark["collection_feed_counts"], "earnings_claims_verified": 0}, indent=2))
     return 0
 
 
