@@ -58,7 +58,7 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertEqual(fourteen["dated_posts"], 6)
         self.assertEqual(seven["creator_candidates"][0]["creator_id"], "a")
         self.assertEqual(fourteen["earnings_status"], "PUBLIC_METRICS_ONLY_NOT_EARNINGS")
-        self.assertNotIn("u", str(fourteen["creator_candidates"]))
+        self.assertNotIn("u", [x["creator_id"] for x in fourteen["creator_candidates"]])
 
     def test_run_preserves_existing_examples_and_writes_outputs(self):
         with tempfile.TemporaryDirectory() as tmp:
