@@ -565,9 +565,9 @@ def build_benchmark(rows: list[dict], generated_at: str, metric_history: list[di
                 "sample_urls": [p.get("source_url") for p in posts[:5]],
                 "earnings_status": "NOT_PUBLICLY_VERIFIED"
             })
-        creators.sort(key=lambda x: (x["mean_public_engagement_rate"], x["posts"], x["reply_rate"]), reverse=True)
+        creators.sort(key=lambda x: (x["mean_public_engagement_rate"], x["posts"], x["reply_rate"] if x["reply_rate"] is not None else -1), reverse=True)
         creators_by_reach = sorted(creators, key=lambda x: (x["median_views"], x["avg_views"], x["posts"]), reverse=True)
-        creators_by_discussion = sorted(creators, key=lambda x: (x["reply_rate"], x["share_rate"], x["posts"]), reverse=True)
+        creators_by_discussion = sorted(creators, key=lambda x: (x["reply_rate"] if x["reply_rate"] is not None else -1, x["share_rate"], x["posts"]), reverse=True)
         families = []
         for name, posts in family_groups.items():
             rates = [engagement_rate(p) for p in posts]; rates = [x for x in rates if x is not None]
