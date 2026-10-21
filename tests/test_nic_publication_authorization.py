@@ -1,4 +1,5 @@
 import hashlib
+import json
 import importlib.util
 import unittest
 from datetime import datetime, timezone
@@ -60,6 +61,24 @@ class EditorialAuthorizationTests(unittest.TestCase):
         values = list(self.fixtures())
         values[4] = "Entry: 1.2, Stop-loss: 1.0"
         self.assertFalse(self.run_auth(values)["authorized"])
+
+    def test_required_human_review_is_a_hard_publication_stop(self):
+        values = list(self.fixtures())
+        values[0]["requires_human_review_for_editorial"] = True
+        result = self.run_auth(values)
+        self.assertFalse(result["authorized"])
+        self.assertTrue(any("mandatory human review is outstanding" in reason for reason in result["reasons"]))
+
+    def test_current_repository_policy_keeps_automatic_publication_disabled(self):
+        policy = json.loads((ROOT / "nic_publication_policy.json").read_text(encoding="utf-8"))
+        self.assertFalse(policy["editorial_auto_publication_enabled"])
+        self.assertTrue(policy["requires_human_review_for_editorial"])
+        values = list(self.fixtures())
+        values[0] = policy
+        result = self.run_auth(values)
+        self.assertFalse(result["authorized"])
+        self.assertTrue(any("standing editorial auto-publication authorization is disabled" in reason for reason in result["reasons"]))
+        self.assertTrue(any("mandatory human review is outstanding" in reason for reason in result["reasons"]))
 
     def test_disabled_policy_blocks(self):
         values = list(self.fixtures())
