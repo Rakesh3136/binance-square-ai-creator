@@ -69,5 +69,34 @@ class RevenueLearningProductionWiringTests(unittest.TestCase):
         self.assertIn("accepted_verified_reward_events", director)
         self.assertIn("owner_reported_revenue_is_separate_and_not_independently_verified", director)
 
+
+    def test_7_and_14_day_creator_research_is_built_before_editorial_preflight(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        benchmark = "run_component run_creator_intelligence python src/run_creator_intelligence.py"
+        learning = "run_component nic_square_earnings_learning python src/nic_square_earnings_learning.py"
+        preflight = "run_component editorial_preflight python src/editorial_preflight.py"
+        self.assertIn(benchmark, text)
+        self.assertIn(learning, text)
+        self.assertIn(preflight, text)
+        self.assertLess(text.index(benchmark), text.index(learning))
+        self.assertLess(text.index(learning), text.index(preflight))
+        learning_source = (ROOT / "src/nic_square_earnings_learning.py").read_text(encoding="utf-8")
+        self.assertIn('"window_days": [7, 14]', learning_source)
+        self.assertIn('"automatic_posting_enabled": False', learning_source)
+
+    def test_creator_learning_outputs_are_validated_ignored_for_push_trigger_and_persisted(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        ignored = text.split("paths-ignore:", 1)[1].split("  schedule:", 1)[0]
+        outputs = (
+            "data/live/nic_square_earnings_learning.json",
+            "data/intelligence/nic_square_earnings_learning_report.json",
+            "analytics/nic_square_earnings_learning_memory.json",
+            "analytics/square_creator_benchmark_history.jsonl",
+        )
+        for output in outputs:
+            with self.subTest(output=output):
+                self.assertIn(output, ignored)
+                self.assertGreaterEqual(text.count(output), 3)
+
 if __name__ == "__main__":
     unittest.main()
