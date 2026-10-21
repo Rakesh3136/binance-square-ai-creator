@@ -153,13 +153,15 @@ class RewardEvidenceTests(unittest.TestCase):
             attr, perf, rewards = root / "publication_attribution.jsonl", root / "square_performance.jsonl", root / "wte_reward_events.jsonl"
             live, intel = root / "live", root / "intelligence"
             out, report = live / "nic_revenue_pattern_lab.json", intel / "nic_revenue_pattern_lab_report.json"
-            write_jsonl(attr, [{"canonical_post_id": "374795126927596", "category": "research", "format": "analysis", "hook_type": "mechanism"}])
+            write_jsonl(attr, [{"canonical_post_id": "374795126927596", "category": "research", "portfolio_format": "visual_analysis", "portfolio_hook_type": "curiosity_gap", "visual_attached": True}])
             write_jsonl(perf, [{"canonical_post_id": "374795126927596", "metrics": {"views": 5100, "likes": 51, "comments": 7, "shares": 3}}])
             write_jsonl(rewards, [])
             with patch.object(revenue_lab, "ATTR", attr), patch.object(revenue_lab, "PERF", perf), patch.object(revenue_lab, "REWARD_EVENTS", rewards), patch.object(revenue_lab, "LIVE", live), patch.object(revenue_lab, "INTEL", intel), patch.object(revenue_lab, "OUT", out), patch.object(revenue_lab, "REPORT", report), patch.object(revenue_lab, "ROOT", root):
                 revenue_lab.main()
             obs = json.loads(out.read_text())["observations"][0]
             self.assertEqual(obs["views"], 5100)
+            self.assertEqual(obs["format"], "visual_analysis")
+            self.assertEqual(obs["content_family"], "curiosity_gap")
             self.assertGreater(obs["engagement_per_1000_views"], 0)
 
     def test_director_reads_nested_metrics_and_preserves_attribution_metadata(self):
@@ -167,8 +169,8 @@ class RewardEvidenceTests(unittest.TestCase):
             root = Path(temp)
             attr, perf, rewards, outcomes = (root / n for n in ("attribution.jsonl", "performance.jsonl", "rewards.jsonl", "outcomes.jsonl"))
             write_jsonl(attr, [
-                {"canonical_post_id": "374795126927596", "category": "research", "format": "analysis", "visual_attached": True},
-                {"canonical_post_id": "374947394936090", "category": "research", "format": "analysis", "visual_attached": False},
+                {"canonical_post_id": "374795126927596", "category": "research", "portfolio_format": "visual_analysis", "portfolio_hook_type": "curiosity_gap", "portfolio_visual_type": "chart", "visual_attached": True},
+                {"canonical_post_id": "374947394936090", "category": "research", "portfolio_format": "text_analysis", "portfolio_hook_type": "question_led", "visual_attached": False},
             ])
             write_jsonl(perf, [
                 {"canonical_post_id": "374795126927596", "category": None, "metrics": {"views": 5100, "likes": 51, "comments": 7, "shares": 3}},
@@ -184,7 +186,10 @@ class RewardEvidenceTests(unittest.TestCase):
             self.assertEqual(views, 5100)
             self.assertGreater(score, 0)
             self.assertEqual(revenue_director.group_key(rows[0])[0], "research")
-            self.assertEqual(revenue_director.group_key(rows[0])[1], "analysis")
+            self.assertEqual(revenue_director.group_key(rows[0])[1], "visual_analysis")
+            self.assertEqual(revenue_director.group_key(rows[0])[2], "curiosity_gap")
+            self.assertEqual(revenue_director.group_key(rows[0])[3], "research")
+            self.assertEqual(revenue_director.group_key(rows[0])[4], "chart")
 
 
 if __name__ == "__main__":
