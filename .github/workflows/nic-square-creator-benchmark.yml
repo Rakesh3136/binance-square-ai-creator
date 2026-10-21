@@ -71,6 +71,7 @@ jobs:
           python -m json.tool data/intelligence/square_creator_benchmark.json >/dev/null
           python -m json.tool data/live/nic_square_earnings_learning.json >/dev/null
           python -m json.tool data/intelligence/nic_square_earnings_learning_report.json >/dev/null
+          python -m json.tool data/intelligence/nic_autonomy_readiness.json >/dev/null
           python -m json.tool data/intelligence/nic_square_profile_research.json >/dev/null
           python -m json.tool data/intelligence/public_wte_claim_discoveries.json >/dev/null
           python -m json.tool data/intelligence/creator_patterns.json >/dev/null
@@ -81,7 +82,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- data/intelligence/public_square_examples.json data/intelligence/nic_square_profile_research.json data/intelligence/public_wte_claim_discoveries.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json analytics/square_creator_benchmark_history.jsonl data/live/nic_square_earnings_learning.json data/intelligence/nic_square_earnings_learning_report.json analytics/nic_square_earnings_learning_memory.json
+          git add -- data/intelligence/public_square_examples.json data/intelligence/nic_square_profile_research.json data/intelligence/public_wte_claim_discoveries.json data/intelligence/nic_autonomy_readiness.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json analytics/square_creator_benchmark_history.jsonl data/live/nic_square_earnings_learning.json data/intelligence/nic_square_earnings_learning_report.json analytics/nic_square_earnings_learning_memory.json
           if git diff --cached --quiet; then
             echo "No creator benchmark changes to persist."
             exit 0
@@ -89,7 +90,7 @@ jobs:
           git commit -m "Refresh public Binance Square creator benchmarks"
           for attempt in 1 2 3; do
             git fetch origin main
-            git rebase origin/main || { git rebase --abort; git reset --hard origin/main; python src/square_creator_benchmark_collector.py; python src/nic_square_wte_claim_discovery.py; python src/nic_square_profile_research.py; python src/creator_intelligence.py; python src/nic_square_earnings_learning.py; git add -- data/intelligence/public_square_examples.json data/intelligence/nic_square_profile_research.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json analytics/square_creator_benchmark_history.jsonl data/live/nic_square_earnings_learning.json data/intelligence/nic_square_earnings_learning_report.json analytics/nic_square_earnings_learning_memory.json; git commit -m "Rebuild public Square creator benchmarks on latest main"; }
+            git rebase origin/main || { git rebase --abort; git reset --hard origin/main; python src/square_creator_benchmark_collector.py; python src/nic_square_wte_claim_discovery.py; python src/nic_square_profile_research.py; python src/creator_intelligence.py; python src/nic_square_earnings_learning.py; git add -- data/intelligence/public_square_examples.json data/intelligence/nic_square_profile_research.json data/intelligence/nic_autonomy_readiness.json data/intelligence/square_creator_benchmark.json data/intelligence/creator_patterns.json data/live/square_creator_benchmark_report.json analytics/square_creator_benchmark_state.json analytics/square_creator_benchmark_history.jsonl data/live/nic_square_earnings_learning.json data/intelligence/nic_square_earnings_learning_report.json analytics/nic_square_earnings_learning_memory.json; git commit -m "Rebuild public Square creator benchmarks on latest main"; }
             if git push origin HEAD:main; then exit 0; fi
             sleep $((attempt * 2))
           done
