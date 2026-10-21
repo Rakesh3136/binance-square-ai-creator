@@ -65,7 +65,13 @@ def main():
         rewards[canonical_post_id(event)]+=max(0,num(event,"reward_amount_usdc"))
     groups=defaultdict(lambda:{"posts":0,"views":0.0,"engagement":0.0,"verified_revenue":0.0,"verified_posts":0,"owner_reported_revenue":0.0,"owner_reported_posts":0})
     for p,a in attrs.items():
-        k=(str(a.get("content_lane") or a.get("category") or "unknown"),str(a.get("content_format") or a.get("format") or "unknown"),str(a.get("hook_type") or a.get("content_family") or "unknown"))
+        fmt = a.get("content_format") or a.get("format") or a.get("portfolio_format")
+        if not fmt and a.get("visual_attached") is True:
+            fmt = "visual_attached"
+        elif not fmt and a.get("visual_attached") is False:
+            fmt = "text_only"
+        hook = a.get("hook_type") or a.get("content_family") or a.get("portfolio_hook_type")
+        k=(str(a.get("content_lane") or a.get("category") or a.get("portfolio_lane") or "unknown"),str(fmt or "unknown"),str(hook or "unknown"))
         g=groups[k]; g["posts"]+=1; r=perf.get(p,{})
         g["views"]+=num(r,"views","view_count","impressions"); g["engagement"]+=num(r,"likes","like_count")+2*num(r,"comments","reply_count")+3*num(r,"shares","share_count")
         reward=rewards.get(p,0.0)
