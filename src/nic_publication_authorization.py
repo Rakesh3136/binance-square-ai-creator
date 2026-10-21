@@ -54,8 +54,10 @@ def evaluate(policy, eligibility, routing, lane, text, now=None, nic21=None):
         reasons.append("trade-signal publication must remain disabled")
     if policy.get("live_orders_enabled") is not False:
         reasons.append("live orders must remain disabled")
-    if policy.get("requires_human_review_for_editorial") is not False:
-        reasons.append("policy requires a human review")
+    if policy.get("requires_human_review_for_editorial") is True:
+        reasons.append("mandatory human review is outstanding; this gate cannot authorize publication automatically")
+    elif policy.get("requires_human_review_for_editorial") is not False:
+        reasons.append("human-review policy must be explicit")
     if eligibility.get("eligible") is not True or str(eligibility.get("publication_mode") or "").upper() != "EDITORIAL":
         reasons.append("current-cycle eligibility is not EDITORIAL")
     if eligibility.get("trade_authorized") is not False:
@@ -91,7 +93,7 @@ def evaluate(policy, eligibility, routing, lane, text, now=None, nic21=None):
         "reasons":reasons,
         "draft_sha256":hashlib.sha256(text.encode("utf-8")).hexdigest() if text else "",
         "policy":str(POLICY_PATH.relative_to(ROOT)),
-        "note":"Standing authorization permits editorial/research publication only. It is not trade or order authorization and does not claim a human reviewed this draft."
+        "note":"Automatic publishing must remain disabled until explicit creator re-authorization and a separate human-review approval workflow exists. This gate never claims a human reviewed the draft."
     }
 
 def main():
