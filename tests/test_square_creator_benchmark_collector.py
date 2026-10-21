@@ -18,6 +18,12 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertIn("12345", found)
         self.assertLessEqual(len(collector.text_value(found["12345"])), collector.MAX_TEXT)
 
+    def test_creator_profile_url_requires_an_explicit_binance_profile_link(self):
+        self.assertEqual(collector.creator_profile_url({"author": {"profileUrl": "https://www.binance.com/en/square/profile/CreatorOne"}}), "https://www.binance.com/en/square/profile/CreatorOne")
+        self.assertEqual(collector.creator_profile_url({"author_profile_url": "/en/square/profile/CreatorTwo"}), "https://www.binance.com/en/square/profile/CreatorTwo")
+        self.assertIsNone(collector.creator_profile_url({"authorName": "CreatorThree", "authorId": "123"}))
+        self.assertIsNone(collector.creator_profile_url({"author": {"profileUrl": "https://example.com/square/profile/not-binance"}}))
+
     def test_engagement_rate_requires_visible_views(self):
         self.assertIsNone(collector.engagement_rate({"views": 0, "likes": 4}))
         self.assertAlmostEqual(collector.engagement_rate({"views": 100, "likes": 4, "replies": 2, "shares": 1}), 0.11)
@@ -32,6 +38,7 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertEqual(len(report["creator_benchmarks"]), 1)
         self.assertEqual(report["creator_benchmarks"][0]["creator_id"], "u1")
         self.assertEqual(report["creator_benchmarks"][0]["earnings_status"], "NOT_PUBLICLY_VERIFIED")
+        self.assertIn("creator_profile_url", report["creator_benchmarks"][0])
         self.assertFalse(report["earnings_policy"]["creator_income_inferred_from_views"])
 
     def test_posted_at_normalizes_seconds_milliseconds_and_unknown_dates(self):

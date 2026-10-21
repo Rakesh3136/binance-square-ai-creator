@@ -184,6 +184,25 @@ def author(row: dict) -> tuple[str, str]:
     return str(name).strip()[:120], str(uid).strip()[:120]
 
 
+def creator_profile_url(row: dict) -> str | None:
+    """Return a profile URL only when the public feed explicitly supplies one."""
+    author_row = row.get("author") if isinstance(row.get("author"), dict) else {}
+    candidates = [row.get(key) for key in ("authorProfileUrl", "author_profile_url", "profileUrl", "profile_url", "userUrl", "user_url")]
+    candidates.extend(author_row.get(key) for key in ("profileUrl", "profile_url", "webUrl", "web_url", "userUrl", "user_url", "url", "homepage"))
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        value = candidate.strip()
+        if value.startswith("//"):
+            value = "https:" + value
+        if value.startswith("/"):
+            value = "https://www.binance.com" + value
+        parsed = urllib.parse.urlparse(value)
+        if parsed.scheme == "https" and parsed.netloc.lower().endswith("binance.com") and re.search(r"/square/profile/[^/?#]+", parsed.path, re.I):
+            return value.split("#", 1)[0]
+    return None
+
+
 def _collect_feed(base: str, fixed_params: dict, source_name: str,
                   max_pages: int, attempts: list[str]) -> dict[str, dict]:
     """Read one public feed with conservative pagination and empty-page stopping."""
@@ -286,6 +305,7 @@ def fetch_public_posts() -> tuple[list[dict], list[str]]:
             "post_id": pid,
             "creator": name or "unknown",
             "creator_id": uid or None,
+            "creator_profile_url": creator_profile_url(item),
             "source": post_url(pid, item),
             "source_url": post_url(pid, item),
             "text": text,
@@ -365,6 +385,7 @@ def update_metric_history(existing: list[dict], public_rows: list[dict], observe
             "post_id": post_id,
             "creator": str(row.get("creator") or "unknown")[:120],
             "creator_id": row.get("creator_id"),
+            "creator_profile_url": row.get("creator_profile_url"),
             "source_url": row.get("source_url") or row.get("source"),
             "posted_at": row.get("posted_at"),
             "archetype": row.get("archetype") or archetype(str(row.get("text") or "")),
@@ -485,6 +506,13 @@ def build_benchmark(rows: list[dict], generated_at: str, metric_history: list[di
             creators.append({
                 "creator": next((p.get("creator") for p in posts if p.get("creator")), "unknown"),
                 "creator_id": key, "posts": len(posts),
+                "creator_profile_url": next((p.get("creator_profile_url") for p in posts if p.get("creator_profile_url")), None),
+                "recent_post_samples": [
+                    {"post_url": p.get("source_url"), "posted_at": p.get("posted_at"),
+                     "archetype": p.get("archetype") or archetype(str(p.get("text") or "")),
+                     "views": p.get("views"), "likes": p.get("likes"), "replies": p.get("replies"), "shares": p.get("shares")}
+                    for p in sorted(posts, key=lambda p: str(p.get("posted_at") or ""), reverse=True)[:10]
+                ],
                 "mean_public_engagement_rate": round(sum(rates)/len(rates), 6),
                 "median_views": sorted(float(p.get("views") or 0) for p in posts)[len(posts)//2],
                 "avg_views": round(total_views/len(posts), 2),
@@ -537,6 +565,7 @@ def build_benchmark(rows: list[dict], generated_at: str, metric_history: list[di
         leaders.append({
             "creator": next((p.get("creator") for p in posts if p.get("creator")), "unknown"),
             "creator_id": creator,
+            "creator_profile_url": next((p.get("creator_profile_url") for p in posts if p.get("creator_profile_url")), None),
             "observed_posts": len(posts),
             "mean_public_engagement_rate": round(sum(rates) / len(rates), 6),
             "median_public_views": sorted(float(p.get("views") or 0) for p in posts)[len(posts) // 2],
