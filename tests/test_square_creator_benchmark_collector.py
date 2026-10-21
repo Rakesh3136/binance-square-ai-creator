@@ -33,6 +33,32 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertEqual(report["creator_benchmarks"][0]["earnings_status"], "NOT_PUBLICLY_VERIFIED")
         self.assertFalse(report["earnings_policy"]["creator_income_inferred_from_views"])
 
+    def test_posted_at_normalizes_seconds_milliseconds_and_unknown_dates(self):
+        seconds = 1790000000
+        self.assertIsNotNone(collector.posted_at({"createTime": seconds}))
+        self.assertIsNotNone(collector.posted_at({"publishedAt": seconds * 1000}))
+        self.assertIsNone(collector.posted_at({"createTime": "not-a-date"}))
+
+    def test_rolling_windows_use_real_post_dates_and_multiple_creator_posts(self):
+        now = datetime(2026, 10, 21, tzinfo=timezone.utc)
+        rows = [
+            {"creator": "A", "creator_id": "a", "posted_at": now.isoformat(), "archetype": "education_explainer", "views": 100, "likes": 10, "replies": 4, "shares": 2, "source_url": "https://x/" + str(i)}
+            for i in range(3)
+        ]
+        rows += [
+            {"creator": "B", "creator_id": "b", "posted_at": (now - timedelta(days=10)).isoformat(), "archetype": "technical_chart", "views": 200, "likes": 8, "replies": 2, "shares": 1, "source_url": "https://y/" + str(i)}
+            for i in range(3)
+        ]
+        rows += [{"creator": "Undated", "creator_id": "u", "views": 9999, "likes": 999, "replies": 99, "shares": 99}]
+        report = collector.build_benchmark(rows, now.isoformat())
+        seven = report["rolling_learning_windows"]["seven_day"]
+        fourteen = report["rolling_learning_windows"]["fourteen_day"]
+        self.assertEqual(seven["dated_posts"], 3)
+        self.assertEqual(fourteen["dated_posts"], 6)
+        self.assertEqual(seven["creator_candidates"][0]["creator_id"], "a")
+        self.assertEqual(fourteen["earnings_status"], "PUBLIC_METRICS_ONLY_NOT_EARNINGS")
+        self.assertNotIn("u", str(fourteen["creator_candidates"]))
+
     def test_run_preserves_existing_examples_and_writes_outputs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
