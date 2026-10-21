@@ -164,6 +164,10 @@ def normalize_public_claim_post(payload: Any, pid: str, hashtag: str,
     if not WTE_CONTEXT.search(text) and hashtag_context not in WTE_HASHTAG_SLUGS:
         return None
     stamp = posted_at(row)
+    # The collector corpus uses the canonical `posted_at` field, while the raw
+    # API normalizer intentionally prioritizes API timestamp aliases.
+    if not stamp and row.get("posted_at") not in (None, ""):
+        stamp = posted_at({"published_at": row.get("posted_at")})
     if not stamp:
         return None
     try:
@@ -249,7 +253,7 @@ def _public_corpus_claim(row: dict, now: datetime) -> dict | None:
     post_row = dict(row)
     post_row.update({
         "id": pid, "bodyTextOnly": text, "posted_at": posted.isoformat(),
-        "source_url": source_url,
+        "published_at": posted.isoformat(), "source_url": source_url,
     })
     # Adapt already-normalized collector rows back to the public API metric keys
     # expected by the shared parser, preserving known zero versus unknown.
