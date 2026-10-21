@@ -188,8 +188,8 @@ def collect_verified_rewards(events: list[dict], now: datetime) -> dict:
 
 def analyze_public_reward_claims(examples: list[dict], now: datetime) -> dict:
     """Find public self-reported earnings posts for research, never as payout proof."""
-    amount_re = re.compile(r"\\b(?:USD\\s*)?\\$?\\d{1,3}(?:,\\d{3})*(?:\\.\\d+)?\\s*(?:USDC|USDT|USD)\\b", re.IGNORECASE)
-    self_report = re.compile(r"\\b(i earned|i made|i received|my earnings|my reward|my payout|we earned|we made|paid me|earned from write[- ]to[- ]earn)\\b", re.IGNORECASE)
+    amount_re = re.compile(r"\b(?:USD\s*)?\$?\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(?:USDC|USDT|USD)\b", re.IGNORECASE)
+    self_report = re.compile(r"\b(i earned|i made|i received|my earnings|my reward|my payout|we earned|we made|paid me|earned from write[- ]to[- ]earn)\b", re.IGNORECASE)
     cutoff = now - timedelta(days=14)
     claims = defaultdict(list)
     undated_count = 0
@@ -278,7 +278,8 @@ def _window_hypotheses(benchmark: dict) -> list[dict]:
 def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dict],
                         own_attribution: list[dict] | None = None,
                         own_performance: list[dict] | None = None,
-                        now: datetime | None = None, target_usdc: float | None = None,\n                        public_examples: list[dict] | None = None) -> dict:
+                        now: datetime | None = None, target_usdc: float | None = None,
+                        public_examples: list[dict] | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
