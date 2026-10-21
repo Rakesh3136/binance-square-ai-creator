@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims
+from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims, summarize_owner_reported_reward_feedback
 
 
 def valid_reward_event():
@@ -81,6 +81,41 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertIsNone(plan["weekly_earnings_goal"]["actual_verified_usdc_7d"])
         self.assertFalse(plan["research_coverage"]["public_views_or_engagement_are_earnings_evidence"])
         self.assertEqual(plan["historical_own_account_baseline"]["samples"], 8)
+
+    def test_owner_reported_exact_post_reward_feeds_learning_but_not_verified_totals(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        event = {
+            "event_id": "owner-report-374795126927596-20261021-01",
+            "post_id": "374795126927596",
+            "reward_amount_usdc": 0.201,
+            "currency": "USDC",
+            "reported_at": "2026-10-21T11:16:00+05:30",
+            "report_source": "ACCOUNT_OWNER_REPORTED",
+            "verification_status": "OWNER_REPORTED",
+            "content_metadata": {
+                "content_lane": "long_term_thesis",
+                "content_format": "text_plus_image",
+                "hook_type": "long_term_conviction_with_target",
+                "summary": "QNT long-term thesis",
+                "owner_reported_views": 5100,
+                "public_post_url": "https://www.binance.com/en/square/post/374795126927596",
+            },
+        }
+        feedback = summarize_owner_reported_reward_feedback([event], now)
+        self.assertEqual(feedback["status"], "OWNER_REPORTED_FEEDBACK_AVAILABLE_NOT_INDEPENDENTLY_VERIFIED")
+        self.assertAlmostEqual(feedback["7_day"]["reported_usdc"], 0.201)
+        self.assertEqual(feedback["7_day"]["post_count"], 1)
+        self.assertFalse(feedback["independently_verified"])
+        self.assertFalse(feedback["included_in_verified_reward_totals"])
+        self.assertEqual(feedback["entries"][0]["post_id"], "374795126927596")
+        self.assertEqual(feedback["entries"][0]["owner_reported_views"], 5100)
+
+        plan = build_learning_plan(
+            benchmark_fixture(), {}, [], now=now, owner_reported_reward_events=[event],
+        )
+        self.assertIsNone(plan["verified_reward_evidence"]["verified_usdc_7d"])
+        self.assertEqual(plan["verified_reward_evidence"]["accepted_unique_reward_events_7d"], 0)
+        self.assertAlmostEqual(plan["owner_reported_reward_feedback"]["7_day"]["reported_usdc"], 0.201)
 
     def test_only_exact_post_source_backed_paid_events_count_as_verified_earnings(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
