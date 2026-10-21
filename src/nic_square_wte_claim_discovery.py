@@ -218,6 +218,10 @@ def _public_corpus_claim(row: dict, now: datetime) -> dict | None:
     if not WTE_CONTEXT.search(text):
         return None
     stamp = posted_at(row)
+    # The normalized collector corpus stores its timestamp in `posted_at`,
+    # while the raw API timestamp helper recognizes API aliases like published_at.
+    if not stamp and row.get("posted_at") not in (None, ""):
+        stamp = posted_at({"published_at": row.get("posted_at")})
     if not stamp:
         return None
     try:
