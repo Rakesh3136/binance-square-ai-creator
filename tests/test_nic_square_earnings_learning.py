@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content
+from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims
 
 
 def valid_reward_event():
@@ -127,6 +127,31 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(seven["posts"], 1)
         self.assertEqual(seven["total_views"], 5100)
         self.assertGreater(seven["weighted_engagement_per_1000_views"], 0)
+
+
+
+    def test_public_earnings_claims_are_discovered_but_never_verified_as_payouts(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        examples = [
+            {"creator": "ClaimingCreator", "creator_id": "creator-1", "post_id": "379000000000001",
+             "posted_at": "2026-10-20T10:00:00+00:00",
+             "source_url": "https://www.binance.com/en/square/post/379000000000001",
+             "text": "I earned 200 USDC from Write to Earn this week!"},
+            {"creator": "OldClaim", "creator_id": "creator-2", "post_id": "379000000000002",
+             "posted_at": "2026-09-20T10:00:00+00:00",
+             "source_url": "https://www.binance.com/en/square/post/379000000000002",
+             "text": "I earned 500 USDC this week."},
+            {"creator": "UndatedClaim", "creator_id": "creator-3", "post_id": "379000000000003",
+             "source_url": "https://www.binance.com/en/square/post/379000000000003",
+             "text": "I earned 400 USDC from Write to Earn."},
+        ]
+        result = analyze_public_reward_claims(examples, now)
+        self.assertEqual(result["public_claim_post_count"], 1)
+        self.assertEqual(result["distinct_claiming_creators"], 1)
+        self.assertEqual(result["claims"][0]["creator"], "ClaimingCreator")
+        self.assertEqual(result["claims"][0]["earnings_status"], "UNVERIFIED_PUBLIC_SELF_REPORT")
+        self.assertEqual(result["claims"][0]["evidence_type"], "PUBLIC_CLAIM_NOT_PAYMENT_PROOF")
+        self.assertEqual(result["undated_claims_excluded"], 1)
 
 
 if __name__ == "__main__":
