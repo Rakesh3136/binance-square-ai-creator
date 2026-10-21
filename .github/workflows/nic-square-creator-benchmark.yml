@@ -6,6 +6,8 @@ on:
       - "src/square_creator_benchmark_collector.py"
       - "src/creator_intelligence.py"
       - "src/run_creator_intelligence.py"
+      - "src/candidate_generation_4.py"
+      - "tests/test_public_creator_patterns_in_candidate_generation.py"
       - "tests/test_square_creator_benchmark_collector.py"
       - "tests/test_square_creator_benchmark_autorefresh.py"
       - ".github/workflows/nic-square-creator-benchmark.yml"
@@ -34,8 +36,9 @@ jobs:
       - name: Validate collector and tests
         run: |
           set -euo pipefail
-          python -m py_compile src/square_creator_benchmark_collector.py src/creator_intelligence.py src/run_creator_intelligence.py
+          python -m py_compile src/square_creator_benchmark_collector.py src/creator_intelligence.py src/run_creator_intelligence.py src/candidate_generation_4.py
           python -m unittest tests.test_square_creator_benchmark_collector tests.test_square_creator_benchmark_autorefresh -v
+          python tests/test_public_creator_patterns_in_candidate_generation.py
       - name: Collect public creator examples
         if: ${{ github.event_name != 'pull_request' }}
         run: |
