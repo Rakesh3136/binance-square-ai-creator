@@ -156,14 +156,26 @@ class SquareEarningsLearningTests(unittest.TestCase):
     def test_own_account_metrics_use_nested_square_performance_schema(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
         attribution = [{"canonical_post_id": "374795126927596", "published_at": "2026-10-18T10:00:00+00:00", "category": "research"}]
-        performance = [{"canonical_post_id": "374795126927596", "collected_at": "2026-10-21T10:00:00+00:00", "metrics": {"views": 5100, "likes": 51, "comments": 7, "shares": 3}}]
+        performance = [{"canonical_post_id": "374795126927596", "collected_at": "2026-10-21T10:00:00+00:00", "metrics": {"views": 5100, "likes": 51, "comments": 7, "shares": 3, "follows": 2}}]
         summary = summarize_own_content(now, attribution, performance)
         seven = summary["7_day"]
         self.assertEqual(seven["posts"], 1)
         self.assertEqual(seven["total_views"], 5100)
         self.assertGreater(seven["weighted_engagement_per_1000_views"], 0)
+        self.assertEqual(seven["total_follows"], 2)
+        self.assertEqual(seven["follow_metric_coverage_posts"], 1)
+        self.assertIsNotNone(seven["follow_rate_per_view"])
 
 
+
+    def test_missing_follow_metrics_are_unknown_not_zero(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        attribution = [{"canonical_post_id": "374795126927596", "published_at": "2026-10-18T10:00:00+00:00", "category": "research"}]
+        performance = [{"canonical_post_id": "374795126927596", "collected_at": "2026-10-21T10:00:00+00:00", "metrics": {"views": 100, "likes": 3, "comments": 1, "shares": 0}}]
+        summary = summarize_own_content(now, attribution, performance)["7_day"]
+        self.assertIsNone(summary["total_follows"])
+        self.assertIsNone(summary["follow_rate_per_view"])
+        self.assertEqual(summary["follow_metric_coverage_posts"], 0)
 
     def test_public_earnings_claims_are_discovered_but_never_verified_as_payouts(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
