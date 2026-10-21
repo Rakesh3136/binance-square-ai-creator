@@ -35,3 +35,19 @@ def test_missing_public_patterns_fail_soft_without_inventing_evidence():
     assert brief["status"] == "NO_PUBLIC_PATTERN_DATA"
     assert brief["top_archetypes_by_observed_reply_and_follower_rate"] == []
     assert brief["observed_format_counts"] == []
+
+def test_public_pattern_brief_exposes_rolling_creator_research_without_earnings_claims():
+    source = {
+        "sample_count": 20,
+        "creator_count": 5,
+        "performance_by_archetype": [{"archetype": "education_explainer", "samples": 5, "reply_rate": 0.1}],
+        "rolling_learning_windows": {
+            "seven_day": {"window_days": 7, "dated_posts": 8, "performance_by_archetype": [{"archetype": "technical_chart", "samples": 4}]},
+            "fourteen_day": {"window_days": 14, "dated_posts": 18, "performance_by_archetype": [{"archetype": "education_explainer", "samples": 7}]},
+        },
+        "research_limits": {"public_metrics_are_not_earnings": True},
+    }
+    brief = module.build_public_pattern_brief(source)
+    assert brief["rolling_learning_windows"]["seven_day"]["dated_posts"] == 8
+    assert brief["rolling_learning_windows"]["fourteen_day"]["window_days"] == 14
+    assert brief["research_limits"]["public_metrics_are_not_earnings"] is True
