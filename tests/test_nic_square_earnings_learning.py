@@ -183,6 +183,25 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertFalse(plan["learning_policy"]["do_not_infer_private_creator_earnings"] is False)
 
 
+    def test_public_leaderboard_amounts_and_creator_names_become_research_leads(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        examples = [{"creator": "Binance Square Official", "creator_id": "official", "post_id": "379000000000010", "posted_at": "2026-10-20T10:00:00+00:00", "source_url": "https://www.binance.com/en/square/post/379000000000010", "text": "Write to Earn weekly leaderboard: @AlphaCreator - $800 USDC; @BetaCreator 💰 500 USDC"}]
+        result = analyze_public_reward_claims(examples, now)
+        entries = result["public_leaderboard_entries"]
+        self.assertEqual({row["claimed_creator"] for row in entries}, {"AlphaCreator", "BetaCreator"})
+        self.assertEqual({row["claimed_amount"] for row in entries}, {800.0, 500.0})
+        self.assertTrue(all(row["earnings_status"] == "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED" for row in entries))
+        plan = build_learning_plan(benchmark_fixture(), {}, [], now=now, public_examples=examples)
+        self.assertGreaterEqual(len(plan["public_earnings_leaderboard_study_queue"]), 2)
+        self.assertTrue(plan["leaderboard_research_coverage"]["amounts_are_not_payout_proof"])
+
+    def test_new_write_to_earn_rules_have_separate_october_19_cohort(self):
+        plan = build_learning_plan(benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
+        mechanics = plan["current_program_mechanics"]
+        self.assertEqual(mechanics["engagement_bonus_effective_at"], "2026-10-19T00:00:00+00:00")
+        self.assertEqual(mechanics["engagement_bonus_settlement_period_days"], 7)
+        self.assertIn("evaluate posts published from 2026-10-19 separately", mechanics["rules_change_cohort_policy"])
+
 
 if __name__ == "__main__":
     unittest.main()
