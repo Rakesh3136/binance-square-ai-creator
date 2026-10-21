@@ -222,6 +222,45 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(queue[0]["earnings_status"], "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT")
         self.assertTrue(plan["leaderboard_research_coverage"]["amounts_are_not_payout_proof"])
 
+    def test_profile_research_enriches_creator_study_queue_without_claiming_earnings(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        profile_research = {
+            "status": "PROFILE_RESEARCH_COMPLETE",
+            "public_only": True,
+            "authenticated_session_used": False,
+            "candidate_count": 1,
+            "profiles_resolved": 1,
+            "profile_resolution_failures": 0,
+            "posts_collected_7d": 2,
+            "posts_collected_8_to_14d": 1,
+            "posts_collected_14d": 3,
+            "seven_day_coverage_observed": True,
+            "fourteen_day_coverage_observed": True,
+            "profiles": [{
+                "creator": "PublicCreator",
+                "username": "public_creator",
+                "display_name": "Public Creator",
+                "creator_profile_url": "https://www.binance.com/en/square/profile/public_creator",
+                "discovery_source": "public_performance_benchmark",
+                "earnings_status": "PUBLIC_RESEARCH_LEAD_NOT_VERIFIED",
+                "posts_7d": 2,
+                "posts_14d": 3,
+                "recent_post_samples": [{"post_url": "https://www.binance.com/en/square/post/12345", "posted_at": "2026-10-20T10:00:00+00:00", "archetype": "education_explainer"}],
+            }],
+            "posts": [],
+        }
+        plan = build_learning_plan(
+            benchmark_fixture(), {}, [], now=now, creator_profile_research=profile_research,
+        )
+        self.assertEqual(plan["creator_profile_research"]["status"], "PROFILE_RESEARCH_COMPLETE")
+        self.assertEqual(plan["creator_profile_research"]["profiles_resolved"], 1)
+        profile_queue = plan["creator_profile_study_queue"]
+        self.assertEqual(profile_queue[0]["creator_profile_url"], "https://www.binance.com/en/square/profile/public_creator")
+        public_queue = plan["creator_study_queue"]
+        self.assertEqual(public_queue[0]["creator_profile_url"], "https://www.binance.com/en/square/profile/public_creator")
+        self.assertFalse(plan["creator_profile_research"]["authenticated_session_used"])
+        self.assertEqual(profile_queue[0]["evidence_type"], "PUBLIC_PROFILE_RESEARCH_NOT_EARNINGS")
+
     def test_new_write_to_earn_rules_have_separate_october_19_cohort(self):
         plan = build_learning_plan(benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
         mechanics = plan["current_program_mechanics"]
