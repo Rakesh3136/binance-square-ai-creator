@@ -904,7 +904,7 @@ def main() -> int:
     plan["autonomy_readiness"] = readiness
     INTEL.mkdir(parents=True, exist_ok=True)
     (INTEL / "nic_autonomy_readiness.json").write_text(
-        json.dumps(readiness, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8"
+        json.dumps(readiness, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     INTEL.mkdir(parents=True, exist_ok=True)
