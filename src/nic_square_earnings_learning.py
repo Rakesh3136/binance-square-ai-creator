@@ -310,6 +310,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "creator_study_queue": creator_study_queue,
         "best_public_format_hypotheses": hypotheses,
         "own_account_performance": own_summary,
+        "historical_own_account_baseline": patterns.get("our_baseline") if isinstance(patterns.get("our_baseline"), dict) else {},
         "verified_reward_evidence": reward_summary,
         "recommended_content_playbook": [
             "Lead with one timely, specific insight that the evidence supports; avoid generic ticker-first templates.",
