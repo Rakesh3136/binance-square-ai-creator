@@ -628,7 +628,17 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "engagement_bonus_settlement_period_days": 7,
             "engagement_bonus_effective_at": "2026-10-19T00:00:00+00:00",
             "rules_change_cohort_policy": "Keep 2026-10-12 through 2026-10-18 under previous rules; evaluate posts published from 2026-10-19 separately under the new engagement-bonus rules.",
-            "engagement_bonus_signal": "Genuine quality engagement including comments, likes, follows and shares; platform weights may vary.",
+            "engagement_bonus_signal": "Genuine high-quality engagement; Binance explicitly names comments, likes and follows, and platform weighting is discretionary rather than a fixed payout per interaction.",
+            "format_reward_map": {
+                "short_text_posts": "Eligible for text trading commission and may receive weekly engagement bonus.",
+                "long_articles": "Eligible text content; may receive weekly engagement bonus.",
+                "videos": "Eligible content format; may receive weekly engagement bonus when qualifying.",
+                "livestreams": "Basic commission; weekly bonus is limited to the top 100 creators by weekly basic commission (ranks 1-30: 30%, ranks 31-100: 10%).",
+                "chats": "Basic commission; no text engagement bonus listed for chats."
+            },
+            "active_autonomous_format": "text_posts_and_article_style_posts",
+            "format_expansion_policy": "Do not claim to produce or publish video/livestream content until the corresponding production and moderation workflow exists.",
+
             "anti_abuse_rule": "No scripted, coordinated, bought or manufactured engagement; no engagement bait presented as substance.",
             "program_note": "Eligibility, qualifying actions and reward decisions are controlled by Binance; content quality and engagement do not guarantee a payout.",
         },
@@ -699,6 +709,18 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "historical_own_account_baseline": patterns.get("our_baseline") if isinstance(patterns.get("our_baseline"), dict) else {},
         "verified_reward_evidence": reward_summary,
         "owner_reported_reward_feedback": owner_reported_feedback,
+        "creator_format_strategy": {
+            "source": "https://www.binance.com/en/support/announcement/detail/d9c84b68e9ab4ef29bee0cc53dfdabd2",
+            "priority": [
+                {"format": "evidence-led short text post", "purpose": "one timely insight, mechanism, reader payoff, counterpoint and one answerable question"},
+                {"format": "article-style text post", "purpose": "original explainers, comparisons, research notes and outcome follow-ups with clear structure"},
+                {"format": "case study / accountability follow-up", "purpose": "show what changed, what was learned and what evidence would falsify the thesis"},
+                {"format": "video or livestream", "purpose": "future expansion only after a validated production workflow exists; never pretend a text draft is video"}
+            ],
+            "engagement_design": "Optimize for genuine comments, likes and follows by being useful and specific; do not manufacture engagement or imply a guaranteed reward.",
+            "experiment_rule": "Compare format and hook variants against NIC's own baseline, while keeping the 2026-10-19 reward-rule cohort separate.",
+            "payout_rule": "No public engagement metric or creator-reported amount is treated as verified payout evidence."
+        },
         "recommended_content_playbook": [
             "Lead with one timely, specific insight that the evidence supports; avoid generic ticker-first templates.",
             "Explain the mechanism and reader payoff, not just a price move or copied headline.",
@@ -719,7 +741,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "own_verified_rewards_outweigh_public_metrics": True,
             "do_not_infer_private_creator_earnings": True,
             "do_not_guarantee_weekly_target": True,
-            "automatic_posting_enabled": False,
+            "automatic_posting_enabled": bool(load_json(ROOT / "nic_publication_policy.json", {}).get("editorial_auto_publication_enabled") is True),
         },
     }
 
