@@ -517,7 +517,7 @@ def main() -> int:
     combined = list(by_id.values())[-MAX_EXAMPLES:]
     metric_history = update_metric_history(read_jsonl(HISTORY), public_rows, generated_at)
     HISTORY.parent.mkdir(parents=True, exist_ok=True)
-    HISTORY.write_text("".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\\n" for row in metric_history), encoding="utf-8")
+    HISTORY.write_text("".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in metric_history), encoding="utf-8")
     benchmark = build_benchmark(combined, generated_at, metric_history)
     benchmark["metric_history"] = {
         "path": "analytics/square_creator_benchmark_history.jsonl",
