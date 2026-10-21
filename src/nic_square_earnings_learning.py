@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -23,6 +24,7 @@ INTEL = ROOT / "data/intelligence"
 LIVE = ROOT / "data/live"
 BENCHMARK = INTEL / "square_creator_benchmark.json"
 PATTERNS = INTEL / "creator_patterns.json"
+EXAMPLES = INTEL / "public_square_examples.json"
 REWARD_EVENTS = ANALYTICS / "wte_reward_events.jsonl"
 ATTRIBUTION = ANALYTICS / "publication_attribution.jsonl"
 PERFORMANCE = ANALYTICS / "square_performance.jsonl"
@@ -184,6 +186,58 @@ def collect_verified_rewards(events: list[dict], now: datetime) -> dict:
     }
 
 
+def analyze_public_reward_claims(examples: list[dict], now: datetime) -> dict:
+    """Find public self-reported earnings posts for research, never as payout proof."""
+    amount_re = re.compile(r"\\b(?:USD\\s*)?\\$?\\d{1,3}(?:,\\d{3})*(?:\\.\\d+)?\\s*(?:USDC|USDT|USD)\\b", re.IGNORECASE)
+    self_report = re.compile(r"\\b(i earned|i made|i received|my earnings|my reward|my payout|we earned|we made|paid me|earned from write[- ]to[- ]earn)\\b", re.IGNORECASE)
+    cutoff = now - timedelta(days=14)
+    claims = defaultdict(list)
+    undated_count = 0
+    for row in examples:
+        if not isinstance(row, dict):
+            continue
+        text = str(row.get("text") or row.get("post") or row.get("title") or "")
+        if not text or not amount_re.search(text) or not self_report.search(text):
+            continue
+        posted = aware_time(row.get("posted_at") or row.get("published_at"))
+        if not posted:
+            undated_count += 1
+            continue
+        if posted < cutoff or posted > now:
+            continue
+        creator = str(row.get("creator") or row.get("creator_id") or "unknown")[:120]
+        post_id = str(row.get("post_id") or "").strip()
+        key = str(row.get("creator_id") or creator)
+        claims[key].append({
+            "creator": creator,
+            "post_id": post_id,
+            "source_url": str(row.get("source_url") or row.get("source") or "")[:400],
+            "posted_at": posted.isoformat(),
+        })
+    candidates = []
+    for key, rows in claims.items():
+        rows.sort(key=lambda row: row["posted_at"], reverse=True)
+        candidates.append({
+            "creator": rows[0]["creator"],
+            "creator_id": key,
+            "claim_posts_14d": len(rows),
+            "latest_claim_at": rows[0]["posted_at"],
+            "sample_urls": [row["source_url"] for row in rows[:5] if row["source_url"]],
+            "post_ids": [row["post_id"] for row in rows[:5] if row["post_id"]],
+            "earnings_status": "UNVERIFIED_PUBLIC_SELF_REPORT",
+            "evidence_type": "PUBLIC_CLAIM_NOT_PAYMENT_PROOF",
+        })
+    candidates.sort(key=lambda row: (row["claim_posts_14d"], row["latest_claim_at"]), reverse=True)
+    return {
+        "window_days": 14,
+        "public_claim_post_count": sum(len(rows) for rows in claims.values()),
+        "distinct_claiming_creators": len(candidates),
+        "undated_claims_excluded": undated_count,
+        "claims": candidates[:30],
+        "warning": "Self-reported public claims may be useful leads but are not verified payout records and never enter NIC's revenue labels.",
+    }
+
+
 def _window_hypotheses(benchmark: dict) -> list[dict]:
     windows = benchmark.get("rolling_learning_windows") if isinstance(benchmark.get("rolling_learning_windows"), dict) else {}
     result = []
@@ -224,7 +278,7 @@ def _window_hypotheses(benchmark: dict) -> list[dict]:
 def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dict],
                         own_attribution: list[dict] | None = None,
                         own_performance: list[dict] | None = None,
-                        now: datetime | None = None, target_usdc: float | None = None) -> dict:
+                        now: datetime | None = None, target_usdc: float | None = None,\n                        public_examples: list[dict] | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -272,6 +326,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     benchmark_state = str(benchmark.get("status") or "UNKNOWN")
     older_count = int((fourteen.get("coverage") or {}).get("posts_age_8_to_14_days") or 0)
     coverage_status = "FULL_7_AND_14_DAY_COVERAGE" if older_count > 0 else "14_DAY_SAMPLE_GAP_KEEP_COLLECTING"
+    public_claim_research = analyze_public_reward_claims(public_examples or [], now)
     return {
         "schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0",
         "generated_at": now.isoformat(),
@@ -308,6 +363,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "public_views_or_engagement_are_earnings_evidence": False,
         },
         "creator_study_queue": creator_study_queue,
+        "public_self_reported_earnings_claims": public_claim_research,
         "best_public_format_hypotheses": hypotheses,
         "own_account_performance": own_summary,
         "historical_own_account_baseline": patterns.get("our_baseline") if isinstance(patterns.get("our_baseline"), dict) else {},
@@ -344,7 +400,10 @@ def main() -> int:
     rewards = load_jsonl(REWARD_EVENTS)
     attribution = load_jsonl(ATTRIBUTION)
     performance = load_jsonl(PERFORMANCE)
-    plan = build_learning_plan(benchmark, patterns, rewards, attribution, performance, now)
+    examples = load_json(EXAMPLES, [])
+    if not isinstance(examples, list):
+        examples = []
+    plan = build_learning_plan(benchmark, patterns, rewards, attribution, performance, now, public_examples=examples)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     INTEL.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -370,6 +429,7 @@ def main() -> int:
         "status": "READY" if benchmark.get("status") == "PUBLIC_BENCHMARKS_AVAILABLE" else "COLLECTING_PUBLIC_CREATOR_RESEARCH",
         "weekly_goal_usdc": plan["weekly_earnings_goal"]["target_usdc"],
         "public_creator_study_queue": len(plan["creator_study_queue"]),
+        "public_self_reported_earnings_claim_creators": plan["public_self_reported_earnings_claims"]["distinct_claiming_creators"],
         "public_archetype_hypotheses": len(plan["best_public_format_hypotheses"]),
         "verified_reward_events_7d": plan["verified_reward_evidence"]["accepted_unique_reward_events_7d"],
         "verified_usdc_7d": plan["weekly_earnings_goal"]["actual_verified_usdc_7d"],
