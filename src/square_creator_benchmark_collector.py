@@ -119,20 +119,40 @@ def post_url(pid: str, row: dict) -> str:
 
 
 def posted_at(row: dict) -> str | None:
-    """Return a verified post timestamp or None; never infer missing dates."""
-    for key in ("createTime", "createdAt", "created_at", "publishTime", "publishedAt", "published_at", "postTime", "post_time", "timestamp"):
-        value = row.get(key)
-        if value in (None, ""): continue
+    """Normalize publication time from varied public-feed shapes; never guess unknown dates."""
+    priority = ("publishTime", "publishedAt", "published_at", "publish_time", "publishedTime",
+                "createTime", "createdAt", "created_at", "createdTime", "create_time",
+                "releaseTime", "release_time", "postTime", "post_time", "createDate",
+                "createdDate", "publishDate", "publish_date", "createdTimestamp",
+                "createTimestamp", "timestamp", "date")
+    candidates = []
+    def visit(node, depth=0):
+        if depth > 5: return
+        if isinstance(node, dict):
+            for key in priority:
+                value = node.get(key)
+                if value not in (None, ""): candidates.append((priority.index(key), value))
+            for key, value in node.items():
+                if isinstance(value, (dict, list)):
+                    visit(value, depth + 1)
+        elif isinstance(node, list):
+            for value in node[:30]:
+                if isinstance(value, (dict, list)): visit(value, depth + 1)
+    visit(row)
+    candidates.sort(key=lambda item: item[0])
+    for _, value in candidates:
         try:
-            if isinstance(value, (int, float)) or str(value).strip().isdigit():
+            if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip().isdigit()):
                 stamp = float(value)
                 if stamp > 1e12: stamp /= 1000.0
-                if stamp > 0: return datetime.fromtimestamp(stamp, timezone.utc).isoformat()
+                if 946684800 <= stamp <= 4102444800:
+                    return datetime.fromtimestamp(stamp, timezone.utc).isoformat()
             parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
-            if parsed.tzinfo is not None: return parsed.astimezone(timezone.utc).isoformat()
-        except (ValueError, TypeError, OverflowError, OSError): pass
+            if parsed.tzinfo is not None and 2000 <= parsed.year <= 2100:
+                return parsed.astimezone(timezone.utc).isoformat()
+        except (ValueError, TypeError, OverflowError, OSError):
+            continue
     return None
-
 
 def archetype(text: str) -> str:
     t = text.lower()

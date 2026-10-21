@@ -40,6 +40,13 @@ class SquareCreatorBenchmarkTests(unittest.TestCase):
         self.assertIsNotNone(collector.posted_at({"publishedAt": seconds * 1000}))
         self.assertIsNone(collector.posted_at({"createTime": "not-a-date"}))
 
+    def test_posted_at_finds_nested_and_alternate_public_feed_timestamp_fields(self):
+        nested = {"data": {"post": {"publishedTime": "2026-10-20T10:30:00Z"}}}
+        millis = {"meta": {"releaseTime": 1792492200000}}
+        self.assertEqual(collector.posted_at(nested), "2026-10-20T10:30:00+00:00")
+        self.assertIsNotNone(collector.posted_at(millis))
+        self.assertIsNone(collector.posted_at({"author": {"lastActiveTime": 1792492200000}}))
+
     def test_rolling_windows_use_real_post_dates_and_multiple_creator_posts(self):
         now = datetime(2026, 10, 21, tzinfo=timezone.utc)
         rows = [
