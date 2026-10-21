@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims, summarize_owner_reported_reward_feedback, build_learning_memory_entry
+from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims, summarize_owner_reported_reward_feedback, build_learning_memory_entry, build_autonomy_readiness
 
 
 def valid_reward_event():
@@ -334,6 +334,38 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(row["owner_reported_reward_events_7d"], 1)
         self.assertTrue(row["owner_reported_feedback_is_not_verified"])
         self.assertIsNone(row["verified_usdc_7d"])
+
+    def test_autonomy_readiness_names_private_reward_and_exact_post_proof_blockers(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        plan = build_learning_plan(
+            benchmark_fixture(), {}, [], now=now,
+            creator_profile_research={
+                "status": "PROFILE_RESEARCH_COMPLETE",
+                "profiles_resolved": 12,
+                "posts_collected_7d": 173,
+                "posts_collected_8_to_14d": 47,
+                "seven_day_coverage_observed": True,
+                "fourteen_day_coverage_observed": True,
+                "public_only": True,
+            },
+        )
+        readiness = build_autonomy_readiness(
+            plan,
+            {"status": "HASHTAG_PAGES_READ_NO_RECENT_DATED_CLAIM_POSTS",
+             "public_corpus_rows_checked": 2255, "retained_recent_claim_post_count": 0},
+            {"editorial_auto_publication_enabled": False, "requires_human_review_for_editorial": True},
+        )
+        self.assertEqual(readiness["status"], "PUBLIC_RESEARCH_READY_PRIVATE_REWARD_SOURCE_BLOCKED")
+        self.assertFalse(readiness["full_autonomy_proven"])
+        self.assertEqual(readiness["capabilities"]["public_creator_profile_research"]["profiles_resolved"], 12)
+        self.assertEqual(readiness["capabilities"]["other_creator_weekly_reward_source"]["status"], "BLOCKED_NO_AUTHORIZED_SOURCE")
+        self.assertEqual(readiness["capabilities"]["own_post_reward_attribution"]["status"], "BLOCKED_NO_VERIFIED_POST_LINKED_REWARD")
+        self.assertFalse(readiness["capabilities"]["automatic_publication"]["enabled_by_policy"])
+        self.assertTrue(readiness["capabilities"]["automatic_publication"]["human_review_required"])
+        blocker_ids = {row["id"] for row in readiness["blockers"]}
+        self.assertIn("other_creator_paid_reward_source", blocker_ids)
+        self.assertIn("own_post_reward_attribution", blocker_ids)
+        self.assertIn("public_reward_claim_leads", blocker_ids)
 
     def test_new_write_to_earn_rules_have_separate_october_19_cohort(self):
         plan = build_learning_plan(benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
