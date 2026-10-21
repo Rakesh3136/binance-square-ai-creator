@@ -262,6 +262,29 @@ def analyze_public_reward_claims(examples: list[dict], now: datetime) -> dict:
     }
 
 
+def summarize_leaderboard_creator_posts(examples: list[dict], entries: list[dict], now: datetime) -> dict:
+    """Summarize public posts by named leaderboard creators over 7/14 days; never infer payout causality."""
+    targets = {str(row.get("claimed_creator") or "").strip().lstrip("@").casefold() for row in entries if row.get("claimed_creator")}
+    selected = []
+    for row in examples:
+        if not isinstance(row, dict): continue
+        name = str(row.get("creator") or "").strip().lstrip("@").casefold()
+        if name not in targets: continue
+        stamp = aware_time(row.get("posted_at") or row.get("published_at"))
+        if not stamp or stamp > now or stamp < now - timedelta(days=14): continue
+        selected.append((row, stamp))
+    def summarize(days: int) -> dict:
+        cohort = [(row, stamp) for row, stamp in selected if stamp >= now - timedelta(days=days)]
+        views = sum(number(row, "views", "view_count", "impressions") for row, _ in cohort)
+        likes = sum(number(row, "likes", "like_count") for row, _ in cohort)
+        replies = sum(number(row, "replies", "comments", "reply_count") for row, _ in cohort)
+        shares = sum(number(row, "shares", "share_count") for row, _ in cohort)
+        archetypes, formats = Counter(), Counter()
+        for row, _ in cohort:
+            archetypes[str(row.get("archetype") or "unknown")] += 1
+            formats[str(row.get("format") or "unknown")] += 1
+        return {"window_days": days, "matched_posts": len(cohort), "matched_creators": len({str(row.get("creator") or "").casefold() for row, _ in cohort}), "total_public_views": round(views, 2), "avg_views": round(views / len(cohort), 2) if cohort else None, "weighted_engagement_per_1000_views": round((likes + 2 * replies + 3 * shares) * 1000 / max(1, views), 4), "reply_rate_per_view": round(replies / max(1, views), 6), "share_rate_per_view": round(shares / max(1, views), 6), "top_archetypes": [{"archetype": key, "samples": count} for key, count in archetypes.most_common(6)], "format_counts": [{"format": key, "samples": count} for key, count in formats.most_common(6)], "evidence_type": "PUBLIC_CONTENT_OBSERVATIONS_NOT_EARNINGS_CAUSALITY"}
+    return {"status": "MATCHED_PUBLIC_POSTS_FOUND" if selected else "NO_MATCHING_PUBLIC_POSTS_IN_COLLECTED_SAMPLE", "leaderboard_creator_names_in_public_source": len(targets), "matched_creator_count_14d": len({str(row.get("creator") or "").casefold() for row, _ in selected}), "posts_age_8_to_14_days": sum(1 for _, stamp in selected if now - timedelta(days=14) <= stamp < now - timedelta(days=7)), "seven_day": summarize(7), "fourteen_day": summarize(14), "public_metrics_are_not_earnings": True}
 def _window_hypotheses(benchmark: dict) -> list[dict]:
     windows = benchmark.get("rolling_learning_windows") if isinstance(benchmark.get("rolling_learning_windows"), dict) else {}
     result = []
@@ -370,6 +393,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     # useful for discovering creators to study, but they are never treated as
     # verified income or merged into the public-performance ranking.
     public_claim_research = analyze_public_reward_claims(public_examples or [], now)
+    leaderboard_creator_public_content = summarize_leaderboard_creator_posts(public_examples or [], public_claim_research.get("public_leaderboard_entries", []), now)
     claim_study_queue = [{
         "creator": row.get("creator", "unknown"),
         "creator_id": row.get("creator_id", ""),
@@ -442,6 +466,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         },
         "public_self_reported_earnings_claims": public_claim_research,
         "self_reported_earnings_creator_study_queue": claim_study_queue,        "public_earnings_leaderboard_study_queue": leaderboard_study_queue,
+        "leaderboard_creator_public_content": leaderboard_creator_public_content,
         "leaderboard_research_coverage": {"window_days": [7, 14], "public_leaderboard_entries_found": len(public_claim_research.get("public_leaderboard_entries", [])), "creator_names_queued_for_post_study": len(leaderboard_study_queue), "amounts_are_not_payout_proof": True},
         "best_public_format_hypotheses": hypotheses,
         "own_account_performance": own_summary,
