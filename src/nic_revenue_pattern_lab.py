@@ -81,9 +81,25 @@ def main():
         if owner_reward:
             g["owner_reported_posts"]+=1; g["owner_reported_revenue"]+=owner_reward["amount_usdc"]
 
+    # Include manually published owner-reported reward examples that have no NIC attribution row.
+    # They remain owner-reported, not independently verified.
+    for post_id, owner_reward in owner_rewards.items():
+        if post_id in attrs:
+            continue
+        meta = owner_reward.get("content_metadata") or {}
+        lane = str(meta.get("content_lane") or "unknown")
+        fmt = str(meta.get("content_format") or "unknown")
+        hook = str(meta.get("hook_type") or "unknown")
+        g = groups[(lane, fmt, hook)]
+        g["posts"] += 1
+        g["owner_reported_posts"] += 1
+        g["owner_reported_revenue"] += owner_reward["amount_usdc"]
+        g["owner_reported_views"] += num(meta, "owner_reported_views")
+        g.setdefault("owner_reported_examples", []).append({"post_id": post_id, "summary": meta.get("summary"), "public_post_url": meta.get("public_post_url"), "evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED"})
+
     observations=[]
     for (cat,fmt,fam),g in groups.items():
-        observations.append({"category":cat,"content_lane":cat,"format":fmt,"content_format":fmt,"hook_type":fam,"content_family":fam,"posts":g["posts"],"views":round(g["views"],2),"engagement_per_1000_views":round(g["engagement"]*1000/max(g["views"],1),4),"verified_posts":g["verified_posts"],"verified_revenue":round(g["verified_revenue"],8),"owner_reported_posts":g["owner_reported_posts"],"owner_reported_revenue_usdc":round(g["owner_reported_revenue"],8),"owner_reported_evidence":"OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED" if g["owner_reported_posts"] else None,"evidence":"OBSERVED_ONLY"})
+        observations.append({"category":cat,"content_lane":cat,"format":fmt,"content_format":fmt,"hook_type":fam,"content_family":fam,"posts":g["posts"],"views":round(g["views"],2),"engagement_per_1000_views":round(g["engagement"]*1000/max(g["views"],1),4),"verified_posts":g["verified_posts"],"verified_revenue":round(g["verified_revenue"],8),"owner_reported_posts":g["owner_reported_posts"],"owner_reported_revenue_usdc":round(g["owner_reported_revenue"],8),"owner_reported_views":round(g.get("owner_reported_views",0),2),"owner_reported_examples":g.get("owner_reported_examples",[]),"owner_reported_evidence":"OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED" if g["owner_reported_posts"] else None,"evidence":"OBSERVED_ONLY"})
     verified=[x for x in observations if x["verified_posts"]>0]
     plan=[]
     for x in sorted(observations,key=lambda z:(z["verified_revenue"],z["owner_reported_revenue_usdc"],z["engagement_per_1000_views"]),reverse=True)[:8]:
