@@ -192,5 +192,41 @@ class RewardEvidenceTests(unittest.TestCase):
             self.assertEqual(revenue_director.group_key(rows[0])[4], "actionable_checklist")
 
 
+    def test_owner_reported_reward_without_attribution_does_not_crash_and_stays_unverified(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            live, intel = root / "data/live", root / "data/intelligence"
+            out, report = live / "nic_revenue_pattern_lab.json", intel / "nic_revenue_pattern_lab_report.json"
+            owner_rewards = {
+                "374795126927596": {
+                    "amount_usdc": 0.201, "event_count": 1, "event_ids": ["owner-report-1"],
+                    "content_metadata": {
+                        "content_lane": "long_term_thesis",
+                        "content_format": "text_plus_image",
+                        "hook_type": "long_term_conviction_with_target",
+                        "summary": "QNT long-term thesis",
+                        "owner_reported_views": 5100,
+                        "public_post_url": "https://www.binance.com/en/square/post/374795126927596",
+                    },
+                },
+            }
+            with patch.object(revenue_lab, "ATTR", root / "analytics/publication_attribution.jsonl"), \\
+                 patch.object(revenue_lab, "PERF", root / "analytics/square_performance.jsonl"), \\
+                 patch.object(revenue_lab, "REWARD_EVENTS", root / "analytics/wte_reward_events.jsonl"), \\
+                 patch.object(revenue_lab, "load_owner_reported_rewards", return_value=owner_rewards), \\
+                 patch.object(revenue_lab, "LIVE", live), patch.object(revenue_lab, "INTEL", intel), \\
+                 patch.object(revenue_lab, "OUT", out), patch.object(revenue_lab, "REPORT", report), \\
+                 patch.object(revenue_lab, "ROOT", root):
+                revenue_lab.main()
+            state = json.loads(out.read_text(encoding="utf-8"))
+            qnt = next(row for row in state["observations"] if row["content_lane"] == "long_term_thesis")
+            self.assertEqual(qnt["owner_reported_posts"], 1)
+            self.assertAlmostEqual(qnt["owner_reported_revenue_usdc"], 0.201)
+            self.assertEqual(qnt["owner_reported_views"], 5100)
+            self.assertEqual(qnt["verified_posts"], 0)
+            self.assertEqual(qnt["verified_revenue"], 0.0)
+            self.assertEqual(qnt["owner_reported_evidence"], "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED")
+
+
 if __name__ == "__main__":
     unittest.main()
