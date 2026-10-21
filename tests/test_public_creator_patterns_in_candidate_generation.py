@@ -1,5 +1,6 @@
 """Tests that public creator benchmarks reach the writer as aggregate-only hypotheses."""
 import importlib.util
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -124,7 +125,7 @@ def test_rolling_window_hides_individual_creator_rows_from_writer():
 
     def test_earnings_learning_passes_aggregate_leaderboard_cohort_without_names(self):
         learning = {"schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0", "leaderboard_creator_public_content": {"status": "MATCHED_PUBLIC_POSTS_FOUND", "matched_creator_count_14d": 3, "seven_day": {"matched_posts": 5, "top_archetypes": [{"archetype": "education_explainer", "samples": 3}]}, "fourteen_day": {"matched_posts": 9, "top_archetypes": [{"archetype": "education_explainer", "samples": 5}]}, "public_metrics_are_not_earnings": True}, "public_earnings_leaderboard_study_queue": [{"creator": "PrivateName", "claimed_amount": 800}]}
-        brief = candidate_generation_4.build_earnings_learning_brief(learning)
+        brief = module.build_earnings_learning_brief(learning)
         cohort = brief["leaderboard_creator_public_content"]
         self.assertEqual(cohort["matched_creator_count_14d"], 3)
         self.assertEqual(cohort["seven_day"]["matched_posts"], 5)
