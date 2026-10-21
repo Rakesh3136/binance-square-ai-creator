@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "data" / "intelligence" / "wte_leaderboard_observations.json"
 DEFAULT_OUTPUT = ROOT / "data" / "intelligence" / "wte_leaderboard_observed.json"
 OFFICIAL_WTE_HOSTS = {"www.binance.com", "binance.com"}
-OFFICIAL_WTE_PATH = re.compile(r"^/(?:en/)?square/(?:WriteToEarn|writetoearn)/?$", re.I)
+OFFICIAL_WTE_PATH = re.compile(r"^/(?:en/)?square(?:/.*)?$|^/(?:en/)?[^?#]*(?:write[-_]?to[-_]?earn|creator(?:[-/]center|/creator-center)|leaderboard)[^?#]*$", re.I)
 
 
 def _timestamp(value: object) -> str | None:
@@ -36,6 +36,9 @@ def _official_wte_url(value: object) -> str | None:
     parsed = urlparse(value.strip())
     if parsed.scheme != "https" or parsed.hostname not in OFFICIAL_WTE_HOSTS:
         return None
+    # Binance can move the authenticated creator centre between UI routes.
+    # Validate the first-party HTTPS origin and a Square/creator/Write-to-Earn
+    # route family rather than hard-coding one unverified page path.
     if not OFFICIAL_WTE_PATH.fullmatch(parsed.path):
         return None
     return value.strip().split("#", 1)[0]

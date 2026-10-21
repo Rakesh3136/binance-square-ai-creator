@@ -329,7 +329,8 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
                         own_performance: list[dict] | None = None,
                         now: datetime | None = None, target_usdc: float | None = None,
                         public_examples: list[dict] | None = None,
-                        observed_leaderboard_entries: list[dict] | None = None) -> dict:
+                        observed_leaderboard_entries: list[dict] | None = None,
+                        creator_profile_research: dict | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -341,6 +342,8 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     hypotheses = _window_hypotheses(benchmark)
     reward_summary = collect_verified_rewards(reward_events, now)
     own_summary = summarize_own_content(now, own_attribution or [], own_performance or [])
+    profile_research = creator_profile_research if isinstance(creator_profile_research, dict) else {}
+    researched_profiles = profile_research.get("profiles") if isinstance(profile_research.get("profiles"), list) else []
 
     # Build a balanced research queue across creator styles and discovery signals.
     # A single high-engagement archetype must not crowd out educational, chart,
@@ -456,6 +459,34 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "study_objective": "Study listed creator public posts from the last 7/14 days; do not copy wording or treat listed amounts as independently verified.",
     } for row in public_claim_research.get("public_leaderboard_entries", [])[:50]]
 
+    # Attach observed profile research to matching creator leads, without
+    # manufacturing profile links from display names or treating public counts as rewards.
+    profile_by_identity = {}
+    for profile in researched_profiles:
+        if not isinstance(profile, dict):
+            continue
+        for identity in (profile.get("creator"), profile.get("username"), profile.get("display_name")):
+            key = str(identity or "").strip().lstrip("@").casefold()
+            if key:
+                profile_by_identity.setdefault(key, profile)
+
+    def enrich_creator_row(row: dict) -> None:
+        key = str(row.get("creator") or "").strip().lstrip("@").casefold()
+        profile = profile_by_identity.get(key)
+        if not profile:
+            return
+        row["creator_profile_url"] = profile.get("creator_profile_url")
+        row["profile_research_status"] = profile.get("posts_status") or "PROFILE_RESEARCHED"
+        row["profile_posts_7d"] = profile.get("posts_7d", 0)
+        row["profile_posts_14d"] = profile.get("posts_14d", 0)
+        row["recent_post_samples"] = profile.get("recent_post_samples", [])
+        row["creator_username"] = profile.get("username")
+
+    for row in creator_study_queue:
+        enrich_creator_row(row)
+    for row in leaderboard_study_queue:
+        enrich_creator_row(row)
+
     benchmark_state = str(benchmark.get("status") or "UNKNOWN")
     older_count = int((fourteen.get("coverage") or {}).get("posts_age_8_to_14_days") or 0)
     coverage_status = "FULL_7_AND_14_DAY_COVERAGE" if older_count > 0 else "14_DAY_SAMPLE_GAP_KEEP_COLLECTING"
@@ -504,6 +535,31 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "selection_signals": ["public_engagement", "discussion_and_shares", "median_reach"],
             "selection_policy": "Archetype-stratified round-robin; public performance is not proof of earnings.",
         },
+        "creator_profile_research": {
+            "status": str(profile_research.get("status") or "NOT_RUN"),
+            "public_only": bool(profile_research.get("public_only", True)),
+            "authenticated_session_used": bool(profile_research.get("authenticated_session_used", False)),
+            "candidates": int(profile_research.get("candidate_count") or 0),
+            "profiles_resolved": int(profile_research.get("profiles_resolved") or 0),
+            "profile_resolution_failures": int(profile_research.get("profile_resolution_failures") or 0),
+            "posts_collected_7d": int(profile_research.get("posts_collected_7d") or 0),
+            "posts_collected_8_to_14d": int(profile_research.get("posts_collected_8_to_14d") or 0),
+            "posts_collected_14d": int(profile_research.get("posts_collected_14d") or 0),
+            "seven_day_coverage_observed": bool(profile_research.get("seven_day_coverage_observed", False)),
+            "fourteen_day_coverage_observed": bool(profile_research.get("fourteen_day_coverage_observed", False)),
+            "public_metrics_are_not_earnings": True,
+        },
+        "creator_profile_study_queue": [{
+            "creator": profile.get("creator"),
+            "username": profile.get("username"),
+            "creator_profile_url": profile.get("creator_profile_url"),
+            "discovery_source": profile.get("discovery_source"),
+            "earnings_status": profile.get("earnings_status") or "PUBLIC_RESEARCH_LEAD_NOT_VERIFIED",
+            "posts_7d": profile.get("posts_7d", 0),
+            "posts_14d": profile.get("posts_14d", 0),
+            "recent_post_samples": profile.get("recent_post_samples", [])[:10],
+            "evidence_type": "PUBLIC_PROFILE_RESEARCH_NOT_EARNINGS",
+        } for profile in researched_profiles if isinstance(profile, dict)],
         "public_self_reported_earnings_claims": public_claim_research,
         "self_reported_earnings_creator_study_queue": claim_study_queue,        "public_earnings_leaderboard_study_queue": leaderboard_study_queue,
         "leaderboard_creator_public_content": leaderboard_creator_public_content,
@@ -554,9 +610,13 @@ def main() -> int:
     (INTEL / "wte_leaderboard_observed.json").write_text(
         json.dumps(normalized_leaderboard, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8"
     )
+    profile_research = load_json(INTEL / "nic_square_profile_research.json", {})
+    if not isinstance(profile_research, dict):
+        profile_research = {}
     plan = build_learning_plan(
         benchmark, patterns, rewards, attribution, performance, now,
         public_examples=examples, observed_leaderboard_entries=observed_leaderboard_entries,
+        creator_profile_research=profile_research,
     )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     INTEL.mkdir(parents=True, exist_ok=True)
@@ -588,6 +648,9 @@ def main() -> int:
         "verified_reward_events_7d": plan["verified_reward_evidence"]["accepted_unique_reward_events_7d"],
         "verified_usdc_7d": plan["weekly_earnings_goal"]["actual_verified_usdc_7d"],
         "coverage_status": plan["research_coverage"]["status"],
+        "creator_profiles_resolved": plan["creator_profile_research"]["profiles_resolved"],
+        "profile_posts_collected_14d": plan["creator_profile_research"]["posts_collected_14d"],
+        "profile_research_status": plan["creator_profile_research"]["status"],
         "public_metrics_are_not_earnings": True,
         "output": str(OUT.relative_to(ROOT)),
     }

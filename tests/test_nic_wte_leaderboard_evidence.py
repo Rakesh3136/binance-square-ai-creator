@@ -38,6 +38,12 @@ class WriteToEarnLeaderboardEvidenceTests(unittest.TestCase):
         self.assertEqual(result["accepted_count"], 0)
         self.assertEqual(result["rejected"][0]["reason"], "official_write_to_earn_source_url_required")
 
+    def test_accepts_official_creator_center_route_variants(self):
+        current_route = normalize_observations({"entries": [row(source_url="https://www.binance.com/en/square")]}, NOW)
+        creator_center = normalize_observations({"entries": [row(source_url="https://www.binance.com/en/my/creator-center/write-to-earn")]}, NOW)
+        self.assertEqual(current_route["accepted_count"], 1)
+        self.assertEqual(creator_center["accepted_count"], 1)
+
     def test_unknown_profile_is_kept_unknown_not_constructed_from_name(self):
         result = normalize_observations({"entries": [row(creator_profile_url=None)]}, NOW)
         self.assertIsNone(result["entries"][0]["creator_profile_url"])
