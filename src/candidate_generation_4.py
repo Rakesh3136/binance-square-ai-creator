@@ -104,6 +104,48 @@ def build_earnings_learning_brief(learning: dict) -> dict:
     own_playbook = learning.get("recommended_content_playbook")
     if not isinstance(own_playbook, list):
         own_playbook = []
+
+    # Owner-reported post rewards are valuable feedback but not independently
+    # verified payouts. Pass only aggregate counts and anonymized lane/format
+    # labels into the writer; never pass amounts, post IDs, URLs, summaries,
+    # private creator identities, or exact account revenue.
+    owner_feedback = learning.get("owner_reported_reward_feedback")
+    if not isinstance(owner_feedback, dict):
+        owner_feedback = {}
+    feedback_7d = owner_feedback.get("7_day") if isinstance(owner_feedback.get("7_day"), dict) else {}
+    feedback_lanes = feedback_7d.get("by_content_lane")
+    if not isinstance(feedback_lanes, list):
+        feedback_lanes = []
+    safe_feedback_lanes = []
+    for lane in feedback_lanes:
+        if not isinstance(lane, dict):
+            continue
+        try:
+            observations = int(lane.get("reported_event_count") or 0)
+            posts = int(lane.get("post_count") or 0)
+        except (TypeError, ValueError):
+            continue
+        if observations <= 0 or posts <= 0:
+            continue
+        safe_feedback_lanes.append({
+            "content_lane": str(lane.get("content_lane") or "unknown")[:80],
+            "reported_event_count": observations,
+            "reported_post_count": posts,
+            "evidence_type": "OWNER_REPORTED_DIRECTIONAL_NOT_VERIFIED",
+        })
+    reported_events = int(feedback_7d.get("reported_event_count") or 0)
+    reported_posts = int(feedback_7d.get("post_count") or 0)
+    owner_feedback_brief = {
+        "status": str(owner_feedback.get("status") or "NO_OWNER_REPORTED_FEEDBACK")[:80],
+        "reported_event_count_7d": reported_events,
+        "reported_post_count_7d": reported_posts,
+        "content_lane_observations": safe_feedback_lanes[:4],
+        "evidence_type": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED",
+        "usable_for_low_confidence_exploration": reported_events > 0,
+        "usable_as_confirmatory_reward_evidence": False,
+        "minimum_independent_post_samples_before_generalizing": 3,
+        "guidance": "Use owner-reported feedback only to generate cautious, original follow-up experiments. One post is a hypothesis, not proof; do not copy or repeat the original, infer payout causality, or quote private reward amounts.",
+    }
     return {
         "status": str(learning.get("schema") or "NO_EARNINGS_LEARNING_DATA"),
         "research_coverage": {
@@ -112,7 +154,9 @@ def build_earnings_learning_brief(learning: dict) -> dict:
             "fourteen_day_dated_posts": int(coverage.get("fourteen_day_dated_posts") or 0),
             "posts_age_8_to_14_days": int(coverage.get("posts_age_8_to_14_days") or 0),
         },
-        "public_archetype_hypotheses": safe_hypotheses[:6],        "leaderboard_creator_public_content": {
+        "public_archetype_hypotheses": safe_hypotheses[:6],
+        "owner_reported_reward_feedback": owner_feedback_brief,
+        "leaderboard_creator_public_content": {
             "status": str((learning.get("leaderboard_creator_public_content") or {}).get("status") or "NO_LEADERBOARD_COHORT_DATA"),
             "matched_creator_count_14d": int((learning.get("leaderboard_creator_public_content") or {}).get("matched_creator_count_14d") or 0),
             "seven_day": (learning.get("leaderboard_creator_public_content") or {}).get("seven_day", {}),
