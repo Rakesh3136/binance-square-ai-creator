@@ -717,6 +717,39 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     }
 
 
+def build_learning_memory_entry(plan: dict, now: datetime) -> dict:
+    """Persist small audit metrics for autonomous learning across daily cycles."""
+    owner = plan.get("owner_reported_reward_feedback") if isinstance(plan.get("owner_reported_reward_feedback"), dict) else {}
+    owner_7d = owner.get("7_day") if isinstance(owner.get("7_day"), dict) else {}
+    coverage = plan.get("research_coverage") if isinstance(plan.get("research_coverage"), dict) else {}
+    profile = plan.get("creator_profile_research") if isinstance(plan.get("creator_profile_research"), dict) else {}
+    weekly = plan.get("weekly_earnings_goal") if isinstance(plan.get("weekly_earnings_goal"), dict) else {}
+    verified = plan.get("verified_reward_evidence") if isinstance(plan.get("verified_reward_evidence"), dict) else {}
+    hypotheses = plan.get("best_public_format_hypotheses") if isinstance(plan.get("best_public_format_hypotheses"), list) else []
+    creator_queue = plan.get("creator_study_queue") if isinstance(plan.get("creator_study_queue"), list) else []
+    leaderboard_queue = plan.get("public_earnings_leaderboard_study_queue") if isinstance(plan.get("public_earnings_leaderboard_study_queue"), list) else []
+    return {
+        "date": now.date().isoformat(),
+        "generated_at": now.isoformat(),
+        "coverage_status": str(coverage.get("status") or "UNKNOWN"),
+        "profile_research_status": str(profile.get("status") or "NOT_RUN"),
+        "creator_profiles_resolved": int(profile.get("profiles_resolved") or 0),
+        "profile_posts_7d": int(profile.get("posts_collected_7d") or 0),
+        "profile_posts_8_to_14d": int(profile.get("posts_collected_8_to_14d") or 0),
+        "weekly_goal_usdc": weekly.get("target_usdc"),
+        "verified_usdc_7d": weekly.get("actual_verified_usdc_7d"),
+        "verified_reward_events_7d": int(verified.get("accepted_unique_reward_events_7d") or 0),
+        "owner_reported_usdc_7d": owner_7d.get("reported_usdc"),
+        "owner_reported_reward_events_7d": int(owner_7d.get("reported_event_count") or 0),
+        "owner_reported_reward_posts_7d": int(owner_7d.get("post_count") or 0),
+        "owner_reported_feedback_status": str(owner.get("status") or "NO_OWNER_REPORTED_FEEDBACK"),
+        "creator_study_count": len(creator_queue),
+        "leaderboard_creator_study_count": len(leaderboard_queue),
+        "hypothesis_archetypes": [str(row.get("archetype") or "unknown")[:60] for row in hypotheses if isinstance(row, dict)],
+        "owner_reported_feedback_is_not_verified": True,
+    }
+
+
 def main() -> int:
     now = datetime.now(timezone.utc)
     benchmark = load_json(BENCHMARK, {})
@@ -751,15 +784,7 @@ def main() -> int:
     history = previous.get("history") if isinstance(previous.get("history"), list) else []
     today = now.date().isoformat()
     history = [row for row in history if isinstance(row, dict) and str(row.get("date") or "") != today]
-    history.append({
-        "date": today,
-        "generated_at": now.isoformat(),
-        "coverage_status": plan["research_coverage"]["status"],
-        "weekly_goal_usdc": plan["weekly_earnings_goal"]["target_usdc"],
-        "verified_usdc_7d": plan["weekly_earnings_goal"]["actual_verified_usdc_7d"],
-        "creator_study_count": len(plan["creator_study_queue"]),
-        "hypothesis_archetypes": [row["archetype"] for row in plan["best_public_format_hypotheses"]],
-    })
+    history.append(build_learning_memory_entry(plan, now))
     memory = {"schema": "NIC-SQUARE-EARNINGS-LEARNING-MEMORY-1.0", "updated_at": now.isoformat(), "history": history[-30:]}
     MEMORY.write_text(json.dumps(memory, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     report = {
