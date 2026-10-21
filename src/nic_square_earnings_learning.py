@@ -489,7 +489,18 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
 
     benchmark_state = str(benchmark.get("status") or "UNKNOWN")
     older_count = int((fourteen.get("coverage") or {}).get("posts_age_8_to_14_days") or 0)
-    coverage_status = "FULL_7_AND_14_DAY_COVERAGE" if older_count > 0 else "14_DAY_SAMPLE_GAP_KEEP_COLLECTING"
+    public_feed_coverage_status = "FULL_7_AND_14_DAY_COVERAGE" if older_count > 0 else "14_DAY_SAMPLE_GAP_KEEP_COLLECTING"
+    profile_posts_7d = int(profile_research.get("posts_collected_7d") or 0)
+    profile_posts_8_to_14d = int(profile_research.get("posts_collected_8_to_14d") or 0)
+    profile_coverage_observed = (
+        bool(profile_research.get("seven_day_coverage_observed"))
+        and bool(profile_research.get("fourteen_day_coverage_observed"))
+        and profile_posts_7d > 0 and profile_posts_8_to_14d > 0
+    )
+    coverage_status = (
+        "FULL_7_AND_14_DAY_PROFILE_COVERAGE" if profile_coverage_observed
+        else public_feed_coverage_status
+    )
     return {
         "schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0",
         "generated_at": now.isoformat(),
@@ -516,6 +527,11 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         },
         "research_coverage": {
             "status": coverage_status,
+            "public_feed_status": public_feed_coverage_status,
+            "profile_research_status": str(profile_research.get("status") or "NOT_RUN"),
+            "profile_coverage_observed": profile_coverage_observed,
+            "profile_posts_7d": profile_posts_7d,
+            "profile_posts_8_to_14d": profile_posts_8_to_14d,
             "benchmark_status": benchmark_state,
             "collected_posts_last_run": int(benchmark.get("public_posts_collected_this_run") or 0),
             "public_posts_retained": int(benchmark.get("public_posts_observed") or 0),
