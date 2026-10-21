@@ -392,6 +392,8 @@ class SquareEarningsLearningTests(unittest.TestCase):
         mechanics = plan["current_program_mechanics"]
         self.assertEqual(mechanics["engagement_bonus_effective_at"], "2026-10-19T00:00:00+00:00")
         self.assertEqual(mechanics["engagement_bonus_settlement_period_days"], 7)
+        self.assertEqual(mechanics["trade_commission_reward_window_days"], 7)
+        self.assertEqual(mechanics["engagement_reward_window_days"], 30)
         self.assertIn("evaluate posts published from 2026-10-19 separately", mechanics["rules_change_cohort_policy"])
 
 
