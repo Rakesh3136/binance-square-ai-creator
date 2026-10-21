@@ -1,19 +1,30 @@
 {
   "schema": "NIC-PUBLICATION-POLICY-1.0",
-  "editorial_auto_publication_enabled": true,
+  "editorial_auto_publication_enabled": false,
   "editorial_mode": "EDITORIAL_ONLY",
   "trade_signal_publication_enabled": false,
   "live_orders_enabled": false,
-  "requires_human_review_for_editorial": false,
-  "authorization_basis": "Explicit creator authorization in the ChatGPT conversation on 2026-10-12 to allow NIC automatic Binance Square publication.",
-  "scope": ["original educational content", "market research and commentary", "conditional, non-actionable analysis"],
-  "must_not_claim": ["human review that did not occur", "verified publication without current-run post ID", "profitable forecasting without held-out evidence"],
+  "requires_human_review_for_editorial": true,
+  "authorization_basis": "Current creator instruction on 2026-10-21: automatic Binance Square publishing must remain disabled until creator quality, visual correctness, and learning from verified outcomes are demonstrated.",
+  "scope": [
+    "draft generation and research only",
+    "prepare review packages only"
+  ],
+  "must_not_claim": [
+    "human review that did not occur",
+    "verified publication without current-run post ID",
+    "profitable forecasting without held-out evidence"
+  ],
   "guardrails": [
-    "Current-cycle EDITORIAL eligibility and trade_authorized=false are mandatory.",
-    "Signal-First and the editorial lane gate must explicitly permit publication.",
+    "Automatic editorial publication is disabled by creator instruction.",
+    "A human must explicitly review and approve each draft before any future publication.",
+    "The current hard workflow stop on payload building and submission must remain in place.",
+    "Current-cycle EDITORIAL eligibility and trade_authorized=false remain mandatory if publication is ever explicitly re-enabled.",
+    "Signal-First and the editorial lane gate must explicitly permit any future publication.",
     "Actionable entry/stop/target instructions and trade calls are forbidden in editorial mode.",
     "All editorial, originality, quality, and required visual validation steps must pass.",
     "Duplicate and asset cooldown checks remain active.",
-    "Live orders and trade-signal publication remain disabled until separate evidence-based authorization."
+    "Live orders and trade-signal publication remain disabled.",
+    "Public views, comments, likes, follows and creator payout claims are not proof of earnings."
   ]
 }
