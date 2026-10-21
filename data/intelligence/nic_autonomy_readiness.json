@@ -1,0 +1,74 @@
+{
+  "schema": "NIC-AUTONOMY-READINESS-1.0",
+  "generated_at": "2026-10-21T13:35:48.831903+00:00",
+  "status": "PUBLIC_RESEARCH_READY_PRIVATE_REWARD_SOURCE_BLOCKED",
+  "full_autonomy_proven": false,
+  "capabilities": {
+    "public_creator_profile_research": {
+      "status": "READY",
+      "profiles_resolved": 12,
+      "posts_7d": 173,
+      "posts_8_to_14d": 47
+    },
+    "public_reward_claim_discovery": {
+      "status": "HASHTAG_PAGES_READ_NO_RECENT_DATED_CLAIM_POSTS",
+      "recent_claim_posts_found": 0,
+      "public_corpus_rows_checked": 2261,
+      "self_reports_are_unverified": true
+    },
+    "other_creator_weekly_reward_source": {
+      "status": "BLOCKED_NO_AUTHORIZED_SOURCE",
+      "observed_entries_in_current_study_queue": 0,
+      "independent_payout_verification_available": false
+    },
+    "own_post_reward_attribution": {
+      "status": "BLOCKED_NO_VERIFIED_POST_LINKED_REWARD",
+      "verified_events_7d": 0,
+      "owner_reported_events_7d": 1,
+      "owner_reported_usdc_7d": 0.201,
+      "owner_reports_are_not_verified": true
+    },
+    "automatic_publication": {
+      "enabled_by_policy": false,
+      "human_review_required": true,
+      "status": "DISABLED_BY_POLICY",
+      "publication_authorized_by_this_report": false
+    }
+  },
+  "critical_blocker_count": 2,
+  "blockers": [
+    {
+      "id": "other_creator_paid_reward_source",
+      "severity": "critical",
+      "status": "BLOCKED_NO_AUTHORIZED_SOURCE",
+      "capability_affected": "Select and learn from creators ranked by actual weekly Write-to-Earn payouts (e.g. $500+).",
+      "evidence": "No observed Write-to-Earn leaderboard entries are available in the current learning input; public post metrics and self-reported claims are not payout proof.",
+      "required_resolution": "Connect an officially supported, authorized read-only source or a permitted structured export. Do not bypass authentication or replay browser fingerprints."
+    },
+    {
+      "id": "own_post_reward_attribution",
+      "severity": "critical",
+      "status": "BLOCKED_NO_VERIFIED_POST_LINKED_REWARD",
+      "capability_affected": "Prove which of NIC's own posts generated a paid reward and calibrate content decisions against confirmed outcomes.",
+      "evidence": "The verified ledger contains no accepted exact-post paid reward event. Owner-reported feedback is kept separately and is not independently verified.",
+      "owner_reported_events_7d": 1,
+      "owner_reported_usdc_7d": 0.201,
+      "required_resolution": "Add post-linked reward evidence from an authorized account export/notification flow and preserve its timestamped evidence reference."
+    },
+    {
+      "id": "public_reward_claim_leads",
+      "severity": "warning",
+      "status": "NO_RECENT_PUBLIC_CLAIMS_FOUND",
+      "capability_affected": "Discover public creators' own recent reward claims as unverified research leads.",
+      "public_corpus_rows_checked": 2261,
+      "discovery_status": "HASHTAG_PAGES_READ_NO_RECENT_DATED_CLAIM_POSTS",
+      "required_resolution": "Continue scanning the public feed; treat any discovered creator amount as self-reported unless independently supported."
+    }
+  ],
+  "policy": {
+    "public_metrics_are_not_payout_evidence": true,
+    "no_unauthorized_private_dashboard_access": true,
+    "no_auto_publish_during_current_pause": true
+  },
+  "next_action": "Connect an officially supported, authorized read-only reward source or a permitted export; in parallel preserve post-linked own reward evidence. Public profile research can continue meanwhile."
+}
