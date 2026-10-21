@@ -203,5 +203,21 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertIn("evaluate posts published from 2026-10-19 separately", mechanics["rules_change_cohort_policy"])
 
 
+    def test_public_posts_by_leaderboard_creators_are_summarized_in_7_and_14_day_windows(self):
+        now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
+        examples = [
+            {"creator": "AlphaCreator", "posted_at": "2026-10-20T10:00:00+00:00", "archetype": "education_explainer", "format": "text", "views": 1000, "likes": 50, "replies": 10, "shares": 5},
+            {"creator": "AlphaCreator", "posted_at": "2026-10-10T10:00:00+00:00", "archetype": "technical_chart", "format": "chart", "views": 2000, "likes": 60, "replies": 8, "shares": 4},
+            {"creator": "OtherCreator", "posted_at": "2026-10-20T10:00:00+00:00", "archetype": "general", "views": 9000, "likes": 900, "replies": 90, "shares": 90},
+        ]
+        entries = [{"claimed_creator": "AlphaCreator", "claimed_amount": 800}]
+        from src.nic_square_earnings_learning import summarize_leaderboard_creator_posts
+        result = summarize_leaderboard_creator_posts(examples, entries, now)
+        self.assertEqual(result["seven_day"]["matched_posts"], 1)
+        self.assertEqual(result["fourteen_day"]["matched_posts"], 2)
+        self.assertEqual(result["posts_age_8_to_14_days"], 1)
+        self.assertEqual(result["fourteen_day"]["top_archetypes"][0]["archetype"], "education_explainer")
+        self.assertTrue(result["public_metrics_are_not_earnings"])
+
 if __name__ == "__main__":
     unittest.main()
