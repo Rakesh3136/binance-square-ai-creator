@@ -154,5 +154,35 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(result["undated_claims_excluded"], 1)
 
 
+
+    def test_creator_research_queue_balances_styles_and_keeps_earnings_claims_separate(self):
+        benchmark = benchmark_fixture()
+        seven = benchmark["rolling_learning_windows"]["seven_day"]
+        fourteen = benchmark["rolling_learning_windows"]["fourteen_day"]
+        second = {
+            "creator": "ChartCreator", "creator_id": "chart-creator-id", "posts": 6,
+            "mean_public_engagement_rate": 0.04, "median_views": 500, "avg_views": 550,
+            "reply_rate": 0.01, "share_rate": 0.02, "dominant_archetypes": ["technical_chart"],
+            "sample_urls": ["https://www.binance.com/en/square/post/378834646947380"],
+            "earnings_status": "NOT_PUBLICLY_VERIFIED",
+        }
+        seven["top_by_public_engagement"] = [benchmark_fixture()["rolling_learning_windows"]["seven_day"]["top_by_public_engagement"][0], second]
+        fourteen["top_by_public_engagement"] = [benchmark_fixture()["rolling_learning_windows"]["fourteen_day"]["top_by_public_engagement"][0], second]
+        examples = [{
+            "creator": "SelfReportedCreator", "creator_id": "claim-creator-id",
+            "post_id": "379000000000001", "posted_at": "2026-10-20T10:00:00+00:00",
+            "source_url": "https://www.binance.com/en/square/post/379000000000001",
+            "text": "I earned 200 USDC from Write to Earn this week!",
+        }]
+        plan = build_learning_plan(benchmark, {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc), public_examples=examples)
+        queue = plan["creator_study_queue"]
+        self.assertEqual({row["creator_id"] for row in queue}, {"public-creator-id", "chart-creator-id"})
+        self.assertIn("technical_chart", plan["creator_research_coverage"]["represented_archetypes"])
+        self.assertEqual(plan["self_reported_earnings_creator_study_queue"][0]["earnings_status"], "UNVERIFIED_PUBLIC_SELF_REPORT")
+        self.assertNotIn("SelfReportedCreator", [row["creator"] for row in queue])
+        self.assertFalse(plan["learning_policy"]["do_not_infer_private_creator_earnings"] is False)
+
+
+
 if __name__ == "__main__":
     unittest.main()
