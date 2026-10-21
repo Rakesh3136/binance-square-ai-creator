@@ -123,6 +123,8 @@ def summarize_own_content(now: datetime, attribution_rows: list[dict], performan
                 "likes": number(perf, "likes", "like_count"),
                 "replies": number(perf, "comments", "replies", "reply_count"),
                 "shares": number(perf, "shares", "share_count"),
+                "follows": number(perf, "follows", "new_follows", "followers_gained"),
+                "follows_observed": any(key in perf or (isinstance(perf.get("metrics"), dict) and key in perf["metrics"]) for key in ("follows", "new_follows", "followers_gained")),
             }
             eligible.append(sample)
             groups[category].append(sample)
@@ -132,13 +134,20 @@ def summarize_own_content(now: datetime, attribution_rows: list[dict], performan
             likes = sum(x["likes"] for x in samples)
             replies = sum(x["replies"] for x in samples)
             shares = sum(x["shares"] for x in samples)
+            observed_follow_rows = [x for x in samples if x.get("follows_observed")]
+            follows = sum(x["follows"] for x in observed_follow_rows)
+            weighted_interactions = sum(x["likes"] + 2 * x["replies"] + 3 * x["shares"] + (4 * x["follows"] if x.get("follows_observed") else 0) for x in samples)
             return {
                 "posts": n,
                 "avg_views": round(views / n, 2) if n else None,
                 "total_views": round(views, 2),
                 "reply_rate_per_view": round(replies / max(1, views), 6),
                 "share_rate_per_view": round(shares / max(1, views), 6),
-                "weighted_engagement_per_1000_views": round((likes + 2 * replies + 3 * shares) * 1000 / max(1, views), 4),
+                "total_follows": follows if observed_follow_rows else None,
+                "follow_metric_coverage_posts": len(observed_follow_rows),
+                "follow_rate_per_view": round(follows / max(1, views), 6) if observed_follow_rows else None,
+                "weighted_engagement_per_1000_views": round(weighted_interactions * 1000 / max(1, views), 4),
+                "weighted_engagement_formula": "likes + 2*comments + 3*shares + 4*follows_when_observed; missing follows are excluded, not treated as zero",
                 "evidence": "OWN_ACCOUNT_PUBLIC_METRICS_NOT_REVENUE",
             }
         per_window[str(days) + "_day"] = {
