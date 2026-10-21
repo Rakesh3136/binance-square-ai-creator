@@ -253,8 +253,13 @@ def main():
     accepted_reward_count = sum(1 for event in raw_reward_events if is_verified_reward_event(event))
     rejected_reward_count = len(raw_reward_events) - accepted_reward_count
 
+    owner_reward_examples = [
+        {"post_id": post_id, "reward_amount_usdc": item["amount_usdc"], "event_count": item["event_count"], "content_metadata": item.get("content_metadata") or {}, "evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED"}
+        for post_id, item in load_owner_reported_rewards().items()
+    ]
+
     director = {
-        "version": "2.1",
+        "version": "2.2",
         "generated_at": now,
         "status": readiness_status(accepted_reward_count, rows),
         "verified_data_policy": {
@@ -310,6 +315,7 @@ def main():
         },
         "next_cycle_instruction": "Use content_priors as bounded priors only after Signal-First selects a real opportunity. Do not manufacture a symbol, setup, revenue claim, or experiment completion.",
         "observations": observations[:100],
+        "owner_reported_reward_examples": owner_reward_examples,
     }
 
     OUT.parent.mkdir(parents=True, exist_ok=True)

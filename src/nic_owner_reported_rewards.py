@@ -58,7 +58,7 @@ def valid_owner_report(row: dict) -> bool:
 
 def load_owner_reported_rewards(path: Path = OWNER_REPORTED_REWARDS) -> dict[str, dict]:
     """Return post-level sums and event counts after strict validation/deduplication."""
-    by_post = defaultdict(lambda: {"amount_usdc": 0.0, "event_count": 0, "event_ids": []})
+    by_post = defaultdict(lambda: {"amount_usdc": 0.0, "event_count": 0, "event_ids": [], "content_metadata": {}})
     seen = set()
     if not path.exists():
         return {}
@@ -78,4 +78,8 @@ def load_owner_reported_rewards(path: Path = OWNER_REPORTED_REWARDS) -> dict[str
         bucket["amount_usdc"] += float(row["reward_amount_usdc"])
         bucket["event_count"] += 1
         bucket["event_ids"].append(event_id)
-    return {post: {"amount_usdc": round(v["amount_usdc"], 8), "event_count": v["event_count"], "event_ids": v["event_ids"]} for post, v in by_post.items()}
+        metadata = row.get("content_metadata")
+        if isinstance(metadata, dict) and not bucket["content_metadata"]:
+            allowed = ("content_lane", "content_format", "hook_type", "summary", "owner_reported_views", "public_post_url", "creator_origin")
+            bucket["content_metadata"] = {key: metadata[key] for key in allowed if metadata.get(key) not in (None, "")}
+    return {post: {"amount_usdc": round(v["amount_usdc"], 8), "event_count": v["event_count"], "event_ids": v["event_ids"], "content_metadata": v["content_metadata"]} for post, v in by_post.items()}
