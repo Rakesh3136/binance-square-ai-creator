@@ -19,15 +19,18 @@ from typing import Any
 
 try:
     from src.nic_square_earnings_learning import analyze_public_reward_claims, extract_public_leaderboard_entries
+    from src.nic_wte_leaderboard_evidence import normalize_observations
     from src.square_creator_benchmark_collector import archetype, metric, normalize_id, posted_at
 except ModuleNotFoundError:
     from nic_square_earnings_learning import analyze_public_reward_claims, extract_public_leaderboard_entries
+    from nic_wte_leaderboard_evidence import normalize_observations
     from square_creator_benchmark_collector import archetype, metric, normalize_id, posted_at
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES_PATH = ROOT / "data/intelligence/public_square_examples.json"
 BENCHMARK_PATH = ROOT / "data/intelligence/square_creator_benchmark.json"
 OBSERVED_LEADERBOARD_PATH = ROOT / "data/intelligence/wte_leaderboard_observed.json"
+OBSERVED_LEADERBOARD_INPUT_PATH = ROOT / "data/intelligence/wte_leaderboard_observations.json"
 OUT_PATH = ROOT / "data/intelligence/nic_square_profile_research.json"
 
 BASE = "https://www.binance.com"
@@ -557,7 +560,9 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     examples = read_json(EXAMPLES_PATH, [])
     benchmark = read_json(BENCHMARK_PATH, {})
-    observed = read_json(OBSERVED_LEADERBOARD_PATH, {"entries": []})
+    observation_input = read_json(OBSERVED_LEADERBOARD_INPUT_PATH, {"entries": []})
+    observed = normalize_observations(observation_input, now)
+    write_json(OBSERVED_LEADERBOARD_PATH, observed)
     if not isinstance(examples, list):
         examples = []
     candidates = build_candidates(examples, benchmark, observed, now)
