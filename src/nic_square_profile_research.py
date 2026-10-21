@@ -202,7 +202,12 @@ def build_candidates(examples: list[dict], benchmark: dict, observed: dict,
     def add(row: dict, source: str, score: tuple = (0, 0)) -> None:
         name = str(row.get("creator") or row.get("claimed_creator") or "").strip().lstrip("@")
         url = row.get("creator_profile_url") or row.get("profile_url")
-        username = profile_username(url) if url else None
+        # A public leaderboard entry extracted from an explicit @handle is
+        # a username lead; display names from the benchmark are not usernames.
+        explicit_username = row.get("username") or row.get("claimed_creator")
+        username = profile_username(url) if url else (
+            str(explicit_username).strip().lstrip("@") if explicit_username else None
+        )
         if not name and username:
             name = username
         samples = row.get("sample_urls") or row.get("recent_post_urls") or []
