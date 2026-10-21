@@ -45,6 +45,25 @@ class OwnerReportedRewardTests(unittest.TestCase):
         self.assertEqual(result["374795126927596"]["event_count"], 2)
         self.assertAlmostEqual(result["374795126927596"]["amount_usdc"], 0.501)
 
+    def test_preserves_content_metadata_for_owner_reported_reward_learning(self):
+        row = self.event(content_metadata={
+            "content_lane": "long_term_thesis",
+            "content_format": "text_plus_image",
+            "hook_type": "long_term_conviction_with_target",
+            "summary": "QNT long-term thesis with entry and target",
+            "owner_reported_views": 5100,
+            "public_post_url": "https://www.binance.com/en/square/post/374795126927596",
+            "creator_origin": "owner_manual",
+        })
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "owner-rewards.jsonl"
+            path.write_text(json.dumps(row) + chr(10), encoding="utf-8")
+            result = load_owner_reported_rewards(path)
+        meta = result["374795126927596"]["content_metadata"]
+        self.assertEqual(meta["content_lane"], "long_term_thesis")
+        self.assertEqual(meta["content_format"], "text_plus_image")
+        self.assertEqual(meta["owner_reported_views"], 5100)
+
 
 if __name__ == "__main__":
     unittest.main()
