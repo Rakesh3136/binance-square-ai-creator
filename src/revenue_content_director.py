@@ -137,7 +137,8 @@ def merge_rows():
         # Public performance rows may carry null category/symbol fields; do not
         # let those nulls erase the richer, exact-post publication attribution.
         for field in ("symbol", "category", "content_lane", "format", "content_format",
-                      "experiment_format", "experiment_id", "direction", "visual_type",
+                      "experiment_format", "experiment_id", "direction", "visual_type", "portfolio_format",
+                      "portfolio_hook_type", "portfolio_visual_type", "portfolio_reader_payoff_type",
                       "hook_type", "reader_payoff_type", "style", "visual_attached"):
             if merged_row.get(field) in (None, "") and attr[post].get(field) not in (None, ""):
                 merged_row[field] = attr[post][field]
@@ -162,16 +163,16 @@ def merge_rows():
 def group_key(row):
     # Attribution schema predates the richer content dimensions; use fields
     # actually recorded there rather than collapsing all posts into "unknown".
-    lane = row.get("content_lane") or row.get("category")
-    fmt = row.get("format") or row.get("content_format") or row.get("experiment_format")
+    lane = row.get("content_lane") or row.get("category") or row.get("portfolio_lane")
+    fmt = row.get("format") or row.get("content_format") or row.get("experiment_format") or row.get("portfolio_format")
     if not fmt and "visual_attached" in row:
         fmt = "visual_attached" if row.get("visual_attached") is True else "text_only"
     values = {
         "content_lane": lane,
         "format": fmt,
-        "hook_type": row.get("hook_type") or row.get("content_family") or row.get("style"),
-        "visual_type": row.get("visual_type"),
-        "reader_payoff_type": row.get("reader_payoff_type"),
+        "hook_type": row.get("hook_type") or row.get("content_family") or row.get("portfolio_hook_type") or row.get("style"),
+        "visual_type": row.get("visual_type") or row.get("portfolio_visual_type"),
+        "reader_payoff_type": row.get("reader_payoff_type") or row.get("portfolio_reader_payoff_type"),
         "experiment_id": row.get("experiment_id"),
     }
     return tuple(str(values.get(dim) or "unknown").strip().lower() for dim in DIMENSIONS)
