@@ -686,7 +686,14 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "public_self_reported_earnings_claims": public_claim_research,
         "self_reported_earnings_creator_study_queue": claim_study_queue,        "public_earnings_leaderboard_study_queue": leaderboard_study_queue,
         "leaderboard_creator_public_content": leaderboard_creator_public_content,
-        "leaderboard_research_coverage": {"window_days": [7, 14], "public_leaderboard_entries_found": len(public_claim_research.get("public_leaderboard_entries", [])), "creator_names_queued_for_post_study": len(leaderboard_study_queue), "amounts_are_not_payout_proof": True},
+        "leaderboard_research_coverage": {
+            "window_days": [7, 14],
+            "public_leaderboard_entries_found": len(public_claim_research.get("public_leaderboard_entries", [])),
+            "observed_wte_leaderboard_entries_count": len([row for row in observed_rows if isinstance(row, dict)]),
+            "creator_names_queued_for_post_study": len(leaderboard_study_queue),
+            "amounts_are_not_payout_proof": True,
+        },
+        "observed_wte_leaderboard_entries_count": len([row for row in observed_rows if isinstance(row, dict)]),
         "best_public_format_hypotheses": hypotheses,
         "own_account_performance": own_summary,
         "historical_own_account_baseline": patterns.get("our_baseline") if isinstance(patterns.get("our_baseline"), dict) else {},
@@ -760,10 +767,9 @@ def build_autonomy_readiness(plan: dict, public_wte_claim_discovery: dict | None
     owner = plan.get("owner_reported_reward_feedback") if isinstance(plan.get("owner_reported_reward_feedback"), dict) else {}
     owner7 = owner.get("7_day") if isinstance(owner.get("7_day"), dict) else {}
     verified = plan.get("verified_reward_evidence") if isinstance(plan.get("verified_reward_evidence"), dict) else {}
-    leaderboard = plan.get("public_earnings_leaderboard_study_queue")
-    if not isinstance(leaderboard, list):
-        leaderboard = []
-    observed_count = len(leaderboard)
+    # Only observations explicitly ingested from the observed WTE input count
+    # as leaderboard rows. Public self-reported claims in the study queue do not.
+    observed_count = int(plan.get("observed_wte_leaderboard_entries_count") or 0)
     profiles_ready = (
         str(profile.get("status") or "") == "PROFILE_RESEARCH_COMPLETE"
         and bool(profile.get("seven_day_coverage_observed"))
