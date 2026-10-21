@@ -952,7 +952,7 @@ def main() -> int:
     report = {
         "schema": plan["schema"],
         "generated_at": now.isoformat(),
-        "status": "READY" if benchmark.get("status") == "PUBLIC_BENCHMARKS_AVAILABLE" else "COLLECTING_PUBLIC_CREATOR_RESEARCH",
+        "status": (plan["autonomy_readiness"]["status"] if plan["autonomy_readiness"]["critical_blocker_count"] else ("READY" if benchmark.get("status") == "PUBLIC_BENCHMARKS_AVAILABLE" else "COLLECTING_PUBLIC_CREATOR_RESEARCH")),
         "weekly_goal_usdc": plan["weekly_earnings_goal"]["target_usdc"],
         "public_creator_study_queue": len(plan["creator_study_queue"]),
         "public_self_reported_earnings_claim_creators": plan["public_self_reported_earnings_claims"]["distinct_claiming_creators"],
