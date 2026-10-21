@@ -374,6 +374,19 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertIn("own_post_reward_attribution", blocker_ids)
         self.assertIn("public_reward_claim_leads", blocker_ids)
 
+    def test_wte_strategy_covers_rewarded_formats_and_policy_drives_auto_post_flag(self):
+        plan = build_learning_plan(benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
+        mechanics = plan["current_program_mechanics"]
+        formats = mechanics["format_reward_map"]
+        self.assertIn("engagement bonus", formats["short_text_posts"])
+        self.assertIn("engagement bonus", formats["long_articles"])
+        self.assertIn("top 100", formats["livestreams"])
+        self.assertIn("Basic commission", formats["chats"])
+        strategy = plan["creator_format_strategy"]
+        self.assertGreaterEqual(len(strategy["priority"]), 3)
+        self.assertIn("genuine", strategy["engagement_design"].lower())
+        self.assertTrue(plan["learning_policy"]["automatic_posting_enabled"])
+
     def test_new_write_to_earn_rules_have_separate_october_19_cohort(self):
         plan = build_learning_plan(benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc))
         mechanics = plan["current_program_mechanics"]
