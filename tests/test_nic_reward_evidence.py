@@ -210,13 +210,17 @@ class RewardEvidenceTests(unittest.TestCase):
                     },
                 },
             }
-            with patch.object(revenue_lab, "ATTR", root / "analytics/publication_attribution.jsonl"), \\
-                 patch.object(revenue_lab, "PERF", root / "analytics/square_performance.jsonl"), \\
-                 patch.object(revenue_lab, "REWARD_EVENTS", root / "analytics/wte_reward_events.jsonl"), \\
-                 patch.object(revenue_lab, "load_owner_reported_rewards", return_value=owner_rewards), \\
-                 patch.object(revenue_lab, "LIVE", live), patch.object(revenue_lab, "INTEL", intel), \\
-                 patch.object(revenue_lab, "OUT", out), patch.object(revenue_lab, "REPORT", report), \\
-                 patch.object(revenue_lab, "ROOT", root):
+            with (
+                patch.object(revenue_lab, "ATTR", root / "analytics/publication_attribution.jsonl"),
+                patch.object(revenue_lab, "PERF", root / "analytics/square_performance.jsonl"),
+                patch.object(revenue_lab, "REWARD_EVENTS", root / "analytics/wte_reward_events.jsonl"),
+                patch.object(revenue_lab, "load_owner_reported_rewards", return_value=owner_rewards),
+                patch.object(revenue_lab, "LIVE", live),
+                patch.object(revenue_lab, "INTEL", intel),
+                patch.object(revenue_lab, "OUT", out),
+                patch.object(revenue_lab, "REPORT", report),
+                patch.object(revenue_lab, "ROOT", root),
+            ):
                 revenue_lab.main()
             state = json.loads(out.read_text(encoding="utf-8"))
             qnt = next(row for row in state["observations"] if row["content_lane"] == "long_term_thesis")
@@ -226,7 +230,6 @@ class RewardEvidenceTests(unittest.TestCase):
             self.assertEqual(qnt["verified_posts"], 0)
             self.assertEqual(qnt["verified_revenue"], 0.0)
             self.assertEqual(qnt["owner_reported_evidence"], "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED")
-
 
 if __name__ == "__main__":
     unittest.main()
