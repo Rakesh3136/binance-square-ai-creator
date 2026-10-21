@@ -122,6 +122,15 @@ def test_rolling_window_hides_individual_creator_rows_from_writer():
     assert "example.invalid/private-post" not in str(brief)
 
 
+    def test_earnings_learning_passes_aggregate_leaderboard_cohort_without_names(self):
+        learning = {"schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0", "leaderboard_creator_public_content": {"status": "MATCHED_PUBLIC_POSTS_FOUND", "matched_creator_count_14d": 3, "seven_day": {"matched_posts": 5, "top_archetypes": [{"archetype": "education_explainer", "samples": 3}]}, "fourteen_day": {"matched_posts": 9, "top_archetypes": [{"archetype": "education_explainer", "samples": 5}]}, "public_metrics_are_not_earnings": True}, "public_earnings_leaderboard_study_queue": [{"creator": "PrivateName", "claimed_amount": 800}]}
+        brief = candidate_generation_4.build_earnings_learning_brief(learning)
+        cohort = brief["leaderboard_creator_public_content"]
+        self.assertEqual(cohort["matched_creator_count_14d"], 3)
+        self.assertEqual(cohort["seven_day"]["matched_posts"], 5)
+        self.assertNotIn("PrivateName", json.dumps(brief))
+        self.assertTrue(cohort["public_metrics_are_not_earnings"])
+
 if __name__ == "__main__":
     test_public_pattern_brief_uses_repeated_aggregate_patterns_only()
     test_missing_public_patterns_fail_soft_without_inventing_evidence()
