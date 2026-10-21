@@ -188,7 +188,7 @@ class RewardEvidenceTests(unittest.TestCase):
             self.assertEqual(revenue_director.group_key(rows[0])[0], "research")
             self.assertEqual(revenue_director.group_key(rows[0])[1], "visual_analysis")
             self.assertEqual(revenue_director.group_key(rows[0])[2], "curiosity_gap")
-            self.assertEqual(revenue_director.group_key(rows[0])[3], "research")
+            self.assertEqual(revenue_director.group_key(rows[0])[3], "chart")
             self.assertEqual(revenue_director.group_key(rows[0])[4], "chart")
 
 
