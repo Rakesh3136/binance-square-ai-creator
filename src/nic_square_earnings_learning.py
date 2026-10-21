@@ -121,11 +121,16 @@ def summarize_own_content(now: datetime, attribution_rows: list[dict], performan
             if not published or published < cutoff or published > now:
                 continue
             category = str(publication.get("category") or "unknown")
+            metrics = perf.get("metrics") if isinstance(perf.get("metrics"), dict) else {}
+            follow_keys = ("follows", "new_follows", "followers_gained")
+            follows_observed = any(key in perf or key in metrics for key in follow_keys)
             sample = {
                 "views": number(perf, "views", "view_count", "impressions"),
                 "likes": number(perf, "likes", "like_count"),
                 "replies": number(perf, "comments", "replies", "reply_count"),
                 "shares": number(perf, "shares", "share_count"),
+                "follows": number(perf, *follow_keys) if follows_observed else None,
+                "follows_observed": follows_observed,
             }
             eligible.append(sample)
             groups[category].append(sample)
@@ -135,6 +140,8 @@ def summarize_own_content(now: datetime, attribution_rows: list[dict], performan
             likes = sum(x["likes"] for x in samples)
             replies = sum(x["replies"] for x in samples)
             shares = sum(x["shares"] for x in samples)
+            observed_follow_rows = [x for x in samples if x.get("follows_observed")]
+            follows = sum(x["follows"] for x in observed_follow_rows)
             return {
                 "posts": n,
                 "avg_views": round(views / n, 2) if n else None,
@@ -142,6 +149,10 @@ def summarize_own_content(now: datetime, attribution_rows: list[dict], performan
                 "reply_rate_per_view": round(replies / max(1, views), 6),
                 "share_rate_per_view": round(shares / max(1, views), 6),
                 "weighted_engagement_per_1000_views": round((likes + 2 * replies + 3 * shares) * 1000 / max(1, views), 4),
+                "total_follows": follows if observed_follow_rows else None,
+                "follow_metric_coverage_posts": len(observed_follow_rows),
+                "follow_rate_per_view": round(follows / max(1, views), 6) if observed_follow_rows else None,
+                "weighted_engagement_formula": "internal proxy: likes + 2*comments + 3*shares; follows tracked separately because Binance's proprietary weights are not public",
                 "evidence": "OWN_ACCOUNT_PUBLIC_METRICS_NOT_REVENUE",
             }
         per_window[str(days) + "_day"] = {
