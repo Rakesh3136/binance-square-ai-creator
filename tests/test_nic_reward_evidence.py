@@ -169,7 +169,7 @@ class RewardEvidenceTests(unittest.TestCase):
             root = Path(temp)
             attr, perf, rewards, outcomes = (root / n for n in ("attribution.jsonl", "performance.jsonl", "rewards.jsonl", "outcomes.jsonl"))
             write_jsonl(attr, [
-                {"canonical_post_id": "374795126927596", "category": "research", "portfolio_format": "visual_analysis", "portfolio_hook_type": "curiosity_gap", "portfolio_visual_type": "chart", "visual_attached": True},
+                {"canonical_post_id": "374795126927596", "category": "research", "portfolio_format": "visual_analysis", "portfolio_hook_type": "curiosity_gap", "portfolio_visual_type": "chart", "portfolio_reader_payoff_type": "actionable_checklist", "visual_attached": True},
                 {"canonical_post_id": "374947394936090", "category": "research", "portfolio_format": "text_analysis", "portfolio_hook_type": "question_led", "visual_attached": False},
             ])
             write_jsonl(perf, [
@@ -189,7 +189,7 @@ class RewardEvidenceTests(unittest.TestCase):
             self.assertEqual(revenue_director.group_key(rows[0])[1], "visual_analysis")
             self.assertEqual(revenue_director.group_key(rows[0])[2], "curiosity_gap")
             self.assertEqual(revenue_director.group_key(rows[0])[3], "chart")
-            self.assertEqual(revenue_director.group_key(rows[0])[4], "chart")
+            self.assertEqual(revenue_director.group_key(rows[0])[4], "actionable_checklist")
 
 
 if __name__ == "__main__":
