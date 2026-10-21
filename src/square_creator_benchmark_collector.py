@@ -193,6 +193,268 @@ def author(row: dict) -> tuple[str, str, str]:
     return str(name).strip()[:120], str(uid).strip()[:160], str(username).strip()[:120]
 
 
+def fetch_json_post(url: str, payload: dict) -> Any:
+    """Best-effort public profile lookup; failure is recorded rather than fatal."""
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; NICPublicCreatorBenchmark/1.0)",
+            "Accept": "application/json,text/plain,*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Content-Type": "application/json",
+            "Referer": "https://www.binance.com/en/square",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8", errors="replace"))
+
+
+def _payload_data(payload: Any) -> dict | None:
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("success") is False:
+        return None
+    code = str(payload.get("code") or "")
+    if code and code not in {"000000", "0"}:
+        return None
+    data = payload.get("data", payload)
+    return data if isinstance(data, dict) else None
+
+
+def _resolve_square_uid(username: str, attempts: list[str]) -> str:
+    username = str(username or "").strip()
+    if not username:
+        return ""
+    attempts.append(USER_PROFILE_URL + "?username=<redacted>")
+    try:
+        payload = fetch_json_post(USER_PROFILE_URL, {
+            "username": username,
+            "getFollowCount": True,
+            "queryFollowersInfo": True,
+            "queryRelationTokens": True,
+        })
+        data = _payload_data(payload)
+        if not data:
+            return ""
+        return str(data.get("squareUid") or data.get("squareAuthorId") or "").strip()
+    except Exception:
+        return ""
+
+
+def _creator_history_candidates(public_rows: list[dict], limit: int) -> list[dict]:
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for row in public_rows:
+        square_uid = str(row.get("square_uid") or "").strip()
+        if square_uid:
+            groups[square_uid].append(row)
+    if not groups:
+        return []
+
+    def score(rows: list[dict], kind: str) -> float:
+        views = sum(float(row.get("views") or 0) for row in rows)
+        likes = sum(float(row.get("likes") or 0) for row in rows)
+        replies = sum(float(row.get("replies") or 0) for row in rows)
+        shares = sum(float(row.get("shares") or 0) for row in rows)
+        rate = (likes + 2 * replies + 3 * shares) / max(views, 1)
+        if kind == "reach":
+            return views
+        if kind == "discussion":
+            return (replies * 2 + shares * 3) / max(views, 1)
+        return rate
+
+    chosen: list[str] = []
+    for kind in ("engagement", "reach", "discussion"):
+        ordered = sorted(groups.items(), key=lambda item: score(item[1], kind), reverse=True)
+        for uid, rows in ordered:
+            if uid not in chosen:
+                chosen.append(uid)
+            if len(chosen) >= limit:
+                break
+        if len(chosen) >= limit:
+            break
+
+    result = []
+    for uid in chosen:
+        rows = groups[uid]
+        rows = sorted(rows, key=lambda row: float(row.get("views") or 0), reverse=True)
+        sample = rows[0]
+        result.append({
+            "square_uid": uid,
+            "creator": str(sample.get("creator") or "unknown"),
+            "creator_username": str(sample.get("creator_username") or ""),
+            "feed_posts_observed": len(rows),
+        })
+    return result
+
+
+def fetch_creator_profile_history(public_rows: list[dict], attempts: list[str],
+                                  now: datetime | None = None) -> list[dict]:
+    """Backfill public posts from selected creator profiles for a true 14-day sample.
+
+    Public profile history is best effort: if the endpoint is unavailable or a
+    Square UID cannot be resolved, the gap remains explicit. Public posts and
+    counters are never considered proof of creator earnings.
+    """
+    global PROFILE_HISTORY_STATS
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+    cutoff = now - timedelta(days=PROFILE_HISTORY_DAYS)
+    candidates = _creator_history_candidates(public_rows, PROFILE_STUDY_CREATORS)
+    stats = {
+        "status": "PROFILE_HISTORY_NOT_AVAILABLE",
+        "candidate_creators": len(candidates),
+        "profiles_attempted": 0,
+        "profiles_resolved": 0,
+        "profile_pages_read": 0,
+        "profile_posts_collected": 0,
+        "profiles_without_older_posts": 0,
+        "profile_failures": 0,
+        "window_days": PROFILE_HISTORY_DAYS,
+        "source": "public_creator_profile_posts",
+        "earnings_status": "PUBLIC_METRICS_ONLY_NOT_EARNINGS",
+    }
+    feed_ids = {normalize_id(row.get("post_id")) for row in public_rows}
+    result = []
+    for candidate in candidates:
+        square_uid = str(candidate.get("square_uid") or "").strip()
+        if not square_uid:
+            square_uid = _resolve_square_uid(str(candidate.get("creator_username") or ""), attempts)
+        if not square_uid:
+            stats["profile_failures"] += 1
+            continue
+        stats["profiles_attempted"] += 1
+        cursor = int(now.timestamp() * 1000)
+        seen_ids: set[str] = set()
+        collected_for_creator = 0
+        older_found = False
+        for _ in range(PROFILE_MAX_PAGES):
+            query = urllib.parse.urlencode({
+                "targetSquareUid": square_uid,
+                "timeOffset": cursor,
+                "filterType": "ALL",
+            })
+            url = f"{USER_POSTS_URL}?{query}"
+            attempts.append(url)
+            try:
+                payload = fetch_json(url)
+            except Exception:
+                stats["profile_failures"] += 1
+                break
+            data = _payload_data(payload)
+            if not data:
+                stats["profile_failures"] += 1
+                break
+            contents = data.get("contents")
+            if not isinstance(contents, list) or not contents:
+                stats["profiles_without_older_posts"] += 1
+                break
+            stats["profiles_resolved"] += 1 if stats["profiles_resolved"] < stats["profiles_attempted"] else 0
+            stats["profile_pages_read"] += 1
+            page_new = 0
+            stamps = []
+            for item in contents:
+                if not isinstance(item, dict):
+                    continue
+                post_id = normalize_id(item.get("id") or item.get("postId") or item.get("contentId") or item.get("content_id"))
+                link = next((item.get(k) for k in ("webLink", "shareLink", "shareUrl", "url") if item.get(k)), "")
+                match = re.search(r"/(?:square/)?post/([A-Za-z0-9_-]+)", str(link), re.I)
+                if not post_id and match:
+                    post_id = normalize_id(match.group(1))
+                if not post_id or post_id in seen_ids:
+                    continue
+                seen_ids.add(post_id)
+                stamp_text = posted_at(item)
+                stamp = aware_datetime(stamp_text) if stamp_text else None
+                if stamp:
+                    stamps.append(stamp)
+                if not stamp or stamp < cutoff or stamp > now + timedelta(minutes=15):
+                    if stamp and stamp < cutoff:
+                        older_found = True
+                    continue
+                text = text_value(item)
+                if len(text) < 20:
+                    continue
+                name, uid, username = author(item)
+                rows_uid = uid or square_uid
+                normalized = {
+                    "source_type": "public_square_creator_profile_observation",
+                    "post_id": post_id,
+                    "creator": name or str(candidate.get("creator") or "unknown"),
+                    "creator_id": rows_uid,
+                    "square_uid": square_uid,
+                    "creator_username": username or str(candidate.get("creator_username") or ""),
+                    "source": post_url(post_id, item),
+                    "source_url": post_url(post_id, item),
+                    "text": text,
+                    "posted_at": stamp.isoformat(),
+                    "archetype": archetype(text),
+                    "format": str(item.get("contentType") or item.get("cardType") or "unknown")[:80],
+                    "views": metric(item, "viewCount", "views", "view_num", "viewNum"),
+                    "likes": metric(item, "likeCount", "likes", "like_num", "likeNum"),
+                    "replies": metric(item, "commentCount", "comments", "replyCount", "replyNum", "commentNum"),
+                    "shares": metric(item, "shareCount", "shares", "shareNum"),
+                    "followers_gained": 0,
+                    "observed_at": now.isoformat(),
+                    "metrics_scope": "public_post_metrics_only",
+                    "earnings_status": "NOT_PUBLICLY_VERIFIED",
+                    "collection_feed": "creator_profile_history",
+                    "collection_feeds": ["creator_profile_history"],
+                }
+                result.append(normalized)
+                feed_ids.add(post_id)
+                page_new += 1
+                collected_for_creator += 1
+            if older_found:
+                break
+            if page_new == 0:
+                break
+            next_cursor = data.get("timeOffset")
+            try:
+                next_cursor = int(next_cursor)
+            except (TypeError, ValueError):
+                next_cursor = None
+            if not next_cursor or next_cursor == cursor:
+                older_stamps = [int(stamp.timestamp() * 1000) for stamp in stamps if stamp <= now]
+                if older_stamps:
+                    inferred_cursor = min(older_stamps)
+                    if inferred_cursor < cursor:
+                        next_cursor = inferred_cursor
+                    else:
+                        break
+                else:
+                    break
+            cursor = next_cursor
+            time.sleep(REQUEST_DELAY_SECONDS)
+            if collected_for_creator >= 100:
+                break
+    stats["profile_posts_collected"] = len(result)
+    stats["creators_with_profile_posts"] = len({row["square_uid"] for row in result})
+    if result:
+        stats["status"] = "PROFILE_HISTORY_COLLECTED"
+    elif stats["profile_failures"]:
+        stats["status"] = "PROFILE_HISTORY_ENDPOINT_UNAVAILABLE_OR_UIDS_MISSING"
+    else:
+        stats["status"] = "NO_ADDITIONAL_PROFILE_HISTORY"
+    PROFILE_HISTORY_STATS = stats
+    return result
+
+
+def aware_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return parsed.astimezone(timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
 def _collect_feed(base: str, fixed_params: dict, source_name: str,
                   max_pages: int, attempts: list[str]) -> dict[str, dict]:
     """Read one public feed with conservative pagination and empty-page stopping."""
