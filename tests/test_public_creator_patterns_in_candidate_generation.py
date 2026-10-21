@@ -51,3 +51,8 @@ def test_public_pattern_brief_exposes_rolling_creator_research_without_earnings_
     assert brief["rolling_learning_windows"]["seven_day"]["dated_posts"] == 8
     assert brief["rolling_learning_windows"]["fourteen_day"]["window_days"] == 14
     assert brief["research_limits"]["public_metrics_are_not_earnings"] is True
+
+if __name__ == "__main__":
+    test_public_pattern_brief_uses_repeated_aggregate_patterns_only()
+    test_missing_public_patterns_fail_soft_without_inventing_evidence()
+    test_public_pattern_brief_exposes_rolling_creator_research_without_earnings_claims()
