@@ -750,6 +750,124 @@ def build_learning_memory_entry(plan: dict, now: datetime) -> dict:
     }
 
 
+def build_autonomy_readiness(plan: dict, public_wte_claim_discovery: dict | None = None,
+                             publication_policy: dict | None = None) -> dict:
+    """Expose exactly which autonomy capabilities are ready and which lack evidence/source access."""
+    discovery = public_wte_claim_discovery if isinstance(public_wte_claim_discovery, dict) else {}
+    policy = publication_policy if isinstance(publication_policy, dict) else {}
+    coverage = plan.get("research_coverage") if isinstance(plan.get("research_coverage"), dict) else {}
+    profile = plan.get("creator_profile_research") if isinstance(plan.get("creator_profile_research"), dict) else {}
+    owner = plan.get("owner_reported_reward_feedback") if isinstance(plan.get("owner_reported_reward_feedback"), dict) else {}
+    owner7 = owner.get("7_day") if isinstance(owner.get("7_day"), dict) else {}
+    verified = plan.get("verified_reward_evidence") if isinstance(plan.get("verified_reward_evidence"), dict) else {}
+    leaderboard = plan.get("public_earnings_leaderboard_study_queue")
+    if not isinstance(leaderboard, list):
+        leaderboard = []
+    observed_count = len(leaderboard)
+    profiles_ready = (
+        str(profile.get("status") or "") == "PROFILE_RESEARCH_COMPLETE"
+        and bool(profile.get("seven_day_coverage_observed"))
+        and bool(profile.get("fourteen_day_coverage_observed"))
+        and int(profile.get("profiles_resolved") or 0) > 0
+    )
+    verified_rewards = int(verified.get("accepted_unique_reward_events_7d") or 0)
+    claims_count = int(discovery.get("retained_recent_claim_post_count") or 0)
+    corpus_rows = int(discovery.get("public_corpus_rows_checked") or 0)
+    blockers = []
+
+    if observed_count == 0:
+        blockers.append({
+            "id": "other_creator_paid_reward_source",
+            "severity": "critical",
+            "status": "BLOCKED_NO_AUTHORIZED_SOURCE",
+            "capability_affected": "Select and learn from creators ranked by actual weekly Write-to-Earn payouts (e.g. $500+).",
+            "evidence": "No observed Write-to-Earn leaderboard entries are available in the current learning input; public post metrics and self-reported claims are not payout proof.",
+            "required_resolution": "Connect an officially supported, authorized read-only source or a permitted structured export. Do not bypass authentication or replay browser fingerprints.",
+        })
+    if verified_rewards == 0:
+        blockers.append({
+            "id": "own_post_reward_attribution",
+            "severity": "critical",
+            "status": "BLOCKED_NO_VERIFIED_POST_LINKED_REWARD",
+            "capability_affected": "Prove which of NIC's own posts generated a paid reward and calibrate content decisions against confirmed outcomes.",
+            "evidence": "The verified ledger contains no accepted exact-post paid reward event. Owner-reported feedback is kept separately and is not independently verified.",
+            "owner_reported_events_7d": int(owner7.get("reported_event_count") or 0),
+            "owner_reported_usdc_7d": owner7.get("reported_usdc"),
+            "required_resolution": "Add post-linked reward evidence from an authorized account export/notification flow and preserve its timestamped evidence reference.",
+        })
+    if not profiles_ready:
+        blockers.append({
+            "id": "creator_profile_7_14_day_coverage",
+            "severity": "high",
+            "status": "INCOMPLETE",
+            "capability_affected": "Study a rotating set of public creators across both 7-day and 14-day windows.",
+            "profile_research_status": str(profile.get("status") or "NOT_RUN"),
+            "required_resolution": "Restore public endpoint access and maintain dated profile-post coverage; do not fill missing dates by guessing.",
+        })
+    if claims_count == 0:
+        blockers.append({
+            "id": "public_reward_claim_leads",
+            "severity": "warning",
+            "status": "NO_RECENT_PUBLIC_CLAIMS_FOUND",
+            "capability_affected": "Discover public creators' own recent reward claims as unverified research leads.",
+            "public_corpus_rows_checked": corpus_rows,
+            "discovery_status": str(discovery.get("status") or "NOT_RUN"),
+            "required_resolution": "Continue scanning the public feed; treat any discovered creator amount as self-reported unless independently supported.",
+        })
+
+    enabled = policy.get("editorial_auto_publication_enabled") is True
+    human_review = policy.get("requires_human_review_for_editorial") is True
+    return {
+        "schema": "NIC-AUTONOMY-READINESS-1.0",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "status": "PUBLIC_RESEARCH_READY_PRIVATE_REWARD_SOURCE_BLOCKED" if profiles_ready and observed_count == 0
+                  else "PARTIAL_AUTONOMY_BLOCKED" if blockers else "RESEARCH_READY_REQUIRES_REVIEW",
+        "full_autonomy_proven": False,
+        "capabilities": {
+            "public_creator_profile_research": {
+                "status": "READY" if profiles_ready else "INCOMPLETE",
+                "profiles_resolved": int(profile.get("profiles_resolved") or 0),
+                "posts_7d": int(profile.get("posts_collected_7d") or 0),
+                "posts_8_to_14d": int(profile.get("posts_collected_8_to_14d") or 0),
+            },
+            "public_reward_claim_discovery": {
+                "status": str(discovery.get("status") or "NOT_RUN"),
+                "recent_claim_posts_found": claims_count,
+                "public_corpus_rows_checked": corpus_rows,
+                "self_reports_are_unverified": True,
+            },
+            "other_creator_weekly_reward_source": {
+                "status": "CONNECTED_OBSERVATIONS_PRESENT" if observed_count else "BLOCKED_NO_AUTHORIZED_SOURCE",
+                "observed_entries_in_current_study_queue": observed_count,
+                "independent_payout_verification_available": False,
+            },
+            "own_post_reward_attribution": {
+                "status": "VERIFIED_EVENTS_PRESENT" if verified_rewards else "BLOCKED_NO_VERIFIED_POST_LINKED_REWARD",
+                "verified_events_7d": verified_rewards,
+                "owner_reported_events_7d": int(owner7.get("reported_event_count") or 0),
+                "owner_reported_usdc_7d": owner7.get("reported_usdc"),
+                "owner_reports_are_not_verified": True,
+            },
+            "automatic_publication": {
+                "enabled_by_policy": enabled,
+                "human_review_required": human_review,
+                "status": "DISABLED_BY_POLICY" if not enabled else (
+                    "BLOCKED_HUMAN_REVIEW_REQUIRED" if human_review else "POLICY_ENABLED_REVIEW_REQUIRED"
+                ),
+                "publication_authorized_by_this_report": False,
+            },
+        },
+        "critical_blocker_count": sum(1 for row in blockers if row.get("severity") == "critical"),
+        "blockers": blockers,
+        "policy": {
+            "public_metrics_are_not_payout_evidence": True,
+            "no_unauthorized_private_dashboard_access": True,
+            "no_auto_publish_during_current_pause": True,
+        },
+        "next_action": "Connect an officially supported, authorized read-only reward source or a permitted export; in parallel preserve post-linked own reward evidence. Public profile research can continue meanwhile.",
+    }
+
+
 def main() -> int:
     now = datetime.now(timezone.utc)
     benchmark = load_json(BENCHMARK, {})
@@ -771,10 +889,22 @@ def main() -> int:
     profile_research = load_json(INTEL / "nic_square_profile_research.json", {})
     if not isinstance(profile_research, dict):
         profile_research = {}
+    public_wte_discovery = load_json(INTEL / "public_wte_claim_discoveries.json", {})
+    if not isinstance(public_wte_discovery, dict):
+        public_wte_discovery = {}
+    publication_policy = load_json(ROOT / "nic_publication_policy.json", {})
+    if not isinstance(publication_policy, dict):
+        publication_policy = {}
     plan = build_learning_plan(
         benchmark, patterns, rewards, attribution, performance, now,
         public_examples=examples, observed_leaderboard_entries=observed_leaderboard_entries,
         creator_profile_research=profile_research, owner_reported_reward_events=owner_reported_rewards,
+    )
+    readiness = build_autonomy_readiness(plan, public_wte_discovery, publication_policy)
+    plan["autonomy_readiness"] = readiness
+    INTEL.mkdir(parents=True, exist_ok=True)
+    (INTEL / "nic_autonomy_readiness.json").write_text(
+        json.dumps(readiness, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8"
     )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     INTEL.mkdir(parents=True, exist_ok=True)
@@ -804,6 +934,10 @@ def main() -> int:
         "creator_profiles_resolved": plan["creator_profile_research"]["profiles_resolved"],
         "profile_posts_collected_14d": plan["creator_profile_research"]["posts_collected_14d"],
         "profile_research_status": plan["creator_profile_research"]["status"],
+        "autonomy_status": plan["autonomy_readiness"]["status"],
+        "autonomy_critical_blockers": plan["autonomy_readiness"]["critical_blocker_count"],
+        "autonomy_blocker_ids": [row["id"] for row in plan["autonomy_readiness"]["blockers"]],
+        "autopublish_enabled": plan["autonomy_readiness"]["capabilities"]["automatic_publication"]["enabled_by_policy"],
         "public_metrics_are_not_earnings": True,
         "output": str(OUT.relative_to(ROOT)),
     }
