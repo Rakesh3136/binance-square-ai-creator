@@ -62,7 +62,7 @@ class SquareProfileResearchTests(unittest.TestCase):
         self.assertEqual(report["status"], "PUBLIC_PROFILE_ENDPOINT_BLOCKED")
         self.assertEqual(report["profiles_resolved"], 0)
         self.assertEqual(report["posts_collected_14d"], 0)
-        self.assertEqual(report["failures"][0]["status"], "PROFILE_RESOLUTION_BLOCKED_PermissionError")
+        self.assertEqual(report["failures"][0]["status"], "PROFILE_RESOLUTION_BLOCKED_RuntimeError")
 
 
 if __name__ == "__main__":
