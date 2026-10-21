@@ -66,6 +66,32 @@ class PublicWriteToEarnClaimDiscoveryTests(unittest.TestCase):
         self.assertFalse(report["authenticated_session_used"])
         self.assertEqual(len(page_urls), 1)
 
+    def test_falls_back_to_fresh_public_feed_corpus_when_hashtag_html_has_no_links(self):
+        corpus = [{
+            "post_id": "379000000000001",
+            "source_url": POST_URL,
+            "creator": "Creator Alpha",
+            "creator_id": "uid-alpha",
+            "creator_profile_url": "https://www.binance.com/en/square/profile/CreatorAlpha",
+            "posted_at": "2026-10-20T10:00:00+00:00",
+            "text": "I earned 800 USDC from Write to Earn last week; here is what I learned.",
+            "views": 8000, "likes": 400, "replies": 30, "shares": 12,
+            "reply_metric_status": "OBSERVED",
+        }]
+        report = collect_public_claim_posts(
+            NOW, lambda _: "<html><body>client-side page with no post links</body></html>",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not fetch a detail ID")),
+            lambda _: None, ("writetoearn",), public_examples=corpus,
+        )
+        self.assertEqual(report["public_corpus_rows_checked"], 1)
+        self.assertEqual(report["public_corpus_claim_matches_before_deduplication"], 1)
+        self.assertEqual(report["post_detail_requests"], 0)
+        self.assertEqual(report["retained_recent_claim_post_count"], 1)
+        self.assertEqual(report["claims"][0]["creator"], "Creator Alpha")
+        self.assertEqual(report["claims"][0]["views"], 8000)
+        self.assertEqual(report["status"], "PUBLIC_SELF_REPORTED_CLAIMS_FOUND")
+        self.assertFalse(report["evidence_policy"]["public_claims_are_independently_verified"])
+
     def test_page_failures_are_reported_not_fabricated(self):
         def fail(url):
             raise PermissionError("blocked")
