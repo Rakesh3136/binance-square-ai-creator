@@ -880,7 +880,7 @@ def build_autonomy_readiness(plan: dict, public_wte_claim_discovery: dict | None
                 "enabled_by_policy": enabled,
                 "human_review_required": human_review,
                 "status": "DISABLED_BY_POLICY" if not enabled else (
-                    "BLOCKED_HUMAN_REVIEW_REQUIRED" if human_review else "POLICY_ENABLED_REVIEW_REQUIRED"
+                    "BLOCKED_HUMAN_REVIEW_REQUIRED" if human_review else "POLICY_ENABLED_GUARDED_QUALITY_GATES_REQUIRED"
                 ),
                 "publication_authorized_by_this_report": False,
             },
@@ -890,9 +890,10 @@ def build_autonomy_readiness(plan: dict, public_wte_claim_discovery: dict | None
         "policy": {
             "public_metrics_are_not_payout_evidence": True,
             "no_unauthorized_private_dashboard_access": True,
-            "no_auto_publish_during_current_pause": True,
+            "automatic_publication_requires_current_cycle_quality_gates": True,
+            "no_auto_publish_without_current_cycle_authorization": True,
         },
-        "next_action": "Connect an officially supported, authorized read-only reward source or a permitted export; in parallel preserve post-linked own reward evidence. Public profile research can continue meanwhile.",
+        "next_action": "Keep guarded editorial publication running only when every current-cycle gate passes; connect an officially supported, authorized read-only reward source or permitted export for verified creator-payout learning, and preserve exact-post own reward evidence.",
     }
 
 
