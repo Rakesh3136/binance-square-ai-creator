@@ -222,8 +222,10 @@ def summarize_owner_reported_reward_feedback(events: list[dict], now: datetime) 
         meta = event.get("content_metadata") if isinstance(event.get("content_metadata"), dict) else {}
         url = str(meta.get("public_post_url") or event.get("public_post_url") or "").strip()
         parsed_url = urllib.parse.urlparse(url) if url else None
+        host = (parsed_url.hostname or "").lower() if parsed_url else ""
+        official_host = host == "binance.com" or host.endswith(".binance.com")
         url_match = re.search(r"/(?:en/)?square/post/([A-Za-z0-9_-]+)", parsed_url.path, re.I) if parsed_url else None
-        if not parsed_url or parsed_url.scheme != "https" or not (parsed_url.hostname or "").lower().endswith("binance.com") or not url_match or url_match.group(1) != post_id:
+        if not parsed_url or parsed_url.scheme != "https" or not official_host or not url_match or url_match.group(1) != post_id:
             url = None
         accepted.append({
             "event_id": event_id,
