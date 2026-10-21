@@ -240,7 +240,14 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertTrue(all(row["earnings_status"] == "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED" for row in entries))
         plan = build_learning_plan(benchmark_fixture(), {}, [], now=now, public_examples=examples)
         self.assertGreaterEqual(len(plan["public_earnings_leaderboard_study_queue"]), 2)
+        self.assertEqual(plan["observed_wte_leaderboard_entries_count"], 0)
         self.assertTrue(plan["leaderboard_research_coverage"]["amounts_are_not_payout_proof"])
+        readiness = build_autonomy_readiness(
+            plan,
+            {"status": "PUBLIC_POSTS_CHECKED_NO_RECENT_CLAIMS", "retained_recent_claim_post_count": 0},
+            {"editorial_auto_publication_enabled": False, "requires_human_review_for_editorial": True},
+        )
+        self.assertEqual(readiness["capabilities"]["other_creator_weekly_reward_source"]["status"], "BLOCKED_NO_AUTHORIZED_SOURCE")
 
     def test_observed_leaderboard_entries_flow_into_creator_study_queue(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
