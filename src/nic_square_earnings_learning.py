@@ -308,8 +308,45 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
         r"\$?\s*" + amount + r"\s*" + currency,
         re.I,
     )
+    inline_pattern = re.compile(
+        r"@(?P<creator>[^\s—–\-:;,!?\n]{2,80})[^@\n]{0,45}?"
+        r"(?:💰\s*)?\$?\s*" + amount + r"\s*" + currency,
+        re.I,
+    )
     cutoff = now - timedelta(days=14)
     results, seen = [], set()
+
+    def add_result(row: dict, posted: datetime, post_id: str, source_url: str,
+                   name: str, raw_amount: str, raw_currency: str, rank: int | None = None) -> None:
+        name = str(name or "").strip().lstrip("@").strip()
+        name = re.sub(r"^\s*[🥇🥈🥉🏅🏆🎖️]+\s*", "", name).strip()
+        if len(name) < 2:
+            return
+        try:
+            parsed_amount = float(str(raw_amount).replace(",", ""))
+        except (TypeError, ValueError):
+            return
+        if parsed_amount <= 0:
+            return
+        chosen_currency = str(raw_currency or "").upper()
+        key = (post_id, name.casefold(), parsed_amount, chosen_currency)
+        if key in seen:
+            return
+        seen.add(key)
+        results.append({
+            "claimed_creator": name[:120],
+            "claimed_amount": parsed_amount,
+            "claimed_currency": chosen_currency,
+            "rank": rank,
+            "source_publisher": str(row.get("creator") or row.get("creator_id") or "unknown")[:120],
+            "source_post_id": post_id,
+            "source_url": source_url[:400],
+            "posted_at": posted.isoformat(),
+            "window_days": 14,
+            "earnings_status": "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED",
+            "evidence_type": "PUBLIC_LEADERBOARD_RESEARCH_LEAD",
+        })
+
     for row in examples:
         if not isinstance(row, dict):
             continue
@@ -340,43 +377,24 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
             # Strip medals / bullets and an optional explicit rank before parsing
             # the creator label. Unicode creator names and masked labels are valid
             # research leads, but remain unverified and do not resolve a profile.
-            line = re.sub(r"^[^\w@]*[0-9]{1,3}[.)]\s*", "", line, count=1, flags=re.UNICODE)
-            line = re.sub(r"^[^\w@]+", "", line, count=1, flags=re.UNICODE)
-            match = row_pattern.match(line)
-            if not match:
-                continue
-            name, raw_amount, raw_currency = (
-                match.group("creator").strip().lstrip("@").strip(),
-                match.group("amount"),
-                match.group("currency"),
-            )
-            name = re.sub(r"^\s*[🥇🥈🥉🏅🏆🎖️]+\s*", "", name).strip()
-            if len(name) < 2:
-                continue
-            try:
-                parsed_amount = float(raw_amount.replace(",", ""))
-            except ValueError:
-                continue
-            if parsed_amount <= 0:
-                continue
-            chosen_currency = raw_currency.upper()
-            key = (post_id, name.casefold(), parsed_amount, chosen_currency)
-            if key in seen:
-                continue
-            seen.add(key)
-            results.append({
-                "claimed_creator": name[:120],
-                "claimed_amount": parsed_amount,
-                "claimed_currency": chosen_currency,
-                "rank": rank,
-                "source_publisher": str(row.get("creator") or row.get("creator_id") or "unknown")[:120],
-                "source_post_id": post_id,
-                "source_url": source_url[:400],
-                "posted_at": posted.isoformat(),
-                "window_days": 14,
-                "earnings_status": "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED",
-                "evidence_type": "PUBLIC_LEADERBOARD_RESEARCH_LEAD",
-            })
+            clean_line = re.sub(r"^[^\w@]*[0-9]{1,3}[.)]\s*", "", line, count=1, flags=re.UNICODE)
+            clean_line = re.sub(r"^[^\w@]+", "", clean_line, count=1, flags=re.UNICODE)
+            match = row_pattern.match(clean_line)
+            if match:
+                add_result(
+                    row, posted, post_id, source_url, match.group("creator"),
+                    match.group("amount"), match.group("currency"), rank,
+                )
+
+            # Some leaderboard posts put several creators on one line. Parse this
+            # form only when the line has multiple @ mentions, avoiding truncation
+            # of a single Unicode display name that can contain spaces.
+            if raw_line.count("@") >= 2:
+                for inline_match in inline_pattern.finditer(raw_line):
+                    add_result(
+                        row, posted, post_id, source_url, inline_match.group("creator"),
+                        inline_match.group("amount"), inline_match.group("currency"),
+                    )
     return sorted(results, key=lambda x: (x["posted_at"], x["claimed_amount"]), reverse=True)[:200]
 
 def analyze_public_reward_claims(examples: list[dict], now: datetime) -> dict:
