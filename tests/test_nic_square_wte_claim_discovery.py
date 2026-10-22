@@ -124,7 +124,7 @@ Nickname - Weekly Reward: 656.47 FDUSD""",
         )
         entries = report["claim_analysis"]["public_leaderboard_entries"]
         self.assertEqual(report["status"], "PUBLIC_LEADERBOARD_RESEARCH_LEADS_FOUND")
-        self.assertEqual(report["public_leaderboard_entries_found"], 3)
+        self.assertEqual(report["public_leaderboard_entries_found"], 3, msg=repr(entries))
         self.assertEqual(len(entries), 3)
         self.assertEqual(report["retained_recent_claim_post_count"], 0)
         self.assertEqual({row["claimed_creator"] for row in entries}, {"محترف عملات رقميه", "小二哥哥68", "Nickname"})
