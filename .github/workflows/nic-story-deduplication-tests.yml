@@ -5,6 +5,8 @@ on:
     paths:
       - "src/binance_square_publisher.py"
       - "src/test_publisher_story_deduplication.py"
+      - "src/persist_publication_log.py"
+      - "src/test_persist_publication_log.py"
       - ".github/workflows/nic-story-deduplication-tests.yml"
   push:
     branches:
@@ -26,6 +28,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile publisher and regression tests
-        run: python -m py_compile src/binance_square_publisher.py src/test_publisher_story_deduplication.py
+        run: python -m py_compile src/binance_square_publisher.py src/test_publisher_story_deduplication.py src/persist_publication_log.py src/test_persist_publication_log.py
       - name: Run story-level duplicate regression tests
         run: python src/test_publisher_story_deduplication.py
+      - name: Run durable publication-log merge tests
+        run: python src/test_persist_publication_log.py
