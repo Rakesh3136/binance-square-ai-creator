@@ -85,13 +85,13 @@ def duplicate_match(text,symbol,category,context,frozen):
     return "",None
 def normalized_story_headline(text):
     """Normalize the opening headline so price/volume refreshes don't look like new stories."""
-    lines=[re.sub(r"^#+\\s*","",line).strip() for line in str(text or "").splitlines() if line.strip()]
+    lines=[re.sub(r"^#+\s*","",line).strip() for line in str(text or "").splitlines() if line.strip()]
     if not lines: return ""
     headline=lines[0].lower()
-    headline=re.sub(r"^.*?\\$btc\\s*[:—-]\\s*","",headline)
-    headline=re.sub(r"\\$[a-z0-9]{2,15}"," ",headline)
-    headline=re.sub(r"\\b(?:live updates?|breaking|update|latest)\\b"," ",headline)
-    headline=re.sub(r"\\b\\d+(?:[.,]\\d+)*(?:%|k|m|b)?\\b"," ",headline)
+    headline=re.sub(r"^.*?\$btc\s*[:—-]\s*","",headline)
+    headline=re.sub(r"\$[a-z0-9]{2,15}"," ",headline)
+    headline=re.sub(r"\b(?:live updates?|breaking|update|latest)\b"," ",headline)
+    headline=re.sub(r"\b\d+(?:[.,]\d+)*(?:%|k|m|b)?\b"," ",headline)
     headline=re.sub(r"[^a-z ]"," ",headline)
     stop={"bitcoin","btc","price","today","now","market","crypto","as","the","a","an","to","of","in","on","for","and","with","near","above","below"}
     words=[w for w in headline.split() if w not in stop]
