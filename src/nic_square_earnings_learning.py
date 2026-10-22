@@ -294,28 +294,91 @@ def summarize_owner_reported_reward_feedback(events: list[dict], now: datetime) 
 
 
 def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> list[dict]:
-    """Extract named amounts from public leaderboard posts as research leads, never payout proof."""
-    context = re.compile(r"write[- ]to[- ]earn|leaderboard|top creators|weekly rewards|creator rewards|earnings season|weekly earnings|reward winners", re.I)
-    entry = re.compile(r"@([A-Za-z0-9_.-]{2,50})[^@]{0,45}?(?:💰\s*)?\$?\s*(\d{2,3}(?:,\d{3})*(?:\.\d+)?)\s*(USDC|USDT|USD)?", re.I)
+    """Extract named or masked creator rows from recent public leaderboard posts as research leads."""
+    context = re.compile(
+        r"write[- ]?to[- ]?earn|leaderboard|top creators|weekly rewards?|creator rewards|"
+        r"earnings season|weekly earnings|reward winners|nickname\s*[-:]\s*weekly reward",
+        re.I,
+    )
+    amount = r"(?P<amount>\d{1,3}(?:,\d{3})*(?:\.\d+)?)"
+    currency = r"(?P<currency>USDC|USDT|FDUSD|USD)\b"
+    row_pattern = re.compile(
+        r"^\s*@?(?P<creator>[^—–\-:|\n]{2,100}?)\s*[—–\-:]\s*"
+        r"(?:(?:weekly\s+)?(?:reward|earnings?|earned|received|paid)\s*:?\s*)?"
+        r"\$?\s*" + amount + r"\s*" + currency,
+        re.I,
+    )
     cutoff = now - timedelta(days=14)
     results, seen = [], set()
     for row in examples:
-        if not isinstance(row, dict): continue
-        body = str(row.get("text") or row.get("post") or row.get("title") or "")
-        if not body or not context.search(body): continue
+        if not isinstance(row, dict):
+            continue
+        body = str(row.get("text") or row.get("post") or row.get("title") or row.get("bodyTextOnly") or "")
+        if not body or not context.search(body):
+            continue
         posted = aware_time(row.get("posted_at") or row.get("published_at"))
-        if not posted or posted < cutoff or posted > now: continue
-        for match in entry.finditer(body):
-            name, raw_amount, currency = match.groups()
-            try: amount = float(raw_amount.replace(",", ""))
-            except ValueError: continue
-            if amount <= 0: continue
-            chosen_currency = (currency or ("USD" if "$" in match.group(0) else "UNSPECIFIED")).upper()
-            key = (str(row.get("post_id") or ""), name.casefold(), amount, chosen_currency)
-            if key in seen: continue
+        if not posted or posted < cutoff or posted > now:
+            continue
+        source_url = str(row.get("source_url") or row.get("source") or "").strip()
+        parsed_url = urllib.parse.urlparse(source_url)
+        host = (parsed_url.hostname or "").lower()
+        if parsed_url.scheme != "https" or not (host == "binance.com" or host.endswith(".binance.com")):
+            continue
+        post_match = re.search(r"/square/post/([A-Za-z0-9_-]+)", parsed_url.path, re.I)
+        if not post_match:
+            continue
+        post_id = str(row.get("post_id") or row.get("postId") or post_match.group(1)).strip()
+        if post_id != post_match.group(1):
+            continue
+
+        for raw_line in body.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            rank_match = re.match(r"^[^\w@]*([0-9]{1,3})[.)]\s*", line, re.UNICODE)
+            rank = int(rank_match.group(1)) if rank_match else None
+            # Strip medals / bullets and an optional explicit rank before parsing
+            # the creator label. Unicode creator names and masked labels are valid
+            # research leads, but remain unverified and do not resolve a profile.
+            line = re.sub(r"^[^\w@]*[0-9]{1,3}[.)]\s*", "", line, count=1, flags=re.UNICODE)
+            line = re.sub(r"^[^\w@]+", "", line, count=1, flags=re.UNICODE)
+            match = row_pattern.match(line)
+            if not match:
+                continue
+            name, raw_amount, raw_currency = (
+                match.group("creator").strip().lstrip("@").strip(),
+                match.group("amount"),
+                match.group("currency"),
+            )
+            name = re.sub(r"^\s*[🥇🥈🥉🏅🏆🎖️]+\s*", "", name).strip()
+            if len(name) < 2:
+                continue
+            try:
+                parsed_amount = float(raw_amount.replace(",", ""))
+            except ValueError:
+                continue
+            if parsed_amount <= 0:
+                continue
+            chosen_currency = raw_currency.upper()
+            key = (post_id, name.casefold(), parsed_amount, chosen_currency)
+            if key in seen:
+                continue
             seen.add(key)
-            results.append({"claimed_creator": name, "claimed_amount": amount, "claimed_currency": chosen_currency, "source_publisher": str(row.get("creator") or row.get("creator_id") or "unknown")[:120], "source_post_id": str(row.get("post_id") or ""), "source_url": str(row.get("source_url") or row.get("source") or "")[:400], "posted_at": posted.isoformat(), "window_days": 14, "earnings_status": "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED", "evidence_type": "PUBLIC_LEADERBOARD_RESEARCH_LEAD"})
-    return sorted(results, key=lambda x: (x["posted_at"], x["claimed_amount"]), reverse=True)[:100]
+            results.append({
+                "claimed_creator": name[:120],
+                "claimed_amount": parsed_amount,
+                "claimed_currency": chosen_currency,
+                "rank": rank,
+                "source_publisher": str(row.get("creator") or row.get("creator_id") or "unknown")[:120],
+                "source_post_id": post_id,
+                "source_url": source_url[:400],
+                "posted_at": posted.isoformat(),
+                "window_days": 14,
+                "earnings_status": "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED",
+                "evidence_type": "PUBLIC_LEADERBOARD_RESEARCH_LEAD",
+            })
+    return sorted(results, key=lambda x: (x["posted_at"], x["claimed_amount"]), reverse=True)[:200]
+
 def analyze_public_reward_claims(examples: list[dict], now: datetime) -> dict:
     """Find public self-reported earnings posts for research, never as payout proof."""
     amount_re = re.compile(r"\b(?:USD\s*)?\$?\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(?:USDC|USDT|USD)\b", re.IGNORECASE)
