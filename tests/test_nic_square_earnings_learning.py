@@ -425,9 +425,9 @@ class SquareEarningsLearningTests(unittest.TestCase):
             "creator": "PublicPublisher",
             "posted_at": "2026-10-20T10:00:00+00:00",
             "text": (
-                "🏆 Last Week’s Write to Earn Top 10 — Congratulations!\\n"
-                "🥇 1. @محترف عملات رقميه — 1,797.04 USDC\\n"
-                "🥈 2. @小二哥哥68 — 931.85 USDC\\n"
+                "🏆 Last Week’s Write to Earn Top 10 — Congratulations!\n"
+                "🥇 1. @محترف عملات رقميه — 1,797.04 USDC\n"
+                "🥈 2. @小二哥哥68 — 931.85 USDC\n"
                 "Nickname - Weekly Reward: 656.47 FDUSD"
             ),
         }]
