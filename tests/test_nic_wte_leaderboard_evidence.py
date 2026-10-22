@@ -35,22 +35,22 @@ class WriteToEarnLeaderboardEvidenceTests(unittest.TestCase):
         self.assertFalse(entry["own_post_reward_attribution"])
         self.assertEqual(entry["displayed_amount"], 800.0)
 
-    def test_access_restriction_is_not_misreported_as_an_empty_leaderboard(self):
+    def test_tinyfish_session_restriction_is_not_misreported_as_an_empty_leaderboard(self):
         result = normalize_observations({
-            "collection_status": "ACCESS_BLOCKED_REGION_RESTRICTION",
+            "collection_status": "ACCESS_BLOCKED_IN_TINYFISH_SESSION",
             "last_attempt_at": "2026-10-22T10:00:00Z",
-            "collection_note": "Visible UI showed Binance regional service restriction.",
+            "collection_note": "TinyFish visible UI showed a service-suspension banner; this does not establish regional program unavailability.",
             "entries": [],
         }, NOW)
         self.assertEqual(result["accepted_count"], 0)
-        self.assertEqual(result["status"], "ACCESS_BLOCKED_REGION_RESTRICTION")
-        self.assertEqual(result["collection_status"], "ACCESS_BLOCKED_REGION_RESTRICTION")
+        self.assertEqual(result["status"], "ACCESS_BLOCKED_IN_TINYFISH_SESSION")
+        self.assertEqual(result["collection_status"], "ACCESS_BLOCKED_IN_TINYFISH_SESSION")
         self.assertEqual(result["last_attempt_at"], "2026-10-22T10:00:00+00:00")
-        self.assertIn("regional service restriction", result["collection_note"])
+        self.assertIn("service-suspension banner", result["collection_note"])
 
     def test_successful_observations_override_previous_access_block(self):
         result = normalize_observations({
-            "collection_status": "ACCESS_BLOCKED_REGION_RESTRICTION",
+            "collection_status": "ACCESS_BLOCKED_IN_TINYFISH_SESSION",
             "entries": [row()],
         }, NOW)
         self.assertEqual(result["status"], "OBSERVATIONS_NORMALIZED")
