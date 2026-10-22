@@ -32,7 +32,11 @@ def symbol_of(s):
 
 def find_market_item(market,symbol):
     target=symbol+'USDT'
-    for group in ('top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market'):
+    # Prefer the full fresh Binance ticker universe. Ranked groups are truncated,
+    # so a valid news-selected asset may be absent from every leaderboard despite
+    # having authoritative market data.
+    groups=('all_market_symbols','top_content_signals','top_gainers','top_losers','highest_volume','new_listing_market')
+    for group in groups:
         for x in market.get(group) or []:
             if isinstance(x,dict) and str(x.get('symbol','')).upper()==target:return x
     return None
