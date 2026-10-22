@@ -1,7 +1,9 @@
-"""Validate observed Binance Square Write-to-Earn leaderboard rows.
+"""Validate first-party displayed Binance Square Write-to-Earn leaderboard rows.
 
-This is an evidence-ingestion boundary, not a scraper or payout verifier.
-Never infer leaderboard amounts from public post metrics or creator claims.
+The official leaderboard is first-party evidence of the earnings amount Binance
+displays for a creator and period. It is not an independent payout receipt or
+proof of the user's own post-level reward attribution.
+Never infer displayed earnings from public post metrics or creator claims.
 """
 from __future__ import annotations
 
@@ -109,9 +111,11 @@ def normalize_observations(payload: object, now: datetime | None = None) -> dict
             "observed_at": observed_at,
             "source_url": source_url,
             "evidence_ref": evidence_ref[:500],
-            "evidence_type": "OBSERVED_WRITE_TO_EARN_LEADERBOARD_ROW",
-            "status": "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT",
+            "evidence_type": "FIRST_PARTY_WRITE_TO_EARN_DISPLAY",
+            "status": "VERIFIED_FIRST_PARTY_DISPLAYED_EARNINGS",
+            "evidence_scope": "Official Binance Write-to-Earn page displayed this creator amount for this period.",
             "independently_verified_payment": False,
+            "own_post_reward_attribution": False,
             "public_metrics_used_as_earnings": False,
         })
 
@@ -124,7 +128,8 @@ def normalize_observations(payload: object, now: datetime | None = None) -> dict
         "entries": accepted,
         "rejected": rejected,
         "policy": {
-            "amounts_are_observed_display_values_not_independently_verified_payouts": True,
+            "official_leaderboard_display_is_first_party_evidence_of_the_displayed_creator_earnings_amount": True,
+            "leaderboard_display_is_not_an_independent_payout_receipt_or_own_post_attribution": True,
             "public_views_or_engagement_never_substitute_for_leaderboard_evidence": True,
             "missing_creator_profile_url_is_unknown_not_invented": True,
         },

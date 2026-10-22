@@ -241,7 +241,7 @@ class SquareEarningsLearningTests(unittest.TestCase):
         plan = build_learning_plan(benchmark_fixture(), {}, [], now=now, public_examples=examples)
         self.assertGreaterEqual(len(plan["public_earnings_leaderboard_study_queue"]), 2)
         self.assertEqual(plan["observed_wte_leaderboard_entries_count"], 0)
-        self.assertTrue(plan["leaderboard_research_coverage"]["amounts_are_not_payout_proof"])
+        self.assertFalse(plan["leaderboard_research_coverage"]["displayed_amounts_are_first_party_earnings_evidence"])
         readiness = build_autonomy_readiness(
             plan,
             {"status": "PUBLIC_POSTS_CHECKED_NO_RECENT_CLAIMS", "retained_recent_claim_post_count": 0},
@@ -262,7 +262,7 @@ class SquareEarningsLearningTests(unittest.TestCase):
             "observed_at": "2026-10-21T10:00:00+00:00",
             "source_url": "https://www.binance.com/en/square/WriteToEarn",
             "evidence_ref": "capture://leaderboard-row-3",
-            "earnings_status": "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT",
+            "earnings_status": "VERIFIED_FIRST_PARTY_DISPLAYED_EARNINGS",
         }]
         plan = build_learning_plan(
             benchmark_fixture(), {}, [], now=now, observed_leaderboard_entries=observed,
@@ -273,8 +273,10 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(queue[0]["claimed_amount"], 800.0)
         self.assertEqual(queue[0]["creator_profile_url"], "https://www.binance.com/en/square/profile/LeaderboardCreator")
         self.assertEqual(queue[0]["evidence_ref"], "capture://leaderboard-row-3")
-        self.assertEqual(queue[0]["earnings_status"], "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT")
-        self.assertTrue(plan["leaderboard_research_coverage"]["amounts_are_not_payout_proof"])
+        self.assertEqual(queue[0]["earnings_status"], "VERIFIED_FIRST_PARTY_DISPLAYED_EARNINGS")
+        self.assertTrue(plan["leaderboard_research_coverage"]["displayed_amounts_are_first_party_earnings_evidence"])
+        self.assertFalse(plan["leaderboard_research_coverage"]["displayed_amounts_are_independent_payout_receipts"])
+        self.assertEqual(plan["observed_wte_leaderboard_entries"][0]["displayed_amount"], 800.0)
 
     def test_profile_research_enriches_creator_study_queue_without_claiming_earnings(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)

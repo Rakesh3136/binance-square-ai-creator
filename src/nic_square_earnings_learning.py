@@ -533,7 +533,8 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "observed_at": observed.get("observed_at"),
             "period_start": observed.get("period_start"),
             "period_end": observed.get("period_end"),
-            "earnings_status": "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT",
+            "earnings_status": "VERIFIED_FIRST_PARTY_DISPLAYED_EARNINGS",
+            "earnings_evidence_scope": "Official Binance leaderboard display; not independent payout receipt or own-post attribution",
             "evidence_type": "OBSERVED_WRITE_TO_EARN_LEADERBOARD_ROW",
         })
         existing_keys.add(key)
@@ -563,7 +564,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "period_end": row.get("period_end"),
         "discovery_window": 14,
         "earnings_status": row.get("earnings_status") or "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED",
-        "study_objective": "Study listed creator public posts from the last 7/14 days; do not copy wording or treat listed amounts as independently verified.",
+        "study_objective": "Study this first-party leaderboard-listed earner's public posts from the last 7/14 days; learn patterns without copying wording. Treat the displayed amount as verified source evidence for the shown period, not as proof of this creator's individual post payout.",
     } for row in public_claim_research.get("public_leaderboard_entries", [])[:50]]
 
     # Attach observed profile research to matching creator leads, without
@@ -703,9 +704,28 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "window_days": [7, 14],
             "public_leaderboard_entries_found": len(public_claim_research.get("public_leaderboard_entries", [])),
             "observed_wte_leaderboard_entries_count": len([row for row in observed_rows if isinstance(row, dict)]),
+            "verified_first_party_displayed_earnings_count": len([row for row in observed_rows if isinstance(row, dict) and row.get("status") == "VERIFIED_FIRST_PARTY_DISPLAYED_EARNINGS"]),
             "creator_names_queued_for_post_study": len(leaderboard_study_queue),
-            "amounts_are_not_payout_proof": True,
+            "displayed_amounts_are_first_party_earnings_evidence": any(isinstance(row, dict) for row in observed_rows),
+            "displayed_amounts_are_independent_payout_receipts": False,
         },
+        "observed_wte_leaderboard_entries": [
+            {
+                "creator": row.get("creator"),
+                "creator_profile_url": row.get("creator_profile_url"),
+                "rank": row.get("rank"),
+                "displayed_amount": row.get("displayed_amount"),
+                "currency": row.get("currency"),
+                "period_start": row.get("period_start"),
+                "period_end": row.get("period_end"),
+                "observed_at": row.get("observed_at"),
+                "source_url": row.get("source_url"),
+                "evidence_ref": row.get("evidence_ref"),
+                "status": row.get("status"),
+                "evidence_type": row.get("evidence_type"),
+            }
+            for row in observed_rows if isinstance(row, dict)
+        ],
         "observed_wte_leaderboard_entries_count": len([row for row in observed_rows if isinstance(row, dict)]),
         "best_public_format_hypotheses": hypotheses,
         "own_account_performance": own_summary,

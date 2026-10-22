@@ -29,8 +29,10 @@ class WriteToEarnLeaderboardEvidenceTests(unittest.TestCase):
         result = normalize_observations({"entries": [row()]}, NOW)
         self.assertEqual(result["accepted_count"], 1)
         entry = result["entries"][0]
-        self.assertEqual(entry["status"], "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT")
+        self.assertEqual(entry["status"], "VERIFIED_FIRST_PARTY_DISPLAYED_EARNINGS")
+        self.assertEqual(entry["evidence_type"], "FIRST_PARTY_WRITE_TO_EARN_DISPLAY")
         self.assertFalse(entry["independently_verified_payment"])
+        self.assertFalse(entry["own_post_reward_attribution"])
         self.assertEqual(entry["displayed_amount"], 800.0)
 
     def test_rejects_untrusted_source_and_does_not_invent_profile_url(self):
