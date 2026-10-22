@@ -1,0 +1,31 @@
+name: NIC Story Deduplication Tests
+
+on:
+  pull_request:
+    paths:
+      - "src/binance_square_publisher.py"
+      - "src/test_publisher_story_deduplication.py"
+      - ".github/workflows/nic-story-deduplication-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/binance_square_publisher.py"
+      - "src/test_publisher_story_deduplication.py"
+      - ".github/workflows/nic-story-deduplication-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  story-deduplication:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile publisher and regression tests
+        run: python -m py_compile src/binance_square_publisher.py src/test_publisher_story_deduplication.py
+      - name: Run story-level duplicate regression tests
+        run: python src/test_publisher_story_deduplication.py
