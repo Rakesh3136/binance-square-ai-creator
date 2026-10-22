@@ -405,7 +405,7 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
             # Some leaderboard posts put several creators on one line. Parse this
             # form only when the line has multiple @ mentions, avoiding truncation
             # of a single Unicode display name that can contain spaces.
-            if raw_line.count("@") >= 2:
+            if raw_line.count("@") >= 1:
                 for inline_match in inline_pattern.finditer(raw_line):
                     add_result(
                         row, posted, post_id, source_url, inline_match.group("creator"),
