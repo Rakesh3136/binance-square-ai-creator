@@ -351,6 +351,10 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
         if not isinstance(row, dict):
             continue
         body = str(row.get("text") or row.get("post") or row.get("title") or row.get("bodyTextOnly") or "")
+        # Some feed/export paths serialize newlines as literal backslash-n
+        # sequences. Restore line boundaries before parsing rows, otherwise the
+        # headline and first creator can be incorrectly merged into one "name".
+        body = body.replace(r"\r\n", "\n").replace(r"\n", "\n").replace(r"\r", "\n")
         if not body or not context.search(body):
             continue
         posted = aware_time(row.get("posted_at") or row.get("published_at"))
