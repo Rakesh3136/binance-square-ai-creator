@@ -24,6 +24,10 @@ class FindMarketItemTests(unittest.TestCase):
         item = {"symbol": "ADAUSDT", "last_price": 0.42}
         self.assertIs(find_market_item({"top_gainers": [item]}, "ADA"), item)
 
+    def test_symbol_match_is_exact_not_substring(self):
+        item = {"symbol": "ADABTC", "last_price": 0.00001}
+        self.assertIsNone(find_market_item({"all_market_symbols": [item]}, "ADA"))
+
 
 if __name__ == "__main__":
     unittest.main()
