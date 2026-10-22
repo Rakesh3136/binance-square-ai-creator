@@ -391,6 +391,7 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
             # upstream feed has collapsed a heading and the first row together.
             if (
                 re.search(r"write[- ]?to[- ]?earn|leaderboard|top\s+\d+", clean_line, re.I)
+                and "@" not in clean_line
                 and not re.match(r"^@?[^\s]+\s*[—–-]", clean_line)
                 and not re.match(r"^\d+[.)]\s*", clean_line)
             ):
