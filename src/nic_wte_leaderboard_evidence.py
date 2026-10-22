@@ -125,7 +125,7 @@ def normalize_observations(payload: object, now: datetime | None = None) -> dict
     return {
         "schema": "NIC-WTE-LEADERBOARD-OBSERVATIONS-1.0",
         "generated_at": now.astimezone(timezone.utc).isoformat(),
-        "status": "OBSERVATIONS_NORMALIZED" if accepted else ("ACCESS_BLOCKED_REGION_RESTRICTION" if requested_collection_status == "ACCESS_BLOCKED_REGION_RESTRICTION" else "NO_VALID_OBSERVATIONS"),
+        "status": "OBSERVATIONS_NORMALIZED" if accepted else ("ACCESS_BLOCKED_IN_TINYFISH_SESSION" if requested_collection_status == "ACCESS_BLOCKED_IN_TINYFISH_SESSION" else "NO_VALID_OBSERVATIONS"),
         "collection_status": "OBSERVATIONS_CAPTURED" if accepted else requested_collection_status,
         "last_attempt_at": last_attempt_at,
         "collection_note": collection_note or None,
