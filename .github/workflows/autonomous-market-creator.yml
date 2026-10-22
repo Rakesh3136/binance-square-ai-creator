@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths-ignore:
+      - 'analytics/publication_log.jsonl'
       - 'data/intelligence/nic_forecast_truth_ledger.jsonl'
       - 'data/intelligence/nic_forecast_outcome_events.jsonl'
       - 'data/intelligence/nic_forecast_prospective_cohort.jsonl'
@@ -695,6 +696,13 @@ jobs:
           python src/nic_transparency_journal.py || true
           python src/pipeline_state.py || true
           python src/diagnostics_report.py || true
+
+      - name: Persist publication history for cross-run duplicate prevention
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python src/persist_publication_log.py
 
       - name: Persist Forecast Laboratory evidence ledgers
         if: always()
