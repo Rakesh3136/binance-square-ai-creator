@@ -6,13 +6,19 @@ on:
       - "src/nic_square_earnings_learning.py"
       - "tests/test_nic_wte_leaderboard_evidence.py"
       - "tests/test_nic_square_earnings_learning.py"
+      - "src/nic_square_wte_claim_discovery.py"
+      - "tests/test_nic_square_wte_claim_discovery.py"
       - "data/intelligence/wte_leaderboard_observations.json"
       - ".github/workflows/nic-wte-leaderboard-evidence-pr.yml"
   push:
     branches: [main]
     paths:
       - "src/nic_wte_leaderboard_evidence.py"
+      - "src/nic_square_earnings_learning.py"
+      - "src/nic_square_wte_claim_discovery.py"
       - "tests/test_nic_wte_leaderboard_evidence.py"
+      - "tests/test_nic_square_earnings_learning.py"
+      - "tests/test_nic_square_wte_claim_discovery.py"
       - "data/intelligence/wte_leaderboard_observations.json"
       - ".github/workflows/nic-wte-leaderboard-evidence-pr.yml"
   workflow_dispatch:
@@ -26,7 +32,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile evidence ingester
-        run: python -m py_compile src/nic_wte_leaderboard_evidence.py
-      - name: Test leaderboard evidence validation and learning-plan integration
-        run: python -m unittest tests.test_nic_wte_leaderboard_evidence tests.test_nic_square_earnings_learning -v
+      - name: Compile leaderboard evidence and discovery modules
+        run: python -m py_compile src/nic_wte_leaderboard_evidence.py src/nic_square_earnings_learning.py src/nic_square_wte_claim_discovery.py
+      - name: Test leaderboard evidence validation, discovery, and learning-plan integration
+        run: python -m unittest tests.test_nic_wte_leaderboard_evidence tests.test_nic_square_earnings_learning tests.test_nic_square_wte_claim_discovery -v
+      - name: Validate the captured Write-to-Earn observation input
+        run: |
+          python src/nic_wte_leaderboard_evidence.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path("data/intelligence/wte_leaderboard_observed.json").read_text(encoding="utf-8"))
+          assert result["status"] == "OBSERVATIONS_NORMALIZED", result
+          assert result["collection_status"] == "OBSERVATIONS_CAPTURED", result
+          assert result["accepted_count"] == 10, result
+          assert result["rejected_count"] == 0, result
+          print("Validated 10 captured first-party displayed-earnings observations.")
+          PY

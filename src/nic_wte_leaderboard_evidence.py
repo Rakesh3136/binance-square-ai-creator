@@ -60,6 +60,9 @@ def normalize_observations(payload: object, now: datetime | None = None) -> dict
     """Normalize only explicitly observed rows; reject malformed evidence, never guess."""
     now = now or datetime.now(timezone.utc)
     rows = payload.get("entries", []) if isinstance(payload, dict) else []
+    requested_collection_status = str(payload.get("collection_status") or "NOT_RECORDED").strip().upper() if isinstance(payload, dict) else "NOT_RECORDED"
+    collection_note = str(payload.get("collection_note") or "").strip()[:1000] if isinstance(payload, dict) else ""
+    last_attempt_at = _timestamp(payload.get("last_attempt_at")) if isinstance(payload, dict) else None
     accepted, rejected = [], []
     if not isinstance(rows, list):
         rows = []
@@ -122,7 +125,10 @@ def normalize_observations(payload: object, now: datetime | None = None) -> dict
     return {
         "schema": "NIC-WTE-LEADERBOARD-OBSERVATIONS-1.0",
         "generated_at": now.astimezone(timezone.utc).isoformat(),
-        "status": "OBSERVATIONS_NORMALIZED" if accepted else "NO_VALID_OBSERVATIONS",
+        "status": "OBSERVATIONS_NORMALIZED" if accepted else ("ACCESS_BLOCKED_IN_TINYFISH_SESSION" if requested_collection_status == "ACCESS_BLOCKED_IN_TINYFISH_SESSION" else "NO_VALID_OBSERVATIONS"),
+        "collection_status": "OBSERVATIONS_CAPTURED" if accepted else requested_collection_status,
+        "last_attempt_at": last_attempt_at,
+        "collection_note": collection_note or None,
         "accepted_count": len(accepted),
         "rejected_count": len(rejected),
         "entries": accepted,

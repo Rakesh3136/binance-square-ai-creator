@@ -49,13 +49,13 @@ WTE_CONTEXT = re.compile(
     re.I,
 )
 AMOUNT_CONTEXT = re.compile(
-    r"(?:\$\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|USD)\b)",
+    r"(?:\$\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|FDUSD|USD)\b)",
     re.I,
 )
 CLAIM_ACTION = re.compile(
     r"\b(?:i|we|my|our)\s+(?:earned|made|received|got\s+paid|was\s+paid|"
     r"reward\w*|payout\w*)\b|\b(?:payout|reward(?:ed|s)?|commission(?:s)?|"
-    r"bonus(?:es)?)\b.{0,50}(?:\$\s?\d|\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|USD))",
+    r"bonus(?:es)?)\b.{0,50}(?:\$\s?\d|\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|FDUSD|USD))",
     re.I,
 )
 WTE_HASHTAG_SLUGS = {"writetoearn", "write2earn", "binancew2e"}
@@ -341,6 +341,37 @@ def collect_public_claim_posts(now: datetime | None = None, page_fetch=_public_p
             seen_claim_ids.add(pid)
 
     claim_report = analyze_public_reward_claims(normalized_posts, now)
+    # Leaderboard posts do not need to say "I earned": they report amounts earned
+    # by other creators. Scan the full public feed corpus separately from
+    # self-reported claims so those rows become research leads without being
+    # mislabeled as the publisher's own earnings.
+    corpus_analysis = analyze_public_reward_claims(
+        public_examples if isinstance(public_examples, list) else [], now
+    )
+    leaderboard_by_key = {}
+    for item in (
+        (claim_report.get("public_leaderboard_entries") or [])
+        + (corpus_analysis.get("public_leaderboard_entries") or [])
+    ):
+        if not isinstance(item, dict):
+            continue
+        key = (
+            str(item.get("source_post_id") or ""),
+            str(item.get("claimed_creator") or "").casefold(),
+            str(item.get("claimed_amount") or ""),
+            str(item.get("claimed_currency") or "").upper(),
+        )
+        if key[0] and key[1] and key[2]:
+            leaderboard_by_key.setdefault(key, item)
+    leaderboard_entries = sorted(
+        leaderboard_by_key.values(),
+        key=lambda item: (str(item.get("posted_at") or ""), float(item.get("claimed_amount") or 0)),
+        reverse=True,
+    )[:200]
+    claim_report["public_leaderboard_entries"] = leaderboard_entries
+    claim_report["public_leaderboard_entries_source"] = "RECENT_DATED_PUBLIC_BINANCE_SQUARE_POST_CORPUS"
+    claim_report["public_leaderboard_entries_are_unverified_research_leads"] = True
+
     claimed_urls = set()
     for claim in claim_report.get("claims", []) if isinstance(claim_report.get("claims"), list) else []:
         if not isinstance(claim, dict):
@@ -354,6 +385,7 @@ def collect_public_claim_posts(now: datetime | None = None, page_fetch=_public_p
         "schema": "NIC-PUBLIC-WTE-CLAIM-DISCOVERY-1.0",
         "generated_at": now.isoformat(),
         "status": "PUBLIC_SELF_REPORTED_CLAIMS_FOUND" if retained_claims else (
+            "PUBLIC_LEADERBOARD_RESEARCH_LEADS_FOUND" if leaderboard_entries else
             "PUBLIC_POSTS_CHECKED_NO_RECENT_CLAIMS" if normalized_posts else
             "HASHTAG_PAGES_READ_NO_RECENT_DATED_CLAIM_POSTS" if page_rows else
             "PUBLIC_HASHTAG_ENDPOINT_BLOCKED"
@@ -370,12 +402,17 @@ def collect_public_claim_posts(now: datetime | None = None, page_fetch=_public_p
         "normalized_recent_claim_post_count": len(normalized_posts),
         "retained_recent_claim_post_count": len(retained_claims),
         "public_claim_creators_found": len({str(row.get("creator") or "").casefold() for row in retained_claims}),
+        "public_leaderboard_entries_found": len(leaderboard_entries),
+        "public_leaderboard_creators_found": len({str(row.get("claimed_creator") or "").casefold() for row in leaderboard_entries}),
+        "public_leaderboard_source_posts": len({str(row.get("source_post_id") or "") for row in leaderboard_entries}),
         "claims": retained_claims,
         "claim_analysis": claim_report,
         "evidence_policy": {
             "public_claims_are_independently_verified": False,
             "creator_amounts_inferred_from_engagement": False,
             "public_claims_are_research_leads_only": True,
+            "leaderboard_entries_are_unverified_research_leads": True,
+            "leaderboard_posts_are_not_mislabeled_as_the_publisher_earnings": True,
             "unknown_dates_excluded": True,
             "no_automated_engagement_or_publication": True,
         },

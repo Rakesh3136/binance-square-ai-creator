@@ -294,31 +294,149 @@ def summarize_owner_reported_reward_feedback(events: list[dict], now: datetime) 
 
 
 def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> list[dict]:
-    """Extract named amounts from public leaderboard posts as research leads, never payout proof."""
-    context = re.compile(r"write[- ]to[- ]earn|leaderboard|top creators|weekly rewards|creator rewards|earnings season|weekly earnings|reward winners", re.I)
-    entry = re.compile(r"@([A-Za-z0-9_.-]{2,50})[^@]{0,45}?(?:💰\s*)?\$?\s*(\d{2,3}(?:,\d{3})*(?:\.\d+)?)\s*(USDC|USDT|USD)?", re.I)
+    """Extract named or masked creator rows from recent public leaderboard posts as research leads."""
+    context = re.compile(
+        r"write[- ]?to[- ]?earn|leaderboard|top creators|weekly rewards?|creator rewards|"
+        r"earnings season|weekly earnings|reward winners|nickname\s*[-:]\s*weekly reward",
+        re.I,
+    )
+    amount = r"(?P<amount>\d{1,3}(?:,\d{3})*(?:\.\d+)?)"
+    currency = r"(?P<currency>USDC|USDT|FDUSD|USD)\b"
+    row_pattern = re.compile(
+        r"^\s*@?(?P<creator>[^—–\-:|\n]{2,100}?)\s*[—–\-:]\s*"
+        r"(?:(?:weekly\s+)?(?:reward|earnings?|earned|received|paid)\s*:?\s*)?"
+        r"\$?\s*" + amount + r"\s*" + currency,
+        re.I,
+    )
+    inline_pattern = re.compile(
+        # Capture the full Unicode display name (including spaces) between an
+        # @ mention and its displayed amount. The lazy match stops at the
+        # nearest amount/currency pair instead of truncating to the first word.
+        r"@(?P<creator>[^@\n—–\-:;,!?]{2,100}?)\s*[—–\-:]?\s*"
+        r"(?:(?:weekly\s+)?(?:reward|earnings?|earned|received|paid)\s*:?\s*)?"
+        r"(?:💰\s*)?\$?\s*" + amount + r"\s*" + currency,
+        re.I,
+    )
     cutoff = now - timedelta(days=14)
     results, seen = [], set()
+
+    def add_result(row: dict, posted: datetime, post_id: str, source_url: str,
+                   name: str, raw_amount: str, raw_currency: str, rank: int | None = None) -> None:
+        name = str(name or "").strip().lstrip("@").strip()
+        name = re.sub(r"^\s*[🥇🥈🥉🏅🏆🎖️]+\s*", "", name).strip()
+        # A display name must not absorb a preceding heading or another @ handle.
+        # These malformed partials can arise when an upstream feed flattens rows.
+        if "@" in name or re.search(r"write[- ]?to[- ]?earn|leaderboard|top\s+\d+|last week", name, re.I):
+            return
+        if len(name) < 2:
+            return
+        try:
+            parsed_amount = float(str(raw_amount).replace(",", ""))
+        except (TypeError, ValueError):
+            return
+        if parsed_amount <= 0:
+            return
+        chosen_currency = str(raw_currency or "").upper()
+        key = (post_id, name.casefold(), parsed_amount, chosen_currency)
+        if key in seen:
+            return
+        seen.add(key)
+        results.append({
+            "claimed_creator": name[:120],
+            "claimed_amount": parsed_amount,
+            "claimed_currency": chosen_currency,
+            "rank": rank,
+            "source_publisher": str(row.get("creator") or row.get("creator_id") or "unknown")[:120],
+            "source_post_id": post_id,
+            "source_url": source_url[:400],
+            "posted_at": posted.isoformat(),
+            "window_days": 14,
+            "earnings_status": "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED",
+            "evidence_type": "PUBLIC_LEADERBOARD_RESEARCH_LEAD",
+        })
+
     for row in examples:
-        if not isinstance(row, dict): continue
-        body = str(row.get("text") or row.get("post") or row.get("title") or "")
-        if not body or not context.search(body): continue
+        if not isinstance(row, dict):
+            continue
+        body = str(row.get("text") or row.get("post") or row.get("title") or row.get("bodyTextOnly") or "")
+        # Some feed/export paths serialize newlines as literal backslash-n
+        # sequences. Restore line boundaries before parsing rows, otherwise the
+        # headline and first creator can be incorrectly merged into one "name".
+        body = body.replace(r"\r\n", "\n").replace(r"\n", "\n").replace(r"\r", "\n")
+        if not body or not context.search(body):
+            continue
         posted = aware_time(row.get("posted_at") or row.get("published_at"))
-        if not posted or posted < cutoff or posted > now: continue
-        for match in entry.finditer(body):
-            name, raw_amount, currency = match.groups()
-            try: amount = float(raw_amount.replace(",", ""))
-            except ValueError: continue
-            if amount <= 0: continue
-            chosen_currency = (currency or ("USD" if "$" in match.group(0) else "UNSPECIFIED")).upper()
-            key = (str(row.get("post_id") or ""), name.casefold(), amount, chosen_currency)
-            if key in seen: continue
-            seen.add(key)
-            results.append({"claimed_creator": name, "claimed_amount": amount, "claimed_currency": chosen_currency, "source_publisher": str(row.get("creator") or row.get("creator_id") or "unknown")[:120], "source_post_id": str(row.get("post_id") or ""), "source_url": str(row.get("source_url") or row.get("source") or "")[:400], "posted_at": posted.isoformat(), "window_days": 14, "earnings_status": "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED", "evidence_type": "PUBLIC_LEADERBOARD_RESEARCH_LEAD"})
-    return sorted(results, key=lambda x: (x["posted_at"], x["claimed_amount"]), reverse=True)[:100]
+        if not posted or posted < cutoff or posted > now:
+            continue
+        source_url = str(row.get("source_url") or row.get("source") or "").strip()
+        parsed_url = urllib.parse.urlparse(source_url)
+        host = (parsed_url.hostname or "").lower()
+        if parsed_url.scheme != "https" or not (host == "binance.com" or host.endswith(".binance.com")):
+            continue
+        post_match = re.search(r"/square/post/([A-Za-z0-9_-]+)", parsed_url.path, re.I)
+        if not post_match:
+            continue
+        post_id = str(row.get("post_id") or row.get("postId") or post_match.group(1)).strip()
+        if post_id != post_match.group(1):
+            continue
+
+        for raw_line in body.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            rank_match = re.match(r"^[^\w@]*([0-9]{1,3})[.)]\s*", line, re.UNICODE)
+            rank = int(rank_match.group(1)) if rank_match else None
+            # Strip medals / bullets and an optional explicit rank before parsing
+            # the creator label. Unicode creator names and masked labels are valid
+            # research leads, but remain unverified and do not resolve a profile.
+            clean_line = re.sub(r"^[^\w@]*[0-9]{1,3}[.)]\s*", "", line, count=1, flags=re.UNICODE)
+            clean_line = re.sub(r"^[^\w@]+", "", clean_line, count=1, flags=re.UNICODE)
+            # Never treat a leaderboard heading as a creator name, even if an
+            # upstream feed has collapsed a heading and the first row together.
+            if (
+                re.search(r"write[- ]?to[- ]?earn|leaderboard|top\s+\d+", clean_line, re.I)
+                and "@" not in clean_line
+                and not re.match(r"^@?[^\s]+\s*[—–-]", clean_line)
+                and not re.match(r"^\d+[.)]\s*", clean_line)
+            ):
+                continue
+            # A leading @ is a display-name marker, not a delimiter. The
+            # generic row parser would truncate names containing spaces, so
+            # let the full-name inline parser handle those rows.
+            match = row_pattern.match(clean_line) if "@" not in clean_line else None
+            if match:
+                add_result(
+                    row, posted, post_id, source_url, match.group("creator"),
+                    match.group("amount"), match.group("currency"), rank,
+                )
+
+            # Some leaderboard posts put several creators on one line. Parse this
+            # form only when the line has multiple @ mentions, avoiding truncation
+            # of a single Unicode display name that can contain spaces.
+            if raw_line.count("@") >= 1:
+                for inline_match in inline_pattern.finditer(raw_line):
+                    add_result(
+                        row, posted, post_id, source_url, inline_match.group("creator"),
+                        inline_match.group("amount"), inline_match.group("currency"),
+                    )
+    # Remove truncated-prefix duplicates for the same post/amount/currency
+    # (e.g. "محترف" beside the full "محترف عملات رقميه" display name).
+    filtered = []
+    for item in sorted(results, key=lambda x: (x["posted_at"], x["claimed_amount"]), reverse=True):
+        is_prefix_duplicate = any(
+            other["source_post_id"] == item["source_post_id"]
+            and other["claimed_amount"] == item["claimed_amount"]
+            and other["claimed_currency"] == item["claimed_currency"]
+            and other["claimed_creator"].casefold().startswith(item["claimed_creator"].casefold() + " ")
+            for other in results
+        )
+        if not is_prefix_duplicate:
+            filtered.append(item)
+    return filtered[:200]
+
 def analyze_public_reward_claims(examples: list[dict], now: datetime) -> dict:
     """Find public self-reported earnings posts for research, never as payout proof."""
-    amount_re = re.compile(r"\b(?:USD\s*)?\$?\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(?:USDC|USDT|USD)\b", re.IGNORECASE)
+    amount_re = re.compile(r"\b(?:USD\s*)?\$?\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(?:USDC|USDT|FDUSD|USD)\b", re.IGNORECASE)
     self_report = re.compile(r"\b(i earned|i made|i received|my earnings|my reward|my payout|we earned|we made|paid me|earned from write[- ]to[- ]earn)\b", re.IGNORECASE)
     cutoff = now - timedelta(days=14)
     claims = defaultdict(list)
@@ -436,7 +554,8 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
                         public_examples: list[dict] | None = None,
                         observed_leaderboard_entries: list[dict] | None = None,
                         creator_profile_research: dict | None = None,
-                        owner_reported_reward_events: list[dict] | None = None) -> dict:
+                        owner_reported_reward_events: list[dict] | None = None,
+                        leaderboard_collection_status: dict | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -509,6 +628,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     # Explicit observations from the authenticated Write-to-Earn page are kept
     # separate from public creator claims and public engagement metrics.
     observed_rows = observed_leaderboard_entries if isinstance(observed_leaderboard_entries, list) else []
+    leaderboard_collection_status = leaderboard_collection_status if isinstance(leaderboard_collection_status, dict) else {}
     existing_keys = {
         (str(row.get("claimed_creator") or "").casefold(), str(row.get("source_url") or ""), str(row.get("claimed_amount") or ""))
         for row in public_claim_research.get("public_leaderboard_entries", []) if isinstance(row, dict)
@@ -700,6 +820,15 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "public_self_reported_earnings_claims": public_claim_research,
         "self_reported_earnings_creator_study_queue": claim_study_queue,        "public_earnings_leaderboard_study_queue": leaderboard_study_queue,
         "leaderboard_creator_public_content": leaderboard_creator_public_content,
+        "leaderboard_collection_status": {
+            "status": str(leaderboard_collection_status.get("status") or "NOT_RECORDED"),
+            "collection_status": str(leaderboard_collection_status.get("collection_status") or "NOT_RECORDED"),
+            "last_attempt_at": leaderboard_collection_status.get("last_attempt_at"),
+            "collection_note": leaderboard_collection_status.get("collection_note"),
+            "access_blocked": leaderboard_collection_status.get("collection_status") == "ACCESS_BLOCKED_IN_TINYFISH_SESSION" and not observed_rows,
+            "zero_rows_mean_zero_earnings": False,
+            "access_failure_is_not_evidence_of_an_empty_leaderboard": True,
+        },
         "leaderboard_research_coverage": {
             "window_days": [7, 14],
             "public_leaderboard_entries_found": len(public_claim_research.get("public_leaderboard_entries", [])),
@@ -951,6 +1080,7 @@ def main() -> int:
         benchmark, patterns, rewards, attribution, performance, now,
         public_examples=examples, observed_leaderboard_entries=observed_leaderboard_entries,
         creator_profile_research=profile_research, owner_reported_reward_events=owner_reported_rewards,
+        leaderboard_collection_status=normalized_leaderboard,
     )
     readiness = build_autonomy_readiness(plan, public_wte_discovery, publication_policy)
     plan["autonomy_readiness"] = readiness
@@ -986,6 +1116,9 @@ def main() -> int:
         "creator_profiles_resolved": plan["creator_profile_research"]["profiles_resolved"],
         "profile_posts_collected_14d": plan["creator_profile_research"]["posts_collected_14d"],
         "profile_research_status": plan["creator_profile_research"]["status"],
+        "leaderboard_collection_status": plan["leaderboard_collection_status"]["collection_status"],
+        "leaderboard_access_blocked": plan["leaderboard_collection_status"]["access_blocked"],
+        "observed_wte_leaderboard_entries_count": plan["leaderboard_research_coverage"]["observed_wte_leaderboard_entries_count"],
         "autonomy_status": plan["autonomy_readiness"]["status"],
         "autonomy_critical_blockers": plan["autonomy_readiness"]["critical_blocker_count"],
         "autonomy_blocker_ids": [row["id"] for row in plan["autonomy_readiness"]["blockers"]],
