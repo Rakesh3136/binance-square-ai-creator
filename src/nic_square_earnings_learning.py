@@ -706,7 +706,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "observed_wte_leaderboard_entries_count": len([row for row in observed_rows if isinstance(row, dict)]),
             "verified_first_party_displayed_earnings_count": len([row for row in observed_rows if isinstance(row, dict) and row.get("status") == "VERIFIED_FIRST_PARTY_DISPLAYED_EARNINGS"]),
             "creator_names_queued_for_post_study": len(leaderboard_study_queue),
-            "displayed_amounts_are_first_party_earnings_evidence": True,
+            "displayed_amounts_are_first_party_earnings_evidence": any(isinstance(row, dict) for row in observed_rows),
             "displayed_amounts_are_independent_payout_receipts": False,
         },
         "observed_wte_leaderboard_entries": [
