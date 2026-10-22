@@ -707,7 +707,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "collection_status": str(leaderboard_collection_status.get("collection_status") or "NOT_RECORDED"),
             "last_attempt_at": leaderboard_collection_status.get("last_attempt_at"),
             "collection_note": leaderboard_collection_status.get("collection_note"),
-            "access_blocked": leaderboard_collection_status.get("collection_status") == "ACCESS_BLOCKED_REGION_RESTRICTION" and not observed_rows,
+            "access_blocked": leaderboard_collection_status.get("collection_status") == "ACCESS_BLOCKED_IN_TINYFISH_SESSION" and not observed_rows,
             "zero_rows_mean_zero_earnings": False,
             "access_failure_is_not_evidence_of_an_empty_leaderboard": True,
         },
