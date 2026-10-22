@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims, summarize_owner_reported_reward_feedback, build_learning_memory_entry, build_autonomy_readiness
+from src.nic_square_earnings_learning import build_learning_plan, collect_verified_rewards, summarize_own_content, analyze_public_reward_claims, summarize_owner_reported_reward_feedback, build_learning_memory_entry, build_autonomy_readiness, extract_public_leaderboard_entries
 
 
 def valid_reward_event():
@@ -414,6 +414,33 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(result["posts_age_8_to_14_days"], 1)
         self.assertEqual(result["fourteen_day"]["top_archetypes"][0]["archetype"], "education_explainer")
         self.assertTrue(result["public_metrics_are_not_earnings"])
+
+
+    def test_public_leaderboard_parser_handles_unicode_names_and_fdusd(self):
+        now = datetime(2026, 10, 22, 12, tzinfo=timezone.utc)
+        post_id = "379000000000001"
+        examples = [{
+            "post_id": post_id,
+            "source_url": f"https://www.binance.com/en/square/post/{post_id}",
+            "creator": "PublicPublisher",
+            "posted_at": "2026-10-20T10:00:00+00:00",
+            "text": (
+                "🏆 Last Week’s Write to Earn Top 10 — Congratulations!\\n"
+                "🥇 1. @محترف عملات رقميه — 1,797.04 USDC\\n"
+                "🥈 2. @小二哥哥68 — 931.85 USDC\\n"
+                "Nickname - Weekly Reward: 656.47 FDUSD"
+            ),
+        }]
+        entries = extract_public_leaderboard_entries(examples, now)
+        self.assertEqual(len(entries), 3)
+        by_creator = {row["claimed_creator"]: row for row in entries}
+        self.assertIn("محترف عملات رقميه", by_creator)
+        self.assertIn("小二哥哥68", by_creator)
+        self.assertEqual(by_creator["محترف عملات رقميه"]["claimed_amount"], 1797.04)
+        self.assertEqual(by_creator["小二哥哥68"]["claimed_currency"], "USDC")
+        self.assertEqual(by_creator["Nickname"]["claimed_currency"], "FDUSD")
+        self.assertTrue(all(row["earnings_status"] == "PUBLIC_LEADERBOARD_CLAIM_NOT_INDEPENDENTLY_VERIFIED" for row in entries))
+        self.assertTrue(all(row["source_url"].endswith(post_id) for row in entries))
 
 if __name__ == "__main__":
     unittest.main()
