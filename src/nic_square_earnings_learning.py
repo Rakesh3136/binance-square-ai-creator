@@ -381,7 +381,7 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
 
 def analyze_public_reward_claims(examples: list[dict], now: datetime) -> dict:
     """Find public self-reported earnings posts for research, never as payout proof."""
-    amount_re = re.compile(r"\b(?:USD\s*)?\$?\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(?:USDC|USDT|USD)\b", re.IGNORECASE)
+    amount_re = re.compile(r"\b(?:USD\s*)?\$?\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(?:USDC|USDT|FDUSD|USD)\b", re.IGNORECASE)
     self_report = re.compile(r"\b(i earned|i made|i received|my earnings|my reward|my payout|we earned|we made|paid me|earned from write[- ]to[- ]earn)\b", re.IGNORECASE)
     cutoff = now - timedelta(days=14)
     claims = defaultdict(list)
