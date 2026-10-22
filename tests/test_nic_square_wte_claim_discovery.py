@@ -101,5 +101,35 @@ class PublicWriteToEarnClaimDiscoveryTests(unittest.TestCase):
         self.assertEqual(report["claims"], [])
 
 
+
+    def test_leaderboard_only_posts_are_discovered_even_without_self_earnings_claim(self):
+        corpus = [{
+            "post_id": "379000000000001",
+            "source_url": POST_URL,
+            "creator": "PublicPublisher",
+            "creator_id": "public-publisher",
+            "posted_at": "2026-10-20T10:00:00+00:00",
+            "text": """🏆 Last Week’s Write to Earn Top 10
+🥇 1. @محترف عملات رقميه — 1,797.04 USDC
+🥈 2. @小二哥哥68 — 931.85 USDC
+Nickname - Weekly Reward: 656.47 FDUSD""",
+        }]
+        report = collect_public_claim_posts(
+            NOW,
+            lambda _: "<html><body>no public post links</body></html>",
+            lambda *args, **kwargs: {},
+            lambda _: None,
+            ("writetoearn",),
+            public_examples=corpus,
+        )
+        entries = report["claim_analysis"]["public_leaderboard_entries"]
+        self.assertEqual(report["status"], "PUBLIC_LEADERBOARD_RESEARCH_LEADS_FOUND")
+        self.assertEqual(report["public_leaderboard_entries_found"], 3)
+        self.assertEqual(len(entries), 3)
+        self.assertEqual(report["retained_recent_claim_post_count"], 0)
+        self.assertEqual({row["claimed_creator"] for row in entries}, {"محترف عملات رقميه", "小二哥哥68", "Nickname"})
+        self.assertTrue(report["evidence_policy"]["leaderboard_entries_are_unverified_research_leads"])
+        self.assertFalse(report["authenticated_session_used"])
+
 if __name__ == "__main__":
     unittest.main()
