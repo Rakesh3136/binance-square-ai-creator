@@ -383,6 +383,14 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
             # research leads, but remain unverified and do not resolve a profile.
             clean_line = re.sub(r"^[^\w@]*[0-9]{1,3}[.)]\s*", "", line, count=1, flags=re.UNICODE)
             clean_line = re.sub(r"^[^\w@]+", "", clean_line, count=1, flags=re.UNICODE)
+            # Never treat a leaderboard heading as a creator name, even if an
+            # upstream feed has collapsed a heading and the first row together.
+            if (
+                re.search(r"write[- ]?to[- ]?earn|leaderboard|top\s+\d+", clean_line, re.I)
+                and not re.match(r"^@?[^\s]+\s*[—–-]", clean_line)
+                and not re.match(r"^\d+[.)]\s*", clean_line)
+            ):
+                continue
             match = row_pattern.match(clean_line)
             if match:
                 add_result(
