@@ -309,7 +309,11 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
         re.I,
     )
     inline_pattern = re.compile(
-        r"@(?P<creator>[^\s—–\-:;,!?\n]{2,80})[^@\n]{0,45}?"
+        # Capture the full Unicode display name (including spaces) between an
+        # @ mention and its displayed amount. The lazy match stops at the
+        # nearest amount/currency pair instead of truncating to the first word.
+        r"@(?P<creator>[^@\n—–\-:;,!?]{2,100}?)\s*[—–\-:]?\s*"
+        r"(?:(?:weekly\s+)?(?:reward|earnings?|earned|received|paid)\s*:?\s*)?"
         r"(?:💰\s*)?\$?\s*" + amount + r"\s*" + currency,
         re.I,
     )
@@ -396,7 +400,10 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
                 and not re.match(r"^\d+[.)]\s*", clean_line)
             ):
                 continue
-            match = row_pattern.match(clean_line)
+            # A leading @ is a display-name marker, not a delimiter. The
+            # generic row parser would truncate names containing spaces, so
+            # let the full-name inline parser handle those rows.
+            match = row_pattern.match(clean_line) if "@" not in clean_line else None
             if match:
                 add_result(
                     row, posted, post_id, source_url, match.group("creator"),
