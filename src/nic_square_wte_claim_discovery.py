@@ -49,13 +49,13 @@ WTE_CONTEXT = re.compile(
     re.I,
 )
 AMOUNT_CONTEXT = re.compile(
-    r"(?:\$\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|USD)\b)",
+    r"(?:\$\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|FDUSD|USD)\b)",
     re.I,
 )
 CLAIM_ACTION = re.compile(
     r"\b(?:i|we|my|our)\s+(?:earned|made|received|got\s+paid|was\s+paid|"
     r"reward\w*|payout\w*)\b|\b(?:payout|reward(?:ed|s)?|commission(?:s)?|"
-    r"bonus(?:es)?)\b.{0,50}(?:\$\s?\d|\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|USD))",
+    r"bonus(?:es)?)\b.{0,50}(?:\$\s?\d|\d[\d,]*(?:\.\d+)?\s*(?:USDC|USDT|FDUSD|USD))",
     re.I,
 )
 WTE_HASHTAG_SLUGS = {"writetoearn", "write2earn", "binancew2e"}
