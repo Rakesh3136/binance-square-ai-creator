@@ -1,6 +1,6 @@
 """Binance Square publisher with explicit verified/submitted/skipped states."""
 from __future__ import annotations
-import json, os, hashlib, re, subprocess, urllib.error, urllib.request
+import json, os, hashlib, re, subprocess, urllib.error, urllib.request, difflib
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
@@ -83,6 +83,54 @@ def duplicate_match(text,symbol,category,context,frozen):
             if od and direction==od and (trigger is None or ot is None or str(trigger)==str(ot)) and (invalidation is None or oi is None or str(invalidation)==str(oi)): return f"same_asset_category_and_setup_within_{DUPLICATE_HOURS:g}h",row
         elif not od and not any(k in text.lower() for k in ("result","outcome","invalidated","follow-up","follow up")): return f"same_asset_and_category_within_{DUPLICATE_HOURS:g}h",row
     return "",None
+def normalized_story_headline(text):
+    """Normalize the opening headline so price/volume refreshes don't look like new stories."""
+    lines=[re.sub(r"^#+\\s*","",line).strip() for line in str(text or "").splitlines() if line.strip()]
+    if not lines: return ""
+    headline=lines[0].lower()
+    headline=re.sub(r"^.*?\\$btc\\s*[:—-]\\s*","",headline)
+    headline=re.sub(r"\\$[a-z0-9]{2,15}"," ",headline)
+    headline=re.sub(r"\\b(?:live updates?|breaking|update|latest)\\b"," ",headline)
+    headline=re.sub(r"\\b\\d+(?:[.,]\\d+)*(?:%|k|m|b)?\\b"," ",headline)
+    headline=re.sub(r"[^a-z ]"," ",headline)
+    stop={"bitcoin","btc","price","today","now","market","crypto","as","the","a","an","to","of","in","on","for","and","with","near","above","below"}
+    words=[w for w in headline.split() if w not in stop]
+    return " ".join(words)
+
+
+def story_duplicate_match(text, context, frozen, story_discovery, monetization_os):
+    """Block republishing the same news catalyst for 14 days, even when price/volume changed."""
+    current_story_id=str(context.get("story_id") or (context.get("story_discovery") or {}).get("story_id") or story_discovery.get("story_id") or monetization_os.get("story_id") or "").strip()
+    category=str(context.get("category") or context.get("content_category") or frozen.get("category") or frozen.get("content_category") or "").lower()
+    headline=normalized_story_headline(text)
+    is_news=any(word in category for word in ("news","macro","breaking","headline","market_update","flash"))
+    if not current_story_id and (not is_news or len(headline.split())<4):
+        return "",None
+    now_dt=datetime.now(timezone.utc)
+    for row in reversed(recent_rows()):
+        try:
+            age=now_dt-datetime.fromisoformat(str(row.get("published_at") or row.get("timestamp") or "").replace("Z","+00:00"))
+        except Exception:
+            continue
+        if age>timedelta(days=14):
+            continue
+        old_story_id=str(row.get("story_id") or "").strip()
+        if current_story_id and old_story_id and current_story_id==old_story_id:
+            return "same_story_id_within_14d",row
+        if not is_news or not headline:
+            continue
+        old_text=str(row.get("text") or row.get("post") or row.get("content") or "").strip()
+        old_headline=normalized_story_headline(old_text)
+        if len(old_headline.split())<4:
+            continue
+        a=set(headline.split()); b=set(old_headline.split())
+        overlap=len(a & b)/max(1,len(a | b))
+        similarity=difflib.SequenceMatcher(None,headline,old_headline).ratio()
+        if overlap>=0.72 and similarity>=0.80:
+            return "same_normalized_news_headline_within_14d",row
+    return "",None
+
+
 def append(row):
     ANALYTICS.mkdir(parents=True,exist_ok=True)
     with LOG_PATH.open("a",encoding="utf-8") as h: h.write(json.dumps(row,ensure_ascii=False)+"\n")
@@ -167,6 +215,11 @@ def main():
             elink=str(cooldown_existing.get("link") or "").strip() or (f"https://www.binance.com/square/post/{eid}" if eid else None)
             append({"timestamp":now(),"status":"PUBLISH_BLOCKED_ASSET_COOLDOWN","post_id":None,"link":None,"existing_post_id":eid or None,"existing_post_link":elink,"symbol":symbol,"category":category,"reason":f"same_asset_within_{ASSET_COOLDOWN_HOURS:g}h_requires_new_evidence_or_follow_up","publication_proof":"existing_verified_publication_log"})
             return skip(f"Asset rotation blocked: {symbol} was already covered within {ASSET_COOLDOWN_HOURS:g}h; reuse/follow-up requires verified new evidence.","PUBLISH_BLOCKED_ASSET_COOLDOWN",symbol,category,cooldown_existing)
+        story_dup,story_existing=story_duplicate_match(text,context,frozen,story_discovery,monetization_os)
+        if story_dup:
+            eid=canonical_post_id(story_existing.get("canonical_post_id") or story_existing.get("post_id") or story_existing.get("link")); elink=str(story_existing.get("link") or "").strip() or (f"https://www.binance.com/square/post/{eid}" if eid else None)
+            append({"timestamp":now(),"status":"PUBLISH_BLOCKED_DUPLICATE_STORY","post_id":None,"link":None,"existing_post_id":eid or None,"existing_post_link":elink,"existing_publication_status":str(story_existing.get("status") or "") or None,"existing_publication_verified_at":story_existing.get("published_at") or story_existing.get("timestamp"),"symbol":symbol,"category":category,"text":text,"reason":story_dup,"publication_proof":"existing_verified_publication_log"})
+            return skip(f"Duplicate story blocked: {story_dup}; the same news catalyst was already published within 14 days.","PUBLISH_BLOCKED_DUPLICATE",symbol,category,story_existing)
         dup,existing=duplicate_match(text,symbol,category,context,frozen)
         if dup:
             eid=canonical_post_id(existing.get("canonical_post_id") or existing.get("post_id") or existing.get("link")); elink=str(existing.get("link") or "").strip() or (f"https://www.binance.com/square/post/{eid}" if eid else None)
