@@ -320,6 +320,10 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
                    name: str, raw_amount: str, raw_currency: str, rank: int | None = None) -> None:
         name = str(name or "").strip().lstrip("@").strip()
         name = re.sub(r"^\s*[🥇🥈🥉🏅🏆🎖️]+\s*", "", name).strip()
+        # A display name must not absorb a preceding heading or another @ handle.
+        # These malformed partials can arise when an upstream feed flattens rows.
+        if "@" in name or re.search(r"write[- ]?to[- ]?earn|leaderboard|top\s+\d+|last week", name, re.I):
+            return
         if len(name) < 2:
             return
         try:
@@ -407,7 +411,20 @@ def extract_public_leaderboard_entries(examples: list[dict], now: datetime) -> l
                         row, posted, post_id, source_url, inline_match.group("creator"),
                         inline_match.group("amount"), inline_match.group("currency"),
                     )
-    return sorted(results, key=lambda x: (x["posted_at"], x["claimed_amount"]), reverse=True)[:200]
+    # Remove truncated-prefix duplicates for the same post/amount/currency
+    # (e.g. "محترف" beside the full "محترف عملات رقميه" display name).
+    filtered = []
+    for item in sorted(results, key=lambda x: (x["posted_at"], x["claimed_amount"]), reverse=True):
+        is_prefix_duplicate = any(
+            other["source_post_id"] == item["source_post_id"]
+            and other["claimed_amount"] == item["claimed_amount"]
+            and other["claimed_currency"] == item["claimed_currency"]
+            and other["claimed_creator"].casefold().startswith(item["claimed_creator"].casefold() + " ")
+            for other in results
+        )
+        if not is_prefix_duplicate:
+            filtered.append(item)
+    return filtered[:200]
 
 def analyze_public_reward_claims(examples: list[dict], now: datetime) -> dict:
     """Find public self-reported earnings posts for research, never as payout proof."""
