@@ -436,7 +436,8 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
                         public_examples: list[dict] | None = None,
                         observed_leaderboard_entries: list[dict] | None = None,
                         creator_profile_research: dict | None = None,
-                        owner_reported_reward_events: list[dict] | None = None) -> dict:
+                        owner_reported_reward_events: list[dict] | None = None,
+                        leaderboard_collection_status: dict | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -509,6 +510,7 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     # Explicit observations from the authenticated Write-to-Earn page are kept
     # separate from public creator claims and public engagement metrics.
     observed_rows = observed_leaderboard_entries if isinstance(observed_leaderboard_entries, list) else []
+    leaderboard_collection_status = leaderboard_collection_status if isinstance(leaderboard_collection_status, dict) else {}
     existing_keys = {
         (str(row.get("claimed_creator") or "").casefold(), str(row.get("source_url") or ""), str(row.get("claimed_amount") or ""))
         for row in public_claim_research.get("public_leaderboard_entries", []) if isinstance(row, dict)
@@ -700,6 +702,15 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
         "public_self_reported_earnings_claims": public_claim_research,
         "self_reported_earnings_creator_study_queue": claim_study_queue,        "public_earnings_leaderboard_study_queue": leaderboard_study_queue,
         "leaderboard_creator_public_content": leaderboard_creator_public_content,
+        "leaderboard_collection_status": {
+            "status": str(leaderboard_collection_status.get("status") or "NOT_RECORDED"),
+            "collection_status": str(leaderboard_collection_status.get("collection_status") or "NOT_RECORDED"),
+            "last_attempt_at": leaderboard_collection_status.get("last_attempt_at"),
+            "collection_note": leaderboard_collection_status.get("collection_note"),
+            "access_blocked": leaderboard_collection_status.get("collection_status") == "ACCESS_BLOCKED_REGION_RESTRICTION" and not observed_rows,
+            "zero_rows_mean_zero_earnings": False,
+            "access_failure_is_not_evidence_of_an_empty_leaderboard": True,
+        },
         "leaderboard_research_coverage": {
             "window_days": [7, 14],
             "public_leaderboard_entries_found": len(public_claim_research.get("public_leaderboard_entries", [])),
@@ -951,6 +962,7 @@ def main() -> int:
         benchmark, patterns, rewards, attribution, performance, now,
         public_examples=examples, observed_leaderboard_entries=observed_leaderboard_entries,
         creator_profile_research=profile_research, owner_reported_reward_events=owner_reported_rewards,
+        leaderboard_collection_status=normalized_leaderboard,
     )
     readiness = build_autonomy_readiness(plan, public_wte_discovery, publication_policy)
     plan["autonomy_readiness"] = readiness
@@ -986,6 +998,9 @@ def main() -> int:
         "creator_profiles_resolved": plan["creator_profile_research"]["profiles_resolved"],
         "profile_posts_collected_14d": plan["creator_profile_research"]["posts_collected_14d"],
         "profile_research_status": plan["creator_profile_research"]["status"],
+        "leaderboard_collection_status": plan["leaderboard_collection_status"]["collection_status"],
+        "leaderboard_access_blocked": plan["leaderboard_collection_status"]["access_blocked"],
+        "observed_wte_leaderboard_entries_count": plan["leaderboard_research_coverage"]["observed_wte_leaderboard_entries_count"],
         "autonomy_status": plan["autonomy_readiness"]["status"],
         "autonomy_critical_blockers": plan["autonomy_readiness"]["critical_blocker_count"],
         "autonomy_blocker_ids": [row["id"] for row in plan["autonomy_readiness"]["blockers"]],
