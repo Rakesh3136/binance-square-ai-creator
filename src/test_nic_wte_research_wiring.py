@@ -21,13 +21,12 @@ class WteResearchWiringTests(unittest.TestCase):
         self.assertIn("data/intelligence/wte_leaderboard_observed.json", text)
         self.assertIn("data/intelligence/nic_autonomy_readiness.json", text)
 
-    def test_authenticated_leaderboard_is_not_fabricated(self):
+    def test_leaderboard_requires_first_party_evidence(self):
         source = (ROOT / "src/nic_square_profile_research.py").read_text(encoding="utf-8")
-        self.assertIn("OBSERVED_LEADERBOARD_PATH", source)
-        self.assertIn("observed_write_to_earn_leaderboard", source)
-        self.assertIn("Never derive a profile URL from a display name", source)
-        template = (ROOT / "data/intelligence/wte_leaderboard_observations.json").read_text(encoding="utf-8")
-        self.assertIn('"entries": []', template)
+        self.assertIn("never derive a profile URL from a display name", source)
+        validator = (ROOT / "src/nic_wte_leaderboard_evidence.py").read_text(encoding="utf-8")
+        self.assertIn("official_write_to_earn_source_url_required", validator)
+        self.assertIn("public_views_or_engagement_never_substitute_for_leaderboard_evidence", validator)
 
 
 if __name__ == "__main__":
