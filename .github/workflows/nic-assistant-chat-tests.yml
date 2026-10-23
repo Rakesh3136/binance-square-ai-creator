@@ -1,0 +1,36 @@
+name: NIC Assistant Chat Adapter Tests
+
+on:
+  pull_request:
+    paths:
+      - 'src/nic_assistant_chat.py'
+      - 'tests/test_nic_assistant_chat.py'
+      - 'requirements.txt'
+      - '.github/workflows/nic-assistant-chat-tests.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/nic_assistant_chat.py'
+      - 'tests/test_nic_assistant_chat.py'
+      - 'requirements.txt'
+      - '.github/workflows/nic-assistant-chat-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  assistant-chat-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --no-cache-dir -r requirements.txt
+      - name: Compile assistant adapter
+        run: python -m py_compile src/nic_assistant_chat.py
+      - name: Test assistant adapter without API credentials
+        run: python tests/test_nic_assistant_chat.py
