@@ -22,6 +22,17 @@ default. For any non-loopback bind, configure a strong access token and place th
 service behind HTTPS and a managed secret store. Do not expose this basic server
 directly to the public internet.
 
+## Calling the assistant from NIC code
+
+Import `ask_assistant` from `src.nic_assistant_chat_client` and call it with a
+message plus optional recent `history`. Configure `NIC_ASSISTANT_URL` to the
+base URL of the separately deployed assistant service and `NIC_CHAT_ACCESS_TOKEN`
+through protected environment secrets. The helper sends a bearer-authenticated
+POST to `/chat`, applies a timeout, and fails closed when unconfigured or when the
+service returns an invalid response. It does not add itself to the production
+publishing workflow automatically; the service URL, secrets, hosting, and an
+explicitly tested caller integration must be configured before production use.
+
 ## NIC-specific behavior
 
 The assistant is instructed to prioritize original Binance Square creator
