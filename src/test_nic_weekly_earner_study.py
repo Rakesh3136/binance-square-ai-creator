@@ -1,7 +1,7 @@
 """Tests for period-level weekly earner research."""
 import unittest
 from datetime import datetime, timezone
-from src.nic_weekly_earner_study import study
+from nic_weekly_earner_study import study
 
 class Tests(unittest.TestCase):
     def test_empty_input_is_explicit(self):
