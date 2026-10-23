@@ -1,0 +1,36 @@
+name: NIC Write-to-Earn Research Wiring Tests
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_square_profile_research.py"
+      - "src/nic_square_earnings_learning.py"
+      - "src/nic_wte_leaderboard_evidence.py"
+      - "src/test_nic_wte_research_wiring.py"
+      - ".github/workflows/autonomous-market-creator.yml"
+      - ".github/workflows/nic-wte-research-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/nic_square_profile_research.py"
+      - "src/nic_square_earnings_learning.py"
+      - "src/nic_wte_leaderboard_evidence.py"
+      - "src/test_nic_wte_research_wiring.py"
+      - ".github/workflows/autonomous-market-creator.yml"
+      - ".github/workflows/nic-wte-research-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  creator-research-wiring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile creator research modules
+        run: python -m py_compile src/nic_square_profile_research.py src/nic_square_earnings_learning.py src/nic_wte_leaderboard_evidence.py src/test_nic_wte_research_wiring.py
+      - name: Run research wiring regression tests
+        run: python src/test_nic_wte_research_wiring.py
