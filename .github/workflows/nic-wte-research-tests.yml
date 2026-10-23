@@ -6,6 +6,8 @@ on:
       - "src/nic_square_profile_research.py"
       - "src/nic_square_earnings_learning.py"
       - "src/nic_wte_leaderboard_evidence.py"
+      - "src/nic_weekly_earner_study.py"
+      - "src/test_nic_weekly_earner_study.py"
       - "src/test_nic_wte_research_wiring.py"
       - ".github/workflows/autonomous-market-creator.yml"
       - ".github/workflows/nic-wte-research-tests.yml"
@@ -31,6 +33,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile creator research modules
-        run: python -m py_compile src/nic_square_profile_research.py src/nic_square_earnings_learning.py src/nic_wte_leaderboard_evidence.py src/test_nic_wte_research_wiring.py
+        run: python -m py_compile src/nic_square_profile_research.py src/nic_square_earnings_learning.py src/nic_wte_leaderboard_evidence.py src/nic_weekly_earner_study.py src/test_nic_wte_research_wiring.py src/test_nic_weekly_earner_study.py
       - name: Run research wiring regression tests
         run: python src/test_nic_wte_research_wiring.py
+      - name: Run weekly earner period study tests
+        run: python src/test_nic_weekly_earner_study.py
