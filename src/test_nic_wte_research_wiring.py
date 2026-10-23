@@ -21,6 +21,16 @@ class WteResearchWiringTests(unittest.TestCase):
         self.assertIn("data/intelligence/wte_leaderboard_observed.json", text)
         self.assertIn("data/intelligence/nic_autonomy_readiness.json", text)
 
+    def test_weekly_earner_study_runs_after_profile_refresh_and_is_persisted(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        profile = "run_component nic_square_profile_research python src/nic_square_profile_research.py"
+        study = "run_component nic_weekly_earner_study python src/nic_weekly_earner_study.py"
+        learning = "run_component nic_square_earnings_learning python src/nic_square_earnings_learning.py"
+        self.assertIn(study, text)
+        self.assertLess(text.index(profile), text.index(study))
+        self.assertLess(text.index(study), text.index(learning))
+        self.assertIn("data/intelligence/nic_weekly_earner_study.json", text)
+
     def test_leaderboard_requires_first_party_evidence(self):
         source = (ROOT / "src/nic_square_profile_research.py").read_text(encoding="utf-8")
         self.assertIn("never derive a profile URL from a display name", source)
