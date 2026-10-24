@@ -121,6 +121,10 @@ def build_learning_artifact(
             "collection_status": "complete" if profile.get("posts_status") == "PROFILE_POSTS_COMPLETE_WINDOW" else "partial",
             "window_7d_complete": profile.get("window_7d_complete") is True,
             "window_14d_complete": profile.get("window_14d_complete") is True,
+            "profile_resolution_method": profile.get("profile_resolution_method"),
+            "profile_resolution_evidence_url": profile.get("profile_resolution_evidence_url"),
+            "profile_resolution_note": profile.get("profile_resolution_note"),
+            "profile_resolution_status": profile.get("profile_resolution_status"),
         }
         for profile in (post_input.get("profiles") or [])
         if isinstance(profile, dict)
@@ -182,6 +186,10 @@ def build_learning_artifact(
             "profile": {
                 "url": collection.get("profile_url"),
                 "identity_match": collection.get("identity_match", "unverified"),
+                "resolution_method": collection.get("profile_resolution_method"),
+                "resolution_evidence_url": collection.get("profile_resolution_evidence_url"),
+                "resolution_note": collection.get("profile_resolution_note"),
+                "resolution_status": collection.get("profile_resolution_status"),
                 "collection_status": collection_status,
                 "window_7d_complete": complete_7d,
                 "window_14d_complete": complete_14d,
