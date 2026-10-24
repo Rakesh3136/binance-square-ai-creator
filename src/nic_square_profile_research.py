@@ -680,9 +680,22 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
     leaderboard_profiles = [p for p in profiles if str(p.get("creator") or "").strip().casefold() in leaderboard_names]
     all_7d_complete = bool(leaderboard_candidates) and len(leaderboard_profiles) == len(leaderboard_candidates) and all(p.get("window_7d_complete") for p in leaderboard_profiles)
     all_14d_complete = bool(leaderboard_candidates) and len(leaderboard_profiles) == len(leaderboard_candidates) and all(p.get("window_14d_complete") for p in leaderboard_profiles)
-    status = "PROFILE_RESEARCH_COMPLETE" if profiles and all_posts else (
-        "PROFILES_RESOLVED_NO_DATED_POSTS" if profiles else
-        "PUBLIC_PROFILE_ENDPOINT_BLOCKED" if failures else "NO_PROFILE_CANDIDATES"
+    # Do not call a research run "complete" merely because it fetched some posts.
+    # When observed Write-to-Earn leaderboard creators are in scope, their exact
+    # 7-day and surrounding 14-day windows must be verified before overall status
+    # can claim completion. Keep this distinct from whether some public samples exist.
+    leaderboard_coverage_complete = (
+        bool(leaderboard_candidates)
+        and all_7d_complete
+        and all_14d_complete
+    )
+    status = (
+        "PROFILE_RESEARCH_PARTIAL_LEADERBOARD_COVERAGE"
+        if profiles and leaderboard_candidates and not leaderboard_coverage_complete
+        else "PROFILE_RESEARCH_COMPLETE" if profiles and all_posts
+        else "PROFILES_RESOLVED_NO_DATED_POSTS" if profiles
+        else "PUBLIC_PROFILE_ENDPOINT_BLOCKED" if failures
+        else "NO_PROFILE_CANDIDATES"
     )
     return {
         "schema": "NIC-SQUARE-PUBLIC-PROFILE-RESEARCH-1.0",
