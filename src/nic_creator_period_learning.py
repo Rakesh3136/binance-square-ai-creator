@@ -244,15 +244,25 @@ def build_learning_artifact(
         and coverage["complete_7d"] == len(entries)
         and coverage["complete_14d"] == len(entries)
     )
+    # One unresolved public profile should not discard otherwise verified cohort
+    # evidence. Keep the missing creator visible in coverage, but permit cautious
+    # descriptive learning when at least 80% of leaderboard creators have BOTH
+    # complete windows and the comparison still has enough creators/posts per tier.
+    covered_both_windows = sum(
+        1 for c in creators
+        if c["profile"]["window_7d_complete"] and c["profile"]["window_14d_complete"]
+    )
+    minimum_covered = (4 * len(entries) + 4) // 5  # ceil(80% of the observed leaderboard)
+    cohort_coverage_sufficient = len(entries) > 0 and covered_both_windows >= minimum_covered
     comparison_ready = (
-        all_leaderboard_windows_complete
+        cohort_coverage_sufficient
         and len(high_group) >= 2
         and len(lower_group) >= 2
         and len(high_posts) >= 5
         and len(lower_posts) >= 5
     )
-    if not all_leaderboard_windows_complete:
-        comparison_status = "BLOCKED_NEED_ALL_LEADERBOARD_CREATOR_WINDOWS_COMPLETE"
+    if not cohort_coverage_sufficient:
+        comparison_status = "BLOCKED_NEED_AT_LEAST_80_PERCENT_VERIFIED_CREATOR_WINDOWS"
     elif len(high_group) < 2 or len(lower_group) < 2 or len(high_posts) < 5 or len(lower_posts) < 5:
         comparison_status = "BLOCKED_NEED_AT_LEAST_TWO_CREATORS_PER_TIER_AND_FIVE_POSTS_PER_TIER"
     else:
@@ -270,6 +280,12 @@ def build_learning_artifact(
         "learning_status": "COHORT_HYPOTHESES_READY" if comparison_ready else "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE",
         "coverage": coverage,
         "coverage_status": "FULL_7_AND_14_DAY_LEADERBOARD_COVERAGE" if all_leaderboard_windows_complete else "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE",
+        "learning_coverage_policy": {
+            "minimum_verified_creator_window_coverage": 0.8,
+            "creators_complete_for_both_windows": covered_both_windows,
+            "creators_required_for_learning": minimum_covered,
+            "partial_coverage_warning": None if all_leaderboard_windows_complete else "Learning hypotheses use only identity-verified creators with complete windows; missing leaderboard creators are excluded and full leaderboard coverage remains incomplete.",
+        },
         "creator_periods": creators,
         "cross_creator_post_cohort": _aggregate(pooled),
         "reward_tier_cohort_comparison": {
