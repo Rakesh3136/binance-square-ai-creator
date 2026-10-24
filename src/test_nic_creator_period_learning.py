@@ -1,7 +1,7 @@
 """Tests for creator-period Write-to-Earn cohort learning."""
 import unittest
 
-from src.nic_creator_period_learning import build_learning_artifact
+from src.nic_creator_period_learning import build_learning_artifact, _creator_match as runtime_name_match
 
 
 class CreatorPeriodLearningTests(unittest.TestCase):
@@ -99,6 +99,40 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         self.assertEqual(creator["post_cohort_7d"]["post_count"], 0)
         self.assertEqual(creator["creator_period_reward"]["amount"], 1000)
         self.assertEqual(creator["creator_period_reward"]["granularity"], "creator_period_only")
+
+
+    def test_non_latin_creator_names_and_case_variant_profile_urls_match_posts(self):
+        leaderboard = {"entries": [{
+            "creator": "小二哥哥68", "rank": 1, "displayed_amount": 557.94,
+            "currency": "USDC", "period_start": "2026-10-12T00:00:00Z",
+            "period_end": "2026-10-18T23:59:59Z",
+            "source_url": "https://www.binance.com/en/square/WriteToEarn",
+        }]}
+        profile_url = "https://www.binance.com/en/square/profile/xiaoer2"
+        post_input = {
+            "creator_collections": [{
+                "creator": "小二哥哥68", "profile_url": profile_url,
+                "identity_match": "verified", "collection_status": "complete",
+                "window_7d_complete": True, "window_14d_complete": True,
+            }],
+            "posts": [{
+                "creator": "小二哥哥68",
+                "creator_profile_url": "https://www.binance.com/en/square/profile/Xiaoer2/",
+                "post_id": "cn-post-1",
+                "posted_at": "2026-10-13T10:00:00Z",
+                "text": "$BTC 12,000 volume and a clear risk boundary?",
+                "format": "text",
+            }],
+        }
+        artifact = build_learning_artifact(leaderboard, post_input, "2026-10-24T00:00:00Z")
+        creator = artifact["creator_periods"][0]
+        self.assertEqual(creator["post_cohort_7d"]["post_count"], 1)
+        self.assertEqual(creator["post_cohort_14d"]["post_count"], 1)
+        self.assertEqual(artifact["coverage"]["identity_verified"], 1)
+
+    def test_arabic_creator_identity_is_not_erased_by_normalization(self):
+        self.assertTrue(runtime_name_match("محترف عملات رقميه", "محترف عملات رقميه"))
+        self.assertFalse(runtime_name_match("محترف عملات رقميه", "Btc星辰"))
 
 
 if __name__ == "__main__":
