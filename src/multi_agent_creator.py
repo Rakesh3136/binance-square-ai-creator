@@ -85,6 +85,10 @@ def main():
         "memory": load("analytics/strategy_memory.json"),
         "wte_strategy": load("data/live/wte_high_level_intelligence.json"),
         "wte_7day": load("data/live/write_to_earn_7day_status.json"),
+        # Feed the period-level creator cohort artifact into the native writer.
+        # The writer may apply only validated cross-creator hypotheses; it must
+        # never infer or assign a weekly reward to any individual post.
+        "creator_period_learning": load("data/intelligence/creator_period_learning.json"),
     }
     selected = preflight.get("selected_opportunity") or {}
     context["instruction"] = (
