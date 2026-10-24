@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-LEADERBOARD_PATH = ROOT / "data/intelligence/wte_leaderboard_observations.json"
-POSTS_INPUT_PATH = ROOT / "data/intelligence/research/creator_period_posts.json"
+LEADERBOARD_PATH = ROOT / "data/intelligence/wte_leaderboard_observed.json"
+POSTS_INPUT_PATH = ROOT / "data/intelligence/nic_square_profile_research.json"
 OUTPUT_PATH = ROOT / "data/intelligence/creator_period_learning.json"
 
 
@@ -113,7 +113,18 @@ def build_learning_artifact(
     generated_at_utc = generated_at_utc or datetime.now(timezone.utc).isoformat()
     entries = leaderboard.get("entries") or []
     posts = post_input.get("posts") or []
-    collections = post_input.get("creator_collections") or []
+    collections = post_input.get("creator_collections") or [
+        {
+            "creator": profile.get("creator"),
+            "profile_url": profile.get("creator_profile_url"),
+            "identity_match": profile.get("identity_match", "unverified"),
+            "collection_status": "complete" if profile.get("posts_status") == "PROFILE_POSTS_COMPLETE_WINDOW" else "partial",
+            "window_7d_complete": profile.get("window_7d_complete") is True,
+            "window_14d_complete": profile.get("window_14d_complete") is True,
+        }
+        for profile in (post_input.get("profiles") or [])
+        if isinstance(profile, dict)
+    ]
     by_creator_collection: dict[str, dict[str, Any]] = {}
     for collection in collections:
         name = str(collection.get("creator") or "")
