@@ -15,7 +15,7 @@ if str(SRC) not in sys.path:
 
 from opportunity_timing_gate import evaluate as evaluate_timing
 from nic_forecast_evidence_adapter import evidence as forecast_evidence
-PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; NIC24_1=ROOT/'data/live/nic24_1_strategy_content_plan.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
+PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; DIRECTOR=ROOT/'data/live/content_director_brief.json'; CADENCE=ROOT/'data/live/autonomous_cadence_6.json'; MARKET=ROOT/'data/live/market_snapshot.json'; FLOW=ROOT/'data/live/capital_flow_intelligence.json'; FULL_FLOW=ROOT/'data/live/full_universe_flow.json'; RANKING=ROOT/'data/live/opportunity_ranking_6.json'; PRE_ROUTER=ROOT/'data/live/pre_router_intelligence.json'; PREDICTION=ROOT/'data/live/nic_prediction_engine.json'; NIC24_1=ROOT/'data/live/nic24_1_strategy_content_plan.json'; ORIGINAL_RESEARCH=ROOT/'data/live/original_research.json'; PUBLICATIONS=ROOT/'analytics/publication_log.jsonl'; OUT=ROOT/'data/live/signal_first_routing.json'
 MIN_SCORE=float(os.getenv('SIGNAL_FIRST_MIN_SCORE','72')); MIN_FLOW_CONF=float(os.getenv('SIGNAL_FIRST_MIN_FLOW_CONFIDENCE','65')); SIM=float(os.getenv('SIGNAL_FIRST_TEXT_SIMILARITY','0.72'))
 ASSET_COOLDOWN_HOURS=float(os.getenv('SIGNAL_FIRST_ASSET_COOLDOWN_HOURS','72'))
 FOLLOWUP_CATEGORIES={'creator_signal_outcome','follow_up','outcome_accountability'}
@@ -73,6 +73,56 @@ def editorial_complete(x):
         if not str(x.get('published_at') or x.get('news_published_at') or '').strip():return False
     if category=='crypto_meme' and str(x.get('meme_source_type') or '').strip() not in {'market_move','news','existing_evidence'}:return False
     return True
+
+def research_editorial_candidates(research, live_symbols, now=None):
+    """Convert fresh, evidence-qualified research findings into non-trade editorial candidates.
+
+    This is a fallback for creator publishing, not a trade signal. It requires a
+    fresh research artifact, a live Binance asset, and explicit research thresholds.
+    """
+    stamp = str(research.get('generated_at') or '').strip()
+    try:
+        generated = datetime.fromisoformat(stamp.replace('Z', '+00:00'))
+        if generated.tzinfo is None:
+            generated = generated.replace(tzinfo=timezone.utc)
+        age = ((now or datetime.now(timezone.utc)) - generated.astimezone(timezone.utc)).total_seconds()
+    except (TypeError, ValueError):
+        return []
+    if age < 0 or age > 45 * 60:
+        return []
+
+    live = {str(s).upper().replace('USDT', '').strip() for s in live_symbols}
+    out = []
+    for key, intent in (('potential_gems', 'research_upside_watch'), ('potential_risks', 'research_risk_watch')):
+        for row in research.get(key) or []:
+            if not isinstance(row, dict):
+                continue
+            symbol = str(row.get('symbol') or '').upper().replace('USDT', '').strip()
+            info = num(row.get('information_advantage_score'))
+            under = num(row.get('undercoverage_score'))
+            evidence = num(row.get('evidence_score'))
+            # Avoid turning a market anomaly into a story without a minimum
+            # evidence floor; missing fundamentals must be stated as unknowns.
+            if not symbol or symbol not in live:
+                continue
+            if info < MIN_SCORE or under < 60 or evidence < 50:
+                continue
+            if not str(row.get('epistemic_note') or '').strip():
+                continue
+            out.append({
+                'type': 'research',
+                'category': 'research_insight',
+                'lane': 'research_insight',
+                'symbol': symbol,
+                'score': info,
+                'ranker_score': info,
+                'research': row,
+                'content_intent': intent,
+                'reason': 'fresh original research cleared information-advantage, undercoverage, and evidence thresholds',
+                'editorial_only': True,
+            })
+    return out
+
 def content_plan_for(x):
     plan=load(NIC24_1).get('plans') or []
     sym=str(x.get('symbol') or '').upper().replace('USDT','').strip()
@@ -267,6 +317,7 @@ def choose(xs,rows,market,full_flow,live_symbols,allow_editorial=False):
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); macro=load(ROOT/'data/live/global_macro_intelligence.json'); rows=recent()
     live_symbols=trading_symbols(); primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
+    markets.extend(research_editorial_candidates(load(ORIGINAL_RESEARCH), live_symbols))
     for event in (macro.get('events') or [])[:30]:
         title=str(event.get('title') or '').strip(); source=str(event.get('source') or '').strip(); published=str(event.get('published_at') or '').strip(); themes=event.get('themes') if isinstance(event.get('themes'),list) else []; score=min(100,64+len(themes)*5+(4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
         for raw in (event.get('asset_symbols') or [])[:2]:
