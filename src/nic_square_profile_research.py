@@ -514,12 +514,14 @@ def _fetch_profile_posts(uid: str, profile: dict, now: datetime, request_json=pu
             if not has_more:
                 if unparseable_window_rows:
                     status = "PARTIAL_PROFILE_POSTS_UNPARSEABLE_WINDOW_ROW"
-                elif collected or reached_before_window:
+                elif reached_before_window:
+                    # A dated post older than the requested start proves that
+                    # pagination crossed the full historical window. Merely
+                    # receiving some in-window rows is not proof that every post
+                    # was collected; APIs can truncate a page while reporting no
+                    # second page or change pagination behavior.
                     status = "PROFILE_POSTS_COMPLETE_WINDOW"
                 else:
-                    # An empty response or a page containing only newer-than-window
-                    # posts does not prove that the historical reward window was
-                    # exhaustively traversed.
                     status = "PARTIAL_PROFILE_POSTS_NO_WINDOW_BOUNDARY_EVIDENCE"
                 break
             if reached_before_window:
