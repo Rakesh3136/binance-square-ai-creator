@@ -148,6 +148,7 @@ class CreatorPeriodCoverageTests(unittest.TestCase):
         self.assertFalse(result["profiles"][0]["window_7d_complete"])
         self.assertFalse(result["leaderboard_7d_window_coverage_complete"])
         self.assertEqual(result["coverage_status"], "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE")
+        self.assertEqual(result["status"], "PROFILE_RESEARCH_PARTIAL_LEADERBOARD_COVERAGE")
 
 
     def test_in_window_posts_without_crossing_start_boundary_remain_partial(self):
