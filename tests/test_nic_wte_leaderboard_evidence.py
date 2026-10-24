@@ -35,6 +35,19 @@ class WriteToEarnLeaderboardEvidenceTests(unittest.TestCase):
         self.assertFalse(entry["own_post_reward_attribution"])
         self.assertEqual(entry["displayed_amount"], 800.0)
 
+    def test_preserves_profile_resolution_provenance_without_claiming_identity_verified(self):
+        result = normalize_observations({"entries": [row(
+            profile_resolution_method="public_indexed_exact_display_name_candidate",
+            profile_resolution_evidence_url="https://www.binance.com/en/square/profile/CreatorAlpha",
+            profile_resolution_note="Candidate mapping; verify fetched display name.",
+        )]}, NOW)
+        entry = result["entries"][0]
+        self.assertEqual(entry["creator_profile_url"], "https://www.binance.com/en/square/profile/CreatorAlpha")
+        self.assertEqual(entry["profile_resolution_method"], "public_indexed_exact_display_name_candidate")
+        self.assertEqual(entry["profile_resolution_status"], "CANDIDATE_URL_PROVIDED")
+        self.assertEqual(entry["profile_resolution_note"], "Candidate mapping; verify fetched display name.")
+        self.assertFalse(entry["independently_verified_payment"])
+
     def test_rejects_untrusted_source_and_does_not_invent_profile_url(self):
         result = normalize_observations({"entries": [row(source_url="https://example.com/en/square/WriteToEarn", creator_profile_url=None)]}, NOW)
         self.assertEqual(result["accepted_count"], 0)
