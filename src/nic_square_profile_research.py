@@ -499,11 +499,17 @@ def _fetch_profile_posts(uid: str, profile: dict, now: datetime, request_json=pu
                     except ValueError:
                         pass
             reached_before_window = bool(row_dates) and min(row_dates) < start_bound
-            if not has_more or not next_cursor or str(next_cursor) == str(cursor) or not rows:
+            if not has_more:
                 status = "PROFILE_POSTS_COMPLETE_WINDOW"
                 break
             if reached_before_window:
                 status = "PROFILE_POSTS_COMPLETE_WINDOW"
+                break
+            if not next_cursor or str(next_cursor) == str(cursor):
+                status = "PARTIAL_PROFILE_POSTS_INVALID_CURSOR"
+                break
+            if not rows:
+                status = "PARTIAL_PROFILE_POSTS_EMPTY_PAGE_WITH_MORE"
                 break
             if len(collected) >= MAX_POSTS_PER_PROFILE:
                 status = "PARTIAL_PROFILE_POSTS_POST_LIMIT"
