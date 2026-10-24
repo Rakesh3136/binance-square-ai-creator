@@ -597,17 +597,22 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
 
     benchmark_state = str(benchmark.get("status") or "UNKNOWN")
     older_count = int((fourteen.get("coverage") or {}).get("posts_age_8_to_14_days") or 0)
-    public_feed_coverage_status = "FULL_7_AND_14_DAY_COVERAGE" if older_count > 0 else "14_DAY_SAMPLE_GAP_KEEP_COLLECTING"
+    public_feed_coverage_status = "PUBLIC_FEED_HAS_7D_AND_14D_SAMPLES" if older_count > 0 else "PUBLIC_FEED_14D_SAMPLE_GAP_KEEP_COLLECTING"
     profile_posts_7d = int(profile_research.get("posts_collected_7d") or 0)
     profile_posts_8_to_14d = int(profile_research.get("posts_collected_8_to_14d") or 0)
+    # A handful of dated posts is not complete coverage. The profile collector
+    # must explicitly verify every observed leaderboard creator's exact 7d and
+    # 14d windows before this status can be FULL.
     profile_coverage_observed = (
-        bool(profile_research.get("seven_day_coverage_observed"))
-        and bool(profile_research.get("fourteen_day_coverage_observed"))
-        and profile_posts_7d > 0 and profile_posts_8_to_14d > 0
+        bool(profile_research.get("leaderboard_7d_window_coverage_complete"))
+        and bool(profile_research.get("leaderboard_14d_window_coverage_complete"))
+        and int(profile_research.get("leaderboard_creators_expected") or 0) > 0
+        and int(profile_research.get("leaderboard_creators_resolved") or 0)
+            == int(profile_research.get("leaderboard_creators_expected") or 0)
     )
     coverage_status = (
         "FULL_7_AND_14_DAY_PROFILE_COVERAGE" if profile_coverage_observed
-        else public_feed_coverage_status
+        else "PARTIAL_OR_BLOCKED_PROFILE_COVERAGE"
     )
     return {
         "schema": "NIC-SQUARE-EARNINGS-LEARNING-1.0",
@@ -684,6 +689,13 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "posts_collected_14d": int(profile_research.get("posts_collected_14d") or 0),
             "seven_day_coverage_observed": bool(profile_research.get("seven_day_coverage_observed", False)),
             "fourteen_day_coverage_observed": bool(profile_research.get("fourteen_day_coverage_observed", False)),
+            "leaderboard_creators_expected": int(profile_research.get("leaderboard_creators_expected") or 0),
+            "leaderboard_creators_resolved": int(profile_research.get("leaderboard_creators_resolved") or 0),
+            "leaderboard_7d_window_coverage_complete": bool(profile_research.get("leaderboard_7d_window_coverage_complete")),
+            "leaderboard_14d_window_coverage_complete": bool(profile_research.get("leaderboard_14d_window_coverage_complete")),
+            "coverage_status": str(profile_research.get("coverage_status") or "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE"),
+            "creator_period_learning_status": str(profile_research.get("creator_period_learning_status") or "NOT_RUN"),
+            "creator_period_learning_coverage": profile_research.get("creator_period_learning_coverage"),
             "public_metrics_are_not_earnings": True,
         },
         "creator_profile_study_queue": [{
@@ -817,9 +829,11 @@ def build_autonomy_readiness(plan: dict, public_wte_claim_discovery: dict | None
     observed_count = int(plan.get("observed_wte_leaderboard_entries_count") or 0)
     profiles_ready = (
         str(profile.get("status") or "") == "PROFILE_RESEARCH_COMPLETE"
-        and bool(profile.get("seven_day_coverage_observed"))
-        and bool(profile.get("fourteen_day_coverage_observed"))
-        and int(profile.get("profiles_resolved") or 0) > 0
+        and bool(profile.get("leaderboard_7d_window_coverage_complete"))
+        and bool(profile.get("leaderboard_14d_window_coverage_complete"))
+        and int(profile.get("leaderboard_creators_expected") or 0) > 0
+        and int(profile.get("leaderboard_creators_resolved") or 0)
+            == int(profile.get("leaderboard_creators_expected") or 0)
     )
     verified_rewards = int(verified.get("accepted_unique_reward_events_7d") or 0)
     claims_count = int(discovery.get("retained_recent_claim_post_count") or 0)
