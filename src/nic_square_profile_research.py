@@ -475,9 +475,13 @@ def _fetch_profile_posts(uid: str, profile: dict, now: datetime, request_json=pu
                          window_end: datetime | None = None) -> tuple[list[dict], str, int]:
     """Collect every post in the requested period, or mark coverage incomplete."""
     collected: dict[str, dict] = {}
-    cursor: Any = int(now.timestamp() * 1000)
     start_bound = window_start or (now - timedelta(days=14))
     end_bound = window_end or now
+    # Start at the requested cohort end, not the current time. For a past
+    # leaderboard week, starting at now can return only newer posts and falsely
+    # leave the actual reward-period cohort empty. The endpoint cursor is a time
+    # offset in milliseconds, so anchor it to the exact requested end boundary.
+    cursor: Any = int(end_bound.timestamp() * 1000)
     status = "PARTIAL_PROFILE_POSTS_PAGE_LIMIT"
     pages = 0
     unparseable_window_rows = False
