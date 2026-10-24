@@ -707,8 +707,25 @@ def main() -> int:
     # creator intelligence and the learning planner evaluate the same samples.
     merged = _merge_example_rows(examples, result.get("posts", []))
     write_json(EXAMPLES_PATH, merged)
+    # Rebuild creator-period cohort learning from this exact post research run and
+    # the normalized first-party leaderboard rewards. Never assign a weekly total
+    # to individual posts.
+    try:
+        try:
+            from src.nic_creator_period_learning import run as run_creator_period_learning
+        except ModuleNotFoundError:
+            from nic_creator_period_learning import run as run_creator_period_learning
+        learning_artifact = run_creator_period_learning()
+        result["creator_period_learning_status"] = learning_artifact.get("learning_status")
+        result["creator_period_learning_coverage"] = learning_artifact.get("coverage")
+    except Exception as exc:
+        result["creator_period_learning_status"] = "ERROR_" + type(exc).__name__
+        result["creator_period_learning_coverage"] = None
+    write_json(OUT_PATH, result)
     print(json.dumps({
         "status": result["status"],
+        "creator_period_learning_status": result.get("creator_period_learning_status"),
+        "creator_period_learning_coverage": result.get("creator_period_learning_coverage"),
         "candidate_count": result["candidate_count"],
         "profiles_resolved": result["profiles_resolved"],
         "posts_collected_7d": result["posts_collected_7d"],
