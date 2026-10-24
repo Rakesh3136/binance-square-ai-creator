@@ -315,7 +315,7 @@ def build_learning_artifact(
 
 def in_period_for_creator(post: dict[str, Any], creator: dict[str, Any], cohort_key: str) -> bool:
     cohort = creator.get(cohort_key) or {}
-    stamp = _parse_date(post.get("published_at_utc") or post.get("published_at") or post.get("created_at"))
+    stamp = _parse_date(post.get("published_at_utc") or post.get("published_at") or post.get("posted_at") or post.get("created_at"))
     start, end = _parse_date(cohort.get("window_start_utc")), _parse_date(cohort.get("window_end_utc"))
     return bool(stamp and start and end and start <= stamp <= end)
 
