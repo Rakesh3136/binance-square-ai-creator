@@ -39,11 +39,29 @@ def _parse_date(value: Any) -> datetime | None:
 
 
 def _norm(value: Any) -> str:
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").casefold()).split())
+    """Normalize identities without deleting non-Latin creator names."""
+    folded = str(value or "").casefold()
+    return " ".join("".join(ch if ch.isalnum() else " " for ch in folded).split())
+
+
+def _profile_url_key(value: Any) -> str:
+    """Compare official profile URLs case-insensitively and ignore trailing slashes."""
+    from urllib.parse import urlsplit, unquote
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parts = urlsplit(raw)
+        host = (parts.hostname or "").casefold()
+        path = unquote(parts.path).rstrip("/").casefold()
+        return f"{parts.scheme.casefold()}://{host}{path}"
+    except ValueError:
+        return raw.casefold().rstrip("/")
 
 
 def _creator_match(a: Any, b: Any) -> bool:
-    return bool(_norm(a) and _norm(a) == _norm(b))
+    left, right = _norm(a), _norm(b)
+    return bool(left and right and left == right)
 
 
 def _features(post: dict[str, Any]) -> dict[str, Any]:
@@ -150,7 +168,7 @@ def build_learning_artifact(
         all_creator_posts = [
             p for p in posts
             if _creator_match(p.get("creator"), name)
-            and (not collection.get("profile_url") or p.get("creator_profile_url") == collection.get("profile_url"))
+            and (not collection.get("profile_url") or _profile_url_key(p.get("creator_profile_url")) == _profile_url_key(collection.get("profile_url")))
         ]
         seven_start = period_start
         fourteen_start = (period_end - timedelta(days=13)) if period_end else None
@@ -216,7 +234,7 @@ def build_learning_artifact(
     def cohort_posts(group: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [
             p for p in posts
-            if any(_creator_match(p.get("creator"), c["creator"]) and in_period_for_creator(p, c, "post_cohort_7d") for c in group)
+            if any(_creator_match(p.get("creator"), c["creator"]) and (not c.get("profile", {}).get("url") or _profile_url_key(p.get("creator_profile_url")) == _profile_url_key(c.get("profile", {}).get("url"))) and in_period_for_creator(p, c, "post_cohort_7d") for c in group)
         ]
 
     high_posts = cohort_posts(high_group)
