@@ -52,6 +52,8 @@ def build(ctx):
     pre=ctx.get("preflight") or {};sel=pre.get("selected_opportunity") or {}
     pub=ctx.get("publication") or {};market=ctx.get("market") or {};news=ctx.get("news") or {}
     director=pre.get("script_director_4") or {}
+    strategy_runtime=ctx.get("creator_strategy_runtime") or {}
+    strategy_id=str(strategy_runtime.get("strategy_id") or "asset_specific_research_edge")
     s=sym(sel.get("symbol") or pub.get("symbol") or director.get("primary_symbol"))
     if not s:raise RuntimeError("NIC Native Writer: authoritative asset missing")
     cat=str(sel.get("category") or pub.get("category") or "market_opportunity").lower()
@@ -65,7 +67,7 @@ def build(ctx):
     obs="$"+price(last) if last else "the latest verified price"
     voltext=f"{vol/1e6:.1f}M USDT" if vol>=1e6 else (f"{vol/1e3:.0f}K USDT" if vol>=1e3 else "the available quote-volume snapshot")
     seed=int(hashlib.sha256((s+cat+str(director.get("narrative_engine"))).encode()).hexdigest()[:8],16)%4
-    story_type=str(director.get("story_type") or sel.get("story_type") or director.get("narrative_engine") or "research_edge").strip().lower().replace(" ","_")
+    story_type=str(director.get("story_type") or sel.get("story_type") or director.get("narrative_engine") or strategy_runtime.get("selected_story_type") or "research_edge").strip().lower().replace(" ","_")
     if cat in {"breaking_news","news","news_and_macro","macro"}:
         articles=[x for x in news.get("articles") or [] if isinstance(x,dict)]
         a=next((x for x in articles if s in [sym(z) for z in (x.get("symbols") or [])]),None)
@@ -164,6 +166,20 @@ def build(ctx):
                         base.append(sentence)
             post="\n\n".join(base + [question_text]).strip()
         return post
-    post=compact_post([hook,body if "body" in locals() else structure,middle,close],question)
+    # Choose the presentation order from the idea's strategy, not one universal template.
+    evidence_block=body if "body" in locals() else structure
+    layouts={
+        "catalyst_context_and_counterpoint": [hook, middle, evidence_block, close],
+        "evidence_led_research": [evidence_block, hook, middle, close],
+        "structure_and_confirmation": [hook, evidence_block, close, middle],
+        "participation_and_relative_strength": [middle, hook, evidence_block, close],
+        "asset_specific_research_edge": [hook, evidence_block, middle, close],
+    }
+    parts=layouts.get(strategy_id, [hook, evidence_block, middle, close])
+    # Compact research observations can lead with evidence instead of forcing every
+    # post into the same five-part sequence.
+    if strategy_id == "evidence_led_research" and seed % 2 == 0:
+        parts=[evidence_block, hook, middle]
+    post=compact_post(parts,question)
     if post.count("?")!=1 or dollar not in post or not 280<=len(post)<=700:raise RuntimeError("NIC Native Writer failed local publication contract")
     return {"research":{"summary":f"NIC verified {dollar} using the frozen opportunity and supplied market evidence.","strongest_signal":s,"opportunity_score":num(sel.get("adjusted_score") or sel.get("raw_score") or 0),"source_mode":"NIC_NATIVE_EVIDENCE_SYNTHESIS"},"critique":{"summary":"Native NIC review bounds claims by supplied evidence and keeps uncertainty explicit.","alternative_hypothesis":"The observed move may be temporary rather than structural.","disconfirming_test":"A materially different next reaction or failed evidence condition weakens the thesis."},"draft":{"post":post,"text":post,"hook":hook,"discussion_question":question,"quality_score":84,"editorial_style":"NIC_NATIVE_WRITER","generation_mode":"NIC_NATIVE","symbol":s,"content_category":cat,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"visual_plan":{"type":"candlestick_chart" if cat not in {"crypto_meme","community","commentary","education"} else "none","use_visual":bool(it.get("candles_1h")),"purpose":"Show only the frozen asset and supplied evidence."},"native_writer":{"version":"1.0","provider":"NIC","external_text_model":False,"evidence_bound":True,"generated_at":datetime.now(timezone.utc).isoformat()}}
