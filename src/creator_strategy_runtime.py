@@ -101,7 +101,8 @@ def prepare_context(context: dict[str, Any]) -> dict[str, Any]:
         "reward_learning_claim": "NOT_CLAIMED",
         "creator_period_learning_status": learning_status,
         "creator_period_learning_sha256": period_digest,
-        "creator_period_learning_used": learning_status == "COHORT_HYPOTHESES_READY",
+        "creator_period_learning_available": learning_status == "COHORT_HYPOTHESES_READY",
+        "creator_period_learning_used": False,
         "reward_granularity": "creator_period_only",
     }
     return context
@@ -127,10 +128,13 @@ def annotate_and_validate(result: dict[str, Any], context: dict[str, Any]) -> di
     draft["creator_strategy_version"] = runtime.get("playbook_schema_version")
     draft["creator_period_learning_status"] = runtime.get("creator_period_learning_status", "NOT_AVAILABLE")
     draft["creator_period_learning_sha256"] = runtime.get("creator_period_learning_sha256")
-    draft["creator_period_learning_used"] = bool(runtime.get("creator_period_learning_used"))
+    draft["creator_period_learning_used"] = bool((result.get("native_writer") or {}).get("creator_period_learning_applied"))
+    draft["creator_period_learning_rule"] = (result.get("native_writer") or {}).get("creator_period_learning_rule")
     draft["reward_granularity"] = "creator_period_only"
     draft["creator_strategy_quality_gate"] = gate
     result["draft"] = draft
+    runtime["creator_period_learning_used"] = draft["creator_period_learning_used"]
+    runtime["creator_period_learning_rule"] = draft["creator_period_learning_rule"]
     result["creator_strategy_runtime"] = runtime
     result["creator_strategy_quality_gate"] = gate
     if duplicate:
