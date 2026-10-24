@@ -150,5 +150,24 @@ class CreatorPeriodCoverageTests(unittest.TestCase):
         self.assertEqual(result["coverage_status"], "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE")
 
 
+    def test_in_window_posts_without_crossing_start_boundary_remain_partial(self):
+        now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
+        def fake_request(url):
+            return {"data": {"contents": [{
+                "id": "in-window-post",
+                "createTime": int(datetime(2026, 10, 13, 10, tzinfo=timezone.utc).timestamp() * 1000),
+                "bodyTextOnly": "A valid dated post inside the requested historical window.",
+            }], "timeOffset": 0, "isExistSecondPage": False}}
+        posts, status, pages = research._fetch_profile_posts(
+            "uid-1", {"creator": "Creator A"}, now, request_json=fake_request,
+            sleep_fn=lambda _: None,
+            window_start=datetime(2026, 10, 5, tzinfo=timezone.utc),
+            window_end=datetime(2026, 10, 18, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(status, "PARTIAL_PROFILE_POSTS_NO_WINDOW_BOUNDARY_EVIDENCE")
+        self.assertEqual(pages, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
