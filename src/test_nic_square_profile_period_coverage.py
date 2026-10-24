@@ -79,6 +79,20 @@ class CreatorPeriodCoverageTests(unittest.TestCase):
         self.assertTrue(result["leaderboard_14d_window_coverage_complete"])
         self.assertEqual(result["coverage_status"], "FULL_7_AND_14_DAY_LEADERBOARD_COVERAGE")
 
+    def test_empty_page_with_more_flag_is_partial_not_complete(self):
+        now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
+        def fake_request(url):
+            return {"data": {"contents": [], "timeOffset": "next-cursor", "isExistSecondPage": True}}
+        posts, status, pages = research._fetch_profile_posts(
+            "uid-1", {"creator": "Creator A"}, now, request_json=fake_request,
+            sleep_fn=lambda _: None,
+            window_start=datetime(2026, 10, 5, tzinfo=timezone.utc),
+            window_end=datetime(2026, 10, 18, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        self.assertEqual(posts, [])
+        self.assertEqual(status, "PARTIAL_PROFILE_POSTS_EMPTY_PAGE_WITH_MORE")
+        self.assertEqual(pages, 1)
+
     def test_partial_pagination_never_claims_complete_coverage(self):
         now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
         candidate = {
