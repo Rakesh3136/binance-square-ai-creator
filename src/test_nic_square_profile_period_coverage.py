@@ -170,5 +170,42 @@ class CreatorPeriodCoverageTests(unittest.TestCase):
         self.assertEqual(pages, 1)
 
 
+    def test_advancing_time_offset_is_followed_even_when_has_more_flag_is_false(self):
+        now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
+        window_start = datetime(2026, 10, 5, tzinfo=timezone.utc)
+        window_end = datetime(2026, 10, 18, 23, 59, 59, tzinfo=timezone.utc)
+        older_cursor = int(datetime(2026, 10, 12, tzinfo=timezone.utc).timestamp() * 1000)
+        calls = []
+
+        def fake_request(url):
+            from urllib.parse import parse_qs, urlparse
+            query = parse_qs(urlparse(url).query)
+            calls.append(query.get("timeOffset", [""])[0])
+            if len(calls) == 1:
+                # Regression: the endpoint signals no second page, but provides
+                # an advancing cursor. The previous collector stopped here.
+                return {"data": {"contents": [{
+                    "id": "in-window-post",
+                    "createTime": int(datetime(2026, 10, 12, 10, tzinfo=timezone.utc).timestamp() * 1000),
+                    "bodyTextOnly": "A useful post inside the exact weekly reward period.",
+                }], "timeOffset": older_cursor, "isExistSecondPage": False}}
+            return {"data": {"contents": [{
+                "id": "boundary-post",
+                "createTime": int(datetime(2026, 10, 4, 20, tzinfo=timezone.utc).timestamp() * 1000),
+                "bodyTextOnly": "This dated post proves that the collector crossed the requested window start.",
+            }], "timeOffset": 0, "isExistSecondPage": False}}
+
+        posts, status, pages = research._fetch_profile_posts(
+            "uid-1", {"creator": "Creator A", "username": "creator_a"},
+            now, request_json=fake_request, sleep_fn=lambda _: None,
+            window_start=window_start, window_end=window_end,
+        )
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0]["post_id"], "in-window-post")
+        self.assertEqual(status, "PROFILE_POSTS_COMPLETE_WINDOW")
+        self.assertEqual(pages, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

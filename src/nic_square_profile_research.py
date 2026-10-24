@@ -511,34 +511,46 @@ def _fetch_profile_posts(uid: str, profile: dict, now: datetime, request_json=pu
                 elif row_dt is not None and start_bound <= row_dt <= end_bound:
                     unparseable_window_rows = True
             reached_before_window = bool(row_dates) and min(row_dates) < start_bound
-            if not has_more:
-                if unparseable_window_rows:
-                    status = "PARTIAL_PROFILE_POSTS_UNPARSEABLE_WINDOW_ROW"
-                elif reached_before_window:
-                    # A dated post older than the requested start proves that
-                    # pagination crossed the full historical window. Merely
-                    # receiving some in-window rows is not proof that every post
-                    # was collected; APIs can truncate a page while reporting no
-                    # second page or change pagination behavior.
-                    status = "PROFILE_POSTS_COMPLETE_WINDOW"
-                else:
-                    status = "PARTIAL_PROFILE_POSTS_NO_WINDOW_BOUNDARY_EVIDENCE"
-                break
+
+            # Some public profile responses return isExistSecondPage=false even
+            # when they also supply a fresh timeOffset cursor. Treat the explicit
+            # advancing cursor as pagination evidence; otherwise the collector
+            # stops after one ~20-post page and can never reach the 8–14-day
+            # cohort. We still require an observed dated post older than the
+            # requested window before declaring coverage complete.
+            next_cursor_text = str(next_cursor).strip() if next_cursor is not None else ""
+            cursor_advances = (
+                bool(next_cursor_text)
+                and next_cursor_text.casefold() not in {"0", "none", "null", "false"}
+                and next_cursor_text != str(cursor)
+            )
+
             if reached_before_window:
                 status = ("PARTIAL_PROFILE_POSTS_UNPARSEABLE_WINDOW_ROW" if unparseable_window_rows
                           else "PROFILE_POSTS_COMPLETE_WINDOW")
                 break
-            if not next_cursor or str(next_cursor) == str(cursor):
-                status = "PARTIAL_PROFILE_POSTS_INVALID_CURSOR"
-                break
             if not rows:
-                status = "PARTIAL_PROFILE_POSTS_EMPTY_PAGE_WITH_MORE"
+                if has_more:
+                    status = "PARTIAL_PROFILE_POSTS_EMPTY_PAGE_WITH_MORE"
+                elif unparseable_window_rows:
+                    status = "PARTIAL_PROFILE_POSTS_UNPARSEABLE_WINDOW_ROW"
+                else:
+                    status = "PARTIAL_PROFILE_POSTS_NO_WINDOW_BOUNDARY_EVIDENCE"
                 break
             if len(collected) >= MAX_POSTS_PER_PROFILE:
                 status = "PARTIAL_PROFILE_POSTS_POST_LIMIT"
                 break
-            cursor = next_cursor
-            sleep_fn(REQUEST_DELAY_SECONDS)
+            if cursor_advances:
+                cursor = next_cursor
+                sleep_fn(REQUEST_DELAY_SECONDS)
+                continue
+            if has_more:
+                status = "PARTIAL_PROFILE_POSTS_INVALID_CURSOR"
+            elif unparseable_window_rows:
+                status = "PARTIAL_PROFILE_POSTS_UNPARSEABLE_WINDOW_ROW"
+            else:
+                status = "PARTIAL_PROFILE_POSTS_NO_WINDOW_BOUNDARY_EVIDENCE"
+            break
         else:
             status = "PARTIAL_PROFILE_POSTS_PAGE_LIMIT"
     except Exception as exc:
