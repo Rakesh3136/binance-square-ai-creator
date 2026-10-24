@@ -38,8 +38,8 @@ USER_API = "/bapi/composite/v3/friendly/pgc/user/client"
 POST_DETAIL_API = "/bapi/composite/v3/friendly/pgc/special/content/detail/"
 USER_POSTS_API = "/bapi/composite/v2/friendly/pgc/content/queryUserProfilePageContentsWithFilter"
 MAX_PROFILE_TARGETS = 12
-MAX_PAGES_PER_PROFILE = 5
-MAX_POSTS_PER_PROFILE = 40
+MAX_PAGES_PER_PROFILE = 50
+MAX_POSTS_PER_PROFILE = 1000
 MAX_EXAMPLES = 8000
 REQUEST_DELAY_SECONDS = 0.35
 MAX_BODY_TEXT = 900
@@ -242,6 +242,8 @@ def build_candidates(examples: list[dict], benchmark: dict, observed: dict,
             "rank": row.get("rank"),
             "evidence_ref": row.get("evidence_ref"),
             "source_url": row.get("source_url"),
+            "period_start": row.get("period_start"),
+            "period_end": row.get("period_end"),
             "earnings_status": ("OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT"
                                 if source == "observed_write_to_earn_leaderboard"
                                 else "PUBLIC_RESEARCH_LEAD_NOT_VERIFIED"),
@@ -371,6 +373,7 @@ def _resolve_user(candidate: dict, request_json=public_json_request) -> tuple[di
         "creator": candidate.get("creator") or display_name,
         "username": username,
         "display_name": display_name,
+        "observed_display_name": str(user.get("displayName") or user.get("nickName") or "").strip() or None,
         "square_uid": uid,
         "creator_profile_url": profile_url if profile_username(profile_url) else None,
         "followers": user.get("totalFollowerCount"),
@@ -398,7 +401,7 @@ def _observed_metric(row: dict, *keys: str) -> tuple[float | None, str | None]:
     return None, None
 
 
-def _parse_profile_post(row: dict, profile: dict, now: datetime) -> dict | None:
+def _parse_profile_post(row: dict, profile: dict, now: datetime, window_start: datetime | None = None, window_end: datetime | None = None) -> dict | None:
     pid = normalize_id(row.get("id") or row.get("postId") or row.get("contentId") or row.get("articleId"))
     if not pid:
         return None
@@ -408,7 +411,9 @@ def _parse_profile_post(row: dict, profile: dict, now: datetime) -> dict | None:
     if not text or not stamp:
         return None
     dt = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-    if dt.tzinfo is None or dt > now or dt < UTC_MIN or dt < now - timedelta(days=14):
+    effective_start = window_start or (now - timedelta(days=14))
+    effective_end = window_end or now
+    if dt.tzinfo is None or dt > now or dt < UTC_MIN or dt < effective_start or dt > effective_end:
         return None
     views = metric(row, "viewCount", "views", "view_num", "viewNum")
     likes = metric(row, "likeCount", "likes", "like_num", "likeNum")
@@ -462,10 +467,14 @@ def _extract_post_rows(page_payload: Any) -> tuple[list[dict], Any, bool]:
 
 
 def _fetch_profile_posts(uid: str, profile: dict, now: datetime, request_json=public_json_request,
-                         sleep_fn=time.sleep) -> tuple[list[dict], str, int]:
+                         sleep_fn=time.sleep, window_start: datetime | None = None,
+                         window_end: datetime | None = None) -> tuple[list[dict], str, int]:
+    """Collect every post in the requested period, or mark coverage incomplete."""
     collected: dict[str, dict] = {}
     cursor: Any = int(now.timestamp() * 1000)
-    status = "PROFILE_POSTS_COLLECTED"
+    start_bound = window_start or (now - timedelta(days=14))
+    end_bound = window_end or now
+    status = "PARTIAL_PROFILE_POSTS_PAGE_LIMIT"
     pages = 0
     try:
         for _ in range(MAX_PAGES_PER_PROFILE):
@@ -475,31 +484,47 @@ def _fetch_profile_posts(uid: str, profile: dict, now: datetime, request_json=pu
             response = request_json(BASE + USER_POSTS_API + "?" + query)
             rows, next_cursor, has_more = _extract_post_rows(response)
             pages += 1
-            added_before = len(collected)
             for row in rows:
-                post = _parse_profile_post(row, profile, now)
+                post = _parse_profile_post(row, profile, now, start_bound, end_bound)
                 if post:
                     collected[post["post_id"]] = post
+            row_dates = []
+            for row in rows:
+                stamp = _post_stamp(row)
+                if stamp:
+                    try:
+                        dt = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+                        if dt.tzinfo is not None:
+                            row_dates.append(dt.astimezone(timezone.utc))
+                    except ValueError:
+                        pass
+            reached_before_window = bool(row_dates) and min(row_dates) < start_bound
+            if not has_more:
+                status = "PROFILE_POSTS_COMPLETE_WINDOW"
+                break
+            if reached_before_window:
+                status = "PROFILE_POSTS_COMPLETE_WINDOW"
+                break
+            if not next_cursor or str(next_cursor) == str(cursor):
+                status = "PARTIAL_PROFILE_POSTS_INVALID_CURSOR"
+                break
+            if not rows:
+                status = "PARTIAL_PROFILE_POSTS_EMPTY_PAGE_WITH_MORE"
+                break
             if len(collected) >= MAX_POSTS_PER_PROFILE:
+                status = "PARTIAL_PROFILE_POSTS_POST_LIMIT"
                 break
-            if not has_more or not next_cursor or str(next_cursor) == str(cursor) or not rows:
-                break
-            # The API's cursor is honored exactly as returned; it is not inferred.
             cursor = next_cursor
-            if len(collected) == added_before and rows:
-                row_dates = [_post_stamp(r) for r in rows]
-                dated = [datetime.fromisoformat(v.replace("Z", "+00:00")) for v in row_dates if v]
-                if dated and max(dated) < now - timedelta(days=14):
-                    break
             sleep_fn(REQUEST_DELAY_SECONDS)
-    except Exception as exc:
-        if collected:
-            status = "PARTIAL_PROFILE_POSTS_" + type(exc).__name__
         else:
-            status = "PROFILE_POST_ENDPOINT_BLOCKED_" + type(exc).__name__
-    posts = sorted(collected.values(), key=lambda p: p["posted_at"], reverse=True)[:MAX_POSTS_PER_PROFILE]
+            status = "PARTIAL_PROFILE_POSTS_PAGE_LIMIT"
+    except Exception as exc:
+        status = ("PARTIAL_PROFILE_POSTS_" if collected else "PROFILE_POST_ENDPOINT_BLOCKED_") + type(exc).__name__
+    posts = sorted(collected.values(), key=lambda p: p["posted_at"], reverse=True)
+    if len(posts) > MAX_POSTS_PER_PROFILE:
+        posts = posts[:MAX_POSTS_PER_PROFILE]
+        status = "PARTIAL_PROFILE_POSTS_POST_LIMIT"
     return posts, status, pages
-
 
 def _merge_example_rows(existing: list[dict], incoming: list[dict]) -> list[dict]:
     by_id: dict[str, dict] = {}
@@ -555,12 +580,45 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
         if not isinstance(candidate, dict):
             continue
         try:
+            period_end = None
+            period_start = None
+            try:
+                if candidate.get("period_end"):
+                    period_end = datetime.fromisoformat(str(candidate["period_end"]).replace("Z", "+00:00"))
+                    if period_end.tzinfo is None:
+                        period_end = period_end.replace(tzinfo=timezone.utc)
+                    period_end = period_end.astimezone(timezone.utc)
+                if candidate.get("period_start"):
+                    period_start = datetime.fromisoformat(str(candidate["period_start"]).replace("Z", "+00:00"))
+                    if period_start.tzinfo is None:
+                        period_start = period_start.replace(tzinfo=timezone.utc)
+                    period_start = period_start.astimezone(timezone.utc)
+            except ValueError:
+                period_end, period_start = None, None
+            period_end = period_end or now
+            seven_start = period_start or (period_end - timedelta(days=7))
+            fourteen_start = (period_start - timedelta(days=7)) if period_start else (period_end - timedelta(days=14))
             profile, uid = _resolve_user(candidate, request_json)
-            posts, posts_status, pages = _fetch_profile_posts(uid, profile, now, request_json, sleep_fn)
-            seven = [p for p in posts if datetime.fromisoformat(p["posted_at"].replace("Z", "+00:00")) >= now - timedelta(days=7)]
-            fourteen = [p for p in posts if datetime.fromisoformat(p["posted_at"].replace("Z", "+00:00")) >= now - timedelta(days=14)]
+            wanted_name = str(candidate.get("creator") or "").strip().casefold()
+            got_name = str(profile.get("observed_display_name") or "").strip().casefold()
+            wanted_user = str(candidate.get("username") or profile_username(candidate.get("creator_profile_url")) or "").strip().casefold()
+            got_user = str(profile.get("username") or "").strip().casefold()
+            identity_match = "verified" if ((wanted_user and got_user and wanted_user == got_user) or (wanted_name and got_name and wanted_name == got_name)) else "unverified"
+            profile["identity_match"] = identity_match
+            posts, posts_status, pages = _fetch_profile_posts(
+                uid, profile, now, request_json, sleep_fn, fourteen_start, period_end
+            )
+            post_times = [(p, datetime.fromisoformat(p["posted_at"].replace("Z", "+00:00")).astimezone(timezone.utc)) for p in posts]
+            seven = [p for p, stamp in post_times if seven_start <= stamp <= period_end]
+            fourteen = [p for p, stamp in post_times if fourteen_start <= stamp <= period_end]
+            older = [p for p, stamp in post_times if fourteen_start <= stamp < seven_start]
+            window_complete = posts_status == "PROFILE_POSTS_COMPLETE_WINDOW"
             profiles.append({
                 **profile,
+                "period_start_utc": seven_start.isoformat(),
+                "period_end_utc": period_end.isoformat(),
+                "window_7d_complete": bool(window_complete and identity_match == "verified"),
+                "window_14d_complete": bool(window_complete and identity_match == "verified"),
                 "discovery_source": candidate.get("discovery_source"),
                 "earnings_status": candidate.get("earnings_status") or "PUBLIC_RESEARCH_LEAD_NOT_VERIFIED",
                 "claimed_amount": candidate.get("claimed_amount"),
@@ -569,7 +627,7 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
                 "evidence_ref": candidate.get("evidence_ref"),
                 "source_url": candidate.get("source_url"),
                 "posts_7d": len(seven), "posts_14d": len(fourteen),
-                "posts_age_8_to_14_days": sum(1 for p in fourteen if datetime.fromisoformat(p["posted_at"].replace("Z", "+00:00")) < now - timedelta(days=7)),
+                "posts_age_8_to_14_days": len(older),
                 "pages_checked": pages,
                 "posts_status": posts_status,
                 "recent_post_samples": [{
@@ -588,8 +646,13 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
         if index + 1 < min(len(candidates), MAX_PROFILE_TARGETS):
             sleep_fn(REQUEST_DELAY_SECONDS)
 
-    seven_count = sum(1 for p in all_posts if datetime.fromisoformat(p["posted_at"].replace("Z", "+00:00")) >= now - timedelta(days=7))
-    older_count = sum(1 for p in all_posts if now - timedelta(days=14) <= datetime.fromisoformat(p["posted_at"].replace("Z", "+00:00")) < now - timedelta(days=7))
+    seven_count = sum(int(p.get("posts_7d") or 0) for p in profiles)
+    older_count = sum(int(p.get("posts_age_8_to_14_days") or 0) for p in profiles)
+    leaderboard_candidates = [c for c in candidates if c.get("discovery_source") == "observed_write_to_earn_leaderboard"]
+    leaderboard_names = {str(c.get("creator") or "").strip().casefold() for c in leaderboard_candidates}
+    leaderboard_profiles = [p for p in profiles if str(p.get("creator") or "").strip().casefold() in leaderboard_names]
+    all_7d_complete = bool(leaderboard_candidates) and len(leaderboard_profiles) == len(leaderboard_candidates) and all(p.get("window_7d_complete") for p in leaderboard_profiles)
+    all_14d_complete = bool(leaderboard_candidates) and len(leaderboard_profiles) == len(leaderboard_candidates) and all(p.get("window_14d_complete") for p in leaderboard_profiles)
     status = "PROFILE_RESEARCH_COMPLETE" if profiles and all_posts else (
         "PROFILES_RESOLVED_NO_DATED_POSTS" if profiles else
         "PUBLIC_PROFILE_ENDPOINT_BLOCKED" if failures else "NO_PROFILE_CANDIDATES"
@@ -615,6 +678,11 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
         "posts_collected_14d": len(all_posts),
         "seven_day_coverage_observed": seven_count > 0,
         "fourteen_day_coverage_observed": older_count > 0,
+        "leaderboard_creators_expected": len(leaderboard_candidates),
+        "leaderboard_creators_resolved": len(leaderboard_profiles),
+        "leaderboard_7d_window_coverage_complete": all_7d_complete,
+        "leaderboard_14d_window_coverage_complete": all_14d_complete,
+        "coverage_status": "FULL_7_AND_14_DAY_LEADERBOARD_COVERAGE" if all_7d_complete and all_14d_complete else "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE",
         "public_metrics_are_not_earnings": True,
         "profiles": profiles,
         "posts": all_posts,
@@ -645,8 +713,25 @@ def main() -> int:
     # creator intelligence and the learning planner evaluate the same samples.
     merged = _merge_example_rows(examples, result.get("posts", []))
     write_json(EXAMPLES_PATH, merged)
+    # Rebuild creator-period cohort learning from this exact post research run and
+    # the normalized first-party leaderboard rewards. Never assign a weekly total
+    # to individual posts.
+    try:
+        try:
+            from src.nic_creator_period_learning import run as run_creator_period_learning
+        except ModuleNotFoundError:
+            from nic_creator_period_learning import run as run_creator_period_learning
+        learning_artifact = run_creator_period_learning()
+        result["creator_period_learning_status"] = learning_artifact.get("learning_status")
+        result["creator_period_learning_coverage"] = learning_artifact.get("coverage")
+    except Exception as exc:
+        result["creator_period_learning_status"] = "ERROR_" + type(exc).__name__
+        result["creator_period_learning_coverage"] = None
+    write_json(OUT_PATH, result)
     print(json.dumps({
         "status": result["status"],
+        "creator_period_learning_status": result.get("creator_period_learning_status"),
+        "creator_period_learning_coverage": result.get("creator_period_learning_coverage"),
         "candidate_count": result["candidate_count"],
         "profiles_resolved": result["profiles_resolved"],
         "posts_collected_7d": result["posts_collected_7d"],

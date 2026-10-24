@@ -1,0 +1,34 @@
+name: NIC Creator Strategy Runtime
+
+on:
+  pull_request:
+    paths:
+      - "src/creator_strategy_runtime.py"
+      - "src/nic_native_writer.py"
+      - "src/multi_agent_creator.py"
+      - "src/nic_creator_period_learning.py"
+      - "src/nic_square_profile_research.py"
+      - "src/test_creator_strategy_runtime.py"
+      - "src/test_nic_creator_period_learning.py"
+      - "src/test_nic_square_profile_period_coverage.py"
+      - "data/intelligence/creator_strategy_playbook.json"
+      - ".github/workflows/creator-strategy-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  creator-strategy-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile creator runtime, period learner, profile research, and writer
+        run: python -m py_compile src/creator_strategy_runtime.py src/nic_creator_period_learning.py src/nic_square_profile_research.py src/nic_native_writer.py src/multi_agent_creator.py src/test_creator_strategy_runtime.py src/test_nic_creator_period_learning.py src/test_nic_square_profile_period_coverage.py
+      - name: Run creator strategy and reward-period regression tests
+        run: python -m unittest src.test_creator_strategy_runtime src.test_nic_creator_period_learning src.test_nic_square_profile_period_coverage -v
