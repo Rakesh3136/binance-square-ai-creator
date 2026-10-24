@@ -122,6 +122,7 @@ def study(observations, research, now=None):
             "leaderboard_source_url": entry.get("source_url"),
             "leaderboard_evidence_ref": entry.get("evidence_ref"),
             "evidence_type": "FIRST_PARTY_WRITE_TO_EARN_DISPLAY",
+            "posts_found_in_earnings_period": len(matching),
             "exact_earnings_period": summarize(matching),
             "fourteen_day_lookback": {
                 "start": lookback_start.isoformat(),
