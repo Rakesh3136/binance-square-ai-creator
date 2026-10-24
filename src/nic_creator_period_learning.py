@@ -171,7 +171,7 @@ def build_learning_artifact(
             and (not collection.get("profile_url") or _profile_url_key(p.get("creator_profile_url")) == _profile_url_key(collection.get("profile_url")))
         ]
         seven_start = period_start
-        fourteen_start = (period_end - timedelta(days=13)) if period_end else None
+        fourteen_start = (period_start - timedelta(days=7)) if period_start else None
         def in_window(post: dict[str, Any], start: datetime | None, end: datetime | None) -> bool:
             stamp = _parse_date(post.get("published_at_utc") or post.get("published_at") or post.get("posted_at") or post.get("created_at"))
             return bool(stamp and start and end and start <= stamp <= end)
