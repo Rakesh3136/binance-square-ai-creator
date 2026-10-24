@@ -1,4 +1,5 @@
 """Tests for creator-period Write-to-Earn cohort learning."""
+import copy
 import unittest
 
 from src.nic_creator_period_learning import build_learning_artifact, _creator_match as runtime_name_match
@@ -101,9 +102,55 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         self.assertEqual(artifact["learning_status"], "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE")
         self.assertEqual(
             artifact["reward_tier_cohort_comparison"]["status"],
-            "BLOCKED_NEED_ALL_LEADERBOARD_CREATOR_WINDOWS_COMPLETE",
+            "BLOCKED_NEED_AT_LEAST_80_PERCENT_VERIFIED_CREATOR_WINDOWS",
         )
         self.assertEqual(artifact["coverage_status"], "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE")
+
+    def test_nine_of_ten_verified_creator_cohorts_can_produce_cautious_learning(self):
+        leaderboard = copy.deepcopy(self.leaderboard)
+        post_input = copy.deepcopy(self.posts_input)
+        for index in range(6):
+            name = f"Extra Creator {index + 1}"
+            profile_url = f"https://www.binance.com/en/square/profile/extra{index + 1}"
+            leaderboard["entries"].append({
+                "creator": name, "rank": index + 5, "displayed_amount": [700, 600, 500, 400, 300, 100][index],
+                "currency": "USDC", "period_start": "2026-10-12T00:00:00Z",
+                "period_end": "2026-10-18T23:59:59Z",
+                "source_url": "https://www.binance.com/en/square/WriteToEarn",
+                "evidence_ref": "test-evidence",
+            })
+            # The tenth creator deliberately remains unresolved. Never fabricate a profile or posts.
+            if index == 5:
+                continue
+            post_input["creator_collections"].append({
+                "creator": name, "profile_url": profile_url, "identity_match": "verified",
+                "collection_status": "complete", "window_7d_complete": True, "window_14d_complete": True,
+            })
+            for day, body in [
+                ("2026-10-06T10:00:00Z", f"$BTC volume and risk boundary for {name}"),
+                ("2026-10-13T10:00:00Z", f"$ETH evidence 12,000 volume and invalidation for {name}"),
+                ("2026-10-14T10:00:00Z", f"$SOL structure and source https://example.com for {name}"),
+                ("2026-10-15T10:00:00Z", f"$BNB market context, but the thesis can fail for {name}"),
+            ]:
+                post_input["posts"].append({
+                    "creator": name, "creator_profile_url": profile_url,
+                    "post_id": f"{name}-{day}", "post_url": f"https://www.binance.com/en/square/post/{name}-{day}",
+                    "published_at_utc": day, "text": body, "format": "text",
+                    "topic": "market structure", "source_urls": ["https://example.com"],
+                })
+
+        artifact = build_learning_artifact(leaderboard, post_input, "2026-10-24T00:00:00Z")
+        self.assertEqual(artifact["coverage"]["leaderboard_creators"], 10)
+        self.assertEqual(artifact["coverage"]["complete_7d"], 9)
+        self.assertEqual(artifact["coverage"]["complete_14d"], 9)
+        self.assertEqual(artifact["learning_status"], "COHORT_HYPOTHESES_READY")
+        self.assertEqual(artifact["coverage_status"], "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE")
+        self.assertEqual(artifact["learning_coverage_policy"]["creators_complete_for_both_windows"], 9)
+        self.assertIn("full leaderboard coverage remains incomplete", artifact["learning_coverage_policy"]["partial_coverage_warning"])
+        self.assertEqual(
+            artifact["reward_tier_cohort_comparison"]["status"],
+            "DESCRIPTIVE_COMPARISON_AVAILABLE",
+        )
 
     def test_no_posts_does_not_turn_creator_reward_into_post_reward(self):
         self.posts_input["posts"] = []
