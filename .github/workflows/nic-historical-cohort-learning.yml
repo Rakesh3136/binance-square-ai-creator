@@ -5,6 +5,9 @@ on:
     paths:
       - "src/nic_square_profile_research.py"
       - "src/nic_creator_period_learning.py"
+      - "src/multi_agent_creator.py"
+      - "src/nic_native_writer.py"
+      - "src/creator_strategy_runtime.py"
       - "src/test_historical_window_cursor.py"
       - ".github/workflows/nic-historical-cohort-learning.yml"
   workflow_dispatch:
@@ -23,6 +26,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile research and cohort learner
-        run: python -m py_compile src/nic_square_profile_research.py src/nic_creator_period_learning.py src/test_historical_window_cursor.py
+        run: python -m py_compile src/nic_square_profile_research.py src/nic_creator_period_learning.py src/multi_agent_creator.py src/nic_native_writer.py src/creator_strategy_runtime.py src/test_historical_window_cursor.py
       - name: Test historical reward-period cursor
         run: python -m unittest src.test_historical_window_cursor -v
