@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -82,8 +82,35 @@ def study(observations, research, now=None):
             posted = parse_time(post.get("posted_at"))
             if posted and start <= posted <= end:
                 matching.append(post)
-        def distribution(field):
-            return dict(Counter(str(p.get(field) or "unknown") for p in matching).most_common())
+        lookback_start = end - timedelta(days=14)
+        lookback = []
+        for post in posts:
+            if not isinstance(post, dict) or not post_matches_creator(post, slug):
+                continue
+            posted = parse_time(post.get("posted_at"))
+            if posted and lookback_start <= posted <= end:
+                lookback.append(post)
+        def summarize(window_posts):
+            def distribution(field):
+                return dict(Counter(str(p.get(field) or "unknown") for p in window_posts).most_common())
+            return {
+                "post_count": len(window_posts),
+                "post_archetypes": distribution("archetype"),
+                "post_formats": distribution("format"),
+                "posts": [{
+                    "post_id": p.get("post_id"),
+                    "post_url": p.get("source_url"),
+                    "posted_at": p.get("posted_at"),
+                    "archetype": p.get("archetype"),
+                    "format": p.get("format"),
+                    "views": p.get("views"),
+                    "likes": p.get("likes"),
+                    "replies": p.get("replies"),
+                    "shares": p.get("shares"),
+                } for p in window_posts],
+                "history_sufficient_for_pattern_claims": bool(window_posts),
+                "empty_history_reason": None if window_posts else "NO_MATCHING_CREATOR_POSTS_RETRIEVED_FOR_THIS_WINDOW",
+            }
         studies.append({
             "creator": entry.get("creator"),
             "creator_profile_url": entry.get("creator_profile_url"),
@@ -96,19 +123,12 @@ def study(observations, research, now=None):
             "leaderboard_evidence_ref": entry.get("evidence_ref"),
             "evidence_type": "FIRST_PARTY_WRITE_TO_EARN_DISPLAY",
             "posts_found_in_earnings_period": len(matching),
-            "post_archetypes": distribution("archetype"),
-            "post_formats": distribution("format"),
-            "posts": [{
-                "post_id": p.get("post_id"),
-                "post_url": p.get("source_url"),
-                "posted_at": p.get("posted_at"),
-                "archetype": p.get("archetype"),
-                "format": p.get("format"),
-                "views": p.get("views"),
-                "likes": p.get("likes"),
-                "replies": p.get("replies"),
-                "shares": p.get("shares"),
-            } for p in matching],
+            "exact_earnings_period": summarize(matching),
+            "fourteen_day_lookback": {
+                "start": lookback_start.isoformat(),
+                "end": end.isoformat(),
+                **summarize(lookback),
+            },
             "interpretation": "Creator-level earnings are displayed for this period; individual post earnings are unknown. Post patterns are hypotheses to test, not causal attribution.",
             "independently_verified_payment": False,
             "individual_post_reward_attribution": False,
@@ -119,10 +139,14 @@ def study(observations, research, now=None):
         "status": "WEEKLY_EARNER_STUDY_READY" if studies else "NO_VALID_WEEKLY_EARNER_OBSERVATIONS",
         "source_observation_count": len(entries),
         "creator_periods_studied": len(studies),
+        "creator_periods_with_exact_period_posts": sum(s["exact_earnings_period"]["post_count"] > 0 for s in studies),
+        "creator_periods_with_14_day_posts": sum(s["fourteen_day_lookback"]["post_count"] > 0 for s in studies),
         "studies": studies,
         "policy": {
             "requires_first_party_observed_earnings": True,
-            "matches_public_posts_only_within_displayed_earnings_period": True,
+            "reports_exact_earnings_period_separately_from_14_day_lookback": True,
+            "matches_public_posts_only_to_creator_profile_and_dates": True,
+            "empty_history_is_reported_not_filled_with_out_of_period_posts": True,
             "does_not_infer_per_post_earnings": True,
             "public_engagement_is_not_earnings": True,
             "missing_profile_url_means_no_creator_match": True,
@@ -134,7 +158,7 @@ def main():
     result = study(read_json(OBSERVED, {}), read_json(PROFILE_RESEARCH, {}))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps({k: result[k] for k in ("status", "source_observation_count", "creator_periods_studied")}, indent=2))
+    print(json.dumps({k: result[k] for k in ("status", "source_observation_count", "creator_periods_studied", "creator_periods_with_exact_period_posts", "creator_periods_with_14_day_posts")}, indent=2))
     return 0
 
 
