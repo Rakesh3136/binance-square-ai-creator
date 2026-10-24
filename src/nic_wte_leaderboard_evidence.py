@@ -103,6 +103,10 @@ def normalize_observations(payload: object, now: datetime | None = None) -> dict
         accepted.append({
             "creator": creator[:160],
             "creator_profile_url": profile,
+            "profile_resolution_method": str(row.get("profile_resolution_method") or "UNSPECIFIED")[:100],
+            "profile_resolution_evidence_url": _profile_url(row.get("profile_resolution_evidence_url")),
+            "profile_resolution_note": str(row.get("profile_resolution_note") or "")[:500] or None,
+            "profile_resolution_status": str(row.get("profile_resolution_status") or ("CANDIDATE_URL_PROVIDED" if profile else "UNRESOLVED"))[:100],
             "rank": rank if isinstance(rank, int) and not isinstance(rank, bool) and rank > 0 else None,
             "displayed_amount": float(amount),
             "currency": currency,

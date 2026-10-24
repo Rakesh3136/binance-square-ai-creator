@@ -121,6 +121,10 @@ def build_learning_artifact(
             "collection_status": "complete" if profile.get("posts_status") == "PROFILE_POSTS_COMPLETE_WINDOW" else "partial",
             "window_7d_complete": profile.get("window_7d_complete") is True,
             "window_14d_complete": profile.get("window_14d_complete") is True,
+            "profile_resolution_method": profile.get("profile_resolution_method"),
+            "profile_resolution_evidence_url": profile.get("profile_resolution_evidence_url"),
+            "profile_resolution_note": profile.get("profile_resolution_note"),
+            "profile_resolution_status": profile.get("profile_resolution_status"),
         }
         for profile in (post_input.get("profiles") or [])
         if isinstance(profile, dict)
@@ -182,6 +186,10 @@ def build_learning_artifact(
             "profile": {
                 "url": collection.get("profile_url"),
                 "identity_match": collection.get("identity_match", "unverified"),
+                "resolution_method": collection.get("profile_resolution_method"),
+                "resolution_evidence_url": collection.get("profile_resolution_evidence_url"),
+                "resolution_note": collection.get("profile_resolution_note"),
+                "resolution_status": collection.get("profile_resolution_status"),
                 "collection_status": collection_status,
                 "window_7d_complete": complete_7d,
                 "window_14d_complete": complete_14d,
@@ -213,7 +221,24 @@ def build_learning_artifact(
 
     high_posts = cohort_posts(high_group)
     lower_posts = cohort_posts(lower_group)
-    comparison_ready = len(high_group) >= 2 and len(lower_group) >= 2 and len(high_posts) >= 5 and len(lower_posts) >= 5
+    all_leaderboard_windows_complete = (
+        len(entries) > 0
+        and coverage["complete_7d"] == len(entries)
+        and coverage["complete_14d"] == len(entries)
+    )
+    comparison_ready = (
+        all_leaderboard_windows_complete
+        and len(high_group) >= 2
+        and len(lower_group) >= 2
+        and len(high_posts) >= 5
+        and len(lower_posts) >= 5
+    )
+    if not all_leaderboard_windows_complete:
+        comparison_status = "BLOCKED_NEED_ALL_LEADERBOARD_CREATOR_WINDOWS_COMPLETE"
+    elif len(high_group) < 2 or len(lower_group) < 2 or len(high_posts) < 5 or len(lower_posts) < 5:
+        comparison_status = "BLOCKED_NEED_AT_LEAST_TWO_CREATORS_PER_TIER_AND_FIVE_POSTS_PER_TIER"
+    else:
+        comparison_status = "DESCRIPTIVE_COMPARISON_AVAILABLE"
     pooled = cohort_posts(eligible)
     return {
         "schema_version": 1,
@@ -226,10 +251,11 @@ def build_learning_artifact(
         "reward_granularity": "creator_period",
         "learning_status": "COHORT_HYPOTHESES_READY" if comparison_ready else "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE",
         "coverage": coverage,
+        "coverage_status": "FULL_7_AND_14_DAY_LEADERBOARD_COVERAGE" if all_leaderboard_windows_complete else "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE",
         "creator_periods": creators,
         "cross_creator_post_cohort": _aggregate(pooled),
         "reward_tier_cohort_comparison": {
-            "status": "DESCRIPTIVE_COMPARISON_AVAILABLE" if comparison_ready else "BLOCKED_NEED_AT_LEAST_TWO_CREATORS_PER_TIER_WITH_COMPLETE_7D_COVERAGE",
+            "status": comparison_status,
             "interpretation": "Compare post cohorts from higher-reward and lower-reward creators for descriptive hypotheses only. The weekly amount belongs to the creator-period, not to any sampled post.",
             "high_reward_creator_periods": {
                 "creator_count": len(high_group),

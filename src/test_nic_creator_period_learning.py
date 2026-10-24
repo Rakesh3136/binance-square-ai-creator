@@ -80,6 +80,18 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         self.assertEqual(artifact["coverage"]["identity_verified"], 3)
         self.assertEqual(artifact["coverage"]["complete_7d"], 3)
 
+    def test_all_7d_posts_but_one_missing_14d_window_blocks_learning(self):
+        self.posts_input["creator_collections"][0]["window_14d_complete"] = False
+        artifact = build_learning_artifact(self.leaderboard, self.posts_input, "2026-10-24T00:00:00Z")
+        self.assertEqual(artifact["coverage"]["complete_7d"], 4)
+        self.assertEqual(artifact["coverage"]["complete_14d"], 3)
+        self.assertEqual(artifact["learning_status"], "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE")
+        self.assertEqual(
+            artifact["reward_tier_cohort_comparison"]["status"],
+            "BLOCKED_NEED_ALL_LEADERBOARD_CREATOR_WINDOWS_COMPLETE",
+        )
+        self.assertEqual(artifact["coverage_status"], "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE")
+
     def test_no_posts_does_not_turn_creator_reward_into_post_reward(self):
         self.posts_input["posts"] = []
         artifact = build_learning_artifact(self.leaderboard, self.posts_input, "2026-10-24T00:00:00Z")
