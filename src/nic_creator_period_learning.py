@@ -202,7 +202,7 @@ def build_learning_artifact(
 
     high_posts = cohort_posts(high_group)
     lower_posts = cohort_posts(lower_group)
-    comparison_ready = len(high_group) >= 2 and len(lower_group) >= 2
+    comparison_ready = len(high_group) >= 2 and len(lower_group) >= 2 and len(high_posts) >= 5 and len(lower_posts) >= 5
     pooled = cohort_posts(eligible)
     return {
         "schema_version": 1,
