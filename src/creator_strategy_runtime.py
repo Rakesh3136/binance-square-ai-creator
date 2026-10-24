@@ -14,6 +14,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAYBOOK_PATH = ROOT / "data/intelligence/creator_strategy_playbook.json"
+PERIOD_LEARNING_PATH = ROOT / "data/intelligence/creator_period_learning.json"
 PUBLICATION_LOG = ROOT / "analytics/publication_log.jsonl"
 PLAYBOOK_FALLBACK_VERSION = "missing-playbook"
 
@@ -82,7 +83,13 @@ def prepare_context(context: dict[str, Any]) -> dict[str, Any]:
         strategy_id = "participation_and_relative_strength"
     else:
         strategy_id = "asset_specific_research_edge"
+    period_learning = _load_json(PERIOD_LEARNING_PATH, {})
+    learning_status = str(period_learning.get("learning_status") or "NOT_AVAILABLE")
+    period_digest = hashlib.sha256(PERIOD_LEARNING_PATH.read_bytes()).hexdigest() if PERIOD_LEARNING_PATH.exists() else None
+    # The reward is creator-period aggregate evidence. Only descriptive cohort
+    # observations may be exposed to generation; never attach reward to a post.
     context["creator_strategy_playbook"] = playbook
+    context["creator_period_learning"] = period_learning if learning_status == "COHORT_HYPOTHESES_READY" else {}
     context["creator_strategy_runtime"] = {
         "status": "LOADED",
         "playbook_schema_version": playbook.get("schema_version"),
@@ -92,6 +99,10 @@ def prepare_context(context: dict[str, Any]) -> dict[str, Any]:
         "selected_story_type": story_type,
         "loaded_at_utc": datetime.now(timezone.utc).isoformat(),
         "reward_learning_claim": "NOT_CLAIMED",
+        "creator_period_learning_status": learning_status,
+        "creator_period_learning_sha256": period_digest,
+        "creator_period_learning_used": learning_status == "COHORT_HYPOTHESES_READY",
+        "reward_granularity": "creator_period_only",
     }
     return context
 
@@ -114,6 +125,10 @@ def annotate_and_validate(result: dict[str, Any], context: dict[str, Any]) -> di
     draft["creator_strategy_id"] = runtime.get("strategy_id")
     draft["creator_strategy_playbook_sha256"] = runtime.get("playbook_sha256")
     draft["creator_strategy_version"] = runtime.get("playbook_schema_version")
+    draft["creator_period_learning_status"] = runtime.get("creator_period_learning_status", "NOT_AVAILABLE")
+    draft["creator_period_learning_sha256"] = runtime.get("creator_period_learning_sha256")
+    draft["creator_period_learning_used"] = bool(runtime.get("creator_period_learning_used"))
+    draft["reward_granularity"] = "creator_period_only"
     draft["creator_strategy_quality_gate"] = gate
     result["draft"] = draft
     result["creator_strategy_runtime"] = runtime
