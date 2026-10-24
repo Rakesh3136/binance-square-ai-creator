@@ -1,8 +1,11 @@
 """Regression tests for creator-period and 14-day lookback studies."""
+import sys
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 
-from src.nic_weekly_earner_study import study
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from nic_weekly_earner_study import study
 
 
 class WeeklyEarnerLookbackTests(unittest.TestCase):
