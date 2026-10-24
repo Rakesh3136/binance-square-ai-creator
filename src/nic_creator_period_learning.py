@@ -151,7 +151,7 @@ def build_learning_artifact(
         seven_start = period_start
         fourteen_start = (period_end - timedelta(days=13)) if period_end else None
         def in_window(post: dict[str, Any], start: datetime | None, end: datetime | None) -> bool:
-            stamp = _parse_date(post.get("published_at_utc") or post.get("published_at") or post.get("created_at"))
+            stamp = _parse_date(post.get("published_at_utc") or post.get("published_at") or post.get("posted_at") or post.get("created_at"))
             return bool(stamp and start and end and start <= stamp <= end)
         posts_7d = [p for p in all_creator_posts if in_window(p, seven_start, period_end)]
         posts_14d = [p for p in all_creator_posts if in_window(p, fourteen_start, period_end)]
