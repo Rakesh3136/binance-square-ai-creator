@@ -63,6 +63,19 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         creator = artifact["creator_periods"][0]
         self.assertEqual(creator["post_cohort_7d"]["post_count"], 3)
         self.assertEqual(creator["post_cohort_14d"]["post_count"], 4)
+        self.assertEqual(creator["post_cohort_14d"]["window_start_utc"], "2026-10-05T00:00:00+00:00")
+        # The first day of the preceding week must not be clipped to 23:59:59.
+        self.posts_input["posts"].append({
+            "creator": "Creator A",
+            "creator_profile_url": "https://www.binance.com/en/square/profile/creatora",
+            "post_id": "Creator A-2026-10-05-boundary",
+            "published_at_utc": "2026-10-05T00:00:00Z",
+            "text": "Boundary post from the first day of the 14-day research window.",
+            "format": "text",
+            "topic": "market structure",
+        })
+        artifact = build_learning_artifact(self.leaderboard, self.posts_input, "2026-10-24T00:00:00Z")
+        self.assertEqual(artifact["creator_periods"][0]["post_cohort_14d"]["post_count"], 5)
         self.assertEqual(creator["creator_period_reward"]["amount"], 1000)
         self.assertEqual(creator["creator_period_reward"]["granularity"], "creator_period_only")
         self.assertIn("NOT attributed", creator["attribution_policy"])
