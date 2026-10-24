@@ -41,6 +41,8 @@ class CreatorPeriodLearningTests(unittest.TestCase):
             for day, body in [
                 ("2026-10-06T10:00:00Z", f"$BTC numeric evidence source link https://example.com. Risk if the level fails? {name}"),
                 ("2026-10-13T10:00:00Z", f"$ETH market structure, volume 12,000, however the downside risk remains. {name}"),
+                ("2026-10-14T10:00:00Z", f"$SOL numeric evidence and source https://example.com. The invalidation matters. {name}"),
+                ("2026-10-15T10:00:00Z", f"$BNB participation and volume 5000, but the thesis can fail. {name}"),
             ]:
                 self.posts_input["posts"].append({
                     "creator": name,
@@ -59,8 +61,8 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         self.assertEqual(artifact["reward_granularity"], "creator_period")
         self.assertEqual(artifact["learning_status"], "COHORT_HYPOTHESES_READY")
         creator = artifact["creator_periods"][0]
-        self.assertEqual(creator["post_cohort_7d"]["post_count"], 1)
-        self.assertEqual(creator["post_cohort_14d"]["post_count"], 2)
+        self.assertEqual(creator["post_cohort_7d"]["post_count"], 3)
+        self.assertEqual(creator["post_cohort_14d"]["post_count"], 4)
         self.assertEqual(creator["creator_period_reward"]["amount"], 1000)
         self.assertEqual(creator["creator_period_reward"]["granularity"], "creator_period_only")
         self.assertIn("NOT attributed", creator["attribution_policy"])
