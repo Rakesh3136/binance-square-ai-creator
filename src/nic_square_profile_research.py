@@ -480,6 +480,7 @@ def _fetch_profile_posts(uid: str, profile: dict, now: datetime, request_json=pu
     end_bound = window_end or now
     status = "PARTIAL_PROFILE_POSTS_PAGE_LIMIT"
     pages = 0
+    unparseable_window_rows = False
     try:
         for _ in range(MAX_PAGES_PER_PROFILE):
             query = urllib.parse.urlencode({
@@ -488,26 +489,38 @@ def _fetch_profile_posts(uid: str, profile: dict, now: datetime, request_json=pu
             response = request_json(BASE + USER_POSTS_API + "?" + query)
             rows, next_cursor, has_more = _extract_post_rows(response)
             pages += 1
-            for row in rows:
-                post = _parse_profile_post(row, profile, now, start_bound, end_bound)
-                if post:
-                    collected[post["post_id"]] = post
             row_dates = []
             for row in rows:
                 stamp = _post_stamp(row)
+                row_dt = None
                 if stamp:
                     try:
-                        dt = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-                        if dt.tzinfo is not None:
-                            row_dates.append(dt.astimezone(timezone.utc))
+                        parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+                        if parsed.tzinfo is not None:
+                            row_dt = parsed.astimezone(timezone.utc)
+                            row_dates.append(row_dt)
                     except ValueError:
                         pass
+                post = _parse_profile_post(row, profile, now, start_bound, end_bound)
+                if post:
+                    collected[post["post_id"]] = post
+                elif row_dt is not None and start_bound <= row_dt <= end_bound:
+                    unparseable_window_rows = True
             reached_before_window = bool(row_dates) and min(row_dates) < start_bound
             if not has_more:
-                status = "PROFILE_POSTS_COMPLETE_WINDOW"
+                if unparseable_window_rows:
+                    status = "PARTIAL_PROFILE_POSTS_UNPARSEABLE_WINDOW_ROW"
+                elif collected or reached_before_window:
+                    status = "PROFILE_POSTS_COMPLETE_WINDOW"
+                else:
+                    # An empty response or a page containing only newer-than-window
+                    # posts does not prove that the historical reward window was
+                    # exhaustively traversed.
+                    status = "PARTIAL_PROFILE_POSTS_NO_WINDOW_BOUNDARY_EVIDENCE"
                 break
             if reached_before_window:
-                status = "PROFILE_POSTS_COMPLETE_WINDOW"
+                status = ("PARTIAL_PROFILE_POSTS_UNPARSEABLE_WINDOW_ROW" if unparseable_window_rows
+                          else "PROFILE_POSTS_COMPLETE_WINDOW")
                 break
             if not next_cursor or str(next_cursor) == str(cursor):
                 status = "PARTIAL_PROFILE_POSTS_INVALID_CURSOR"

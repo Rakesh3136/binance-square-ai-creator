@@ -93,6 +93,38 @@ class CreatorPeriodCoverageTests(unittest.TestCase):
         self.assertEqual(status, "PARTIAL_PROFILE_POSTS_EMPTY_PAGE_WITH_MORE")
         self.assertEqual(pages, 1)
 
+    def test_empty_exhausted_page_without_window_boundary_is_not_complete(self):
+        now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
+        def fake_request(url):
+            return {"data": {"contents": [], "timeOffset": 0, "isExistSecondPage": False}}
+        posts, status, pages = research._fetch_profile_posts(
+            "uid-1", {"creator": "Creator A"}, now, request_json=fake_request,
+            sleep_fn=lambda _: None,
+            window_start=datetime(2026, 10, 5, tzinfo=timezone.utc),
+            window_end=datetime(2026, 10, 18, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        self.assertEqual(posts, [])
+        self.assertEqual(status, "PARTIAL_PROFILE_POSTS_NO_WINDOW_BOUNDARY_EVIDENCE")
+        self.assertEqual(pages, 1)
+
+    def test_only_newer_posts_do_not_prove_a_historical_window_was_collected(self):
+        now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
+        def fake_request(url):
+            return {"data": {"contents": [{
+                "id": "newer-post",
+                "createTime": int(datetime(2026, 10, 23, 10, tzinfo=timezone.utc).timestamp() * 1000),
+                "bodyTextOnly": "This post is newer than the leaderboard reward period.",
+            }], "timeOffset": 0, "isExistSecondPage": False}}
+        posts, status, pages = research._fetch_profile_posts(
+            "uid-1", {"creator": "Creator A"}, now, request_json=fake_request,
+            sleep_fn=lambda _: None,
+            window_start=datetime(2026, 10, 5, tzinfo=timezone.utc),
+            window_end=datetime(2026, 10, 18, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        self.assertEqual(posts, [])
+        self.assertEqual(status, "PARTIAL_PROFILE_POSTS_NO_WINDOW_BOUNDARY_EVIDENCE")
+        self.assertEqual(pages, 1)
+
     def test_partial_pagination_never_claims_complete_coverage(self):
         now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
         candidate = {
