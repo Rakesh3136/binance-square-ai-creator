@@ -40,6 +40,35 @@ class CreatorStrategyRuntimeTests(unittest.TestCase):
         self.assertEqual(result["draft"]["creator_strategy_id"], "evidence_led_research")
         self.assertEqual(result["creator_strategy_quality_gate"]["status"], "PASSED")
 
+    def test_creator_period_learning_is_provenanced_and_only_claimed_when_writer_applies_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            playbook_path = root / "playbook.json"
+            learning_path = root / "period_learning.json"
+            playbook_path.write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+            learning_path.write_text(json.dumps({
+                "learning_status": "COHORT_HYPOTHESES_READY",
+                "reward_granularity": "creator_period",
+                "reward_tier_cohort_comparison": {"status": "DESCRIPTIVE_COMPARISON_AVAILABLE"},
+            }), encoding="utf-8")
+            ctx = {"preflight": {"selected_opportunity": {"category": "research_only"}}}
+            with patch.object(runtime, "PLAYBOOK_PATH", playbook_path), patch.object(
+                runtime, "PERIOD_LEARNING_PATH", learning_path
+            ):
+                runtime.prepare_context(ctx)
+            self.assertTrue(ctx["creator_strategy_runtime"]["creator_period_learning_available"])
+            self.assertFalse(ctx["creator_strategy_runtime"]["creator_period_learning_used"])
+            result = runtime.annotate_and_validate({
+                "draft": {"text": "A new thesis based on fresh evidence and a clear counterpoint."},
+                "native_writer": {
+                    "creator_period_learning_applied": True,
+                    "creator_period_learning_rule": "evidence_led",
+                },
+            }, ctx)
+            self.assertTrue(result["draft"]["creator_period_learning_used"])
+            self.assertEqual(result["draft"]["creator_period_learning_rule"], "evidence_led")
+            self.assertEqual(result["draft"]["reward_granularity"], "creator_period_only")
+
     def test_repeated_opening_is_rejected(self):
         text = "A repeated opening that appeared in the recent publication history."
         ctx = {"creator_strategy_runtime": {
