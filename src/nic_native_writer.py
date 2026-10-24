@@ -54,6 +54,27 @@ def build(ctx):
     director=pre.get("script_director_4") or {}
     strategy_runtime=ctx.get("creator_strategy_runtime") or {}
     strategy_id=str(strategy_runtime.get("strategy_id") or "asset_specific_research_edge")
+    period_learning=ctx.get("creator_period_learning") or {}
+    tier_comparison=period_learning.get("reward_tier_cohort_comparison") or {}
+    high_cohort=tier_comparison.get("high_reward_creator_periods") or {}
+    lower_cohort=tier_comparison.get("lower_reward_creator_periods") or {}
+    high_rates=(high_cohort.get("cohort") or {}).get("rates") or {}
+    lower_rates=(lower_cohort.get("cohort") or {}).get("rates") or {}
+    cohort_guidance=None
+    cohort_comparison_ready=(
+        tier_comparison.get("status")=="DESCRIPTIVE_COMPARISON_AVAILABLE"
+        and int(high_cohort.get("cohort",{}).get("post_count") or 0)>=5
+        and int(lower_cohort.get("cohort",{}).get("post_count") or 0)>=5
+    )
+    # Apply a cohort pattern only when it appears across a minimum of five posts
+    # in both creator tiers. This is a presentation hypothesis, not post-level reward attribution.
+    if cohort_comparison_ready:
+        high_sources=num(high_rates.get("has_source_link"))
+        low_sources=num(lower_rates.get("has_source_link"))
+        high_numbers=num(high_rates.get("has_numeric_evidence"))
+        low_numbers=num(lower_rates.get("has_numeric_evidence"))
+        if high_sources >= low_sources + 0.2 and high_numbers >= low_numbers + 0.2:
+            cohort_guidance="evidence_led"
     s=sym(sel.get("symbol") or pub.get("symbol") or director.get("primary_symbol"))
     if not s:raise RuntimeError("NIC Native Writer: authoritative asset missing")
     cat=str(sel.get("category") or pub.get("category") or "market_opportunity").lower()
@@ -180,6 +201,10 @@ def build(ctx):
     # post into the same five-part sequence.
     if strategy_id == "evidence_led_research" and seed % 2 == 0:
         parts=[evidence_block, hook, middle]
+    cohort_learning_applied=False
+    if cohort_guidance=="evidence_led" and strategy_id not in {"catalyst_context_and_counterpoint"}:
+        parts=[evidence_block,hook,middle,close]
+        cohort_learning_applied=True
     post=compact_post(parts,question)
     if post.count("?")!=1 or dollar not in post or not 280<=len(post)<=700:raise RuntimeError("NIC Native Writer failed local publication contract")
-    return {"research":{"summary":f"NIC verified {dollar} using the frozen opportunity and supplied market evidence.","strongest_signal":s,"opportunity_score":num(sel.get("adjusted_score") or sel.get("raw_score") or 0),"source_mode":"NIC_NATIVE_EVIDENCE_SYNTHESIS"},"critique":{"summary":"Native NIC review bounds claims by supplied evidence and keeps uncertainty explicit.","alternative_hypothesis":"The observed move may be temporary rather than structural.","disconfirming_test":"A materially different next reaction or failed evidence condition weakens the thesis."},"draft":{"post":post,"text":post,"hook":hook,"discussion_question":question,"quality_score":84,"editorial_style":"NIC_NATIVE_WRITER","generation_mode":"NIC_NATIVE","symbol":s,"content_category":cat,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"visual_plan":{"type":"candlestick_chart" if cat not in {"crypto_meme","community","commentary","education"} else "none","use_visual":bool(it.get("candles_1h")),"purpose":"Show only the frozen asset and supplied evidence."},"native_writer":{"version":"1.0","provider":"NIC","external_text_model":False,"evidence_bound":True,"generated_at":datetime.now(timezone.utc).isoformat()}}
+    return {"research":{"summary":f"NIC verified {dollar} using the frozen opportunity and supplied market evidence.","strongest_signal":s,"opportunity_score":num(sel.get("adjusted_score") or sel.get("raw_score") or 0),"source_mode":"NIC_NATIVE_EVIDENCE_SYNTHESIS"},"critique":{"summary":"Native NIC review bounds claims by supplied evidence and keeps uncertainty explicit.","alternative_hypothesis":"The observed move may be temporary rather than structural.","disconfirming_test":"A materially different next reaction or failed evidence condition weakens the thesis."},"draft":{"post":post,"text":post,"hook":hook,"discussion_question":question,"quality_score":84,"editorial_style":"NIC_NATIVE_WRITER","generation_mode":"NIC_NATIVE","symbol":s,"content_category":cat,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"visual_plan":{"type":"candlestick_chart" if cat not in {"crypto_meme","community","commentary","education"} else "none","use_visual":bool(it.get("candles_1h")),"purpose":"Show only the frozen asset and supplied evidence."},"native_writer":{"version":"1.1","provider":"NIC","external_text_model":False,"evidence_bound":True,"creator_period_learning_status":period_learning.get("learning_status","NOT_AVAILABLE"),"creator_period_learning_applied":cohort_learning_applied,"creator_period_learning_rule":cohort_guidance if cohort_learning_applied else None,"creator_period_reward_granularity":"creator_period_only","generated_at":datetime.now(timezone.utc).isoformat()}}
