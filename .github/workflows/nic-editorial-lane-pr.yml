@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'src/nic_editorial_lane_gate.py'
+      - 'src/signal_first_router.py'
+      - 'tests/test_signal_first_research_editorial_fallback.py'
       - 'src/nic_editorial_context_sync.py'
       - 'tests/test_nic_editorial_context_sync.py'
       - 'tests/test_nic_editorial_lane_gate.py'
@@ -24,6 +26,10 @@ jobs:
           python-version: '3.12'
       - name: Compile editorial lane gate
         run: python -m py_compile src/nic_editorial_lane_gate.py
+      - name: Compile Signal-First research fallback
+        run: python -m py_compile src/signal_first_router.py
+      - name: Run research editorial fallback tests
+        run: python tests/test_signal_first_research_editorial_fallback.py
       - name: Run editorial lane fail-closed tests
         run: python tests/test_nic_editorial_lane_gate.py
       - name: Compile editorial context sync
