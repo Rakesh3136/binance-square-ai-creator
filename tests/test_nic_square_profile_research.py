@@ -20,13 +20,16 @@ class SquareProfileResearchTests(unittest.TestCase):
         candidates = build_candidates(
             examples=[{"creator": "Report", "posted_at": "2026-10-20T10:00:00Z", "text": "Write to Earn leaderboard @Alpha - $800 USDC", "source_url": "https://www.binance.com/en/square/post/123"}],
             benchmark={"creator_benchmarks": [{"creator": "Alpha", "sample_urls": ["https://www.binance.com/en/square/post/456"]}, {"creator": "Beta", "sample_urls": ["https://www.binance.com/en/square/post/789"]}]},
-            observed={"entries": [{"creator": "Alpha", "creator_profile_url": "https://www.binance.com/en/square/profile/Alpha", "displayed_amount": 900, "currency": "USDC"}]},
+            observed={"entries": [{"creator": "Alpha", "creator_profile_url": "https://www.binance.com/en/square/profile/Alpha", "profile_resolution_method": "public_indexed_exact_display_name_candidate", "profile_resolution_evidence_url": "https://www.binance.com/en/square/profile/Alpha", "profile_resolution_note": "verify display name", "displayed_amount": 900, "currency": "USDC"}]},
             now=NOW, limit=10,
         )
         self.assertEqual(candidates[0]["discovery_source"], "observed_write_to_earn_leaderboard")
         self.assertEqual(sum(1 for c in candidates if (c.get("username") or c["creator"]).casefold() == "alpha"), 1)
         self.assertEqual(candidates[0]["earnings_status"], "OBSERVED_LEADERBOARD_ENTRY_NOT_OWN_PAYOUT")
-        self.assertEqual(next(c for c in candidates if c["creator"] == "Alpha")["username"], "Alpha")
+        alpha = next(c for c in candidates if c["creator"] == "Alpha")
+        self.assertEqual(alpha["username"], "Alpha")
+        self.assertEqual(alpha["profile_resolution_method"], "public_indexed_exact_display_name_candidate")
+        self.assertEqual(alpha["profile_resolution_evidence_url"], "https://www.binance.com/en/square/profile/Alpha")
 
     def test_daily_rotation_changes_benchmark_creator_batch_but_keeps_leads_first(self):
         benchmark = {"creator_benchmarks": [
