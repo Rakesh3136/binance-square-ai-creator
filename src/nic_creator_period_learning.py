@@ -189,11 +189,21 @@ def build_learning_artifact(
         })
 
     eligible = [c for c in creators if c["profile"]["identity_match"] == "verified" and c["profile"]["window_7d_complete"]]
-    pooled = [p for p in posts if any(
-        _creator_match(p.get("creator"), c["creator"]) and
-        in_period_for_creator(p, c, "post_cohort_7d")
-        for c in eligible
-    )]
+    eligible_sorted = sorted(eligible, key=lambda c: float(c["creator_period_reward"].get("amount") or 0), reverse=True)
+    split = len(eligible_sorted) // 2
+    high_group = eligible_sorted[:split] if split else []
+    lower_group = eligible_sorted[split:] if split else []
+
+    def cohort_posts(group: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            p for p in posts
+            if any(_creator_match(p.get("creator"), c["creator"]) and in_period_for_creator(p, c, "post_cohort_7d") for c in group)
+        ]
+
+    high_posts = cohort_posts(high_group)
+    lower_posts = cohort_posts(lower_group)
+    comparison_ready = len(high_group) >= 2 and len(lower_group) >= 2
+    pooled = cohort_posts(eligible)
     return {
         "schema_version": 1,
         "artifact_type": "creator_period_cohort_learning",
@@ -203,10 +213,25 @@ def build_learning_artifact(
             "post_input": str(POSTS_INPUT_PATH.relative_to(ROOT)),
         },
         "reward_granularity": "creator_period",
-        "learning_status": "COHORT_HYPOTHESES_READY" if eligible else "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE",
+        "learning_status": "COHORT_HYPOTHESES_READY" if comparison_ready else "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE",
         "coverage": coverage,
         "creator_periods": creators,
         "cross_creator_post_cohort": _aggregate(pooled),
+        "reward_tier_cohort_comparison": {
+            "status": "DESCRIPTIVE_COMPARISON_AVAILABLE" if comparison_ready else "BLOCKED_NEED_AT_LEAST_TWO_CREATORS_PER_TIER_WITH_COMPLETE_7D_COVERAGE",
+            "interpretation": "Compare post cohorts from higher-reward and lower-reward creators for descriptive hypotheses only. The weekly amount belongs to the creator-period, not to any sampled post.",
+            "high_reward_creator_periods": {
+                "creator_count": len(high_group),
+                "creators": [c["creator"] for c in high_group],
+                "cohort": _aggregate(high_posts),
+            },
+            "lower_reward_creator_periods": {
+                "creator_count": len(lower_group),
+                "creators": [c["creator"] for c in lower_group],
+                "cohort": _aggregate(lower_posts),
+            },
+            "causal_claim": "NOT_SUPPORTED_BY_CREATOR_PERIOD_REWARDS",
+        },
         "rules": [
             "Never divide creator-period rewards by post count or attach the total to a post.",
             "A creator is covered only when profile identity is verified and the collection manifest explicitly confirms the complete time window.",
