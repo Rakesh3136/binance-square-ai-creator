@@ -373,6 +373,7 @@ def _resolve_user(candidate: dict, request_json=public_json_request) -> tuple[di
         "creator": candidate.get("creator") or display_name,
         "username": username,
         "display_name": display_name,
+        "observed_display_name": str(user.get("displayName") or user.get("nickName") or "").strip() or None,
         "square_uid": uid,
         "creator_profile_url": profile_url if profile_username(profile_url) else None,
         "followers": user.get("totalFollowerCount"),
@@ -593,7 +594,7 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
             fourteen_start = (period_start - timedelta(days=7)) if period_start else (period_end - timedelta(days=14))
             profile, uid = _resolve_user(candidate, request_json)
             wanted_name = str(candidate.get("creator") or "").strip().casefold()
-            got_name = str(profile.get("display_name") or "").strip().casefold()
+            got_name = str(profile.get("observed_display_name") or "").strip().casefold()
             wanted_user = str(candidate.get("username") or profile_username(candidate.get("creator_profile_url")) or "").strip().casefold()
             got_user = str(profile.get("username") or "").strip().casefold()
             identity_match = "verified" if ((wanted_user and got_user and wanted_user == got_user) or (wanted_name and got_name and wanted_name == got_name)) else "unverified"
