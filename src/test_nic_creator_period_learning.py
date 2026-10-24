@@ -82,6 +82,20 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         self.assertIn("NOT attributed", creator["attribution_policy"])
         self.assertEqual(artifact["reward_tier_cohort_comparison"]["causal_claim"], "NOT_SUPPORTED_BY_CREATOR_PERIOD_REWARDS")
 
+
+    def test_reward_tier_comparison_accepts_posted_at_timestamp_alias(self):
+        leaderboard = copy.deepcopy(self.leaderboard)
+        post_input = copy.deepcopy(self.posts_input)
+        # Production profile collectors commonly serialize timestamps as posted_at.
+        for post in post_input["posts"]:
+            post["posted_at"] = post.pop("published_at_utc")
+        artifact = build_learning_artifact(leaderboard, post_input, "2026-10-24T00:00:00Z")
+        comparison = artifact["reward_tier_cohort_comparison"]
+        self.assertEqual(comparison["status"], "DESCRIPTIVE_COMPARISON_AVAILABLE")
+        self.assertGreaterEqual(comparison["high_reward_creator_periods"]["cohort"]["post_count"], 5)
+        self.assertGreaterEqual(comparison["lower_reward_creator_periods"]["cohort"]["post_count"], 5)
+        self.assertEqual(artifact["learning_status"], "COHORT_HYPOTHESES_READY")
+
     def test_missing_complete_collection_blocks_reward_learning_claim(self):
         self.posts_input["creator_collections"][0]["window_7d_complete"] = False
         artifact = build_learning_artifact(self.leaderboard, self.posts_input, "2026-10-24T00:00:00Z")
