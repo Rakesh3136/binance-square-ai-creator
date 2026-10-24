@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import creator_strategy_runtime as runtime
+from src import creator_strategy_runtime as runtime
 
 
 class CreatorStrategyRuntimeTests(unittest.TestCase):
