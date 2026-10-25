@@ -1,8 +1,4 @@
-"""Rewrite exact repeated non-factual sentences before the authoritative originality judge.
-
-This is a narrow repair, not a bypass: factual sentences are never rewritten,
-and the elite judge still decides whether the resulting draft is publishable.
-"""
+"""Rewrite exact repeated non-factual sentences before the authoritative originality judge."""
 from __future__ import annotations
 import json, os, re
 from datetime import datetime, timezone
@@ -13,10 +9,8 @@ LOG = ROOT / "analytics/publication_log.jsonl"
 OUT = ROOT / "data/live/recent_sentence_deduplication.json"
 REPORT_DIR = ROOT / "data/reports"
 
-
 def norm(text: str) -> str:
-    return re.sub(r"[^a-z0-9 ]", "", re.sub(r"\\s+", " ", str(text or "").lower())).strip()
-
+    return re.sub(r"[^a-z0-9 ]", "", re.sub(r"\s+", " ", str(text or "").lower())).strip()
 
 def load_json(path: Path) -> dict:
     try:
@@ -24,7 +18,6 @@ def load_json(path: Path) -> dict:
         return value if isinstance(value, dict) else {}
     except Exception:
         return {}
-
 
 def recent_sentences() -> set[str]:
     found = set()
@@ -36,12 +29,11 @@ def recent_sentences() -> set[str]:
         except Exception:
             continue
         post = str(item.get("text") or item.get("post") or item.get("content") or "")
-        for sentence in re.split(r"(?<=[.!?])\\s+|\\n+", post):
+        for sentence in re.split(r"(?<=[.!?])\s+|\n+", post):
             n = norm(sentence)
             if len(n.split()) >= 6:
                 found.add(n)
     return found
-
 
 def resolve_draft() -> Path:
     raw = os.getenv("DRAFT_PATH", "").strip()
@@ -55,7 +47,6 @@ def resolve_draft() -> Path:
         raise SystemExit("Recent sentence deduplication: no draft report")
     return reports[0]
 
-
 def main() -> int:
     path = resolve_draft()
     data = load_json(path)
@@ -63,24 +54,21 @@ def main() -> int:
     text = str(draft.get("post") or draft.get("text") or "").strip()
     if not text:
         raise SystemExit("Recent sentence deduplication: empty draft")
-
     symbol = str(draft.get("symbol") or draft.get("resolved_asset") or "").upper()
     if not symbol:
-        match = re.search(r"\\$([A-Z][A-Z0-9]{1,14})\\b", text.upper())
+        match = re.search(r"\$([A-Z][A-Z0-9]{1,14})\b", text.upper())
         symbol = match.group(1) if match else ""
     symbol = re.sub(r"[^A-Z0-9]", "", symbol.replace("USDT", "").replace("$", ""))
     recent = recent_sentences()
     used = set()
     replacements = []
-    factual = re.compile(r"\\$[A-Z][A-Z0-9]{1,14}\\b|\\b\\d+(?:\\.\\d+)?%|\\$\\s?\\d", re.I)
-
+    factual = re.compile(r"\$[A-Z][A-Z0-9]{1,14}\b|\b\d+(?:\.\d+)?%|\$\s?\d", re.I)
     exact_replacements = {
         "that keeps the read falsifiable the next measurable reaction either supports the structure or weakens it":
             "The next observed response should either strengthen this thesis or give a concrete reason to set it aside.",
         "the available evidence supports a scenario to test not certainty about the next candle":
             "Treat this as a working hypothesis; the next confirmed response should decide whether it still fits.",
     }
-
     def fresh_replacement(sentence: str) -> str | None:
         n = norm(sentence)
         candidates = []
@@ -100,11 +88,8 @@ def main() -> int:
             if cn and cn not in recent and cn not in used and cn != n:
                 return candidate
         return None
-
-    # Split on sentence boundaries but keep the original separators/punctuation
-    # in the unchanged portions. Only exact repeated sentences with no numeric
-    # values or explicit cashtags are eligible for replacement.
-    parts = re.split(r"(?<=[.!?])(?=\\s)|(?<=\\n)", text)
+    # Only repeated sentences with no numeric values or explicit cashtags are rewritten.
+    parts = re.split(r"(?<=[.!?])(?=\s)|(?<=\n)", text)
     output = []
     changed = 0
     for part in parts:
@@ -117,7 +102,6 @@ def main() -> int:
                 continue
             candidate = fresh_replacement(stripped)
             if candidate:
-                # Keep any leading/trailing whitespace from the original segment.
                 leading = part[:len(part)-len(part.lstrip())]
                 trailing = part[len(part.rstrip()):]
                 output.append(leading + candidate + trailing)
@@ -127,35 +111,29 @@ def main() -> int:
                 continue
             replacements.append({"sentence": stripped, "status": "no_safe_alternative"})
         output.append(part)
-
     new_text = "".join(output).strip()
-    # Fail closed if repair would break the publisher's copy contract.
-    questions = new_text.count("?")
-    if changed and (len(new_text) > 740 or questions != 1):
+    if changed and (len(new_text) > 740 or new_text.count("?") != 1):
         result = {"version": "1.0", "status": "BLOCKED_REPAIR_CONTRACT", "changed": changed,
                   "replacements": replacements, "reason": "repair would violate 740-character or one-question contract"}
         OUT.parent.mkdir(parents=True, exist_ok=True)
-        OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+        OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 1
-
     if changed:
         draft["post"] = new_text
         draft["text"] = new_text
         draft["recent_sentence_deduplication"] = {"status": "REPAIRED", "changed_sentences": changed}
         if isinstance(data.get("draft"), dict):
             data["draft"] = draft
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
-
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     result = {"version": "1.0", "generated_at": datetime.now(timezone.utc).isoformat(),
               "status": "REPAIRED" if changed else "UNCHANGED", "changed": changed,
               "factual_sentences_rewritten": 0, "replacements": replacements,
               "draft_path": str(path), "recheck_required": True}
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+    OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
