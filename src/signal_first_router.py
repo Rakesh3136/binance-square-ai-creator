@@ -74,40 +74,71 @@ def editorial_complete(x):
     if category=='crypto_meme' and str(x.get('meme_source_type') or '').strip() not in {'market_move','news','existing_evidence'}:return False
     return True
 
-def research_editorial_candidates(research, live_symbols, now=None):
-    """Convert fresh, evidence-qualified research findings into non-trade editorial candidates.
-
-    This is a fallback for creator publishing, not a trade signal. It requires a
-    fresh research artifact, a live Binance asset, and explicit research thresholds.
-    """
+def analyze_research_editorial_candidates(research, live_symbols, now=None):
+    """Return qualified editorial candidates and explicit reasons for every rejection."""
     stamp = str(research.get('generated_at') or '').strip()
+    diagnostics = {
+        'artifact_generated_at': stamp or None,
+        'artifact_age_seconds': None,
+        'artifact_fresh': False,
+        'input_rows': 0,
+        'qualified_rows': 0,
+        'rejected_rows': 0,
+        'rejection_reason_counts': {},
+        'rejected_candidates': [],
+    }
     try:
         generated = datetime.fromisoformat(stamp.replace('Z', '+00:00'))
         if generated.tzinfo is None:
             generated = generated.replace(tzinfo=timezone.utc)
         age = ((now or datetime.now(timezone.utc)) - generated.astimezone(timezone.utc)).total_seconds()
     except (TypeError, ValueError):
-        return []
+        diagnostics['artifact_rejection_reason'] = 'missing_or_invalid_generated_at'
+        return [], diagnostics
+    diagnostics['artifact_age_seconds'] = round(age, 2)
     if age < 0 or age > 45 * 60:
-        return []
+        diagnostics['artifact_rejection_reason'] = 'research_artifact_stale_or_future_dated'
+        return [], diagnostics
+    diagnostics['artifact_fresh'] = True
 
     live = {str(s).upper().replace('USDT', '').strip() for s in live_symbols}
     out = []
+    reason_counts = {}
     for key, intent in (('potential_gems', 'research_upside_watch'), ('potential_risks', 'research_risk_watch')):
-        for row in research.get(key) or []:
+        rows = research.get(key) or []
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
             if not isinstance(row, dict):
                 continue
+            diagnostics['input_rows'] += 1
             symbol = str(row.get('symbol') or '').upper().replace('USDT', '').strip()
             info = num(row.get('information_advantage_score'))
             under = num(row.get('undercoverage_score'))
             evidence = num(row.get('evidence_score'))
-            # Avoid turning a market anomaly into a story without a minimum
-            # evidence floor; missing fundamentals must be stated as unknowns.
-            if not symbol or symbol not in live:
-                continue
-            if info < MIN_SCORE or under < 60 or evidence < 50:
-                continue
+            reasons = []
+            if not symbol:
+                reasons.append('missing_symbol')
+            elif symbol not in live:
+                reasons.append('asset_not_in_live_binance_usdt_universe')
+            if info < MIN_SCORE:
+                reasons.append('information_advantage_below_minimum')
+            if under < 60:
+                reasons.append('undercoverage_below_60')
+            if evidence < 50:
+                reasons.append('evidence_below_50')
             if not str(row.get('epistemic_note') or '').strip():
+                reasons.append('missing_epistemic_note')
+            if reasons:
+                diagnostics['rejected_rows'] += 1
+                for reason in reasons:
+                    reason_counts[reason] = reason_counts.get(reason, 0) + 1
+                diagnostics['rejected_candidates'].append({
+                    'symbol': symbol or None, 'source_list': key,
+                    'information_advantage_score': info,
+                    'undercoverage_score': under, 'evidence_score': evidence,
+                    'reasons': reasons,
+                })
                 continue
             out.append({
                 'type': 'research',
@@ -121,7 +152,18 @@ def research_editorial_candidates(research, live_symbols, now=None):
                 'reason': 'fresh original research cleared information-advantage, undercoverage, and evidence thresholds',
                 'editorial_only': True,
             })
-    return out
+    diagnostics['qualified_rows'] = len(out)
+    diagnostics['rejection_reason_counts'] = reason_counts
+    if diagnostics['input_rows'] == 0:
+        diagnostics['artifact_rejection_reason'] = 'no_research_rows_in_potential_gems_or_risks'
+    elif not out:
+        diagnostics['artifact_rejection_reason'] = 'no_candidate_cleared_research_editorial_thresholds'
+    return out, diagnostics
+
+
+def research_editorial_candidates(research, live_symbols, now=None):
+    """Compatibility wrapper returning only evidence-qualified editorial candidates."""
+    return analyze_research_editorial_candidates(research, live_symbols, now=now)[0]
 
 def content_plan_for(x):
     plan=load(NIC24_1).get('plans') or []
@@ -330,7 +372,7 @@ def choose(xs,rows,market,full_flow,live_symbols,allow_editorial=False):
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); macro=load(ROOT/'data/live/global_macro_intelligence.json'); rows=recent()
     live_symbols=trading_symbols(); primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
-    research_candidates = research_editorial_candidates(load(ORIGINAL_RESEARCH), live_symbols)
+    research_candidates, research_diagnostics = analyze_research_editorial_candidates(load(ORIGINAL_RESEARCH), live_symbols)
     markets.extend(research_candidates)
     for event in (macro.get('events') or [])[:30]:
         title=str(event.get('title') or '').strip(); source=str(event.get('source') or '').strip(); published=str(event.get('published_at') or '').strip(); themes=event.get('themes') if isinstance(event.get('themes'),list) else []; score=min(100,64+len(themes)*5+(4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
@@ -357,6 +399,6 @@ def main():
     else:
         pre.pop('selected_opportunity',None); pre['signal_first_routing']={'decision':'NO_ELIGIBLE_OPPORTUNITY','primary':False,'bound_symbol':'','bound_category':'','prediction_contract_complete':False,'prediction':{}}
     PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'decision_id':(selected or {}).get('decision_id'),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'research_editorial':len(research_candidates),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True,'nic24_1_strategy_content_routing':True,'content_format_rotation_advisory':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'decision_id':(selected or {}).get('decision_id'),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'research_editorial':len(research_candidates),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'research_editorial_diagnostics':research_diagnostics,'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True,'nic24_1_strategy_content_routing':True,'content_format_rotation_advisory':True}}
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()
