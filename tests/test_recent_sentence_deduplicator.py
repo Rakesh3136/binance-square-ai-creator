@@ -9,12 +9,12 @@ class RecentSentenceDeduplicatorTests(unittest.TestCase):
     def test_replaces_exact_repeated_generic_sentences_and_preserves_question(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            repeated = "That keeps the read falsifiable the next measurable reaction either supports the structure or weakens it."
-            second = "The available evidence supports a scenario to test not certainty about the next candle."
+            first = "That keeps the read falsifiable; the next measurable reaction either supports the structure or weakens it."
+            second = "The available evidence supports a scenario to test, not certainty about the next candle."
             log = root / "publication_log.jsonl"
-            log.write_text(json.dumps({"text": repeated + " " + second}) + "\n", encoding="utf-8")
+            log.write_text(json.dumps({"text": first + " " + second}) + "\n", encoding="utf-8")
             report = root / "draft.json"
-            report.write_text(json.dumps({"draft": {"symbol": "EPIC", "post": repeated + " " + second + " What evidence should readers watch next?"}}), encoding="utf-8")
+            report.write_text(json.dumps({"draft": {"symbol": "EPIC", "post": first + " " + second + " What evidence should readers watch next?"}}), encoding="utf-8")
             out = root / "dedup.json"
             with patch.object(dedup, "LOG", log), patch.object(dedup, "OUT", out), patch.object(dedup, "REPORT_DIR", root), patch.dict("os.environ", {"DRAFT_PATH": str(report)}):
                 rc = dedup.main()
@@ -22,7 +22,7 @@ class RecentSentenceDeduplicatorTests(unittest.TestCase):
             updated = json.loads(report.read_text(encoding="utf-8"))["draft"]["post"]
             self.assertEqual(updated.count("?"), 1)
             self.assertIn("What evidence should readers watch next?", updated)
-            self.assertNotIn(repeated.rstrip("."), updated)
+            self.assertNotIn(first.rstrip("."), updated)
             self.assertNotIn(second.rstrip("."), updated)
             self.assertEqual(json.loads(out.read_text(encoding="utf-8"))["factual_sentences_rewritten"], 0)
 
