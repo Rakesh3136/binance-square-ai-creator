@@ -99,6 +99,7 @@ jobs:
           python tests/test_nic_publication_authorization.py
           python tests/test_nic_editorial_lane_gate.py
           python tests/test_signal_first_research_editorial_fallback.py
+          python tests/test_recent_sentence_deduplicator.py
           python tests/test_nic_editorial_context_sync.py
           python tests/test_nic21_originality_visual_truth.py
           python tests/test_nic24_2_evidence_content_integrity_gate.py
@@ -468,6 +469,7 @@ jobs:
           DRAFT_PATH: ${{ steps.editorial.outputs.path }}
         run: |
           python src/mechanism_value_rewriter.py
+          python src/recent_sentence_deduplicator.py
           python src/nic_editorial_quality_gate.py
           python src/jev_runtime_gate.py
           python src/elite_prepublication_judge.py
