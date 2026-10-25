@@ -93,10 +93,46 @@ def test_rejected_editorial_candidate_is_not_misrouted_as_trade():
     assert any(row.get("category") == "research_insight" for row in blocked)
 
 
+def test_rejection_diagnostics_explain_why_no_research_candidate_qualified():
+    now = datetime.now(timezone.utc)
+    research = artifact(now.isoformat(), [
+        row(symbol="FOR", information_advantage_score=60, undercoverage_score=40, evidence_score=20),
+        row(symbol="DATA", epistemic_note=""),
+        row(symbol="DELISTED"),
+    ])
+    candidates, diagnostics = router.analyze_research_editorial_candidates(
+        research, {"FOR", "DATA", "BTC"}, now=now
+    )
+    assert candidates == []
+    assert diagnostics["artifact_fresh"] is True
+    assert diagnostics["input_rows"] == 3
+    assert diagnostics["qualified_rows"] == 0
+    assert diagnostics["rejected_rows"] == 3
+    assert diagnostics["artifact_rejection_reason"] == "no_candidate_cleared_research_editorial_thresholds"
+    assert diagnostics["rejection_reason_counts"]["information_advantage_below_minimum"] == 1
+    assert diagnostics["rejection_reason_counts"]["undercoverage_below_60"] == 1
+    assert diagnostics["rejection_reason_counts"]["evidence_below_50"] == 1
+    assert diagnostics["rejection_reason_counts"]["missing_epistemic_note"] == 1
+    assert diagnostics["rejection_reason_counts"]["asset_not_in_live_binance_usdt_universe"] == 1
+
+
+def test_diagnostics_identify_stale_research_artifact():
+    now = datetime.now(timezone.utc)
+    stale = (now - timedelta(minutes=46)).isoformat()
+    candidates, diagnostics = router.analyze_research_editorial_candidates(
+        artifact(stale, [row()]), {"FOR"}, now=now
+    )
+    assert candidates == []
+    assert diagnostics["artifact_fresh"] is False
+    assert diagnostics["artifact_rejection_reason"] == "research_artifact_stale_or_future_dated"
+
+
 if __name__ == "__main__":
     test_fresh_qualified_research_becomes_editorial_only_candidate()
     test_stale_research_cannot_create_candidate()
     test_weak_evidence_or_missing_epistemic_note_is_excluded()
     test_non_live_asset_is_excluded()
     test_rejected_editorial_candidate_is_not_misrouted_as_trade()
+    test_rejection_diagnostics_explain_why_no_research_candidate_qualified()
+    test_diagnostics_identify_stale_research_artifact()
     print("Signal-First research editorial fallback tests passed")
