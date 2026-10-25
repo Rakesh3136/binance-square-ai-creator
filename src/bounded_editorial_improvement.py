@@ -46,7 +46,7 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
         issues.append("length_out_of_bounds")
     if questions != 1:
         issues.append("must_have_exactly_one_reader_question")
-    if any(term in normalized for term in UNSAFE_CLAIMS):
+    if any(_normalize(term) in normalized for term in UNSAFE_CLAIMS):
         issues.append("unsupported_earnings_or_certainty_claim")
     if len(sentences) < 3:
         issues.append("insufficient_structure")
