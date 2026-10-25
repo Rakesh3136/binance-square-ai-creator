@@ -1,7 +1,7 @@
 import unittest
 
 from src.bounded_editorial_improvement import (
-    generate_and_select, score_candidate, MAX_CANDIDATES,
+    generate_and_select, score_candidate, sentence_redundancy, MAX_CANDIDATES,
 )
 
 
@@ -36,6 +36,29 @@ class BoundedEditorialImprovementTests(unittest.TestCase):
         self.assertFalse(selected["editorial_iteration"]["selection_is_reward_prediction"])
         self.assertEqual(selected["editorial_iteration"]["reward_claim"], "NOT_CLAIMED")
         self.assertTrue(selected["editorial_iteration"]["quality_and_publication_gates_remain_authoritative"])
+
+    def test_rejects_draft_that_repeats_the_same_point(self):
+        repeated = draft(
+            "$QUICK trades around $0.00426 with 550K USDT in quote volume. "
+            "The current snapshot puts $QUICK around $0.00426 with 550K USDT "
+            "in quoted volume. For $QUICK, the price is around $0.00426 and "
+            "quoted volume is 550K USDT. The next response should test whether "
+            "the thesis holds or fails as fresh evidence arrives. "
+            "What new evidence would change your view on $QUICK?",
+            symbol="QUICK",
+        )
+        report = score_candidate(repeated, {})
+        self.assertGreaterEqual(report["sentence_redundancy"], 0.55)
+        self.assertIn("repeats_same_point_across_sentences", report["issues"])
+        self.assertFalse(report["eligible"])
+
+    def test_sentence_redundancy_is_low_for_distinct_points(self):
+        value = sentence_redundancy([
+            "QUICK is trading near the observed price.",
+            "Quote volume indicates current market participation.",
+            "The chart remains in a broader downtrend.",
+        ])
+        self.assertLess(value, 0.55)
 
     def test_rejects_guaranteed_earnings_language(self):
         result = draft(
