@@ -290,16 +290,29 @@ def choose(xs,rows,market,full_flow,live_symbols,allow_editorial=False):
         if reason:
             blocked_rows.append({'symbol':raw_symbol,'reason':reason}); continue
 
-        if category in EDITORIAL_LANES and allow_editorial and editorial_complete(x):
-            e=dict(x)
-            e['type']=e.get('type') or 'editorial'
-            e['editorial_only']=True
-            e['signal_first_primary']=False
-            if category in {'breaking_news','news_and_macro'}:
-                e['news_title']=e.get('news_title') or e.get('title') or ''
-                e['news_source']=e.get('news_source') or e.get('source') or ''
-                e['news_published_at']=e.get('news_published_at') or e.get('published_at') or ''
-            return e,blocked_rows
+        if category in EDITORIAL_LANES and allow_editorial:
+            if editorial_complete(x):
+                e=dict(x)
+                e['type']=e.get('type') or 'editorial'
+                e['editorial_only']=True
+                e['signal_first_primary']=False
+                if category in {'breaking_news','news_and_macro'}:
+                    e['news_title']=e.get('news_title') or e.get('title') or ''
+                    e['news_source']=e.get('news_source') or e.get('source') or ''
+                    e['news_published_at']=e.get('news_published_at') or e.get('published_at') or ''
+                return e,blocked_rows
+            research = x.get('research') if isinstance(x.get('research'),dict) else {}
+            blocked_rows.append({
+                'symbol': raw_symbol,
+                'category': category,
+                'reason': 'editorial_candidate_failed_evidence_requirements',
+                'score': num(x.get('score'), num(x.get('ranker_score'))),
+                'evidence_score': num(research.get('evidence_score')),
+                'information_advantage_score': num(research.get('information_advantage_score'), num(x.get('score'))),
+                'undercoverage_score': num(research.get('undercoverage_score')),
+            })
+            # Editorial candidates are never reinterpreted as trade setups.
+            continue
 
         try:
             e=derive(x,market)
@@ -317,7 +330,8 @@ def choose(xs,rows,market,full_flow,live_symbols,allow_editorial=False):
 def main():
     pre=load(PREFLIGHT); brief=load(DIRECTOR); cad=load(CADENCE); market=load(MARKET); flow=load(FLOW); full_flow=load(FULL_FLOW); ranking=load(RANKING); pre_router=load(PRE_ROUTER); macro=load(ROOT/'data/live/global_macro_intelligence.json'); rows=recent()
     live_symbols=trading_symbols(); primary,markets=candidates(brief,pre,cad,market,flow,full_flow,ranking,pre_router)
-    markets.extend(research_editorial_candidates(load(ORIGINAL_RESEARCH), live_symbols))
+    research_candidates = research_editorial_candidates(load(ORIGINAL_RESEARCH), live_symbols)
+    markets.extend(research_candidates)
     for event in (macro.get('events') or [])[:30]:
         title=str(event.get('title') or '').strip(); source=str(event.get('source') or '').strip(); published=str(event.get('published_at') or '').strip(); themes=event.get('themes') if isinstance(event.get('themes'),list) else []; score=min(100,64+len(themes)*5+(4 if event.get('primary_theme') in {'geopolitical_risk','monetary_policy','inflation','energy_shock'} else 0))
         for raw in (event.get('asset_symbols') or [])[:2]:
@@ -343,6 +357,6 @@ def main():
     else:
         pre.pop('selected_opportunity',None); pre['signal_first_routing']={'decision':'NO_ELIGIBLE_OPPORTUNITY','primary':False,'bound_symbol':'','bound_category':'','prediction_contract_complete':False,'prediction':{}}
     PREFLIGHT.write_text(json.dumps(pre,indent=2,ensure_ascii=False),encoding='utf-8')
-    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'decision_id':(selected or {}).get('decision_id'),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True,'nic24_1_strategy_content_routing':True,'content_format_rotation_advisory':True}}
+    result={'generated_at':datetime.now(timezone.utc).isoformat(),'router_version':'2.7-nic-wait-safe','publish':bool(selected),'decision':decision,'reason':reason,'primary_signal':primary_signal,'selected':selected,'prediction_contract_complete':bool(selected and flow_complete(selected)),'decision_id':(selected or {}).get('decision_id'),'cadence_publish_on_disk':current_allowed,'cadence_override':cadence_override,'blocked_candidates':blocks,'candidate_counts':{'primary':len(primary),'market':len(markets),'research_editorial':len(research_candidates),'live_usdt_symbols':len(live_symbols),'pre_router_shortlist':len(pre_router.get('shortlist') or [])},'policy':{'prediction_required':['direction','entry_trigger','tp1','tp2','sl','confidence'],'nic_accuracy_gate_is_authoritative':True,'weak_prediction_means_wait':True,'no_eligible_opportunity_is_normal':True,'editorial_lanes_may_publish_without_trade_contract':True,'knowledge_discovery_lanes_enabled':True,'knowledge_requires_evidence':True,'no_synthetic_trade_levels':True,'no_guaranteed_outcome':True,'nic24_1_strategy_content_routing':True,'content_format_rotation_advisory':True}}
     OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8'); print(json.dumps(result,indent=2,ensure_ascii=False))
 if __name__=='__main__':main()

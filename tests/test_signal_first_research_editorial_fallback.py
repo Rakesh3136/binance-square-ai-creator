@@ -64,9 +64,39 @@ def test_non_live_asset_is_excluded():
     ) == []
 
 
+
+def test_rejected_editorial_candidate_is_not_misrouted_as_trade():
+    candidate = {
+        "symbol": "FOR",
+        "category": "research_insight",
+        "lane": "research_insight",
+        "score": 60,
+        "editorial_only": True,
+        "research": {
+            "evidence_score": 49,
+            "information_advantage_score": 60,
+            "undercoverage_score": 70,
+            "epistemic_note": "Screening signal, not certainty.",
+        },
+    }
+    router.content_plan_for = lambda _x: {}
+    router.prediction_quality_for = lambda _x: {}
+    router.forecast_evidence_for = lambda x: x
+    router.timing_for = lambda *_args: {"allowed": True, "timing_state": "WATCH"}
+    router.blocked = lambda *_args: None
+    router.derive = lambda *_args: (_ for _ in ()).throw(AssertionError("editorial candidate must not enter trade derivation"))
+    selected, blocked = router.choose(
+        [candidate], [], {}, {}, {"FOR"}, allow_editorial=True
+    )
+    assert selected is None
+    assert any(row.get("reason") == "editorial_candidate_failed_evidence_requirements" for row in blocked)
+    assert any(row.get("category") == "research_insight" for row in blocked)
+
+
 if __name__ == "__main__":
     test_fresh_qualified_research_becomes_editorial_only_candidate()
     test_stale_research_cannot_create_candidate()
     test_weak_evidence_or_missing_epistemic_note_is_excluded()
     test_non_live_asset_is_excluded()
+    test_rejected_editorial_candidate_is_not_misrouted_as_trade()
     print("Signal-First research editorial fallback tests passed")
