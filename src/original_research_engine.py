@@ -69,8 +69,8 @@ def main():
   now=datetime.now(timezone.utc).isoformat()
   state={'version':'3.3','generated_at':now,'status':'MARKET_SNAPSHOT_STALE','universe_size':0,'potential_gems':[],'potential_risks':[],'research_queue':[],'market_snapshot_generated_at':m.get('generated_at'),'market_snapshot_age_seconds':market_age,'epistemic_note':'Research fails closed unless the market snapshot is timestamped and no more than 15 minutes old.'}
   OUT.parent.mkdir(parents=True,exist_ok=True);REPORT.parent.mkdir(parents=True,exist_ok=True)
-  OUT.write_text(json.dumps(state,indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
-  REPORT.write_text(json.dumps({'module':'original_research_engine','version':'3.3','generated_at':now,'status':state['status'],'universe_size':0,'market_snapshot_age_seconds':market_age},indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
+  OUT.write_text(json.dumps(state,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+  REPORT.write_text(json.dumps({'module':'original_research_engine','version':'3.3','generated_at':now,'status':state['status'],'universe_size':0,'market_snapshot_age_seconds':market_age},indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
   print(json.dumps({'status':state['status'],'market_snapshot_age_seconds':market_age},indent=2))
   return
  try:
@@ -79,8 +79,8 @@ def main():
   now=datetime.now(timezone.utc).isoformat()
   state={'version':'3.3','generated_at':now,'status':'LIVE_UNIVERSE_UNAVAILABLE','universe_size':0,'potential_gems':[],'potential_risks':[],'research_queue':[],'live_universe_error':str(exc)[:300],'epistemic_note':'Research fails closed when the live Binance USDT universe cannot be verified.'}
   OUT.parent.mkdir(parents=True,exist_ok=True);REPORT.parent.mkdir(parents=True,exist_ok=True)
-  OUT.write_text(json.dumps(state,indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
-  REPORT.write_text(json.dumps({'module':'original_research_engine','version':'3.3','generated_at':now,'status':state['status'],'universe_size':0,'live_universe_error':state['live_universe_error']},indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
+  OUT.write_text(json.dumps(state,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+  REPORT.write_text(json.dumps({'module':'original_research_engine','version':'3.3','generated_at':now,'status':state['status'],'universe_size':0,'live_universe_error':state['live_universe_error']},indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
   print(json.dumps({'status':state['status'],'universe_size':0,'error':state['live_universe_error']},indent=2))
   return
  if PUB.exists():
