@@ -29,6 +29,29 @@ def _normalize(text: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9 ]", " ", str(text).lower()).split())
 
 
+def sentence_redundancy(sentences: list[str]) -> float:
+    """Return the highest content-word overlap between distinct sentences."""
+    stop = {
+        "the", "a", "an", "and", "or", "but", "if", "then", "is", "are",
+        "was", "were", "be", "to", "of", "in", "on", "at", "for", "with",
+        "as", "this", "that", "it", "its", "we", "you", "your", "what",
+        "would", "could", "should", "next", "still", "around", "because",
+        "whether", "about", "from", "than", "have", "has", "had",
+    }
+    token_sets = []
+    for sentence in sentences:
+        words = set(re.findall(r"[a-z0-9$]+", sentence.lower())) - stop
+        if words:
+            token_sets.append(words)
+    highest = 0.0
+    for i, left in enumerate(token_sets):
+        for right in token_sets[i + 1:]:
+            union = left | right
+            if union:
+                highest = max(highest, len(left & right) / len(union))
+    return round(highest, 4)
+
+
 def score_candidate(result: dict[str, Any], context: dict[str, Any],
                     previous_texts: list[str] | None = None) -> dict[str, Any]:
     draft = result.get("draft") if isinstance(result.get("draft"), dict) else {}
@@ -37,6 +60,7 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
     normalized = _normalize(post)
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", post) if s.strip()]
     questions = post.count("?")
+    redundancy = sentence_redundancy(sentences)
     issues = []
     if not post:
         issues.append("missing_text")
@@ -50,6 +74,8 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
         issues.append("unsupported_earnings_or_certainty_claim")
     if len(sentences) < 3:
         issues.append("insufficient_structure")
+    if redundancy >= 0.55:
+        issues.append("repeats_same_point_across_sentences")
 
     score = 0.0
     score += 25 if not issues else max(0, 25 - 8 * len(issues))
@@ -71,6 +97,7 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
         "issues": issues,
         "character_count": len(post),
         "sentence_count": len(sentences),
+        "sentence_redundancy": redundancy,
         "question_count": questions,
         "max_similarity_to_other_candidate": round(max_similarity, 4),
         "presentation_strategy": result.get("iteration_presentation_strategy"),
