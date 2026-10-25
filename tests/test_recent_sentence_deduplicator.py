@@ -1,8 +1,15 @@
 import json
 import tempfile
 import unittest
+import sys
 from pathlib import Path
 from unittest.mock import patch
+
+# Direct execution sets sys.path[0] to tests/, so add the repository root.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import src.recent_sentence_deduplicator as dedup
 
 class RecentSentenceDeduplicatorTests(unittest.TestCase):
