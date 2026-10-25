@@ -7,6 +7,8 @@ on:
       - 'src/signal_first_router.py'
       - 'tests/test_signal_first_research_editorial_fallback.py'
       - 'src/nic_editorial_context_sync.py'
+      - 'src/recent_sentence_deduplicator.py'
+      - 'tests/test_recent_sentence_deduplicator.py'
       - 'tests/test_nic_editorial_context_sync.py'
       - 'tests/test_nic_editorial_lane_gate.py'
       - '.github/workflows/autonomous-market-creator.yml'
@@ -32,6 +34,10 @@ jobs:
         run: python tests/test_signal_first_research_editorial_fallback.py
       - name: Run editorial lane fail-closed tests
         run: python tests/test_nic_editorial_lane_gate.py
+      - name: Compile recent sentence deduplicator
+        run: python -m py_compile src/recent_sentence_deduplicator.py
+      - name: Run recent sentence deduplicator regression tests
+        run: python tests/test_recent_sentence_deduplicator.py
       - name: Compile editorial context sync
         run: python -m py_compile src/nic_editorial_context_sync.py
       - name: Run editorial context sync tests
