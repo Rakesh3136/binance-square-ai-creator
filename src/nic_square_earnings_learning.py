@@ -623,7 +623,17 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "goal_type": "OPTIMIZATION_TARGET_NOT_FORECAST",
             "guaranteed": False,
             "actual_verified_usdc_7d": reward_summary["verified_usdc_7d"],
-            "actual_status": reward_summary["verified_usdc_7d_status"],
+            "actual_verified_status": reward_summary["verified_usdc_7d_status"],
+            "actual_owner_reported_usdc_7d": (owner_reported_feedback.get("7_day") or {}).get("reported_usdc"),
+            "owner_reported_reward_events_7d": int((owner_reported_feedback.get("7_day") or {}).get("reported_event_count") or 0),
+            "owner_reported_reward_posts_7d": int((owner_reported_feedback.get("7_day") or {}).get("post_count") or 0),
+            "owner_reported_status": owner_reported_feedback.get("status", "NO_OWNER_REPORTED_FEEDBACK"),
+            "reward_evidence_status": (
+                "OWNER_REPORTED_REWARD_EVIDENCE_PRESENT_VERIFICATION_PENDING"
+                if int((owner_reported_feedback.get("7_day") or {}).get("reported_event_count") or 0) > 0
+                else reward_summary["verified_usdc_7d_status"]
+            ),
+            "status_explanation": "Zero independently verified rewards means no qualifying independent source record was ingested; it does not mean the account owner earned zero. Owner-reported rewards are retained as evidence for directional learning and displayed separately until independently reconciled.",
         },
         "current_program_mechanics": {
             "source_url": OFFICIAL_PROGRAM_URL,
