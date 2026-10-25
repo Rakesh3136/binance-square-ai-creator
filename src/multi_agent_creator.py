@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from nic_native_writer import build
 from creator_strategy_runtime import prepare_context, annotate_and_validate
+from bounded_editorial_improvement import generate_and_select
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "data/reports"
@@ -100,7 +101,9 @@ def main():
     # Fail closed if the playbook is absent or malformed: do not silently generate
     # a draft that cannot record which creator strategy it consumed.
     prepare_context(context)
-    result = build(context)
+    # Bounded self-improvement: compare four presentation variants from the same frozen evidence.
+    # This selects one draft; it never authorizes publication or claims reward prediction.
+    result = generate_and_select(context, build)
     research = result.get("research") or {}
     research["deep_research_provider"] = "NIC_NATIVE"
     research["deep_research_status"] = "native"
