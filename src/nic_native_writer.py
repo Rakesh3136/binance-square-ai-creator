@@ -53,7 +53,7 @@ def build(ctx):
     pub=ctx.get("publication") or {};market=ctx.get("market") or {};news=ctx.get("news") or {}
     director=pre.get("script_director_4") or {}
     strategy_runtime=ctx.get("creator_strategy_runtime") or {}
-    strategy_id=str(strategy_runtime.get("strategy_id") or "asset_specific_research_edge")
+    strategy_id=str(ctx.get("iteration_strategy_id") or strategy_runtime.get("strategy_id") or "asset_specific_research_edge")
     period_learning=ctx.get("creator_period_learning") or {}
     tier_comparison=period_learning.get("reward_tier_cohort_comparison") or {}
     high_cohort=tier_comparison.get("high_reward_creator_periods") or {}
@@ -87,7 +87,7 @@ def build(ctx):
     tp1=setup.get("tp1");tp2=setup.get("tp2");dollar="$"+s
     obs="$"+price(last) if last else "the latest verified price"
     voltext=f"{vol/1e6:.1f}M USDT" if vol>=1e6 else (f"{vol/1e3:.0f}K USDT" if vol>=1e3 else "the available quote-volume snapshot")
-    seed=int(hashlib.sha256((s+cat+str(director.get("narrative_engine"))).encode()).hexdigest()[:8],16)%4
+    seed=int(hashlib.sha256((s+cat+str(director.get("narrative_engine"))+str(ctx.get("iteration_seed",0))).encode()).hexdigest()[:8],16)%4
     story_type=str(director.get("story_type") or sel.get("story_type") or director.get("narrative_engine") or strategy_runtime.get("selected_story_type") or "research_edge").strip().lower().replace(" ","_")
     if cat in {"breaking_news","news","news_and_macro","macro"}:
         articles=[x for x in news.get("articles") or [] if isinstance(x,dict)]

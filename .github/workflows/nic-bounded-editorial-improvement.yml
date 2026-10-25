@@ -1,0 +1,37 @@
+name: NIC Bounded Editorial Improvement
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/bounded_editorial_improvement.py"
+      - "src/multi_agent_creator.py"
+      - "src/nic_native_writer.py"
+      - "tests/test_bounded_editorial_improvement.py"
+      - ".github/workflows/nic-bounded-editorial-improvement.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/bounded_editorial_improvement.py"
+      - "src/multi_agent_creator.py"
+      - "src/nic_native_writer.py"
+      - "tests/test_bounded_editorial_improvement.py"
+      - ".github/workflows/nic-bounded-editorial-improvement.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-editorial-improvement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile bounded writer path
+        run: python -m py_compile src/bounded_editorial_improvement.py src/multi_agent_creator.py src/nic_native_writer.py
+      - name: Test bounded candidate selection and fail-closed rules
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p 'test_bounded_editorial_improvement.py' -v
