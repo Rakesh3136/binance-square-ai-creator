@@ -7,6 +7,8 @@ on:
       - 'src/nic_assistant_chat_client.py'
       - 'tests/test_nic_assistant_chat.py'
       - 'tests/test_nic_assistant_chat_client.py'
+      - 'src/nic_control_gate.py'
+      - 'tests/test_nic_control_gate.py'
       - 'requirements.txt'
       - '.github/workflows/nic-assistant-chat-tests.yml'
   push:
@@ -15,6 +17,8 @@ on:
     paths:
       - 'src/nic_assistant_chat.py'
       - 'tests/test_nic_assistant_chat.py'
+      - 'src/nic_control_gate.py'
+      - 'tests/test_nic_control_gate.py'
       - 'requirements.txt'
       - '.github/workflows/nic-assistant-chat-tests.yml'
 
@@ -33,10 +37,14 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: python -m pip install --no-cache-dir -r requirements.txt
-      - name: Compile assistant adapter and caller
-        run: python -m py_compile src/nic_assistant_chat.py src/nic_assistant_chat_client.py
+        run: |
+          python -m pip install --no-cache-dir -r requirements.txt
+          python -m pip install pytest
+      - name: Compile assistant and control-gate modules
+        run: python -m py_compile src/nic_assistant_chat.py src/nic_assistant_chat_client.py src/nic_control_gate.py
       - name: Test assistant adapter without API credentials
         run: |
           python tests/test_nic_assistant_chat.py
           python tests/test_nic_assistant_chat_client.py
+      - name: Test control gate approval and emergency-stop invariants
+        run: python -m pytest -q tests/test_nic_control_gate.py
