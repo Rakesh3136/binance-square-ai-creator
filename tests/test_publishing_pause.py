@@ -39,6 +39,31 @@ class PublishingPauseTest(unittest.TestCase):
 
 
 
+    def test_emergency_stop_blocks_enabled_publisher_before_credentials_or_network(self):
+        names = ("PUBLISHING_ENABLED", "NIC_EMERGENCY_STOP", "BINANCE_SQUARE_OPENAPI_KEY", "BINANCE_SQUARE_API_KEY")
+        old = {name: os.environ.get(name) for name in names}
+        old_result = publisher.RESULT_PATH
+        try:
+            os.environ["PUBLISHING_ENABLED"] = "true"
+            os.environ["NIC_EMERGENCY_STOP"] = "1"
+            os.environ.pop("BINANCE_SQUARE_OPENAPI_KEY", None)
+            os.environ.pop("BINANCE_SQUARE_API_KEY", None)
+            with tempfile.TemporaryDirectory() as directory:
+                publisher.RESULT_PATH = Path(directory) / "publication_result.json"
+                result = publisher.main()
+                payload = json.loads(publisher.RESULT_PATH.read_text(encoding="utf-8"))
+                self.assertEqual(result, 0)
+                self.assertEqual(payload["status"], "PUBLISH_BLOCKED_EMERGENCY_STOP")
+                self.assertEqual(payload["current_run_publication"], "NO_NEW_PUBLICATION")
+                self.assertIsNone(payload["post_id"])
+        finally:
+            publisher.RESULT_PATH = old_result
+            for name, value in old.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
     def test_editorial_only_mode_allows_non_actionable_editorial(self):
         ok, _ = publisher.editorial_only_publication_check(
             "A research note comparing liquidity and volatility without a trade setup.",
