@@ -200,6 +200,22 @@ class ControlGate:
             self._write(state)
             return True
 
+    def list_requests(self, statuses: set[str] | None = None) -> list[dict[str, Any]]:
+        """Return safe request summaries for the owner console."""
+        with _LOCK:
+            state = self._read()
+            requests = list(state.get("requests", {}).values())
+            if statuses:
+                requests = [r for r in requests if r.get("status") in statuses]
+            requests.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+            return [
+                {k: r.get(k) for k in (
+                    "request_id", "capability", "action", "details", "created_at",
+                    "expires_at", "status", "approved_by", "consumed_at"
+                )}
+                for r in requests[-100:]
+            ]
+
     def status(self) -> dict[str, Any]:
         with _LOCK:
             state = self._read()
