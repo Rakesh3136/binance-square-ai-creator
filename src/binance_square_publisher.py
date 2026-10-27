@@ -185,11 +185,19 @@ def verify_quality_authorization(text, authorization, nic21, lane):
         reasons.append("editorial lane hash or trade-denial contract does not match exact publication text")
     return not reasons, reasons
 
+def emergency_stop_requested() -> bool:
+    """Out-of-band hard stop shared with GitHub Actions via NIC_EMERGENCY_STOP."""
+    return os.getenv("NIC_EMERGENCY_STOP", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def main():
     # Safety pause: do not publish automatically until NIC editorial, timing, and visual-truth gates are re-verified.
     # Publishing can be re-enabled deliberately with PUBLISHING_ENABLED=true after explicit review.
     if os.getenv("PUBLISHING_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         write_result({"status":"PUBLISHING_PAUSED","message":"Automatic Binance Square publishing is disabled unless the workflow explicitly enables a current-cycle, fully authorized editorial draft.","checked_at":now(),"endpoint":ENDPOINT,"post_id":None,"link":None,"publication_proof":"none","current_run_publication":"NO_NEW_PUBLICATION"})
+        return 0
+    if emergency_stop_requested():
+        write_result({"status":"PUBLISH_BLOCKED_EMERGENCY_STOP","message":"NIC_EMERGENCY_STOP is active; publisher refused external submission.","checked_at":now(),"endpoint":ENDPOINT,"post_id":None,"link":None,"publication_proof":"none","current_run_publication":"NO_NEW_PUBLICATION"})
         return 0
     key=(os.getenv("BINANCE_SQUARE_OPENAPI_KEY") or os.getenv("BINANCE_SQUARE_API_KEY") or "").strip()
     if not key: return fail("BINANCE_SQUARE_OPENAPI_KEY/BINANCE_SQUARE_API_KEY is not configured","PUBLISHER_NOT_CONFIGURED")
@@ -226,6 +234,10 @@ def main():
             append({"timestamp":now(),"status":"PUBLISH_BLOCKED_DUPLICATE","post_id":None,"link":None,"existing_post_id":eid or None,"existing_post_link":elink,"existing_publication_status":str(existing.get("status") or "") or None,"existing_publication_verified_at":existing.get("published_at") or existing.get("timestamp"),"symbol":symbol,"category":category,"text":text,"reason":dup,"publication_proof":"existing_verified_publication_log"}); return skip(f"Duplicate publication blocked: {dup}","PUBLISH_BLOCKED_DUPLICATE",symbol,category,existing)
         visual_requested=bool(context.get("visual_requested") or context.get("visual_required") or context.get("visual_verified") or context.get("tradingview_verified") or (context.get("visual_decision") or {}).get("required")); require_image=visual_requested or category not in NO_IMAGE_LANES; use_image=VISUAL.exists() and VISUAL.stat().st_size>10000 and require_image
         if require_image and not use_image: raise RuntimeError(f"Required TradingView visual is missing or too small for {symbol}: {VISUAL}")
+        # Re-check immediately before either network-capable publishing path.
+        if emergency_stop_requested():
+            write_result({"status":"PUBLISH_BLOCKED_EMERGENCY_STOP","message":"NIC_EMERGENCY_STOP became active before external submission; publisher refused to send.","checked_at":now(),"endpoint":ENDPOINT,"post_id":None,"link":None,"symbol":symbol,"category":category,"publication_proof":"none","current_run_publication":"NO_NEW_PUBLICATION"})
+            return 0
         if use_image:
             p=subprocess.run(["node",str(ROOT/"src/square_image_publisher.mjs"),str(VISUAL),text],env={**os.environ,"BINANCE_SQUARE_OPENAPI_KEY":key},cwd=ROOT,text=True,capture_output=True,check=False)
             if p.stdout.strip(): print(p.stdout)
