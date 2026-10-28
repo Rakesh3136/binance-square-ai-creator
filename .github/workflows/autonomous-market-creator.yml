@@ -58,6 +58,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}
+      # The publisher polls this repository variable immediately before submission.
+      # Missing variable/token/API access is fail-closed when this flag is enabled.
+      NIC_SHARED_GITHUB_STOP: "1"
+      GITHUB_TOKEN: ${{ github.token }}
     timeout-minutes: 75
     permissions:
       contents: write
