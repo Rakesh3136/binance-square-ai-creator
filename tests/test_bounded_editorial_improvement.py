@@ -75,6 +75,41 @@ class BoundedEditorialImprovementTests(unittest.TestCase):
         self.assertNotIn("near_duplicate_of_recent_publication", selected_score["issues"])
         self.assertLess(selected_score["max_similarity_to_recent_publication"], 0.88)
 
+
+    def test_rejects_one_reused_sentence_even_when_the_full_post_is_original(self):
+        repeated_sentence = (
+            "The useful test is whether the next reaction holds that structure "
+            "rather than reversing it immediately."
+        )
+        repeated_post = (
+            "$ETH's current funding basis tells a different story from spot price. "
+            + repeated_sentence + " "
+            "That difference can reveal positioning pressure, but it cannot prove "
+            "which side will win. The next confirmation should come from fresh "
+            "participation data rather than a recycled narrative. What evidence "
+            "would change your read first?"
+        )
+        fresh_post = (
+            "$ETH is showing a divergence between spot movement and derivatives "
+            "positioning. A funding shift can matter when it persists across more "
+            "than one observation, especially if open interest changes alongside "
+            "price. That is a hypothesis to test, not proof of a coming move. "
+            "Watch whether the next data point confirms the divergence or erases it. "
+            "Which metric would you check first?"
+        )
+        context = {"recent_publication_texts": [repeated_sentence]}
+        blocked = score_candidate(draft(repeated_post), context)
+        self.assertIn("repeats_recent_published_sentence", blocked["issues"])
+        self.assertEqual(blocked["repeated_recent_published_sentence_count"], 1)
+        self.assertFalse(blocked["eligible"])
+
+        def build(ctx):
+            return draft(repeated_post if ctx["iteration_seed"] == 0 else fresh_post)
+
+        selected = generate_and_select(context, build, max_candidates=2)
+        self.assertEqual(selected["draft"]["post"], fresh_post)
+        self.assertEqual(selected["editorial_iteration"]["eligible_candidates"], 1)
+
     def test_rejects_guaranteed_earnings_language(self):
         result = draft(
             "$ETH is a guaranteed profit opportunity. Price is around $2,500, "
