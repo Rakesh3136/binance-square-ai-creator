@@ -39,7 +39,7 @@ class RecentSentenceDeduplicatorTests(unittest.TestCase):
             root = Path(tmp)
             repeated = "4M USDT in quote volume; the available 1H evidence does not justify inventing a cleaner range."
             log = root / "publication_log.jsonl"
-            log.write_text(json.dumps({"text": repeated}) + "\\n", encoding="utf-8")
+            log.write_text(json.dumps({"text": repeated}) + "\n", encoding="utf-8")
             report = root / "draft.json"
             original = "$INIT is moving through a measurable market context. " + repeated + " What evidence would change your view on $INIT?"
             report.write_text(json.dumps({"draft": {"symbol": "INIT", "post": original}}), encoding="utf-8")
