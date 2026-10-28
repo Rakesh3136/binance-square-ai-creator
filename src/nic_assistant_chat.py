@@ -60,6 +60,40 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *, 
     return reply.strip()
 
 
+def sync_github_emergency_stop(enabled: bool) -> None:
+    """Set only the pre-created repository variable used by the publisher.
+
+    Configure NIC_GITHUB_REPOSITORY and NIC_GITHUB_CONTROL_TOKEN on the
+    owner-control service. The token should have Actions: write for this repo.
+    The variable NIC_EMERGENCY_STOP must be created once in repository settings.
+    """
+    repository = os.getenv("NIC_GITHUB_REPOSITORY", "").strip()
+    token = os.getenv("NIC_GITHUB_CONTROL_TOKEN", "").strip()
+    if not repository or not token:
+        raise RuntimeError("shared_github_stop_not_configured")
+    if not all(part and part.replace("-", "").replace("_", "").isalnum() for part in repository.split("/", 1)) or repository.count("/") != 1:
+        raise RuntimeError("shared_github_repository_invalid")
+    url = f"https://api.github.com/repos/{repository}/actions/variables/NIC_EMERGENCY_STOP"
+    request = __import__("urllib.request", fromlist=["Request"]).Request(
+        url,
+        data=json.dumps({"name": "NIC_EMERGENCY_STOP", "value": "1" if enabled else "0"}).encode("utf-8"),
+        method="PATCH",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "nic-owner-control",
+        },
+    )
+    try:
+        with __import__("urllib.request", fromlist=["urlopen"]).urlopen(request, timeout=8) as response:
+            if response.status not in (200, 204):
+                raise RuntimeError("shared_github_stop_update_failed")
+    except Exception as exc:
+        raise RuntimeError("shared_github_stop_update_failed") from exc
+
+
 def make_handler(gate: ControlGate | None = None):
     """Create HTTP routes for chat and separately authenticated owner controls."""
     control = gate or ControlGate()
@@ -147,10 +181,20 @@ def make_handler(gate: ControlGate | None = None):
                     return
                 try:
                     if self.path == "/control/stop":
-                        self._json(200, control.set_emergency_stop(True, actor="owner_api"))
+                        # Stop locally first; then propagate to the shared Actions flag.
+                        local = control.set_emergency_stop(True, actor="owner_api")
+                        try:
+                            sync_github_emergency_stop(True)
+                        except RuntimeError:
+                            self._json(503, {**local, "shared_stop": "UPDATE_FAILED", "warning": "Local gate is stopped, but the GitHub Actions control flag could not be updated."})
+                            return
+                        self._json(200, {**local, "shared_stop": "ACTIVE"})
                         return
                     if self.path == "/control/resume":
-                        self._json(200, control.set_emergency_stop(False, actor="owner_api"))
+                        # Never resume local execution if the shared flag cannot be cleared.
+                        sync_github_emergency_stop(False)
+                        local = control.set_emergency_stop(False, actor="owner_api")
+                        self._json(200, {**local, "shared_stop": "INACTIVE"})
                         return
                     prefix = "/control/approvals/"
                     if self.path.startswith(prefix):

@@ -6,11 +6,50 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("binance_square_publisher", ROOT / "src" / "binance_square_publisher.py")
 publisher = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(publisher)
+
+
+class SharedEmergencyStopTest(unittest.TestCase):
+    def test_shared_stop_reads_repository_variable(self):
+        old = {name: os.environ.get(name) for name in ("NIC_SHARED_GITHUB_STOP", "GITHUB_REPOSITORY", "GITHUB_TOKEN")}
+        try:
+            os.environ["NIC_SHARED_GITHUB_STOP"] = "1"
+            os.environ["GITHUB_REPOSITORY"] = "owner/repo"
+            os.environ["GITHUB_TOKEN"] = "test-token"
+            class Response:
+                status = 200
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def read(self): return b'{"value":"1"}'
+            with patch.object(publisher.urllib.request, "urlopen", return_value=Response()) as request:
+                self.assertTrue(publisher.github_emergency_stop_requested())
+                self.assertIn("/actions/variables/NIC_EMERGENCY_STOP", request.call_args.args[0].full_url)
+            class ResumeResponse(Response):
+                def read(self): return b'{"value":"0"}'
+            with patch.object(publisher.urllib.request, "urlopen", return_value=ResumeResponse()):
+                self.assertFalse(publisher.github_emergency_stop_requested())
+        finally:
+            for name, value in old.items():
+                if value is None: os.environ.pop(name, None)
+                else: os.environ[name] = value
+
+    def test_shared_stop_fails_closed_when_variable_cannot_be_read(self):
+        old = {name: os.environ.get(name) for name in ("NIC_SHARED_GITHUB_STOP", "GITHUB_REPOSITORY", "GITHUB_TOKEN")}
+        try:
+            os.environ["NIC_SHARED_GITHUB_STOP"] = "1"
+            os.environ["GITHUB_REPOSITORY"] = "owner/repo"
+            os.environ["GITHUB_TOKEN"] = "test-token"
+            with patch.object(publisher.urllib.request, "urlopen", side_effect=OSError("unavailable")):
+                self.assertTrue(publisher.github_emergency_stop_requested())
+        finally:
+            for name, value in old.items():
+                if value is None: os.environ.pop(name, None)
+                else: os.environ[name] = value
 
 
 class PublishingPauseTest(unittest.TestCase):
