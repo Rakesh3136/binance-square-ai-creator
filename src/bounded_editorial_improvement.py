@@ -13,6 +13,8 @@ from difflib import SequenceMatcher
 from typing import Callable, Any
 
 MAX_CANDIDATES = 4
+RECENT_POST_SIMILARITY_BLOCK = 0.88
+RECENT_PUBLICATION_LOG = __import__("pathlib").Path(__file__).resolve().parents[1] / "analytics" / "publication_log.jsonl"
 PRESENTATION_STRATEGIES = (
     "asset_specific_research_edge",
     "evidence_led_research",
@@ -29,8 +31,37 @@ def _normalize(text: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9 ]", " ", str(text).lower()).split())
 
 
+def _token_jaccard(left: str, right: str) -> float:
+    a = set(_normalize(left).split())
+    b = set(_normalize(right).split())
+    return len(a & b) / len(a | b) if a and b else 0.0
+
+
+def _recent_publication_texts(context: dict[str, Any]) -> list[str]:
+    # Tests and controlled callers may inject a frozen history; production reads
+    # the persisted publication log used by the final originality gate.
+    injected = context.get("recent_publication_texts")
+    if isinstance(injected, list):
+        return [str(x).strip() for x in injected if isinstance(x, str) and x.strip()]
+    if not RECENT_PUBLICATION_LOG.exists():
+        return []
+    rows = []
+    for line in RECENT_PUBLICATION_LOG.read_text(encoding="utf-8", errors="replace").splitlines()[-12:]:
+        try:
+            item = __import__("json").loads(line)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or item.get("post") or item.get("content") or "").strip()
+        if text:
+            rows.append(text)
+    return rows
+
+
 def score_candidate(result: dict[str, Any], context: dict[str, Any],
-                    previous_texts: list[str] | None = None) -> dict[str, Any]:
+                    previous_texts: list[str] | None = None,
+                    recent_publication_texts: list[str] | None = None) -> dict[str, Any]:
     draft = result.get("draft") if isinstance(result.get("draft"), dict) else {}
     post = str(draft.get("post") or draft.get("text") or "").strip()
     symbol = str(draft.get("symbol") or "").upper().replace("USDT", "").strip()
@@ -65,6 +96,14 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
     score += 10 * (1.0 - max_similarity)
     if max_similarity >= 0.82:
         issues.append("near_duplicate_of_another_candidate")
+
+    history = recent_publication_texts if recent_publication_texts is not None else _recent_publication_texts(context)
+    max_recent_similarity = max((_token_jaccard(post, old) for old in history), default=0.0)
+    # Match the production NIC 21 originality gate's token-set Jaccard metric.
+    # This is an early candidate-selection guard, not a replacement for final gates.
+    if max_recent_similarity >= RECENT_POST_SIMILARITY_BLOCK:
+        issues.append("near_duplicate_of_recent_publication")
+    score += 10 * (1.0 - max_recent_similarity)
     return {
         "score": round(score, 2),
         "eligible": not issues,
@@ -73,6 +112,7 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
         "sentence_count": len(sentences),
         "question_count": questions,
         "max_similarity_to_other_candidate": round(max_similarity, 4),
+        "max_similarity_to_recent_publication": round(max_recent_similarity, 4),
         "presentation_strategy": result.get("iteration_presentation_strategy"),
     }
 
@@ -101,8 +141,9 @@ def generate_and_select(context: dict[str, Any],
 
     scored = []
     texts = []
+    recent_texts = _recent_publication_texts(context)
     for result in candidates:
-        report = score_candidate(result, context, texts)
+        report = score_candidate(result, context, texts, recent_texts)
         text = str((result.get("draft") or {}).get("post") or
                    (result.get("draft") or {}).get("text") or "")
         if report["max_similarity_to_other_candidate"] >= 0.82:
