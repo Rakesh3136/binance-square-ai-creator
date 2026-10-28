@@ -38,13 +38,13 @@ def _token_jaccard(left: str, right: str) -> float:
 
 
 def _sentence_norm(text: str) -> str:
-    return " ".join(re.sub(r"[^a-z0-9 ]", "", re.sub(r"\\s+", " ", str(text or "").lower())).split())
+    return " ".join(re.sub(r"[^a-z0-9 ]", "", re.sub(r"\s+", " ", str(text or "").lower())).split())
 
 
 def _sentence_set(texts: list[str]) -> set[str]:
     found = set()
     for post in texts:
-        for sentence in re.split(r"(?<=[.!?])\\s+|\\n+", str(post)):
+        for sentence in re.split(r"(?<=[.!?])\s+|\n+", str(post)):
             normalized = _sentence_norm(sentence)
             if len(normalized.split()) >= 6:
                 found.add(normalized)
