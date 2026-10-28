@@ -37,6 +37,44 @@ class BoundedEditorialImprovementTests(unittest.TestCase):
         self.assertEqual(selected["editorial_iteration"]["reward_claim"], "NOT_CLAIMED")
         self.assertTrue(selected["editorial_iteration"]["quality_and_publication_gates_remain_authoritative"])
 
+
+    def test_recent_publication_similarity_blocks_duplicate_and_selects_different_candidate(self):
+        repeated = (
+            "$ETH is the market question worth watching today. Price is around "
+            "$2,500, and the recent range spans $2,420 to $2,560. The useful "
+            "test is whether the next reaction holds that structure rather than "
+            "reversing it immediately. These are observed levels, not a forecast "
+            "or promise, and fresh evidence could change the read. What would "
+            "make you reconsider this setup?"
+        )
+        alternative = (
+            "$ETH's funding basis deserves attention because positioning can "
+            "change before spot price makes the shift obvious. The key evidence "
+            "is whether participation expands alongside the move or fades while "
+            "price keeps drifting. That distinction separates a durable change "
+            "in demand from a short-lived squeeze, without assuming either outcome. "
+            "A single snapshot is not enough to prove the mechanism. Which new "
+            "data point would change your interpretation first?"
+        )
+        context = {"recent_publication_texts": [repeated]}
+
+        blocked = score_candidate(draft(repeated), context)
+        self.assertIn("near_duplicate_of_recent_publication", blocked["issues"])
+        self.assertFalse(blocked["eligible"])
+
+        def build(ctx):
+            return draft(repeated if ctx["iteration_seed"] == 0 else alternative)
+
+        selected = generate_and_select(context, build, max_candidates=2)
+        selected_text = selected["draft"]["post"]
+        self.assertEqual(selected_text, alternative)
+        selected_score = next(
+            row for row in selected["editorial_iteration"]["candidates"]
+            if row["presentation_strategy"] == "evidence_led_research"
+        )
+        self.assertNotIn("near_duplicate_of_recent_publication", selected_score["issues"])
+        self.assertLess(selected_score["max_similarity_to_recent_publication"], 0.88)
+
     def test_rejects_guaranteed_earnings_language(self):
         result = draft(
             "$ETH is a guaranteed profit opportunity. Price is around $2,500, "
