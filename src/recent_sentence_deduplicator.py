@@ -77,9 +77,9 @@ def main() -> int:
         # Preserve a concrete quote-volume observation while changing the repeated
         # generic interpretation around it. The amount is copied from the original
         # sentence; the repair must not invent a new market fact.
-        volume_match = re.search(r"\\b(\\d+(?:\\.\\d+)?\\s*[kmb]?)\\s*usdt\\b", sentence, re.I)
+        volume_match = re.search(r"\b(\d+(?:\.\d+)?\s*[kmb]?)\s*usdt\b", sentence, re.I)
         if volume_match:
-            amount = re.sub(r"\\s+", "", volume_match.group(1)).upper()
+            amount = re.sub(r"\s+", "", volume_match.group(1)).upper()
             candidates.append(
                 f"The snapshot records {amount} USDT in volume, but the available high-low data is insufficient to establish a reliable one-hour range."
             )
