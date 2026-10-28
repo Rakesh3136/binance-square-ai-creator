@@ -37,6 +37,20 @@ def _token_jaccard(left: str, right: str) -> float:
     return len(a & b) / len(a | b) if a and b else 0.0
 
 
+def _sentence_norm(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9 ]", "", re.sub(r"\\s+", " ", str(text or "").lower())).split())
+
+
+def _sentence_set(texts: list[str]) -> set[str]:
+    found = set()
+    for post in texts:
+        for sentence in re.split(r"(?<=[.!?])\\s+|\\n+", str(post)):
+            normalized = _sentence_norm(sentence)
+            if len(normalized.split()) >= 6:
+                found.add(normalized)
+    return found
+
+
 def _recent_publication_texts(context: dict[str, Any]) -> list[str]:
     # Tests and controlled callers may inject a frozen history; production reads
     # the persisted publication log used by the final originality gate.
@@ -104,6 +118,16 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
     if max_recent_similarity >= RECENT_POST_SIMILARITY_BLOCK:
         issues.append("near_duplicate_of_recent_publication")
     score += 10 * (1.0 - max_recent_similarity)
+
+    # The final publication workflow also blocks a single reused sentence even
+    # when the complete post is otherwise original. Apply that same check here,
+    # before a candidate is selected, so the run can choose a different draft.
+    recent_sentences = _sentence_set(history)
+    current_sentences = _sentence_set([post])
+    repeated_sentences = sorted(current_sentences & recent_sentences)
+    if repeated_sentences:
+        issues.append("repeats_recent_published_sentence")
+        score -= min(20, 5 * len(repeated_sentences))
     return {
         "score": round(score, 2),
         "eligible": not issues,
@@ -113,6 +137,7 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
         "question_count": questions,
         "max_similarity_to_other_candidate": round(max_similarity, 4),
         "max_similarity_to_recent_publication": round(max_recent_similarity, 4),
+        "repeated_recent_published_sentence_count": len(repeated_sentences),
         "presentation_strategy": result.get("iteration_presentation_strategy"),
     }
 
