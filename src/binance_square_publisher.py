@@ -198,9 +198,11 @@ def github_emergency_stop_requested() -> bool:
     publishing is safe. Local test/dev runs without GITHUB_REPOSITORY use the
     environment kill switch above.
     """
+    if os.getenv("NIC_SHARED_GITHUB_STOP", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        return False
     repository = os.getenv("GITHUB_REPOSITORY", "").strip()
     if not repository:
-        return False
+        return True
     token = os.getenv("GITHUB_TOKEN", "").strip()
     if not token:
         return True
