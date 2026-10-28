@@ -2,6 +2,7 @@ import json
 import os
 import threading
 import unittest
+from unittest.mock import patch
 from http.server import ThreadingHTTPServer
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -16,6 +17,9 @@ class NICControlAPITests(unittest.TestCase):
         self._old_owner = os.environ.get("NIC_OWNER_CONTROL_TOKEN")
         os.environ["NIC_CHAT_ACCESS_TOKEN"] = "chat-test-token"
         os.environ["NIC_OWNER_CONTROL_TOKEN"] = "owner-test-token"
+        self.shared_stop_mock = patch("src.nic_assistant_chat.sync_github_emergency_stop")
+        self.sync_shared_stop = self.shared_stop_mock.start()
+        self.addCleanup(self.shared_stop_mock.stop)
         self.gate = ControlGate(self._temp_path())
         self.gate.set_emergency_stop(False)
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.gate))
@@ -73,9 +77,12 @@ class NICControlAPITests(unittest.TestCase):
         status, payload = self.request("/control/stop", "owner-test-token", method="POST", payload={})
         self.assertEqual(status, 200)
         self.assertTrue(payload["emergency_stop"])
+        self.sync_shared_stop.assert_called_with(True)
         status, payload = self.request("/control/resume", "owner-test-token", method="POST", payload={})
         self.assertEqual(status, 200)
         self.assertFalse(payload["emergency_stop"])
+        self.sync_shared_stop.assert_called_with(False)
+        self.assertEqual(payload["shared_stop"], "INACTIVE")
 
     def test_approval_list_is_owner_authenticated_and_actions_are_one_time(self):
         details = {"post_id": "draft-1", "destination": "Binance Square"}
