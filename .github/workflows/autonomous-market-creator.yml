@@ -469,6 +469,9 @@ jobs:
           python src/mechanism_value_rewriter.py
           python src/recent_sentence_deduplicator.py
           python src/nic_editorial_quality_gate.py
+          python -m json.tool "$DRAFT_PATH" >/dev/null
+          python -m json.tool data/live/nic_editorial_quality_gate.json >/dev/null
+          python -m json.tool data/live/nic_conversion_contract.json >/dev/null
           python src/jev_runtime_gate.py
           python src/elite_prepublication_judge.py
           python src/elite_prepublication_gate.py
