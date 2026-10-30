@@ -105,6 +105,12 @@ def latest_report() -> Path | None:
 
 
 def current_draft() -> tuple[str, dict]:
+    """Read the actual publication text from supported report wrappers.
+
+    The creator's report schema has evolved over time. Never interpret a valid
+    report as an empty post just because the authored text moved from
+    report["draft"]["post"] to another supported wrapper.
+    """
     raw = os.environ.get("DRAFT_PATH", "").strip()
     report = Path(raw) if raw else latest_report()
     if raw and not report.is_absolute():
@@ -112,9 +118,43 @@ def current_draft() -> tuple[str, dict]:
     if not report or not report.exists():
         return "", {}
     obj = load_json(report, {})
-    draft = obj.get("draft") if isinstance(obj.get("draft"), dict) else {}
-    text = str(draft.get("post") or draft.get("text") or draft.get("body") or draft.get("content") or "").strip()
-    return text, draft
+    if not isinstance(obj, dict):
+        return "", {}
+
+    text_keys = ("post", "text", "body", "final_post", "final_text", "caption")
+    wrapper_keys = ("draft", "final_draft", "publication", "content_package", "result", "output")
+
+    def walk(value):
+        if isinstance(value, dict):
+            # Prefer canonical publication fields on the current object.
+            for key in text_keys:
+                candidate = value.get(key)
+                if isinstance(candidate, str) and candidate.strip():
+                    return candidate.strip(), value
+            # Search known draft wrappers before arbitrary metadata.
+            for key in wrapper_keys:
+                if key in value:
+                    found_text, found_obj = walk(value[key])
+                    if found_text:
+                        return found_text, found_obj
+            for candidate in value.values():
+                if isinstance(candidate, (dict, list)):
+                    found_text, found_obj = walk(candidate)
+                    if found_text:
+                        return found_text, found_obj
+        elif isinstance(value, list):
+            for candidate in value:
+                found_text, found_obj = walk(candidate)
+                if found_text:
+                    return found_text, found_obj
+        return "", {}
+
+    text, metadata = walk(obj)
+    # Keep report-level identity fields available when the post lives in a nested
+    # object that does not repeat symbol/category metadata.
+    merged = dict(obj)
+    merged.update(metadata)
+    return text, merged
 
 
 def selected_symbol(draft: dict) -> str:
