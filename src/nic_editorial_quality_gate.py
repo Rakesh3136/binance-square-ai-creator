@@ -85,7 +85,22 @@ def main():
  asset_ok=bool(asset and re.search(r"\$"+re.escape(asset)+r"\b",text,re.I));opener=text.split("\n\n",1)[0];generic=any(re.search(p,opener,re.I) for p in GENERIC_OPENERS);action_signal=bool(ACTION_WORDS.search(text));trade_pressure=bool(TRADE_PRESSURE.search(text));conversion_status="PASS" if asset_ok and action_signal and not trade_pressure else "BLOCK"
  conversion={"version":"6.6","status":conversion_status,"checked_at":datetime.now(timezone.utc).isoformat(),"asset":asset,"asset_source":asset_source,"cashtag":"$"+asset if asset else None,"content_lane":lane,"repair_count":len(conversion_repairs),"repairs":conversion_repairs,"evidence":{"asset_reference_present":asset_ok,"reader_action_signal_present":action_signal,"trade_pressure_detected":trade_pressure,"reader_interaction_is_not_inferred":True,"views_are_not_revenue":True,"verified_reward_required":True}}
  draft.update({"text":text,"post":text,"content_lane":lane,"resolved_asset":asset,"reader_facing_sanitized":True,"internal_telemetry_removed":before!=text,"template_opening_detected":generic,"question_count":text.count("?")});ok=text.count("?")==1 and len(text)<=MAX_CHARS and conversion_status=="PASS";report["nic_editorial_quality_gate"]={"version":"3.6+6.6","status":"PASS" if ok else "BLOCK","lane":lane,"resolved_asset":asset,"asset_source":asset_source,"conversion_repairs":conversion_repairs,"checked_at":datetime.now(timezone.utc).isoformat(),"conversion_status":conversion_status,"rules":{"max_characters":MAX_CHARS,"exactly_one_question":True,"no_fact_invention":True,"truthful_reader_action_required":True,"no_trade_pressure":True}}
- if len(text)>MAX_CHARS or text.count("?")!=1:raise SystemExit("NIC editorial gate: copy must be <=740 characters and contain exactly one question")
- if conversion_status!="PASS":raise SystemExit("NIC conversion gate: post needs a relevant asset reference and a truthful reader-action signal, with no trade pressure")
- report["draft"]=draft;path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(report["nic_editorial_quality_gate"],indent=2)+"\n",encoding="utf-8");CONVERSION_OUT.write_text(json.dumps(conversion,indent=2,ensure_ascii=False)+"\n",encoding="utf-8");print(json.dumps({"editorial":report["nic_editorial_quality_gate"],"conversion":conversion},indent=2))
+ report["draft"]=draft
+ reasons=[]
+ if len(text)>MAX_CHARS: reasons.append(f"character_limit_exceeded:{len(text)}>{MAX_CHARS}")
+ if text.count("?")!=1: reasons.append(f"question_count_invalid:{text.count('?')}!=1")
+ if not asset: reasons.append("asset_unresolved")
+ if not asset_ok: reasons.append("cashtag_missing_after_repair")
+ if not action_signal: reasons.append("reader_action_signal_missing")
+ if trade_pressure: reasons.append("trade_pressure_detected")
+ report["nic_editorial_quality_gate"]["failure_reasons"]=reasons
+ report["nic_editorial_quality_gate"]["character_count"]=len(text)
+ report["nic_editorial_quality_gate"]["question_count"]=text.count("?")
+ report["nic_editorial_quality_gate"]["status"]="PASS" if not reasons else "BLOCK"
+ OUT.parent.mkdir(parents=True,exist_ok=True)
+ path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+ OUT.write_text(json.dumps(report["nic_editorial_quality_gate"],indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+ CONVERSION_OUT.write_text(json.dumps(conversion,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+ print(json.dumps({"editorial":report["nic_editorial_quality_gate"],"conversion":conversion},indent=2))
+ if reasons: raise SystemExit("NIC editorial/conversion quality gate blocked: "+", ".join(reasons))
 if __name__=="__main__":main()
