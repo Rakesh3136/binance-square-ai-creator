@@ -22,20 +22,55 @@ def load(p):
 
 
 def draft_text(path: str) -> str:
+    """Extract the authored post from supported report/draft wrappers."""
     try:
         x=load(Path(path))
-        if isinstance(x.get('draft'),dict):
-            d=x['draft']; return str(d.get('post') or d.get('text') or '')
-        return str(x.get('post') or x.get('text') or '')
-    except Exception: return ''
+        def walk(value):
+            if isinstance(value, dict):
+                # Prefer canonical post/text fields before searching nested wrappers.
+                for key in ('post', 'text', 'final_post', 'final_text', 'content'):
+                    candidate=value.get(key)
+                    if isinstance(candidate, str) and candidate.strip():
+                        return candidate.strip()
+                for key in ('draft', 'final_draft', 'publication', 'content_package', 'result'):
+                    candidate=value.get(key)
+                    found=walk(candidate)
+                    if found:
+                        return found
+                for candidate in value.values():
+                    found=walk(candidate)
+                    if found:
+                        return found
+            elif isinstance(value, list):
+                for candidate in value:
+                    found=walk(candidate)
+                    if found:
+                        return found
+            return ''
+        return walk(x)
+    except Exception:
+        return ''
 
 
 def main() -> int:
     frozen=load(FROZEN); signal=load(SIGNAL); ensemble=load(ENSEMBLE)
     path=os.getenv('DRAFT_PATH','').strip()
     post=draft_text(path)
+    # Jev is optional. If it has no credential, missing optional input must not
+    # turn a valid deterministic content pipeline into a hard failure.
+    key=(os.getenv('TYPESAFE_API_KEY') or os.getenv('JEV_API_KEY') or '').strip()
+    if not key:
+        result={'enabled':False,'provider':'TypeSafe AI','status':'disabled_no_api_key',
+                'publish':False,'action':'local_gates_only','confidence':0.0,
+                'jev_authoritative':False,'draft_text_available':bool(post)}
+        OUT.parent.mkdir(parents=True,exist_ok=True)
+        OUT.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
+        print(json.dumps({'enabled':False,'status':'disabled_no_api_key',
+                          'action':'local_gates_only','publish':False,
+                          'draft_text_available':bool(post)},indent=2))
+        return 0
     if not post:
-        raise SystemExit('Jev runtime gate: final draft text is missing')
+        raise SystemExit('Jev runtime gate: final draft text is missing while Jev is configured')
     evidence=[]
     for key in ('reason','instruction','signal_thesis_key'):
         if frozen.get(key): evidence.append(f"{key}: {frozen[key]}")
