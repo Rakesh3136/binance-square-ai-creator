@@ -17,3 +17,14 @@ def test_missing_asset_and_action_are_repaired_within_budget():
 
 def test_trade_pressure_is_not_repaired_away():
     assert gate.TRADE_PRESSURE.search("buy now")
+
+
+def test_write_json_emits_parseable_json_with_real_newline(tmp_path):
+    import json
+    path=tmp_path/"report.json"
+    payload={"status":"PASS","draft":{"post":"real draft"}}
+    gate.write_json(path,payload)
+    raw=path.read_text(encoding="utf-8")
+    assert raw.endswith("\n")
+    assert not raw.endswith("\\n")
+    assert json.loads(raw)==payload
