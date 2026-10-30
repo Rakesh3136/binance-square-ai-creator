@@ -32,7 +32,7 @@ def test_word_set_overlap_does_not_masquerade_as_semantic_clone(monkeypatch, tmp
     old = "alpha alpha alpha alpha alpha alpha beta beta beta gamma gamma delta epsilon zeta eta theta iota kappa lambda"
     current = "lambda lambda lambda lambda lambda lambda kappa iota theta eta zeta epsilon delta gamma gamma beta beta beta alpha alpha alpha alpha alpha alpha"
     log = tmp_path / "publication_log.jsonl"
-    log.write_text(json.dumps({"text": old}) + "\\n", encoding="utf-8")
+    log.write_text(json.dumps({"text": old}) + "\n", encoding="utf-8")
     monkeypatch.setattr(n, "PUBLICATION_LOG", log)
     assert n.jaccard(old, current) == 1.0
     assert n.token_cosine_similarity(old, current) < n.SIMILARITY_BLOCK
