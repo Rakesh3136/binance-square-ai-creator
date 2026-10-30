@@ -76,7 +76,10 @@ def conversion_repair(text,asset):
  return text,repairs
 def write_json(path,value):
  path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
- path.write_text(json.dumps(value,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+ serialized=json.dumps(value,indent=2,ensure_ascii=False)
+ path.write_text(serialized+"\n",encoding="utf-8")
+ # Validate the exact bytes before downstream gates consume this artifact.
+ json.loads(path.read_text(encoding="utf-8"))
 def main():
  path=resolve();report=load_json(path);draft=report.get("draft") if isinstance(report.get("draft"),dict) else report;text=str(draft.get("post") or draft.get("text") or report.get("post") or report.get("text") or "").strip()
  if not text:raise SystemExit("NIC editorial gate: empty draft")
