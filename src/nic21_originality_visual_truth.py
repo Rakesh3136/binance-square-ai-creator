@@ -24,10 +24,16 @@ DRAFT_PREFLIGHT = ROOT / "editorial_preflight.json"
 VISUAL_META = ROOT / "visual_metadata.json"
 VISUAL_FILE = ROOT / "visual.png"
 
-SIMILARITY_BLOCK = 0.88
+# Match the upstream NIC 21.2 differentiator. The previous implementation used
+# set-Jaccard over the entire word bag; that ignores word order and can label
+# a different editorial treatment as a 0.92 "semantic" clone. Use token cosine
+# plus ordered 3-word phrase overlap instead.
+SIMILARITY_BLOCK = 0.82
+PHRASE_SHINGLE_BLOCK = 0.62
 HOOK_BLOCK = 0.92
 STRUCTURE_BLOCK = 0.90
 CTA_BLOCK = 0.92
+STOP_WORDS = set("the a an and or but is are was were to of in on for with from this that what how why when after before as by it its their they we our you your i be has have had will would can could should market price move moved next into about does gets get more less one two then than through not no".split())
 RECENT_POSTS = 12
 
 
@@ -55,6 +61,33 @@ def tokens(text: str) -> set[str]:
 
 def jaccard(a: str, b: str) -> float:
     aa, bb = tokens(a), tokens(b)
+    if not aa or not bb:
+        return 0.0
+    return len(aa & bb) / len(aa | bb)
+
+
+def similarity_tokens(text: str) -> list[str]:
+    return [word for word in norm(text).split() if len(word) > 2 and word not in STOP_WORDS]
+
+
+def token_cosine_similarity(a: str, b: str) -> float:
+    """Frequency-aware lexical similarity; unlike set-Jaccard, it is not fooled by a shared word bag."""
+    from collections import Counter
+    aa, bb = Counter(similarity_tokens(a)), Counter(similarity_tokens(b))
+    if not aa or not bb:
+        return 0.0
+    common = set(aa) & set(bb)
+    denominator = (sum(v * v for v in aa.values()) * sum(v * v for v in bb.values())) ** 0.5
+    return sum(aa[word] * bb[word] for word in common) / denominator if denominator else 0.0
+
+
+def phrase_shingles(text: str, size: int = 3) -> set[tuple[str, ...]]:
+    words = similarity_tokens(text)
+    return {tuple(words[i:i + size]) for i in range(max(0, len(words) - size + 1))}
+
+
+def phrase_shingle_similarity(a: str, b: str) -> float:
+    aa, bb = phrase_shingles(a), phrase_shingles(b)
     if not aa or not bb:
         return 0.0
     return len(aa & bb) / len(aa | bb)
@@ -270,18 +303,32 @@ def originality(draft_text: str, symbol: str) -> dict:
 
     for i, post in enumerate(posts):
         old = post["_text"]
-        sem = jaccard(draft_text, old)
+        # Use the same ordered-phrase and frequency-aware checks as NIC 21.2.
+        # A word-set overlap alone is not evidence that two posts are semantic clones.
+        cosine = token_cosine_similarity(draft_text, old)
+        shingles = phrase_shingle_similarity(draft_text, old)
         hs = jaccard(current_hook, hook(old))
         ss = 1.0 if current_structure and current_structure == structure(old) else 0.0
         cs = jaccard(current_cta, cta(old)) if current_cta and cta(old) else 0.0
         old_symbol = re.sub(r"[^A-Z0-9]", "", str(post.get("symbol") or "").upper().replace("USDT", ""))
         same_asset = bool(symbol and old_symbol and symbol == old_symbol)
-        comparison = {"recent_index": i, "same_asset": same_asset, "semantic_similarity": round(sem, 4),
-                      "hook_similarity": round(hs, 4), "structure_similarity": ss,
-                      "cta_similarity": round(cs, 4)}
+        comparison = {
+            "recent_index": i,
+            "post_id": post.get("post_id") or post.get("id"),
+            "compared_symbol": old_symbol or None,
+            "same_asset": same_asset,
+            # Keep the legacy field as an alias for downstream report readers.
+            "semantic_similarity": round(cosine, 4),
+            "token_cosine_similarity": round(cosine, 4),
+            "phrase_shingle_similarity": round(shingles, 4),
+            "hook_similarity": round(hs, 4),
+            "structure_similarity": ss,
+            "cta_similarity": round(cs, 4),
+        }
         comparisons.append(comparison)
         reasons = []
-        if sem >= SIMILARITY_BLOCK: reasons.append("semantic_similarity")
+        if cosine >= SIMILARITY_BLOCK: reasons.append("token_cosine_similarity")
+        if shingles >= PHRASE_SHINGLE_BLOCK: reasons.append("phrase_shingle_similarity")
         if hs >= HOOK_BLOCK: reasons.append("hook_similarity")
         if ss >= STRUCTURE_BLOCK and cs >= CTA_BLOCK: reasons.append("structure_and_cta_similarity")
         if reasons:
@@ -289,8 +336,8 @@ def originality(draft_text: str, symbol: str) -> dict:
 
     return {"status": "PASS" if not failures else "FAIL", "failures": failures,
             "comparisons": comparisons, "recent_posts_checked": len(posts),
-            "thresholds": {"semantic": SIMILARITY_BLOCK, "hook": HOOK_BLOCK,
-                           "structure": STRUCTURE_BLOCK, "cta": CTA_BLOCK}}
+            "thresholds": {"token_cosine": SIMILARITY_BLOCK, "phrase_shingle": PHRASE_SHINGLE_BLOCK,
+                           "hook": HOOK_BLOCK, "structure": STRUCTURE_BLOCK, "cta": CTA_BLOCK}}
 
 
 def acquire_lock(owner: str, ttl_seconds: int = 900) -> tuple[bool, str]:
