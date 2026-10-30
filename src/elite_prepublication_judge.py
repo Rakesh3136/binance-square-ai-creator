@@ -60,10 +60,35 @@ def research_adv(r,d,t):
  return max(vals) if vals else None
 def originality(t,f,attr,mech,inv,a):
  lo=t.lower();sy=symbols(t);names=set(re.findall(r'\b[A-Z][A-Z0-9]{1,9}\b',t))|set(re.findall(r'\$[A-Z][A-Z0-9]{1,14}\b',t));causal=sum(x in lo for x in CAUSAL_OR_RELATIONAL_TERMS);sent=max(1,len([x for x in re.split(r'[.!?]+',t) if x.strip()]));words=re.findall(r"[A-Za-z][A-Za-z'-]+",lo);div=len(set(words))/max(1,len(words));b={'base_editorial_synthesis':40,'asset_specific_research':15 if a is not None and a>=50 else 0,'mechanism':10 if mech else 0,'invalidation_or_confirmation':10 if inv else 0,'source_attribution':5 if attr else 0,'multi_entity_relationship':8 if len(sy)>=2 or len(names)>=3 else 0,'causal_or_contrast_language':7 if causal>=2 else (4 if causal else 0),'concrete_evidence_mix':5 if f>=3 else (3 if f==2 else 0),'lexical_novelty':5 if div>=.58 and sent>=3 else (3 if div>=.50 else 0)};return min(100,sum(b.values())),b
+def extract_post(data):
+    """Resolve authored post text across current and legacy multi-agent report schemas."""
+    text_keys=("post","text","body","final_post","final_text","caption","content")
+    wrapper_keys=("draft","final_draft","publication","content_package","result","output")
+    def walk(value):
+        if isinstance(value,dict):
+            for key in text_keys:
+                candidate=value.get(key)
+                if isinstance(candidate,str) and candidate.strip():
+                    return candidate.strip(),value
+            for key in wrapper_keys:
+                if key in value:
+                    found,owner=walk(value[key])
+                    if found:return found,owner
+            for candidate in value.values():
+                if isinstance(candidate,(dict,list)):
+                    found,owner=walk(candidate)
+                    if found:return found,owner
+        elif isinstance(value,list):
+            for candidate in value:
+                found,owner=walk(candidate)
+                if found:return found,owner
+        return "",{}
+    return walk(data)
+
 def main():
  p=resolve_report()
  if not p:raise SystemExit('Judge: no draft found')
- data=load(p);draft=data.get('draft') or {};t=str(draft.get('post') or draft.get('text') or '').strip();r=load(RESEARCH);lo=t.lower();lines=[x.strip() for x in t.splitlines() if x.strip()];hook=lines[0].lower() if lines else '';qs=re.findall(r'[^\n.!?]*\?',t);facts=len(re.findall(r'\$[A-Z][A-Z0-9]{1,14}|\b\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?',t));mech=has_any(lo,MECHANISM_TERMS);inv=has_any(lo,INVALIDATION_TERMS);watch=has_any(lo,('watch','next','signal','evidence','confirm','changes my view','what would'));attr=has_any(lo,('source:','reported','according to','announced','data from','according'));generic_q=any(q.strip().lower() in BAD_QUESTIONS for q in qs);generic_hook=hook in GENERIC or len(hook.split())<5;malformed=bool(re.search(r'\bspot volume is\s+\$?[\d,.]+[kmb]?\s+spot volume\b',lo));tpl=[x for x in TEMPLATE_PATTERNS if re.search(x,re.sub(r'\s+',' ',lo),re.I|re.S)];tplphr=sum(x in lo for x in ('reaction matters','bear case:','bull case:','reclaims the range','keep control below support','keep control above support'));rep=recent_similarity(t);evidence=min(100,35+facts*15+(20 if attr else 0));adv=research_adv(r,data,t);spec=specificity(t,facts,adv);reader=min(100,45+(20 if mech else 0)+(15 if inv else 0)+(15 if watch else 0));orig,ob=originality(t,facts,attr,mech,inv,adv);hook_score=max(0,90-(35 if generic_hook else 0)-(25 if len(hook.split())<8 else 0));conversation=max(0,90-(35 if generic_q else 0)) if len(qs)==1 else 20;compliance=100 if not any(x in lo for x in ('guaranteed profit','risk-free','guaranteed return','100% win')) else 0;structure=min(100,50+(10 if len(lines)>=4 else 0)+(15 if mech else 0)+(15 if inv else 0));overall=round(evidence*.20+reader*.20+orig*.15+spec*.15+hook_score*.08+structure*.08+conversation*.04+compliance*.10,1)
+ data=load(p);t,draft=extract_post(data);r=load(RESEARCH);lo=t.lower();lines=[x.strip() for x in t.splitlines() if x.strip()];hook=lines[0].lower() if lines else '';qs=re.findall(r'[^\n.!?]*\?',t);facts=len(re.findall(r'\$[A-Z][A-Z0-9]{1,14}|\b\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?',t));mech=has_any(lo,MECHANISM_TERMS);inv=has_any(lo,INVALIDATION_TERMS);watch=has_any(lo,('watch','next','signal','evidence','confirm','changes my view','what would'));attr=has_any(lo,('source:','reported','according to','announced','data from','according'));generic_q=any(q.strip().lower() in BAD_QUESTIONS for q in qs);generic_hook=hook in GENERIC or len(hook.split())<5;malformed=bool(re.search(r'\bspot volume is\s+\$?[\d,.]+[kmb]?\s+spot volume\b',lo));tpl=[x for x in TEMPLATE_PATTERNS if re.search(x,re.sub(r'\s+',' ',lo),re.I|re.S)];tplphr=sum(x in lo for x in ('reaction matters','bear case:','bull case:','reclaims the range','keep control below support','keep control above support'));rep=recent_similarity(t);evidence=min(100,35+facts*15+(20 if attr else 0));adv=research_adv(r,data,t);spec=specificity(t,facts,adv);reader=min(100,45+(20 if mech else 0)+(15 if inv else 0)+(15 if watch else 0));orig,ob=originality(t,facts,attr,mech,inv,adv);hook_score=max(0,90-(35 if generic_hook else 0)-(25 if len(hook.split())<8 else 0));conversation=max(0,90-(35 if generic_q else 0)) if len(qs)==1 else 20;compliance=100 if not any(x in lo for x in ('guaranteed profit','risk-free','guaranteed return','100% win')) else 0;structure=min(100,50+(10 if len(lines)>=4 else 0)+(15 if mech else 0)+(15 if inv else 0));overall=round(evidence*.20+reader*.20+orig*.15+spec*.15+hook_score*.08+structure*.08+conversation*.04+compliance*.10,1)
  failures=[]
  if not t:failures+=['empty_post']
  if len(qs)!=1:failures+=['must_have_exactly_one_question']
