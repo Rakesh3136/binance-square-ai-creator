@@ -25,6 +25,22 @@ def test_originality_blocks_near_duplicate(monkeypatch, tmp_path):
     assert result["status"] == "FAIL"
 
 
+def test_word_set_overlap_does_not_masquerade_as_semantic_clone(monkeypatch, tmp_path):
+    # Both posts contain the same vocabulary, but they use different phrase order
+    # and materially different word-frequency emphasis. Set-Jaccard reports 1.0;
+    # phrase-aware NIC 21 detection must not call this a near-duplicate.
+    old = "alpha alpha alpha alpha alpha alpha beta beta beta gamma gamma delta epsilon zeta eta theta iota kappa lambda"
+    current = "lambda lambda lambda lambda lambda lambda kappa iota theta eta zeta epsilon delta gamma gamma beta beta beta alpha alpha alpha alpha alpha alpha"
+    log = tmp_path / "publication_log.jsonl"
+    log.write_text(json.dumps({"text": old}) + "\\n", encoding="utf-8")
+    monkeypatch.setattr(n, "PUBLICATION_LOG", log)
+    assert n.jaccard(old, current) == 1.0
+    assert n.token_cosine_similarity(old, current) < n.SIMILARITY_BLOCK
+    assert n.phrase_shingle_similarity(old, current) < n.PHRASE_SHINGLE_BLOCK
+    result = n.originality(current, "")
+    assert result["status"] == "PASS"
+
+
 def test_visual_truth_rejects_symbol_mismatch(monkeypatch, tmp_path):
     meta = tmp_path / "visual_metadata.json"
     meta.write_text(json.dumps({"symbol": "BINANCE:ETHUSDT"}), encoding="utf-8")
