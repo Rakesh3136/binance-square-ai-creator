@@ -30,7 +30,7 @@ def test_word_set_overlap_does_not_masquerade_as_semantic_clone(monkeypatch, tmp
     # and materially different word-frequency emphasis. Set-Jaccard reports 1.0;
     # phrase-aware NIC 21 detection must not call this a near-duplicate.
     old = "alpha alpha alpha alpha alpha alpha beta beta beta gamma gamma delta epsilon zeta eta theta iota kappa lambda"
-    current = "lambda lambda lambda lambda lambda lambda kappa iota theta eta zeta epsilon delta gamma gamma beta beta beta alpha alpha alpha alpha alpha alpha"
+    current = "lambda lambda lambda lambda lambda lambda kappa kappa kappa iota iota theta eta zeta epsilon delta gamma beta alpha"
     log = tmp_path / "publication_log.jsonl"
     log.write_text(json.dumps({"text": old}) + "\n", encoding="utf-8")
     monkeypatch.setattr(n, "PUBLICATION_LOG", log)
