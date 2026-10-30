@@ -98,9 +98,9 @@ def main():
  report["nic_editorial_quality_gate"]["question_count"]=text.count("?")
  report["nic_editorial_quality_gate"]["status"]="PASS" if not reasons else "BLOCK"
  OUT.parent.mkdir(parents=True,exist_ok=True)
- path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
- OUT.write_text(json.dumps(report["nic_editorial_quality_gate"],indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
- CONVERSION_OUT.write_text(json.dumps(conversion,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
+ path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+ OUT.write_text(json.dumps(report["nic_editorial_quality_gate"],indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+ CONVERSION_OUT.write_text(json.dumps(conversion,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
  print(json.dumps({"editorial":report["nic_editorial_quality_gate"],"conversion":conversion},indent=2))
  if reasons: raise SystemExit("NIC editorial/conversion quality gate blocked: "+", ".join(reasons))
 if __name__=="__main__":main()
