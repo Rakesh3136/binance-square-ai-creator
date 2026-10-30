@@ -74,6 +74,9 @@ def conversion_repair(text,asset):
   candidate=text.rstrip()+"\n\n"+add
   if len(candidate)<=MAX_CHARS:text=candidate;repairs.append("reader_action_bridge")
  return text,repairs
+def write_json(path,value):
+ path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
+ path.write_text(json.dumps(value,indent=2,ensure_ascii=False)+"\\n",encoding="utf-8")
 def main():
  path=resolve();report=load_json(path);draft=report.get("draft") if isinstance(report.get("draft"),dict) else report;text=str(draft.get("post") or draft.get("text") or report.get("post") or report.get("text") or "").strip()
  if not text:raise SystemExit("NIC editorial gate: empty draft")
@@ -98,9 +101,9 @@ def main():
  report["nic_editorial_quality_gate"]["question_count"]=text.count("?")
  report["nic_editorial_quality_gate"]["status"]="PASS" if not reasons else "BLOCK"
  OUT.parent.mkdir(parents=True,exist_ok=True)
- path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
- OUT.write_text(json.dumps(report["nic_editorial_quality_gate"],indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
- CONVERSION_OUT.write_text(json.dumps(conversion,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+ write_json(path,report)
+ write_json(OUT,report["nic_editorial_quality_gate"])
+ write_json(CONVERSION_OUT,conversion)
  print(json.dumps({"editorial":report["nic_editorial_quality_gate"],"conversion":conversion},indent=2))
  if reasons: raise SystemExit("NIC editorial/conversion quality gate blocked: "+", ".join(reasons))
 if __name__=="__main__":main()
