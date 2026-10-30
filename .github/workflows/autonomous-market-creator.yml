@@ -460,15 +460,6 @@ jobs:
           python src/nic21_2_hook_preflight.py
           python -m json.tool data/live/nic21_2_hook_preflight.json >/dev/null
 
-      - name: NIC 21 Originality Preflight
-        if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
-        env:
-          DRAFT_PATH: ${{ steps.editorial.outputs.path }}
-        run: |
-          # Visual truth is deliberately deferred until visual_decision and rendering finish.
-          python src/nic21_originality_visual_truth.py --originality-only
-          python -m json.tool data/live/nic21_gate.json >/dev/null
-
       - name: Reader value and authoritative quality gates
         if: ${{ steps.cadence.outputs.publish == 'true' && steps.editorial.outputs.blocked != 'true' }}
         env:
@@ -482,6 +473,10 @@ jobs:
           python src/elite_prepublication_gate.py
           python src/content_integrity_gate_4.py
           python src/pipeline_stage.py quality_gate success 'Draft passed authoritative content gates'
+          # Editorial quality gates above may mutate the draft. Check originality only
+          # after the final text transformation, before spending time on visual rendering.
+          python src/nic21_originality_visual_truth.py --originality-only
+          python -m json.tool data/live/nic21_gate.json >/dev/null
 
       - name: Decide whether visual is required
         id: visual_decision
