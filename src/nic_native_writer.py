@@ -78,6 +78,8 @@ def build(ctx):
     s=sym(sel.get("symbol") or pub.get("symbol") or director.get("primary_symbol"))
     if not s:raise RuntimeError("NIC Native Writer: authoritative asset missing")
     cat=str(sel.get("category") or pub.get("category") or "market_opportunity").lower()
+    timing_state=str(pub.get("timing_state") or "").upper()
+    research_observation=pub.get("research_observation") if isinstance(pub.get("research_observation"),dict) else {}
     it=item_for(s,market);move=num(it.get("price_change_percent"));last=num(it.get("last_price"))
     vol=num(it.get("quote_volume_usdt") or it.get("quote_volume"));ir=num(it.get("intraday_range_percent"))
     lo,hi=rng(it);used=recent()
@@ -109,6 +111,23 @@ def build(ctx):
         ]
         hook,body,middle,close=trade_styles[seed % len(trade_styles)]
         question=f"What would you need to see on ${dollar} before you would consider this ${side} scenario confirmed?"
+    elif cat in {"research_insight", "market_mechanism", "data_surprise"} and timing_state == "EXHAUSTED":
+        # An exhausted move may still support an explanatory research post, but
+        # it must never be framed as a fresh setup or turned into entry levels.
+        move_text=f"{move:+.1f}% in 24 hours" if move else "sharply over the measured period"
+        range_text=f" and a {ir:.1f}% intraday range" if ir else ""
+        hook="$"+s+f" has already moved {move_text}; the evidence gap now matters more than the headline."
+        body=f"The snapshot shows price near {obs}, {voltext} in quote volume{range_text}. Those figures describe volatility and participation, not a confirmed catalyst."
+        missing=research_observation.get("missing_evidence") if isinstance(research_observation.get("missing_evidence"),list) else []
+        missing_map={"market_cap":"market cap","fdv":"FDV","circulating_supply":"circulating supply","product_adoption":"adoption","revenue_or_fees":"fees/revenue","holder_concentration":"holder concentration","unlocks":"unlock schedules","security_audits":"security checks","external_news_corroboration":"external corroboration"}
+        gaps=[missing_map.get(str(x),str(x).replace("_"," ")) for x in missing]
+        gap_text=", ".join(gaps[:6]) if gaps else "fundamental and independent-source corroboration"
+        news_count=research_observation.get("news_count")
+        official_count=research_observation.get("official_evidence_count")
+        corroboration="No independent news corroboration is recorded. " if news_count == 0 and official_count == 0 else "Independent corroboration is not yet established in this research record. "
+        middle=corroboration+f"{gap_text.capitalize()} remain unverified. Sustained demand, short covering and thin liquidity are competing explanations; this snapshot cannot distinguish them."
+        close="Timing is exhausted for a fresh entry. The defensible conclusion is volatility, not proof of durable demand."
+        question="Which missing data would you verify first for $"+s+"?"
     else:
         story_templates={
             "breakout_retest": (
