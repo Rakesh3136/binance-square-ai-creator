@@ -13,7 +13,13 @@ LIVE = ROOT / "data/live"
 OUT = LIVE / "nic_editorial_lane_gate.json"
 MAX_SETUP_MOVE_24H_PCT = 5.0
 SETUP_TERMS = re.compile(
-    r"\b(support|resistance|entry|stop[- ]?loss|invalidation|target|take[- ]?profit|long bias|short bias|breakout|technical setup)\b",
+    r"\b(?:breakout|breakdown|technical setup|long bias|short bias|stop[- ]?loss|take[- ]?profit)\b"
+    r"|\bentry\s*(?:trigger|price|at|near|zone)\b"
+    r"|\btarget\s*(?:price|at|near|zone)\b"
+    r"|\b(?:support|resistance)\s+(?:level|zone|at|near|around|holds?|breaks?|reclaims?|flips?)\b"
+    r"|\binvalidation\s+(?:below|above|at|near|around)\b"
+    r"|\bentry\s*(?:price)?\s*[:=@]"
+    r"|\b(?:stop[- ]?loss|take[- ]?profit)\s*[:=@]",
     re.I,
 )
 ACTIONABLE_TERMS = re.compile(
@@ -49,7 +55,9 @@ def _draft_text(report):
 
 
 def _setup_market_check(text, symbol, market):
-    if not SETUP_TERMS.search(text):
+    # Generic prose such as "support this thesis" is not a chart-level setup.
+    # Only technical-level phrasing or explicit order/level instructions trigger this guard.
+    if not (SETUP_TERMS.search(text) or ACTIONABLE_TERMS.search(text)):
         return []
     reasons = []
     if ACTIONABLE_TERMS.search(text):
