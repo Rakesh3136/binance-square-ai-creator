@@ -3,7 +3,7 @@ from __future__ import annotations
 import json,re,os
 from pathlib import Path
 from datetime import datetime,timezone
-ROOT=Path(__file__).resolve().parents[1];DRAFT=Path(os.getenv("DRAFT_PATH",""));CONTRACT=ROOT/"data/live/nic_monetization_contract.json";OPPORTUNITY=ROOT/"data/live/authoritative_opportunity.json";DIRECTOR=ROOT/"data/live/content_director_brief.json";OUT=ROOT/"data/live/nic_editorial_quality_gate.json";CONVERSION_OUT=ROOT/"data/live/nic_conversion_contract.json";MAX_CHARS=740
+ROOT=Path(__file__).resolve().parents[1];DRAFT=Path(os.getenv("DRAFT_PATH",""));CONTRACT=ROOT/"data/live/nic_monetization_contract.json";PUBLICATION_CONTEXT=ROOT/"data/live/publication_context.json";OPPORTUNITY=ROOT/"data/live/authoritative_opportunity.json";DIRECTOR=ROOT/"data/live/content_director_brief.json";OUT=ROOT/"data/live/nic_editorial_quality_gate.json";CONVERSION_OUT=ROOT/"data/live/nic_conversion_contract.json";MAX_CHARS=740
 INTERNAL_PATTERNS=[r"(?im)^\s*(?:attention|quality|engagement|opportunity|editorial)\s+score\s*[:=].*\n?",r"(?im)^\s*(?:experiment|campaign|cycle)\s*(?:id|day)?\s*[:=].*\n?",r"(?im)^\s*(?:generation_mode|content_lane|reader_payoff_type|hook_type)\s*[:=].*\n?"]
 GENERIC_OPENERS=[r"^For \$?[A-Z0-9]{2,15}, that matters because",r"^\$?[A-Z0-9]{2,15} is moving, but the useful signal is",r"^The \$?[A-Z0-9]{2,15} move is easy to see\."]
 TRADE_PRESSURE=re.compile(r"\b(buy now|sell now|guaranteed|guarantee|100%|can't lose|must buy|must sell|urgent)\b",re.I);ACTION_WORDS=re.compile(r"\b(inspect|check|compare|watch|verify|track|review|monitor|see|look|test|confirm|observe|follow)\b",re.I);TICKER=re.compile(r"\$([A-Z][A-Z0-9]{1,14})\b",re.I);ASSET_KEYS=("asset","symbol","ticker","coin","cashtag","asset_symbol","base_asset","pair","market")
@@ -11,6 +11,12 @@ def load_json(p):
  try:
   x=json.loads(p.read_text(encoding="utf-8"));return x if isinstance(x,dict) else {}
  except Exception:return {}
+def resolve_lane(publication_context,contract,draft,report):
+ for source in (publication_context,contract,draft,report):
+  if not isinstance(source,dict):continue
+  lane=str(source.get("content_lane") or source.get("category") or "").strip().lower()
+  if lane:return lane
+ return "market_setup"
 def resolve():
  if DRAFT and DRAFT.exists():return DRAFT
  reports=sorted((ROOT/"data/reports").glob("*-multi-agent.json"),key=lambda p:p.stat().st_mtime_ns,reverse=True)
@@ -85,7 +91,7 @@ def main():
  if not text:raise SystemExit("NIC editorial gate: empty draft")
  before=text;text=clean(text)
  if not text:raise SystemExit("NIC editorial gate: internal-only draft")
- contract=load_json(CONTRACT);lane=str(contract.get("content_lane") or draft.get("content_lane") or report.get("content_lane") or "market_setup");asset,asset_source=resolve_asset(contract,draft,text,report);text,conversion_repairs=conversion_repair(text,asset)
+ contract=load_json(CONTRACT);publication_context=load_json(PUBLICATION_CONTEXT);lane=resolve_lane(publication_context,contract,draft,report);asset,asset_source=resolve_asset(contract,draft,text,report);text,conversion_repairs=conversion_repair(text,asset)
  if text.count("?")>1:
   last=text.rfind("?");text=text[:last].replace("?",".")+text[last:];conversion_repairs.append("question_count_normalized")
  asset_ok=bool(asset and re.search(r"\$"+re.escape(asset)+r"\b",text,re.I));opener=text.split("\n\n",1)[0];generic=any(re.search(p,opener,re.I) for p in GENERIC_OPENERS);action_signal=bool(ACTION_WORDS.search(text));trade_pressure=bool(TRADE_PRESSURE.search(text));conversion_status="PASS" if asset_ok and action_signal and not trade_pressure else "BLOCK"
