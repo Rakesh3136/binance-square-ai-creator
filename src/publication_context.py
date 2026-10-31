@@ -61,6 +61,7 @@ def resolve_editorial_state(frozen, preflight, eligibility):
 def main():
  frozen=load('data/live/authoritative_opportunity.json'); brain=load('data/live/creator_brain_decision.json'); pre=load('data/live/editorial_preflight.json'); director=load('data/live/content_director_brief.json'); engagement=pre.get('engagement_strategy') or {}; experiment=engagement.get('experiment') or {}; selected=pre.get('selected_opportunity') or {}; monetization=load_monetization(); monetization_os=load('data/live/nic_monetization_contract.json')
  eligibility=load('data/live/nic22_5_publication_eligibility.json')
+ eligible_selected=eligibility.get('selected') if isinstance(eligibility.get('selected'),dict) else {}
  editorial=resolve_editorial_state(frozen,pre,eligibility)
  symbol=clean(frozen.get('symbol')) or clean(brain.get('symbol')) or clean(selected.get('symbol'))
  if not symbol:raise SystemExit('No authoritative publication symbol')
