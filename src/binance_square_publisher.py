@@ -190,22 +190,21 @@ def emergency_stop_requested() -> bool:
     return os.getenv("NIC_EMERGENCY_STOP", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def github_emergency_stop_requested() -> bool:
-    """Read the repository-level stop flag immediately before external submission.
+def github_emergency_stop_check() -> tuple[bool, str]:
+    """Read the shared stop flag and return a safe, non-secret diagnostic code.
 
-    GitHub Actions supplies GITHUB_REPOSITORY and GITHUB_TOKEN. If running in
-    Actions without a readable control variable, fail closed rather than assume
-    publishing is safe. Local test/dev runs without GITHUB_REPOSITORY use the
-    environment kill switch above.
+    Any unavailable or malformed control state remains fail-closed. The
+    diagnostic distinguishes configuration, authorization, transport, and
+    response failures without exposing the token or response body.
     """
     if os.getenv("NIC_SHARED_GITHUB_STOP", "").strip().lower() not in {"1", "true", "yes", "on"}:
-        return False
+        return False, "shared_polling_disabled"
     repository = os.getenv("GITHUB_REPOSITORY", "").strip()
     if not repository:
-        return True
+        return True, "github_repository_missing"
     token = os.getenv("GITHUB_TOKEN", "").strip()
     if not token:
-        return True
+        return True, "github_token_missing"
     url = f"https://api.github.com/repos/{repository}/actions/variables/NIC_EMERGENCY_STOP"
     req = urllib.request.Request(url, headers={
         "Accept": "application/vnd.github+json",
@@ -216,12 +215,35 @@ def github_emergency_stop_requested() -> bool:
     try:
         with urllib.request.urlopen(req, timeout=5) as response:
             payload = json.loads(response.read().decode("utf-8", errors="replace"))
+        if not isinstance(payload, dict) or "value" not in payload:
+            return True, "github_variable_response_malformed"
         value = str(payload.get("value", "")).strip().lower()
-        return value not in {"0", "false", "no", "off"}
+        if value in {"0", "false", "no", "off"}:
+            return False, "github_variable_inactive"
+        if value in {"1", "true", "yes", "on"}:
+            return True, "github_variable_active"
+        return True, "github_variable_value_unrecognized"
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            return True, "github_api_unauthorized"
+        if exc.code == 403:
+            return True, "github_api_forbidden_check_actions_read_permission"
+        if exc.code == 404:
+            return True, "github_variable_missing_or_repository_not_visible"
+        return True, f"github_api_http_{exc.code}"
+    except urllib.error.URLError:
+        return True, "github_api_unreachable"
+    except TimeoutError:
+        return True, "github_api_timeout"
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return True, "github_variable_response_malformed"
     except Exception:
-        # Missing variable, permissions failure, timeout, or malformed response
-        # must not accidentally authorize a public post.
-        return True
+        return True, "github_variable_read_unexpected_error"
+
+
+def github_emergency_stop_requested() -> bool:
+    """Compatibility wrapper; unavailable control state is still fail-closed."""
+    return github_emergency_stop_check()[0]
 
 
 def main():
@@ -230,8 +252,10 @@ def main():
     if os.getenv("PUBLISHING_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         write_result({"status":"PUBLISHING_PAUSED","message":"Automatic Binance Square publishing is disabled unless the workflow explicitly enables a current-cycle, fully authorized editorial draft.","checked_at":now(),"endpoint":ENDPOINT,"post_id":None,"link":None,"publication_proof":"none","current_run_publication":"NO_NEW_PUBLICATION"})
         return 0
-    if emergency_stop_requested() or github_emergency_stop_requested():
-        write_result({"status":"PUBLISH_BLOCKED_EMERGENCY_STOP","message":"NIC emergency stop is active or its shared GitHub control flag is unavailable; publisher refused external submission.","checked_at":now(),"endpoint":ENDPOINT,"post_id":None,"link":None,"publication_proof":"none","current_run_publication":"NO_NEW_PUBLICATION"})
+    local_stop = emergency_stop_requested()
+    shared_stop, shared_stop_diagnostic = github_emergency_stop_check()
+    if local_stop or shared_stop:
+        write_result({"status":"PUBLISH_BLOCKED_EMERGENCY_STOP","message":"NIC emergency stop is active or its shared GitHub control flag is unavailable; publisher refused external submission.","emergency_stop_source":"local_environment" if local_stop else "github_repository_variable","emergency_stop_diagnostic":"local_environment_active" if local_stop else shared_stop_diagnostic,"checked_at":now(),"endpoint":ENDPOINT,"post_id":None,"link":None,"publication_proof":"none","current_run_publication":"NO_NEW_PUBLICATION"})
         return 0
     key=(os.getenv("BINANCE_SQUARE_OPENAPI_KEY") or os.getenv("BINANCE_SQUARE_API_KEY") or "").strip()
     if not key: return fail("BINANCE_SQUARE_OPENAPI_KEY/BINANCE_SQUARE_API_KEY is not configured","PUBLISHER_NOT_CONFIGURED")
