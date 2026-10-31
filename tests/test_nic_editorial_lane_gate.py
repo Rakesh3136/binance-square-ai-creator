@@ -61,6 +61,14 @@ class EditorialLaneGateTest(unittest.TestCase):
         self.assertFalse(result["publish"])
         self.assertTrue(any("already extended" in reason for reason in result["reasons"]))
 
+    def test_research_language_about_supporting_a_thesis_is_not_a_setup(self):
+        e, r, c = self.fixtures()
+        draft = {"draft": {"post": "The next response can support this thesis or show why it no longer fits. Timing is exhausted for a fresh entry."}}
+        market = {"generated_at": NOW, "top_gainers": [{"symbol": "HOTUSDT", "price_change_percent": 13.3}]}
+        result = evaluate(e, r, c, draft=draft, market=market, symbol="HOT")
+        self.assertTrue(result["publish"])
+        self.assertFalse(any("already extended" in reason for reason in result["reasons"]))
+
     def test_setup_like_post_missing_market_evidence_is_blocked(self):
         e, r, c = self.fixtures()
         draft = {"draft": {"post": "OSMO breakout with support and resistance levels."}}
