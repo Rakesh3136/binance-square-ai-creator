@@ -28,3 +28,12 @@ def test_write_json_emits_parseable_json_with_real_newline(tmp_path):
     assert raw.endswith("\n")
     assert not raw.endswith("\\n")
     assert json.loads(raw)==payload
+
+def test_current_publication_context_lane_overrides_stale_os_lane():
+    lane = gate.resolve_lane(
+        {"content_lane": "research_insight", "category": "research_insight"},
+        {"content_lane": "market_setup"},
+        {"content_lane": "market_setup"},
+        {"content_lane": "market_setup"},
+    )
+    assert lane == "research_insight"
