@@ -68,12 +68,21 @@ def build(ctx):
     )
     # Apply a cohort pattern only when it appears across a minimum of five posts
     # in both creator tiers. This is a presentation hypothesis, not post-level reward attribution.
-    if cohort_comparison_ready:
+    if cohort_comparison_ready and period_learning.get("learning_status") == "COHORT_HYPOTHESES_READY":
         high_sources=num(high_rates.get("has_source_link"))
         low_sources=num(lower_rates.get("has_source_link"))
         high_numbers=num(high_rates.get("has_numeric_evidence"))
         low_numbers=num(lower_rates.get("has_numeric_evidence"))
-        if high_sources >= low_sources + 0.2 and high_numbers >= low_numbers + 0.2:
+        high_questions=num(high_rates.get("has_question"))
+        low_questions=num(lower_rates.get("has_question"))
+        high_risk=num(high_rates.get("has_risk_or_invalidation_language"))
+        low_risk=num(lower_rates.get("has_risk_or_invalidation_language"))
+        # The current leaderboard study showed stronger question and risk/
+        # invalidation signals in the higher-reward creator-period cohort.
+        # These are descriptive format hypotheses, never post-level attribution.
+        if high_questions >= low_questions + 0.15 and high_risk >= low_risk + 0.15:
+            cohort_guidance="risk_aware_discussion"
+        elif high_sources >= low_sources + 0.2 and high_numbers >= low_numbers + 0.2:
             cohort_guidance="evidence_led"
     s=sym(sel.get("symbol") or pub.get("symbol") or director.get("primary_symbol"))
     if not s:raise RuntimeError("NIC Native Writer: authoritative asset missing")
@@ -223,6 +232,20 @@ def build(ctx):
     cohort_learning_applied=False
     if cohort_guidance=="evidence_led" and strategy_id not in {"catalyst_context_and_counterpoint"}:
         parts=[evidence_block,hook,middle,close]
+        cohort_learning_applied=True
+    elif cohort_guidance=="risk_aware_discussion":
+        # Convert the observed cohort pattern into a useful, asset-specific test.
+        # Do not copy creator wording or imply that the cohort reward was earned
+        # by any particular post.
+        if timing_state == "EXHAUSTED" and cat in {"research_insight", "market_mechanism", "data_surprise"}:
+            close=("For traders, follow-through is the test: if price gives back the move while "
+                   "participation fades, the demand explanation weakens; if both persist, seek "
+                   "independent catalyst evidence before calling it durable.")
+        else:
+            close=("For traders, define the failure condition before acting: if price loses the "
+                   "observed structure while participation fades, the thesis weakens; reassess "
+                   "only when fresh evidence supports it.")
+        parts=[hook,evidence_block,middle,close]
         cohort_learning_applied=True
     post=compact_post(parts,question)
     if post.count("?")!=1 or dollar not in post or not 280<=len(post)<=700:raise RuntimeError("NIC Native Writer failed local publication contract")
