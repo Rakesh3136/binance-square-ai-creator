@@ -245,7 +245,9 @@ def build(ctx):
             close=("For traders, define the failure condition before acting: if price loses the "
                    "observed structure while participation fades, the thesis weakens; reassess "
                    "only when fresh evidence supports it.")
-        parts=[hook,evidence_block,middle,close]
+        # Keep the learned reader-payoff sentence attached to the analysis block:
+        # the compacting routine may otherwise drop the final block on longer posts.
+        parts=[hook,evidence_block,middle + " " + close]
         cohort_learning_applied=True
     post=compact_post(parts,question)
     if post.count("?")!=1 or dollar not in post or not 280<=len(post)<=700:raise RuntimeError("NIC Native Writer failed local publication contract")
