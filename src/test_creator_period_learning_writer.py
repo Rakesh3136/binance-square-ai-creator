@@ -92,7 +92,7 @@ class CreatorPeriodLearningWriterTests(unittest.TestCase):
             result["native_writer"]["creator_period_learning_rule"],
             "risk_aware_discussion",
         )
-        self.assertIn("follow-through is the test", result["draft"]["text"])
+        self.assertIn("watch follow-through", result["draft"]["text"])
         self.assertEqual(result["draft"]["text"].count("?"), 1)
         self.assertEqual(
             result["native_writer"]["creator_period_reward_granularity"],
