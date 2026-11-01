@@ -237,11 +237,7 @@ def build(ctx):
         # Convert the observed cohort pattern into a useful, asset-specific test.
         # Do not copy creator wording or imply that the cohort reward was earned
         # by any particular post.
-        if timing_state == "EXHAUSTED" and cat in {"research_insight", "market_mechanism", "data_surprise"}:
-            close=("For traders, follow-through is the test: if price gives back the move while "
-                   "participation fades, the demand explanation weakens; if both persist, seek "
-                   "independent catalyst evidence before calling it durable.")
-        else:
+        if not (timing_state == "EXHAUSTED" and cat in {"research_insight", "market_mechanism", "data_surprise"}):
             close=("For traders, define the failure condition before acting: if price loses the "
                    "observed structure while participation fades, the thesis weakens; reassess "
                    "only when fresh evidence supports it.")
