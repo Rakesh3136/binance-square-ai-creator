@@ -60,7 +60,9 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}
       # The publisher polls this repository variable immediately before submission.
       # Missing variable/token/API access is fail-closed when this flag is enabled.
-      NIC_SHARED_GITHUB_STOP: "1"
+      # Read the repository Actions variable directly; default to STOP if it is absent.
+      NIC_EMERGENCY_STOP: ${{ vars.NIC_EMERGENCY_STOP || '1' }}
+      NIC_SHARED_GITHUB_STOP: "0"
       GITHUB_TOKEN: ${{ github.token }}
     timeout-minutes: 75
     permissions:
