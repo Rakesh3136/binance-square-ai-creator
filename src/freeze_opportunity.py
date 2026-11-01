@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, math, urllib.request
+import json, math, re, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,12 +22,19 @@ def load(p):
         return {}
 
 def symbol(v):
+    # A free-form topic/name is never a market ticker. Accept only explicit
+    # symbol fields and Binance-style ASCII alphanumeric base symbols.
     if isinstance(v,dict):
-        for k in ('symbol','selected_lane_symbol','topic'):
-            raw=str(v.get(k) or '').upper().strip().replace('BINANCE:','')
-            if raw: return raw if raw.endswith('USDT') else raw+'USDT'
-    raw=str(v or '').upper().strip().replace('BINANCE:','')
-    if not raw: return ''
+        raw=''
+        for k in ('symbol','selected_lane_symbol'):
+            candidate=str(v.get(k) or '').upper().strip().replace('BINANCE:','')
+            if candidate:
+                raw=candidate
+                break
+    else:
+        raw=str(v or '').upper().strip().replace('BINANCE:','')
+    if not raw or not re.fullmatch(r'[A-Z0-9]{1,15}(?:USDT)?',raw):
+        return ''
     return raw if raw.endswith('USDT') else raw+'USDT'
 
 def base_symbol(v):
