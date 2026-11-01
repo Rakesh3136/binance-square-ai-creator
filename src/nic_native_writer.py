@@ -134,8 +134,8 @@ def build(ctx):
         news_count=research_observation.get("news_count")
         official_count=research_observation.get("official_evidence_count")
         corroboration="No independent news corroboration is recorded. " if news_count == 0 and official_count == 0 else "Independent corroboration is not yet established in this research record. "
-        middle=corroboration+f"{gap_text.capitalize()} remain unverified. Demand, short covering and thin liquidity are competing explanations."
-        close="Timing is exhausted for a fresh entry; for traders, watch follow-through: if price reverses as volume fades, the demand thesis weakens. Persistence still needs independent catalyst evidence."
+        middle=f"No independent catalyst is confirmed; {gap_text} remain unverified. Demand, short covering and thin liquidity remain competing explanations."
+        close="Trader test: if price reverses as volume fades, the demand thesis weakens; follow-through needs independent catalyst evidence."
         question="Which missing data would you verify first for $"+s+"?"
     else:
         story_templates={
