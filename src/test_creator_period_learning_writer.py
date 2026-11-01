@@ -57,6 +57,48 @@ class CreatorPeriodLearningWriterTests(unittest.TestCase):
         self.assertEqual(result["native_writer"]["creator_period_learning_rule"], "evidence_led")
         self.assertEqual(result["native_writer"]["creator_period_reward_granularity"], "creator_period_only")
 
+    def test_actual_high_earner_question_and_risk_pattern_is_applied(self):
+        learning = {
+            "learning_status": "COHORT_HYPOTHESES_READY",
+            "reward_tier_cohort_comparison": {
+                "status": "DESCRIPTIVE_COMPARISON_AVAILABLE",
+                "high_reward_creator_periods": {
+                    "cohort": {
+                        "post_count": 653,
+                        "rates": {
+                            "has_question": 0.5559,
+                            "has_risk_or_invalidation_language": 0.5176,
+                            "has_numeric_evidence": 0.7734,
+                        },
+                    },
+                },
+                "lower_reward_creator_periods": {
+                    "cohort": {
+                        "post_count": 977,
+                        "rates": {
+                            "has_question": 0.087,
+                            "has_risk_or_invalidation_language": 0.1054,
+                            "has_numeric_evidence": 0.7666,
+                        },
+                    },
+                },
+            },
+        }
+        context = context_with_learning(learning)
+        context["publication"]["timing_state"] = "EXHAUSTED"
+        result = nic_native_writer.build(context)
+        self.assertTrue(result["native_writer"]["creator_period_learning_applied"])
+        self.assertEqual(
+            result["native_writer"]["creator_period_learning_rule"],
+            "risk_aware_discussion",
+        )
+        self.assertIn("Trader test:", result["draft"]["text"])
+        self.assertEqual(result["draft"]["text"].count("?"), 1)
+        self.assertEqual(
+            result["native_writer"]["creator_period_reward_granularity"],
+            "creator_period_only",
+        )
+
     def test_incomplete_cohort_does_not_claim_reward_learning_applied(self):
         result = nic_native_writer.build(context_with_learning({
             "learning_status": "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE",
