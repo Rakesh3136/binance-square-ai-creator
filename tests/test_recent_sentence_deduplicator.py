@@ -61,7 +61,7 @@ class RecentSentenceDeduplicatorTests(unittest.TestCase):
             root = Path(tmp)
             repeated = "For $BTC, that matters because the next response tests follow-through or rejection."
             log = root / "publication_log.jsonl"
-            log.write_text(json.dumps({"text": repeated}) + "\\n", encoding="utf-8")
+            log.write_text(json.dumps({"text": repeated}) + "\n", encoding="utf-8")
             report = root / "draft.json"
             original = repeated + " What new evidence would change your view on $BTC?"
             report.write_text(json.dumps({"draft": {"symbol": "BTC", "post": original}}), encoding="utf-8")
