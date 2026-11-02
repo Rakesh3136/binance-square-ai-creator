@@ -28,7 +28,7 @@ def symbols(t):
  # Binance tickers may begin with digits (for example, 1000CAT or 1000SATS).
  # Require at least one letter so ordinary dollar amounts are not cashtags.
  upper=str(t or '').upper()
- cashtags={x for x in re.findall(r'\$([A-Z0-9]{2,15})\b',upper) if re.search(r'[A-Z]',x)}
+ cashtags={x for x in re.findall(r'\$([A-Z0-9]{2,15})\b',upper) if re.search(r'[A-Z]',x) and not re.fullmatch(r'\d+(?:\.\d+)?[KMB]',x)}
  pairs={x for x in re.findall(r'\b([A-Z0-9]{2,15})USDT\b',upper) if re.search(r'[A-Z]',x)}
  return cashtags | pairs
 
@@ -54,7 +54,7 @@ def recent_similarity(t):
  return matches[:6]
 def specificity(t,f,a=None):
  lo=t.lower();ent=sum(k in lo for k in ENTITY_TERMS);num=len(re.findall(r'\b\d+(?:\.\d+)?%|\$[\d,]+(?:\.\d+)?',t))
- names=set(re.findall(r'\b(?=[A-Z0-9]{2,15}\b)(?=[A-Z0-9]*[A-Z])[A-Z0-9]+\b',t)) | symbols(t)
+ names=set(re.findall(r'\b[A-Z][A-Z0-9]{1,9}\b',t)) | symbols(t)
  return min(100,35+(15 if symbols(t) else 0)+min(20,len(names)*8)+min(20,ent*3)+min(20,(f+num)*5)+(10 if isinstance(a,(int,float)) and a>=50 else 0))
 def research_adv(r,d,t):
  # A high global research score is not proof that this particular asset was researched.
@@ -87,7 +87,7 @@ def research_adv(r,d,t):
    if isinstance(v,(int,float)):vals.append(float(v))
  return max(vals) if vals else None
 def originality(t,f,attr,mech,inv,a):
- lo=t.lower();sy=symbols(t);names=set(re.findall(r'\b(?=[A-Z0-9]{2,15}\b)(?=[A-Z0-9]*[A-Z])[A-Z0-9]+\b',t)) | sy;causal=sum(x in lo for x in CAUSAL_OR_RELATIONAL_TERMS);sent=max(1,len([x for x in re.split(r'[.!?]+',t) if x.strip()]));words=re.findall(r"[A-Za-z][A-Za-z'-]+",lo);div=len(set(words))/max(1,len(words));b={'base_editorial_synthesis':40,'asset_specific_research':15 if a is not None and a>=50 else 0,'mechanism':10 if mech else 0,'invalidation_or_confirmation':10 if inv else 0,'source_attribution':5 if attr else 0,'multi_entity_relationship':8 if len(sy)>=2 or len(names)>=3 else 0,'causal_or_contrast_language':7 if causal>=2 else (4 if causal else 0),'concrete_evidence_mix':5 if f>=3 else (3 if f==2 else 0),'lexical_novelty':5 if div>=.58 and sent>=3 else (3 if div>=.50 else 0)};return min(100,sum(b.values())),b
+ lo=t.lower();sy=symbols(t);names=set(re.findall(r'\b[A-Z][A-Z0-9]{1,9}\b',t)) | sy;causal=sum(x in lo for x in CAUSAL_OR_RELATIONAL_TERMS);sent=max(1,len([x for x in re.split(r'[.!?]+',t) if x.strip()]));words=re.findall(r"[A-Za-z][A-Za-z'-]+",lo);div=len(set(words))/max(1,len(words));b={'base_editorial_synthesis':40,'asset_specific_research':15 if a is not None and a>=50 else 0,'mechanism':10 if mech else 0,'invalidation_or_confirmation':10 if inv else 0,'source_attribution':5 if attr else 0,'multi_entity_relationship':8 if len(sy)>=2 or len(names)>=3 else 0,'causal_or_contrast_language':7 if causal>=2 else (4 if causal else 0),'concrete_evidence_mix':5 if f>=3 else (3 if f==2 else 0),'lexical_novelty':5 if div>=.58 and sent>=3 else (3 if div>=.50 else 0)};return min(100,sum(b.values())),b
 def extract_post(data):
     """Resolve authored post text across current and legacy multi-agent report schemas."""
     text_keys=("post","text","body","final_post","final_text","caption","content")
