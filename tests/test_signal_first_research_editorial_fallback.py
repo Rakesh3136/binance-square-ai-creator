@@ -64,6 +64,20 @@ def test_non_live_asset_is_excluded():
     ) == []
 
 
+def test_non_ascii_or_malformed_symbol_is_excluded_even_if_present_in_live_set():
+    now = datetime.now(timezone.utc)
+    research = artifact(now.isoformat(), [
+        row(symbol="牛来"),
+        row(symbol="BAD/PAIR"),
+        row(symbol="QNT"),
+    ])
+    candidates, diagnostics = router.analyze_research_editorial_candidates(
+        research, {"牛来", "BAD/PAIR", "QNT"}, now=now
+    )
+    assert [candidate["symbol"] for candidate in candidates] == ["QNT"]
+    assert diagnostics["rejection_reason_counts"]["invalid_binance_symbol_format"] == 2
+
+
 
 def test_rejected_editorial_candidate_is_not_misrouted_as_trade():
     candidate = {
