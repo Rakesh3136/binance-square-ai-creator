@@ -48,17 +48,26 @@ def fresh(value):
     except Exception:
         return False
 
+def valid_symbol(value):
+    """Only accept Binance-style ASCII base asset identifiers."""
+    import re
+    symbol=str(value or "").upper().replace("USDT","").replace("$","").strip()
+    return symbol if re.fullmatch(r"[A-Z0-9]{1,15}", symbol) else ""
+
 def research_candidate(research):
     rows=[]
     for key in ("potential_gems","potential_risks"):
         for row in research.get(key) or []:
             if not isinstance(row,dict): continue
+            symbol=valid_symbol(row.get("symbol"))
+            if not symbol:
+                continue
             info=number(row.get("information_advantage_score"))
             under=number(row.get("undercoverage_score"))
             evidence=number(row.get("evidence_score"))
             if info >= MIN_RESEARCH_INFO and under >= MIN_RESEARCH_UNDERCOVERAGE and evidence >= MIN_RESEARCH_EVIDENCE:
                 rows.append({
-                    "symbol":str(row.get("symbol") or "").upper().replace("USDT",""),
+                    "symbol":symbol,
                     "information_advantage_score":info,
                     "undercoverage_score":under,
                     "evidence_score":evidence,
@@ -108,10 +117,18 @@ def main():
             reason="Current-cycle Signal-First trade decision lacks a complete authoritative prediction contract."
             selected={}
     elif signal_publish and signal_decision == "EDITORIAL_SIGNAL":
-        mode="EDITORIAL"
-        eligible=True
-        reason="Current-cycle Signal-First editorial decision passed the publication eligibility handoff."
-        selected=signal_selected
+        selected_symbol=valid_symbol(signal_selected.get("symbol"))
+        if selected_symbol:
+            mode="EDITORIAL"
+            eligible=True
+            reason="Current-cycle Signal-First editorial decision passed the publication eligibility handoff."
+            selected=dict(signal_selected)
+            selected["symbol"]=selected_symbol
+        else:
+            mode="BLOCKED"
+            eligible=False
+            reason="Current-cycle Signal-First editorial candidate has an invalid Binance symbol."
+            selected={}
     elif signal and signal_fresh:
         mode="BLOCKED"
         eligible=False
