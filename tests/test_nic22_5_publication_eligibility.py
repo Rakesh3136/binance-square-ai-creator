@@ -68,5 +68,7 @@ def test_research_candidate_rejects_non_ascii_and_malformed_symbols():
 def test_symbol_validator_accepts_only_ascii_binance_base_symbols():
     assert MODULE.valid_symbol("BINANCE:QNTUSDT")==""  # exchange-qualified names are not base symbols
     assert MODULE.valid_symbol("QNTUSDT")=="QNT"
+    assert MODULE.valid_symbol("$QNTUSDT")=="QNT"
+    assert MODULE.valid_symbol("BADUSDTX")==""
     assert MODULE.valid_symbol("牛来")==""
     assert MODULE.valid_symbol("BAD/PAIR")==""
