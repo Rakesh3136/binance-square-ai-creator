@@ -117,6 +117,27 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(plan["verified_reward_evidence"]["accepted_unique_reward_events_7d"], 0)
         self.assertAlmostEqual(plan["owner_reported_reward_feedback"]["7_day"]["reported_usdc"], 0.201)
 
+    def test_owner_reported_reward_in_14_day_window_is_exposed_separately(self):
+        now = datetime(2026, 11, 2, 0, 30, tzinfo=timezone.utc)
+        event = {
+            "event_id": "owner-report-376457571598023-20261022-077",
+            "post_id": "376457571598023",
+            "reward_amount_usdc": 0.77,
+            "currency": "USDC",
+            "reported_at": "2026-10-22T23:42:35+00:00",
+            "report_source": "ACCOUNT_OWNER_REPORTED",
+            "verification_status": "OWNER_REPORTED",
+            "content_metadata": {
+                "public_post_url": "https://www.binance.com/en/square/post/376457571598023",
+                "reported_reward_period": "2026-10-12/2026-10-18",
+            },
+        }
+        feedback = summarize_owner_reported_reward_feedback([event], now)
+        self.assertEqual(feedback["7_day"]["reported_event_count"], 0)
+        self.assertEqual(feedback["14_day"]["reported_event_count"], 1)
+        self.assertAlmostEqual(feedback["14_day"]["reported_usdc"], 0.77)
+        self.assertFalse(feedback["included_in_verified_reward_totals"])
+
     def test_only_exact_post_source_backed_paid_events_count_as_verified_earnings(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
         unattributed = {
