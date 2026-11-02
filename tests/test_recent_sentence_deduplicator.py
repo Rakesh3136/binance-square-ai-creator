@@ -56,6 +56,27 @@ class RecentSentenceDeduplicatorTests(unittest.TestCase):
             self.assertEqual(result["changed"], 1)
             self.assertEqual(result["replacements"][0]["status"], "replaced")
 
+    def test_rewrites_repeated_editorial_sentence_with_ticker_but_no_numeric_fact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repeated = "For $BTC, that matters because the next response tests follow-through or rejection."
+            log = root / "publication_log.jsonl"
+            log.write_text(json.dumps({"text": repeated}) + "\\n", encoding="utf-8")
+            report = root / "draft.json"
+            original = repeated + " What new evidence would change your view on $BTC?"
+            report.write_text(json.dumps({"draft": {"symbol": "BTC", "post": original}}), encoding="utf-8")
+            out = root / "dedup.json"
+            with patch.object(dedup, "LOG", log), patch.object(dedup, "OUT", out), patch.object(dedup, "REPORT_DIR", root), patch.dict("os.environ", {"DRAFT_PATH": str(report)}):
+                rc = dedup.main()
+            self.assertEqual(rc, 0)
+            updated = json.loads(report.read_text(encoding="utf-8"))["draft"]["post"]
+            self.assertNotEqual(updated, original)
+            self.assertEqual(updated.count("?"), 1)
+            self.assertNotIn(repeated, updated)
+            result = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(result["changed"], 1)
+            self.assertEqual(result["replacements"][0]["status"], "replaced")
+
     def test_does_not_rewrite_repeated_fact_sentence(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
