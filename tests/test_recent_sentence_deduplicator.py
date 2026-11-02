@@ -74,5 +74,26 @@ class RecentSentenceDeduplicatorTests(unittest.TestCase):
             self.assertEqual(result["changed"], 0)
             self.assertEqual(result["replacements"][0]["status"], "preserved_factual_repeat")
 
+    def test_over_budget_replacement_rolls_back_instead_of_blocking_valid_draft(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repeated = "The next evidence point should determine whether this interpretation still holds up."
+            log = root / "publication_log.jsonl"
+            log.write_text(json.dumps({"text": repeated}) + "\\n", encoding="utf-8")
+            report = root / "draft.json"
+            original = ("$QI moved +20.4% in 24 hours. " + repeated + " " +
+                        ("The market context remains uncertain and traders should compare the next response with the prior range. " * 5) +
+                        "What evidence should readers watch next?")
+            report.write_text(json.dumps({"draft": {"symbol": "QI", "post": original}}), encoding="utf-8")
+            out = root / "dedup.json"
+            with patch.object(dedup, "LOG", log), patch.object(dedup, "OUT", out), patch.object(dedup, "REPORT_DIR", root), patch.dict("os.environ", {"DRAFT_PATH": str(report)}):
+                rc = dedup.main()
+            self.assertEqual(rc, 0)
+            self.assertEqual(json.loads(report.read_text(encoding="utf-8"))["draft"]["post"], original)
+            result = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "UNCHANGED")
+            self.assertEqual(result["changed"], 0)
+            self.assertEqual(result["replacements"][0]["status"], "preserved_contract_no_safe_replacement")
+
 if __name__ == "__main__":
     unittest.main()
