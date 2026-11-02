@@ -51,7 +51,11 @@ def fresh(value):
 def valid_symbol(value):
     """Only accept Binance-style ASCII base asset identifiers."""
     import re
-    symbol=str(value or "").upper().replace("USDT","").replace("$","").strip()
+    symbol=str(value or "").strip().upper()
+    if symbol.startswith("$"):
+        symbol=symbol[1:]
+    if symbol.endswith("USDT"):
+        symbol=symbol[:-4]
     return symbol if re.fullmatch(r"[A-Z0-9]{1,15}", symbol) else ""
 
 def research_candidate(research):
