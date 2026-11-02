@@ -81,9 +81,15 @@ class RecentSentenceDeduplicatorTests(unittest.TestCase):
             log = root / "publication_log.jsonl"
             log.write_text(json.dumps({"text": repeated}) + "\n", encoding="utf-8")
             report = root / "draft.json"
-            original = ("$QI moved +20.4% in 24 hours. " + repeated + " " +
-                        ("The market context remains uncertain and traders should compare the next response with the prior range. " * 5) +
-                        "What evidence should readers watch next?")
+            prefix = "$QI moved +20.4% in 24 hours. " + repeated + " "
+            question = " What evidence should readers watch next?"
+            # Keep the source draft valid (<=740 chars), but close enough to the
+            # limit that the 6-character-longer replacement would exceed it.
+            filler_length = 738 - len(prefix) - len(question)
+            filler = ("market context remains uncertain and traders should compare the next response " * 10)[:filler_length]
+            original = prefix + filler + question
+            self.assertLessEqual(len(original), 740)
+            self.assertGreater(len(original) - len(repeated) + len("For $QI, the next observed response can support this thesis or show why it no longer fits."), 740)
             report.write_text(json.dumps({"draft": {"symbol": "QI", "post": original}}), encoding="utf-8")
             out = root / "dedup.json"
             with patch.object(dedup, "LOG", log), patch.object(dedup, "OUT", out), patch.object(dedup, "REPORT_DIR", root), patch.dict("os.environ", {"DRAFT_PATH": str(report)}):
