@@ -34,8 +34,8 @@ def tickers(text: str) -> list[str]:
     first character must be a letter but the total symbol length may be 1.
     """
     upper = text.upper()
-    found = re.findall(r"\$([A-Z][A-Z0-9]{0,11})(?:USDT)?\b", upper)
-    found += re.findall(r"\b([A-Z][A-Z0-9]{0,11})USDT\b", upper)
+    found = re.findall(r"\$((?=[A-Z0-9]{1,12}\b)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{1,12})(?:USDT)?\b", upper)
+    found += re.findall(r"\b((?=[A-Z0-9]{1,12}USDT\b)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{1,12})USDT\b", upper)
     return list(dict.fromkeys(found))
 
 

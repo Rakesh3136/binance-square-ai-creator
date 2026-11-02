@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src import nic21_originality_visual_truth as n
 from src import elite_prepublication_judge as elite
+from src import validate_visual as visual_validator
 
 
 def test_nic21_module_has_hard_similarity_thresholds():
@@ -133,3 +134,7 @@ def test_elite_judge_recognizes_numeric_leading_binance_cashtags():
     }
     assert elite.research_adv(unrelated, {}, text) is None
     assert elite.specificity(text, facts=2, a=85.3) >= 80
+
+
+def test_visual_ticker_extraction_accepts_numeric_leading_assets_without_treating_dollars_as_tickers():
+    assert visual_validator.tickers("$1000CAT moved 28.7%; volume reached 4M USDT while $150 is only a price reference.") == ["1000CAT"]
