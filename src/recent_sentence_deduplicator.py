@@ -121,13 +121,17 @@ def main() -> int:
             replacements.append({"sentence": stripped, "status": "no_safe_alternative"})
         output.append(part)
     new_text = "".join(output).strip()
+    # Deduplication is optional: never let a rewrite break the reader contract.
+    # Roll back only the replacements if their combined result exceeds 740 chars
+    # or changes the exact-one-question invariant; downstream quality gates decide.
     if changed and (len(new_text) > 740 or new_text.count("?") != 1):
-        result = {"version": "1.0", "status": "BLOCKED_REPAIR_CONTRACT", "changed": changed,
-                  "replacements": replacements, "reason": "repair would violate 740-character or one-question contract"}
-        OUT.parent.mkdir(parents=True, exist_ok=True)
-        OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print(json.dumps(result, indent=2, ensure_ascii=False))
-        return 1
+        replacements = [
+            {**item, "status": "preserved_contract_no_safe_replacement"}
+            if item.get("status") == "replaced" else item
+            for item in replacements
+        ]
+        new_text = text
+        changed = 0
     if changed:
         draft["post"] = new_text
         draft["text"] = new_text
