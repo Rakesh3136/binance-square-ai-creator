@@ -62,7 +62,7 @@ def main() -> int:
     recent = recent_sentences()
     used = set()
     replacements = []
-    factual = re.compile(r"\$[A-Z][A-Z0-9]{1,14}\b|\b\d+(?:\.\d+)?%|\$\s?\d", re.I)
+    factual = re.compile(r"\b\d+(?:\.\d+)?%|\$\s?\d", re.I)
     exact_replacements = {
         "that keeps the read falsifiable the next measurable reaction either supports the structure or weakens it":
             "The next observed response should either strengthen this thesis or give a concrete reason to set it aside.",
@@ -97,7 +97,7 @@ def main() -> int:
             if cn and cn not in recent and cn not in used and cn != n:
                 return candidate
         return None
-    # Only repeated sentences with no numeric values or explicit cashtags are rewritten.
+    # A ticker reference alone is not a factual claim: generic commentary containing $BTC/$ETH can be safely rephrased. Preserve numeric price, percentage, and other quantified observations.
     parts = re.split(r"(?<=[.!?])(?=\s)|(?<=\n)", text)
     output = []
     changed = 0
