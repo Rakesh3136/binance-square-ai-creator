@@ -79,7 +79,7 @@ class RecentSentenceDeduplicatorTests(unittest.TestCase):
             root = Path(tmp)
             repeated = "The next evidence point should determine whether this interpretation still holds up."
             log = root / "publication_log.jsonl"
-            log.write_text(json.dumps({"text": repeated}) + "\\n", encoding="utf-8")
+            log.write_text(json.dumps({"text": repeated}) + "\n", encoding="utf-8")
             report = root / "draft.json"
             original = ("$QI moved +20.4% in 24 hours. " + repeated + " " +
                         ("The market context remains uncertain and traders should compare the next response with the prior range. " * 5) +
