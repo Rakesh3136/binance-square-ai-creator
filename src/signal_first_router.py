@@ -119,6 +119,10 @@ def analyze_research_editorial_candidates(research, live_symbols, now=None):
             reasons = []
             if not symbol:
                 reasons.append('missing_symbol')
+            elif not re.fullmatch(r'[A-Z0-9]{1,15}', symbol):
+                # Binance market symbols are ASCII identifiers. A display name,
+                # localized alias, or malformed ticker must never become a post asset.
+                reasons.append('invalid_binance_symbol_format')
             elif symbol not in live:
                 reasons.append('asset_not_in_live_binance_usdt_universe')
             if info < MIN_SCORE:
