@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from src import nic21_originality_visual_truth as n
+from src import elite_prepublication_judge as elite
 
 
 def test_nic21_module_has_hard_similarity_thresholds():
@@ -115,3 +116,20 @@ def test_structure_detects_question_shape():
 
 def test_symbols_in_recognizes_btc():
     assert "BTC" in n.symbols_in("$BTC setup is forming")
+
+
+
+def test_elite_judge_recognizes_numeric_leading_binance_cashtags():
+    text = "$1000CAT moved 28.7% with 4M USDT quote volume; liquidity and network participation now need confirmation."
+    assert elite.symbols(text) == {"1000CAT"}
+    research = {
+        "information_advantage_score": 99,  # Global score must not be treated as asset-specific.
+        "potential_gems": [{"symbol": "1000CAT", "information_advantage_score": 85.3}],
+    }
+    assert elite.research_adv(research, {}, text) == 85.3
+    unrelated = {
+        "information_advantage_score": 99,
+        "potential_gems": [{"symbol": "BTC", "information_advantage_score": 92}],
+    }
+    assert elite.research_adv(unrelated, {}, text) is None
+    assert elite.specificity(text, facts=2, a=85.3) >= 80
