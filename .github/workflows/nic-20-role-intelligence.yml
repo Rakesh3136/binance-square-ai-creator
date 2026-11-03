@@ -23,7 +23,7 @@ jobs:
         env: {PYTHONUNBUFFERED: "1"}
         run: |
           set -euo pipefail
-          python -m compileall -q src/nic_role_contract.py src/nic_task_compiler.py src/nic_question_understanding.py src/nic_research_orchestrator.py src/nic_evidence_registry.py src/nic_evidence_verifier.py src/nic_capability_gap.py src/nic_capability_benchmark.py src/nic_role_intelligence.py
+          python -m compileall -q src/nic_role_contract.py src/nic_task_compiler.py src/nic_question_understanding.py src/nic_research_orchestrator.py src/nic_evidence_registry.py src/nic_evidence_verifier.py src/nic_capability_gap.py src/nic_capability_benchmark.py src/nic_role_intelligence.py src/nic_agent_registry.py
           python src/nic_role_contract.py
           python src/nic_task_compiler.py
           python src/nic_question_understanding.py
@@ -33,7 +33,8 @@ jobs:
           python src/nic_capability_gap.py
           python src/nic_capability_benchmark.py
           python src/nic_role_intelligence.py
-          for f in data/live/nic_role_contract.json data/live/nic_task_plan.json data/live/nic_question_understanding.json data/live/nic_research_raw.json data/live/nic_evidence_registry.json data/live/nic_verified_evidence.json data/live/nic_capability_gap.json data/live/nic_capability_benchmark.json data/live/nic_role_intelligence.json; do python -m json.tool "$f" >/dev/null; done
+          python src/nic_agent_registry.py
+          for f in data/live/nic_role_contract.json data/live/nic_task_plan.json data/live/nic_question_understanding.json data/live/nic_research_raw.json data/live/nic_evidence_registry.json data/live/nic_verified_evidence.json data/live/nic_capability_gap.json data/live/nic_capability_benchmark.json data/live/nic_role_intelligence.json data/live/nic_agent_registry.json; do python -m json.tool "$f" >/dev/null; done
       - name: Persist only NIC 20.2-owned artifacts
         run: |
           set -euo pipefail
@@ -41,7 +42,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
           git reset --mixed origin/main
-          git add data/live/nic_verified_evidence.json data/live/nic_capability_benchmark.json data/intelligence/nic_evidence_verification_report.json data/intelligence/nic_capability_benchmark_report.json
+          git add data/live/nic_agent_registry.json data/live/nic_verified_evidence.json data/live/nic_capability_benchmark.json data/intelligence/nic_evidence_verification_report.json data/intelligence/nic_capability_benchmark_report.json
           if git diff --cached --quiet; then echo "No NIC 20.2-owned state changes."; exit 0; fi
           git commit -m 'Run NIC 20.2 evidence and capability verification cycle'
           git pull --rebase --autostash origin main
