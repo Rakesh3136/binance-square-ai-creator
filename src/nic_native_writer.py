@@ -246,6 +246,14 @@ def build(ctx):
             close_options = [close]
         middle = fresh(middle_options, used)
         close = fresh(close_options, used)
+        # Preserve the explicit high-earner cohort hypothesis when it is present.
+        # Strategy diversity must not silently erase the learned risk-aware
+        # discussion cue that the existing creator-period regression protects.
+        if cohort_guidance == "risk_aware_discussion":
+            close = (
+                "Trader test: if price reverses as volume fades, the demand thesis "
+                "weakens; follow-through needs independent catalyst evidence."
+            )
 
     def compact_post(parts, question_text, limit=700):
         kept=list(parts)
