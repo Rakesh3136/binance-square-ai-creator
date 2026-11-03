@@ -191,7 +191,8 @@ def build(ctx):
             (f"I would not chase ${dollar} here. I would wait for the market to answer one specific question.",f"Can price establish the ${side} setup through ${trigger}? If not, there is no reason to force the signal.",f"The predefined failure point is ${inv}; the scenario targets are ${tp1} and ${tp2}. The current snapshot has price near ${obs} with ${voltext} in quote volume.","Waiting is part of the setup. A missed trade is cheaper than inventing confirmation.",f"How much follow-through would you need after ${trigger} before treating this as a valid ${side} setup?"),
             (f"${dollar} has a clean conditional setup, but the condition comes first.",f"The evidence is actionable only if ${trigger} is reached and the ${side.lower()} case holds there.",f"Invalidation sits at ${inv}; TP1 is ${tp1} and TP2 is ${tp2}. Current price is ${obs}, so the distance to the decision point still matters.","If the trigger never confirms, the correct outcome is no trade — not a rewritten signal.",f"What would make you abandon the ${dollar} setup before it reaches the first target?")
         ]
-        hook,body,middle,close,question=trade_styles[seed % len(trade_styles)]
+        hook,body,middle,close,_style_question=trade_styles[seed % len(trade_styles)]
+        question=fresh_question([style[4] for style in trade_styles],used,seed)
     elif cat in {"research_insight", "market_mechanism", "data_surprise"} and timing_state == "EXHAUSTED":
         # An exhausted move may still support an explanatory research post, but
         # it must never be framed as a fresh setup or turned into entry levels.
