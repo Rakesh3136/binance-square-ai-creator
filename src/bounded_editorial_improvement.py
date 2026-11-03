@@ -12,6 +12,7 @@ import json
 import re
 from difflib import SequenceMatcher
 from typing import Callable, Any
+from src import nic21_originality_visual_truth as final_originality
 
 MAX_CANDIDATES = 4
 RECENT_POST_SIMILARITY_BLOCK = 0.88
@@ -74,6 +75,47 @@ def _recent_publication_texts(context: dict[str, Any]) -> list[str]:
     return rows
 
 
+
+def _final_gate_conflicts(post: str, history: list[str]) -> list[dict[str, Any]]:
+    """Apply the exact same similarity metrics and thresholds as the final NIC 21 gate."""
+    conflicts = []
+    current_hook = final_originality.hook(post)
+    current_structure = final_originality.structure(post)
+    current_cta = final_originality.cta(post)
+    for index, old in enumerate(history):
+        cosine = final_originality.token_cosine_similarity(post, old)
+        shingles = final_originality.phrase_shingle_similarity(post, old)
+        hook_score = final_originality.jaccard(current_hook, final_originality.hook(old))
+        structure_score = (
+            1.0 if current_structure and current_structure == final_originality.structure(old) else 0.0
+        )
+        cta_score = (
+            final_originality.jaccard(current_cta, final_originality.cta(old))
+            if current_cta and final_originality.cta(old) else 0.0
+        )
+        reasons = []
+        if cosine >= final_originality.SIMILARITY_BLOCK:
+            reasons.append("token_cosine_similarity")
+        if shingles >= final_originality.PHRASE_SHINGLE_BLOCK:
+            reasons.append("phrase_shingle_similarity")
+        if hook_score >= final_originality.HOOK_BLOCK:
+            reasons.append("hook_similarity")
+        if (structure_score >= final_originality.STRUCTURE_BLOCK
+                and cta_score >= final_originality.CTA_BLOCK):
+            reasons.append("structure_and_cta_similarity")
+        if reasons:
+            conflicts.append({
+                "recent_index": index,
+                "reasons": reasons,
+                "token_cosine_similarity": round(cosine, 4),
+                "phrase_shingle_similarity": round(shingles, 4),
+                "hook_similarity": round(hook_score, 4),
+                "structure_similarity": structure_score,
+                "cta_similarity": round(cta_score, 4),
+            })
+    return conflicts
+
+
 def score_candidate(result: dict[str, Any], context: dict[str, Any],
                     previous_texts: list[str] | None = None,
                     recent_publication_texts: list[str] | None = None) -> dict[str, Any]:
@@ -114,6 +156,9 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
 
     history = recent_publication_texts if recent_publication_texts is not None else _recent_publication_texts(context)
     max_recent_similarity = max((_token_jaccard(post, old) for old in history), default=0.0)
+    final_gate_conflicts = _final_gate_conflicts(post, history)
+    if final_gate_conflicts:
+        issues.append("final_gate_originality_conflict")
     # Match the production NIC 21 originality gate's token-set Jaccard metric.
     # This is an early candidate-selection guard, not a replacement for final gates.
     if max_recent_similarity >= RECENT_POST_SIMILARITY_BLOCK:
@@ -138,6 +183,8 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
         "question_count": questions,
         "max_similarity_to_other_candidate": round(max_similarity, 4),
         "max_similarity_to_recent_publication": round(max_recent_similarity, 4),
+        "final_gate_originality_conflicts": final_gate_conflicts,
+        "final_gate_originality_conflict_count": len(final_gate_conflicts),
         "repeated_recent_published_sentence_count": len(repeated_sentences),
         "presentation_strategy": result.get("iteration_presentation_strategy"),
     }
@@ -212,6 +259,15 @@ def generate_and_select(context: dict[str, Any],
         "selection_is_reward_prediction": False,
         "reward_claim": "NOT_CLAIMED",
         "candidates": [dict(report) for report, _ in scored],
+        "alternate_candidates": [
+            {
+                "strategy": report["presentation_strategy"],
+                "score": report["score"],
+                "draft": copy.deepcopy(result.get("draft") or {}),
+            }
+            for report, result in sorted(eligible, key=lambda pair: pair[0]["score"], reverse=True)
+            if result is not selected
+        ],
         "generation_errors": errors,
         "quality_and_publication_gates_remain_authoritative": True,
     }
