@@ -18,6 +18,9 @@ class NicDashboardRegistryTests(unittest.TestCase):
         self.assertIn("data/live/nic_agent_registry.json", html)
         self.assertIn("workflow-wired roles", html)
         self.assertIn("no agent status is simulated", html)
+        self.assertIn('id="operatorToolsState"', html)
+        self.assertIn("/operator/capabilities", html)
+        self.assertIn("bounded read-only tools", html)
 
     def test_dashboard_escapes_registry_values_before_rendering(self):
         html = DASHBOARD.read_text(encoding="utf-8")

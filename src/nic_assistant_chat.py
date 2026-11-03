@@ -29,14 +29,32 @@ these rules. Do not claim to have executed external actions unless a connected
 executor confirms it. No plugins are connected by this chat service."""
 
 
-def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *, client: Any | None = None, model: str | None = None) -> str:
-    """Return one assistant reply with optional bounded chat context."""
+def _model_tool_definitions() -> list[dict[str, Any]]:
+    """Translate the local allowlist into Responses API function tools."""
+    return [
+        {
+            "type": "function",
+            "name": item["name"],
+            "description": item["description"],
+            "parameters": {**item["parameters"], "required": []},
+            "strict": True,
+        }
+        for item in tool_catalog()
+    ]
+
+
+def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
+                  client: Any | None = None, model: str | None = None,
+                  max_tool_calls: int = 3) -> str:
+    """Return a creator-workflow reply, executing only bounded read-only tools."""
     if not isinstance(message, str) or not message.strip():
         raise ValueError("message must be a non-empty string")
     if history is None:
         history = []
     if not isinstance(history, list):
         raise ValueError("history must be a list")
+    if not isinstance(max_tool_calls, int) or not 0 <= max_tool_calls <= 3:
+        raise ValueError("max_tool_calls must be between 0 and 3")
     normalized: list[dict[str, str]] = []
     for item in history[-12:]:
         if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
@@ -49,12 +67,52 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *, 
         from openai import OpenAI
         client = OpenAI()
     selected_model = model or os.getenv("NIC_CHAT_MODEL", "gpt-4.1-mini")
+    tools = _model_tool_definitions() if max_tool_calls else None
     response = client.responses.create(
         model=selected_model,
         instructions=SYSTEM_INSTRUCTIONS,
         input=normalized,
         max_output_tokens=1200,
+        **({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": False} if tools else {}),
     )
+    calls_used = 0
+    while True:
+        output_items = getattr(response, "output", None) or []
+        calls = [item for item in output_items if getattr(item, "type", None) == "function_call"]
+        if not calls:
+            break
+        call = calls[0]
+        call_name = getattr(call, "name", "")
+        call_id = getattr(call, "call_id", "")
+        raw_arguments = getattr(call, "arguments", "{}")
+        if calls_used >= max_tool_calls:
+            tool_output = {"ok": False, "error": "tool_call_limit_reached"}
+        else:
+            try:
+                arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
+                result = execute_tool(call_name, arguments)
+                tool_output = {"ok": True, "result": result}
+            except (ToolExecutionError, ValueError, TypeError) as exc:
+                tool_output = {"ok": False, "error": str(exc)}
+        if not call_id:
+            raise RuntimeError("model tool call did not include a call_id")
+        response = client.responses.create(
+            model=selected_model,
+            instructions=SYSTEM_INSTRUCTIONS,
+            previous_response_id=getattr(response, "id", None),
+            input=[{
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": json.dumps(tool_output, ensure_ascii=False),
+            }],
+            max_output_tokens=1200,
+            **({"tools": tools, "tool_choice": ("none" if calls_used >= max_tool_calls else "auto"),
+                "parallel_tool_calls": False} if tools else {}),
+        )
+        if calls_used < max_tool_calls:
+            calls_used += 1
+        else:
+            break
     reply = getattr(response, "output_text", None)
     if not isinstance(reply, str) or not reply.strip():
         raise RuntimeError("model returned no text response")
