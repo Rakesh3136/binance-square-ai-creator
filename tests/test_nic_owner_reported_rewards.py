@@ -63,6 +63,25 @@ class OwnerReportedRewardTests(unittest.TestCase):
         self.assertEqual(meta["content_lane"], "long_term_thesis")
         self.assertEqual(meta["content_format"], "text_plus_image")
         self.assertEqual(meta["owner_reported_views"], 5100)
+        setup = self.event(post_id="376457571598023", reward_amount_usdc=0.77, content_metadata={
+            "asset_symbol": "US", "timeframe": "4H", "chart_type": "annotated_candlestick",
+            "setup_structure": "demand-zone retest after a sharp retracement",
+            "confirmation_condition": "price holds the 0.010000-0.011500 demand area and confirms a reaction",
+            "invalidation_condition": "4H/Daily close below approximately 0.009500",
+            "entry_zone": "0.010000-0.011500",
+            "target_levels": ["0.020000", "0.030000", "0.035000+"],
+            "owner_reported_views": 2100, "owner_reported_likes": 6,
+            "owner_reported_comments": 0, "post_created_at": "2026-10-12T15:39:00",
+            "evidence_notes": "Visible in account owner's Write to Earn reward-details screenshot; reward is owner-reported, not independently verified."
+        })
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "owner-rewards.jsonl"
+            path.write_text(json.dumps(setup) + chr(10), encoding="utf-8")
+            meta = load_owner_reported_rewards(path)["376457571598023"]["content_metadata"]
+        self.assertEqual(meta["asset_symbol"], "US")
+        self.assertEqual(meta["timeframe"], "4H")
+        self.assertEqual(meta["target_levels"], ["0.020000", "0.030000", "0.035000+"])
+        self.assertEqual(meta["owner_reported_views"], 2100)
 
 
 if __name__ == "__main__":
