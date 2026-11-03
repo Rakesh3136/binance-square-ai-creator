@@ -1,0 +1,32 @@
+name: NIC Specialist Agent Registry Tests
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_agent_registry.py"
+      - "src/test_nic_agent_registry.py"
+      - ".github/workflows/autonomous-market-creator.yml"
+      - ".github/workflows/nic-agent-registry-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/nic_agent_registry.py"
+      - "src/test_nic_agent_registry.py"
+      - ".github/workflows/autonomous-market-creator.yml"
+      - ".github/workflows/nic-agent-registry-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  registry-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile registry and tests
+        run: python -m py_compile src/nic_agent_registry.py src/test_nic_agent_registry.py
+      - name: Verify registry modules, workflow wiring, and authority boundaries
+        run: python -m unittest -v src.test_nic_agent_registry
