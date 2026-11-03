@@ -8,6 +8,7 @@ authoritative and the system never loops indefinitely.
 from __future__ import annotations
 
 import copy
+import json
 import re
 from difflib import SequenceMatcher
 from typing import Callable, Any
@@ -178,9 +179,27 @@ def generate_and_select(context: dict[str, Any],
 
     eligible = [(report, result) for report, result in scored if report["eligible"]]
     if not eligible:
+        failure_report = {
+            "status": "NO_ELIGIBLE_NATIVE_CANDIDATE",
+            "candidate_budget": budget,
+            "generated_candidates": len(candidates),
+            "eligible_candidates": 0,
+            "candidate_rejections": [
+                {
+                    "strategy": report.get("presentation_strategy"),
+                    "character_count": report.get("character_count"),
+                    "question_count": report.get("question_count"),
+                    "issues": report.get("issues", []),
+                }
+                for report, _ in scored
+            ],
+            "generation_errors": errors,
+            "quality_and_publication_gates_remain_authoritative": True,
+        }
         raise RuntimeError(
             "NIC bounded editorial improvement found no candidate passing its "
-            f"local rubric; generated={len(candidates)}, errors={len(errors)}"
+            f"local rubric; generated={len(candidates)}, errors={len(errors)}; "
+            "diagnostics=" + json.dumps(failure_report, sort_keys=True)
         )
     selected_report, selected = max(eligible, key=lambda pair: pair[0]["score"])
     selected["editorial_iteration"] = {
