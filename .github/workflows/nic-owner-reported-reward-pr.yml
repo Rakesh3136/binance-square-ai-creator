@@ -1,0 +1,28 @@
+name: NIC Owner-Reported Reward Learning PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/nic_owner_reported_rewards.py'
+      - 'tests/test_nic_owner_reported_rewards.py'
+      - 'analytics/wte_owner_reported_reward_events.jsonl'
+      - '.github/workflows/nic-owner-reported-reward-pr.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  owner-reported-reward-learning:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile owner-reported reward loader
+        run: python -m py_compile src/nic_owner_reported_rewards.py
+      - name: Run owner-reported reward regression tests
+        run: python -m unittest tests.test_nic_owner_reported_rewards -v
+      - name: Validate owner-reported reward ledger
+        run: python -c "import json,pathlib; [json.loads(x) for x in pathlib.Path('analytics/wte_owner_reported_reward_events.jsonl').read_text().splitlines()]"
