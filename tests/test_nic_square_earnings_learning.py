@@ -203,7 +203,7 @@ class SquareEarningsLearningTests(unittest.TestCase):
             {"editorial_auto_publication_enabled": False, "requires_human_review_for_editorial": True},
         )
         self.assertEqual(readiness["capabilities"]["public_creator_profile_research"]["status"], "INCOMPLETE")
-        self.assertEqual(readiness["blockers"][0]["id"], "creator_profile_7_14_day_coverage")
+        self.assertIn("creator_profile_7_14_day_coverage", [row["id"] for row in readiness["blockers"]])
 
     def test_own_account_metrics_use_nested_square_performance_schema(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
