@@ -97,8 +97,45 @@ class SquareProfileResearchTests(unittest.TestCase):
         self.assertEqual(report["profiles_resolved"], 1)
         self.assertEqual(report["posts_collected_7d"], 1)
         self.assertEqual(report["posts_collected_8_to_14d"], 1)
+        self.assertEqual(report["profiles"][0]["posts_pre_period_14d"], 1)
+        self.assertEqual(report["profiles"][0]["profile_resolution_status"], "VERIFIED_PUBLIC_PROFILE_IDENTITY")
         self.assertTrue(report["public_metrics_are_not_earnings"])
         self.assertFalse(report["authenticated_session_used"])
+
+
+    def test_leaderboard_profile_with_sparse_pre_period_history_is_not_marked_complete(self):
+        candidate = {
+            "creator": "Alpha",
+            "username": "Alpha",
+            "creator_profile_url": "https://www.binance.com/en/square/profile/Alpha",
+            "discovery_source": "observed_write_to_earn_leaderboard",
+            "period_start": (NOW - __import__("datetime").timedelta(days=7)).isoformat(),
+            "period_end": NOW.isoformat(),
+            "profile_resolution_status": "CANDIDATE_URL_PROVIDED",
+        }
+        def fake_request(url, method="GET", payload=None, timeout=15.0):
+            if url.endswith("/friendly/pgc/user/client") and method == "POST":
+                return {"code": "000000", "data": {
+                    "squareUid": "uid-alpha", "username": "Alpha", "displayName": "Alpha",
+                }}
+            if "/queryUserProfilePageContentsWithFilter" in url:
+                return {"code": "000000", "data": {
+                    "contents": [{
+                        "id": "recent", "createTime": int((NOW - __import__("datetime").timedelta(days=2)).timestamp() * 1000),
+                        "bodyTextOnly": "An original post within the exact reward week.", "viewCount": 100,
+                        "likeCount": 6, "commentCount": 2, "shareCount": 1,
+                    }],
+                    "timeOffset": 0, "isExistSecondPage": False,
+                }}
+            return {"code": "000000", "data": {}}
+        with patch("src.nic_square_profile_research.time.sleep", return_value=None):
+            report = research_profiles([candidate], NOW, fake_request, lambda _: None)
+        profile = report["profiles"][0]
+        self.assertEqual(report["status"], "PROFILE_RESEARCH_PARTIAL_LEADERBOARD_COVERAGE")
+        self.assertEqual(profile["profile_resolution_status"], "VERIFIED_PUBLIC_PROFILE_IDENTITY")
+        self.assertEqual(profile["posts_pre_period_14d"], 0)
+        self.assertFalse(profile["window_pre_period_14d_complete"])
+        self.assertFalse(report["leaderboard_pre_period_14d_coverage_complete"])
 
     def test_endpoint_failures_are_reported_and_do_not_fake_a_creator_or_posts(self):
         def blocked(*args, **kwargs):
