@@ -80,6 +80,6 @@ def load_owner_reported_rewards(path: Path = OWNER_REPORTED_REWARDS) -> dict[str
         bucket["event_ids"].append(event_id)
         metadata = row.get("content_metadata")
         if isinstance(metadata, dict) and not bucket["content_metadata"]:
-            allowed = ("content_lane", "content_format", "hook_type", "summary", "owner_reported_views", "public_post_url", "creator_origin")
+            allowed = ("content_lane", "content_format", "hook_type", "summary", "owner_reported_views", "public_post_url", "creator_origin", "asset_symbol", "timeframe", "chart_type", "setup_structure", "confirmation_condition", "invalidation_condition", "entry_zone", "target_levels", "owner_reported_likes", "owner_reported_comments", "post_created_at", "reward_period", "evidence_notes")
             bucket["content_metadata"] = {key: metadata[key] for key in allowed if metadata.get(key) not in (None, "")}
     return {post: {"amount_usdc": round(v["amount_usdc"], 8), "event_count": v["event_count"], "event_ids": v["event_ids"], "content_metadata": v["content_metadata"]} for post, v in by_post.items()}
