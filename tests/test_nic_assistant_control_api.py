@@ -101,6 +101,38 @@ class NICControlAPITests(unittest.TestCase):
         self.assertTrue(self.gate.authorize_execution(request["request_id"], "binance_square", "publish_post", details))
         self.assertFalse(self.gate.authorize_execution(request["request_id"], "binance_square", "publish_post", details))
 
+    def test_operator_capabilities_and_execution_require_owner_token(self):
+        status, _ = self.request("/operator/capabilities")
+        self.assertEqual(status, 401)
+        status, payload = self.request("/operator/capabilities", "owner-test-token")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["execution_mode"], "owner_authenticated_read_only")
+        names = {item["name"] for item in payload["tools"]}
+        self.assertIn("get_agent_registry", names)
+        self.assertFalse(payload["publishing_available_through_operator"])
+
+        status, _ = self.request(
+            "/operator/execute", "wrong", method="POST",
+            payload={"tool": "get_agent_registry", "arguments": {}}
+        )
+        self.assertEqual(status, 401)
+
+    def test_operator_rejects_unapproved_or_mutating_tools(self):
+        status, payload = self.request(
+            "/operator/execute", "owner-test-token", method="POST",
+            payload={"tool": "publish_post", "arguments": {"text": "unsafe"}}
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"], "tool_not_allowed")
+
+    def test_operator_rejects_path_injection_arguments(self):
+        status, payload = self.request(
+            "/operator/execute", "owner-test-token", method="POST",
+            payload={"tool": "get_agent_registry", "arguments": {"path": "../../.env"}}
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"], "tool_arguments_not_supported")
+
 
 if __name__ == "__main__":
     unittest.main()
