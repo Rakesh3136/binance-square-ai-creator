@@ -13,8 +13,10 @@ class NicAgentRegistryTests(unittest.TestCase):
         self.assertEqual(by_id["community_replies"]["state"], "not_implemented")
         self.assertEqual(
             by_id["chat_operator"]["state"],
-            "service_present_tools_not_connected",
+            "service_present_read_only_tools_connected",
         )
+        self.assertIn("nic_tool_registry.py", by_id["chat_operator"]["modules"])
+        self.assertIn("bounded_read_only_tool_execution", by_id["chat_operator"]["skills"])
         self.assertEqual(
             by_id["audience_analytics"]["state"],
             "module_present_not_proven_in_canonical_workflow",
