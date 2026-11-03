@@ -160,6 +160,24 @@ def make_handler(gate: ControlGate | None = None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "NICChat/1.1"
 
+        def _allowed_origin(self) -> str | None:
+            origin = self.headers.get("Origin", "").strip()
+            allowed = {
+                value.strip().rstrip("/")
+                for value in os.getenv("NIC_CHAT_ALLOWED_ORIGINS", "").split(",")
+                if value.strip() and value.strip() != "*"
+            }
+            return origin if origin and origin.rstrip("/") in allowed else None
+
+        def _cors_headers(self) -> None:
+            origin = self._allowed_origin()
+            if origin:
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+                self.send_header("Access-Control-Max-Age", "600")
+
         def _json(self, status: int, payload: dict[str, Any]) -> None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
@@ -167,6 +185,7 @@ def make_handler(gate: ControlGate | None = None):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self._cors_headers()
             self.end_headers()
             self.wfile.write(body)
 
@@ -183,6 +202,15 @@ def make_handler(gate: ControlGate | None = None):
             if not isinstance(payload, dict):
                 raise ValueError("JSON body must be an object")
             return payload
+
+        def do_OPTIONS(self) -> None:
+            if not self._allowed_origin():
+                self._json(403, {"error": "origin_not_allowed"})
+                return
+            self.send_response(204)
+            self.send_header("Cache-Control", "no-store")
+            self._cors_headers()
+            self.end_headers()
 
         def do_GET(self) -> None:
             if self.path == "/healthz":

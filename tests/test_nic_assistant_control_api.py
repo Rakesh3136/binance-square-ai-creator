@@ -15,8 +15,10 @@ class NICControlAPITests(unittest.TestCase):
     def setUp(self):
         self._old_chat = os.environ.get("NIC_CHAT_ACCESS_TOKEN")
         self._old_owner = os.environ.get("NIC_OWNER_CONTROL_TOKEN")
+        self._old_origins = os.environ.get("NIC_CHAT_ALLOWED_ORIGINS")
         os.environ["NIC_CHAT_ACCESS_TOKEN"] = "chat-test-token"
         os.environ["NIC_OWNER_CONTROL_TOKEN"] = "owner-test-token"
+        os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = "https://example.github.io"
         self.shared_stop_mock = patch("src.nic_assistant_chat.sync_github_emergency_stop")
         self.sync_shared_stop = self.shared_stop_mock.start()
         self.addCleanup(self.shared_stop_mock.stop)
@@ -47,9 +49,15 @@ class NICControlAPITests(unittest.TestCase):
             os.environ.pop("NIC_OWNER_CONTROL_TOKEN", None)
         else:
             os.environ["NIC_OWNER_CONTROL_TOKEN"] = self._old_owner
+        if self._old_origins is None:
+            os.environ.pop("NIC_CHAT_ALLOWED_ORIGINS", None)
+        else:
+            os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = self._old_origins
 
-    def request(self, path, token=None, method="GET", payload=None):
+    def request(self, path, token=None, method="GET", payload=None, origin=None):
         headers = {}
+        if origin:
+            headers["Origin"] = origin
         if token:
             headers["Authorization"] = "Bearer " + token
         data = None
@@ -59,9 +67,33 @@ class NICControlAPITests(unittest.TestCase):
         req = Request(self.base + path, data=data, headers=headers, method=method)
         try:
             with urlopen(req, timeout=3) as response:
-                return response.status, json.loads(response.read().decode())
+                self.last_headers = response.headers
+                raw = response.read().decode()
+                return response.status, json.loads(raw) if raw else {}
         except HTTPError as exc:
-            return exc.code, json.loads(exc.read().decode())
+            self.last_headers = exc.headers
+            raw = exc.read().decode()
+            return exc.code, json.loads(raw) if raw else {}
+
+
+    def test_dashboard_origin_is_allowed_and_unknown_origin_is_rejected(self):
+        status, _ = self.request("/healthz", origin="https://example.github.io")
+        self.assertEqual(status, 200)
+        self.assertEqual(self.last_headers.get("Access-Control-Allow-Origin"), "https://example.github.io")
+
+        status, _ = self.request("/healthz", origin="https://attacker.example")
+        self.assertEqual(status, 200)
+        self.assertIsNone(self.last_headers.get("Access-Control-Allow-Origin"))
+
+        status, _ = self.request("/chat", "chat-test-token", method="OPTIONS",
+                                 origin="https://example.github.io")
+        self.assertEqual(status, 204)
+        self.assertIn("Authorization", self.last_headers.get("Access-Control-Allow-Headers", ""))
+
+        status, payload = self.request("/chat", "chat-test-token", method="OPTIONS",
+                                       origin="https://attacker.example")
+        self.assertEqual(status, 403)
+        self.assertEqual(payload["error"], "origin_not_allowed")
 
     def test_control_routes_require_owner_token(self):
         status, _ = self.request("/control/status")
