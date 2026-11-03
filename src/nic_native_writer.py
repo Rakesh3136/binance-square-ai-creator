@@ -33,6 +33,68 @@ def fresh(options,used):
     for x in options:
         if " ".join(re.sub(r"[^a-z0-9 ]","",x.lower()).split()) not in used:return x
     return options[0]
+def fresh_question(options,used,seed):
+    if not options:return "What new evidence would change your view?"
+    offset=int(seed or 0)%len(options)
+    ordered=list(options[offset:])+list(options[:offset])
+    return fresh(ordered,used)
+def question_options_for(story_type,s):
+    variants={
+        "breakout_retest":[
+            f"What would confirm that ${s} is holding the retest?",
+            f"Which reaction would tell you the ${s} breakout is failing?",
+            f"How long would you want ${s} to hold above the old ceiling?",
+            f"What price action would make you stop trusting the ${s} retest?",
+        ],
+        "rejection_invalidation":[
+            f"Which rejection would make you abandon the ${s} thesis?",
+            f"What evidence would show the ${s} failure level is being respected?",
+            f"At what point would you stop treating this ${s} move as a valid setup?",
+            f"What would make the ${s} rejection more convincing than the bounce?",
+        ],
+        "range_structure":[
+            f"Which side of the ${s} range needs to hold before you trust the move?",
+            f"What would prove that ${s} has escaped the range rather than faked out?",
+            f"Would you wait for a retest before trusting a ${s} range break?",
+            f"Which reaction would invalidate the current ${s} range read?",
+        ],
+        "trend_continuation":[
+            f"What would tell you the ${s} trend is continuing rather than exhausting?",
+            f"Which pullback level would change your view on ${s} continuation?",
+            f"What follow-through would you need before trusting the ${s} trend?",
+            f"What would make you downgrade the ${s} continuation thesis?",
+        ],
+        "momentum_volume":[
+            f"What volume change would make you trust the next ${s} move?",
+            f"Which price-and-volume reaction would invalidate the ${s} momentum read?",
+            f"Would you trust ${s} without volume follow-through?",
+            f"What would show that participation is fading in ${s}?",
+        ],
+        "relative_strength":[
+            f"What would show that ${s} is losing its relative strength?",
+            f"Which comparison would you use to test ${s} against the broader market?",
+            f"How many sessions would you need before trusting ${s} outperformance?",
+            f"What would make you treat the ${s} strength as temporary?",
+        ],
+        "research_edge":[
+            f"Which new evidence would change your interpretation of ${s}?",
+            f"What would you verify first before trusting the ${s} thesis?",
+            f"Which competing explanation deserves the next check on ${s}?",
+            f"What missing data would most change your read on ${s}?",
+        ],
+        "post_mortem_lesson":[
+            f"What would you carry forward from the ${s} setup into the next trade?",
+            f"Which part of the ${s} thesis would you test differently next time?",
+            f"What evidence mattered most in judging the ${s} reaction?",
+            f"Which lesson from ${s} would change your next decision?",
+        ],
+    }
+    return variants.get(story_type,[
+        f"What new evidence would change your view on ${s}?",
+        f"Which part of the ${s} thesis would you verify first?",
+        f"What would make you reconsider the current ${s} read?",
+        f"Which next reaction matters most for ${s}?",
+    ])
 def item_for(s,market):
     for g in ("top_content_signals","top_gainers","top_losers","highest_volume","new_listing_market"):
         for x in market.get(g) or []:
@@ -98,7 +160,8 @@ def build(ctx):
     tp1=setup.get("tp1");tp2=setup.get("tp2");dollar="$"+s
     obs="$"+price(last) if last else "the latest verified price"
     voltext=f"{vol/1e6:.1f}M USDT" if vol>=1e6 else (f"{vol/1e3:.0f}K USDT" if vol>=1e3 else "the available quote-volume snapshot")
-    seed=int(hashlib.sha256((s+cat+str(director.get("narrative_engine"))+str(ctx.get("iteration_seed",0))).encode()).hexdigest()[:8],16)%4
+    iteration_seed=ctx.get("iteration_seed")
+    seed=(int(iteration_seed)%4) if iteration_seed is not None else int(hashlib.sha256((s+cat+str(director.get("narrative_engine"))).encode()).hexdigest()[:8],16)%4
     story_type=str(director.get("story_type") or sel.get("story_type") or director.get("narrative_engine") or strategy_runtime.get("selected_story_type") or "research_edge").strip().lower().replace(" ","_")
     if cat in {"breaking_news","news","news_and_macro","macro"}:
         articles=[x for x in news.get("articles") or [] if isinstance(x,dict)]
@@ -110,16 +173,20 @@ def build(ctx):
               if title else f"The available evidence gives {dollar} a reason to watch, but it does not prove a durable catalyst. That distinction matters when the market can react faster than the underlying story changes.")
         middle=f"{dollar} is around {obs} after a {move:+.1f}% move, so the market response is measurable rather than theoretical."
         close="The useful test is whether price and participation keep validating the same interpretation; if they diverge, the thesis weakens."
-        question=f"What new evidence would make you change your view on {dollar}?"
+        question=fresh_question([
+            f"What new evidence would make you change your view on {dollar}?",
+            f"Which part of the supplied report would you verify first for {dollar}?",
+            f"What market reaction would confirm the report is changing {dollar}?",
+            f"What would show that the {dollar} reaction is fading rather than repricing?",
+        ],used,seed)
     elif cat in {"capital_flow_long","capital_flow_short","flow","technical_setup","creator_signal_outcome","follow_up"} and side in {"LONG","SHORT"} and trigger is not None and inv is not None:
         trade_styles=[
             (f"${dollar}: the setup is conditional, not a call to chase.",f"The ${side} thesis only activates at ${trigger}. Until price reaches and holds that area, the signal is incomplete.",f"If it triggers, TP1 is ${tp1} and TP2 is ${tp2}. If ${inv} fails, the thesis is invalidated. Current price is ${obs}; the snapshot shows ${voltext} of quote volume.","The useful edge here is waiting for confirmation instead of paying for the move before the market proves it."),
             (f"The interesting question on ${dollar} is not 'up or down?' It is whether the market can prove this level.",f"For a ${side} scenario, ${trigger} is the decision point. A move near it is only preparation; acceptance beyond it is the confirmation condition.",f"The risk boundary is ${inv}. TP1/TP2 sit at ${tp1} and ${tp2}. Those levels describe the scenario, not a guaranteed path. Price is currently ${obs}.","That makes the invalidation more important than the target: it tells us when the thesis stops making sense."),
-            (f"I would not chase ${dollar} here. I would wait for the market to answer one specific question.",f"Can price establish the ${side} setup through ${trigger}? If not, there is no reason to force the signal.",f"The predefined failure point is ${inv}; the scenario targets are ${tp1} and ${tp2}. The current snapshot has price near ${obs} with ${voltext} in quote volume.","Waiting is part of the setup. A missed trade is cheaper than inventing confirmation."),
-            (f"${dollar} has a clean conditional setup, but the condition comes first.",f"The evidence is actionable only if ${trigger} is reached and the ${side.lower()} case holds there.",f"Invalidation sits at ${inv}; TP1 is ${tp1} and TP2 is ${tp2}. Current price is ${obs}, so the distance to the decision point still matters.","If the trigger never confirms, the correct outcome is no trade — not a rewritten signal.")
+            (f"I would not chase ${dollar} here. I would wait for the market to answer one specific question.",f"Can price establish the ${side} setup through ${trigger}? If not, there is no reason to force the signal.",f"The predefined failure point is ${inv}; the scenario targets are ${tp1} and ${tp2}. The current snapshot has price near ${obs} with ${voltext} in quote volume.","Waiting is part of the setup. A missed trade is cheaper than inventing confirmation.",f"How much follow-through would you need after ${trigger} before treating this as a valid ${side} setup?"),
+            (f"${dollar} has a clean conditional setup, but the condition comes first.",f"The evidence is actionable only if ${trigger} is reached and the ${side.lower()} case holds there.",f"Invalidation sits at ${inv}; TP1 is ${tp1} and TP2 is ${tp2}. Current price is ${obs}, so the distance to the decision point still matters.","If the trigger never confirms, the correct outcome is no trade — not a rewritten signal.",f"What would make you abandon the ${dollar} setup before it reaches the first target?")
         ]
-        hook,body,middle,close=trade_styles[seed % len(trade_styles)]
-        question=f"What would you need to see on ${dollar} before you would consider this ${side} scenario confirmed?"
+        hook,body,middle,close,question=trade_styles[seed % len(trade_styles)]
     elif cat in {"research_insight", "market_mechanism", "data_surprise"} and timing_state == "EXHAUSTED":
         # An exhausted move may still support an explanatory research post, but
         # it must never be framed as a fresh setup or turned into entry levels.
@@ -136,7 +203,12 @@ def build(ctx):
         corroboration="No independent news corroboration is recorded. " if news_count == 0 and official_count == 0 else "Independent corroboration is not yet established in this research record. "
         middle=f"No independent catalyst is confirmed; {gap_text} remain unverified. Demand, short covering and thin liquidity remain competing explanations."
         close="Trader test: if price reverses as volume fades, the demand thesis weakens; follow-through needs independent catalyst evidence."
-        question="Which missing data would you verify first for $"+s+"?"
+        question=fresh_question([
+            "Which missing data would you verify first for $"+s+"?",
+            "What independent source would most change your read on $"+s+"?",
+            "Which competing explanation should be tested first for $"+s+"?",
+            "What evidence would make you downgrade the $"+s+" thesis?",
+        ],used,seed)
     else:
         story_templates={
             "breakout_retest": (
@@ -183,7 +255,8 @@ def build(ctx):
         default=([f"The useful ${s} question is what the next reaction can actually prove."],
                  "The available evidence supports a scenario to test, not certainty about the next candle.",
                  f"What new evidence would change your view on ${s}?")
-        hooks,mechanism,question=story_templates.get(story_type,default)
+        hooks,mechanism,_template_question=story_templates.get(story_type,default)
+        question=fresh_question(question_options_for(story_type,s),used,seed)
         hook=fresh(hooks[seed:]+hooks[:seed],used)
         if lo is not None and hi is not None:
             structure=f"The recent 1H window spans roughly $" + price(lo) + " to $" + price(hi) + f". Price is around {obs}, with {voltext} in quote volume and a {ir:.1f}% intraday range."
