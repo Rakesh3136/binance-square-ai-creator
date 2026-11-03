@@ -40,8 +40,8 @@ REGISTRY = [
         "name": "Writing and Editorial Agent",
         "purpose": "Turn evidence into original creator posts and apply editorial review.",
         "skills": ["content_planning", "native_drafting", "editing", "originality_review", "deduplication"],
-        "modules": ["multi_agent_creator.py", "nic_native_writer.py", "human_editor.py", "recent_sentence_deduplicator.py"],
-        "workflow_entrypoints": ["multi_agent_creator.py", "human_editor.py", "recent_sentence_deduplicator.py"],
+        "modules": ["candidate_generation_4.py", "safe_creator_runner.py", "multi_agent_creator.py", "nic_native_writer.py", "human_editor.py", "recent_sentence_deduplicator.py"],
+        "workflow_entrypoints": ["candidate_generation_4.py", "safe_creator_runner.py", "human_editor.py", "recent_sentence_deduplicator.py"],
         "state": "workflow_wired",
         "limitations": ["The native writer is a bounded deterministic writing engine, not an independent model-backed agent."],
     },
@@ -71,7 +71,7 @@ REGISTRY = [
         "purpose": "Collect post outcomes, creator-period evidence, reward events, and strategy feedback.",
         "skills": ["post_performance_collection", "reward_evidence_reconciliation", "creator_period_learning", "experiment_feedback"],
         "modules": ["square_performance_collector.py", "nic_square_earnings_learning.py", "nic_creator_period_learning.py", "nic_outcome_learner.py"],
-        "workflow_entrypoints": ["square_performance_collector.py", "nic_square_earnings_learning.py", "nic_creator_period_learning.py", "nic_outcome_learner.py"],
+        "workflow_entrypoints": ["square_performance_collector.py", "nic_square_earnings_learning.py", "nic_outcome_learner.py"],
         "state": "workflow_wired",
         "limitations": ["Creator-week totals are cohort evidence, not proof of an individual post payout."],
     },
@@ -114,9 +114,14 @@ def build_registry() -> dict:
     for definition in REGISTRY:
         modules = definition["modules"]
         missing = [name for name in modules if not (ROOT / "src" / name).is_file()]
+        import re
         wired = [
             name for name in definition["workflow_entrypoints"]
-            if f"src/{name}" in workflow
+            if re.search(
+                rf"(?:^|\\s)python\\s+src/{re.escape(name)}(?:\\s|$)",
+                workflow,
+                flags=re.MULTILINE,
+            )
         ]
         expected_wiring_missing = [
             name for name in definition["workflow_entrypoints"]
