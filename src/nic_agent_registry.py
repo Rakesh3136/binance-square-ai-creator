@@ -99,11 +99,11 @@ REGISTRY = [
         "agent_id": "chat_operator",
         "name": "NIC Chat Operator",
         "purpose": "Provide the existing authenticated chat and owner-control API.",
-        "skills": ["assistant_chat", "owner_control_api"],
-        "modules": ["nic_assistant_chat.py", "nic_control_gate.py"],
+        "skills": ["assistant_chat", "owner_control_api", "bounded_read_only_tool_execution"],
+        "modules": ["nic_assistant_chat.py", "nic_control_gate.py", "nic_tool_registry.py"],
         "workflow_entrypoints": [],
-        "state": "service_present_tools_not_connected",
-        "limitations": ["Chat service explicitly does not expose tool execution; dashboard chat is not yet a universal agent operator."],
+        "state": "service_present_read_only_tools_connected",
+        "limitations": ["Chat can call only three bounded read-only tools; no publication, trading, shell, arbitrary writes, or universal executor integration."],
     },
 ]
 
