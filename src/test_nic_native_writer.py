@@ -61,6 +61,23 @@ class NativeWriterQuestionTests(unittest.TestCase):
             self.assertEqual(result["draft"]["post"].count("?"), 1)
             self.assertIn("$ICX", result["draft"]["post"])
 
+
+    def test_writer_refuses_to_reuse_cta_when_all_variants_are_recent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            recent_log = Path(temp) / "publication_log.jsonl"
+            with patch.object(nic_native_writer, "RECENT_LOG", recent_log):
+                prior_questions = [
+                    nic_native_writer.build({**self.context, "iteration_seed": seed})["draft"]["discussion_question"]
+                    for seed in range(4)
+                ]
+                recent_log.write_text(
+                    "".join(json.dumps({"text": question}) + "\\n" for question in prior_questions),
+                    encoding="utf-8",
+                )
+                for seed in range(4):
+                    with self.assertRaisesRegex(RuntimeError, "no_fresh_reader_question_variant"):
+                        nic_native_writer.build({**self.context, "iteration_seed": seed})
+
     def test_writer_uses_iteration_seed_to_cover_each_trade_style_once(self):
         styles = []
         for seed in range(4):
