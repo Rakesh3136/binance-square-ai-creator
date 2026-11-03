@@ -128,8 +128,9 @@ class BoundedEditorialImprovementTests(unittest.TestCase):
         message = str(caught.exception)
         self.assertIn('"status": "NO_ELIGIBLE_NATIVE_CANDIDATE"', message)
         self.assertIn('"strategy": "asset_specific_research_edge"', message)
-        self.assertIn('"must_have_exactly_one_reader_question"', message)
+        self.assertIn('"missing_frozen_asset"', message)
         self.assertIn('"length_out_of_bounds"', message)
+        self.assertIn('"generation_errors": []', message)
         self.assertIn('"quality_and_publication_gates_remain_authoritative": true', message)
 
 
