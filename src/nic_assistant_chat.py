@@ -2,7 +2,7 @@
 
 Chat requests use NIC_CHAT_ACCESS_TOKEN. Control-plane operations use the
 separate NIC_OWNER_CONTROL_TOKEN. Bind to loopback unless deployed behind a
-proper TLS reverse proxy. Tool execution is not exposed by this service.
+proper TLS reverse proxy. The owner-only operator API exposes bounded read-only tools.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from typing import Any
 from urllib.parse import unquote
 
 from src.nic_control_gate import ControlGate
+from src.nic_tool_registry import ToolExecutionError, execute_tool, tool_catalog
 
 SYSTEM_INSTRUCTIONS = """You are NIC's creator-workflow assistant.
 NIC's primary mission is original, high-quality Binance Square content that can
@@ -137,9 +138,17 @@ def make_handler(gate: ControlGate | None = None):
                     "external_action_execution": "not_connected",
                 })
                 return
-            if self.path in ("/control/status", "/control/approvals"):
+            if self.path in ("/operator/capabilities", "/control/status", "/control/approvals"):
                 if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                if self.path == "/operator/capabilities":
+                    self._json(200, {
+                        "execution_mode": "owner_authenticated_read_only",
+                        "tools": tool_catalog(),
+                        "publication_authority": "src/binance_square_publisher.py",
+                        "publishing_available_through_operator": False,
+                    })
                     return
                 if self.path == "/control/status":
                     self._json(200, {
@@ -173,6 +182,22 @@ def make_handler(gate: ControlGate | None = None):
                     self._json(400, {"error": str(exc)})
                 except Exception:
                     self._json(502, {"error": "assistant_provider_failed"})
+                return
+
+            if self.path == "/operator/execute":
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                try:
+                    payload = self._body()
+                    result = execute_tool(payload.get("tool"), payload.get("arguments", {}))
+                    self._json(200, {"status": "completed", "tool": payload.get("tool"), "result": result})
+                except ToolExecutionError as exc:
+                    self._json(400, {"error": str(exc)})
+                except ValueError as exc:
+                    self._json(400, {"error": str(exc)})
+                except Exception:
+                    self._json(500, {"error": "operator_tool_failed"})
                 return
 
             if self.path.startswith("/control/"):
