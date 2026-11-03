@@ -2,11 +2,13 @@
 from __future__ import annotations
 import json, subprocess, sys
 from pathlib import Path
-try:
-    from src.nic_rewarded_format_learning import build_owner_rewarded_format_brief
-except ModuleNotFoundError:
-    from nic_rewarded_format_learning import build_owner_rewarded_format_brief
 ROOT=Path(__file__).resolve().parents[1]
+# Support both `python src/candidate_generation_4.py` and importlib-based tests
+# that load this file by path (where the repository root is not on sys.path).
+for _path in (str(ROOT), str(ROOT / "src")):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+from src.nic_rewarded_format_learning import build_owner_rewarded_format_brief
 PREFLIGHT=ROOT/'data/live/editorial_preflight.json'; NEWS=ROOT/'data/live/news_snapshot.json'; CONTEXT=ROOT/'data/live/publication_context.json'; CORE=ROOT/'data/live/superhuman_creator_core.json'; NOTES=ROOT/'docs/BINANCE_SQUARE_TOP_CREATOR_DEEP_RESEARCH_NOTES.md'; RESEARCH=ROOT/'data/live/original_research.json'; STRATEGY=ROOT/'data/live/agent_strategy.json'; PORTFOLIO=ROOT/'data/live/content_portfolio_plan.json'; DISCOVERY=ROOT/'data/live/nic_story_discovery.json'; CRAFT=ROOT/'data/live/nic_content_craft_9.json'; MASTER=ROOT/'data/live/nic_content_master_10.json'; CREATIVE=ROOT/'data/live/nic_creative_evolution_11.json'; AUDIENCE12=ROOT/'data/live/nic_audience_response_12.json'; LEARNING15=ROOT/'data/live/nic_creative_learning_15.json'; EXP16=ROOT/'data/live/nic_creative_experiment_16.json'; PORTFOLIO17=ROOT/'data/live/nic_creative_portfolio_17.json'; EARNINGS_LEARNING=ROOT/'data/live/nic_square_earnings_learning.json'
 def load(p):
     try:
