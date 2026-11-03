@@ -5,7 +5,10 @@ on:
     branches: [main]
     paths:
       - 'src/nic_owner_reported_rewards.py'
+      - 'src/nic_rewarded_format_learning.py'
+      - 'src/candidate_generation_4.py'
       - 'tests/test_nic_owner_reported_rewards.py'
+      - 'tests/test_nic_rewarded_format_learning.py'
       - 'analytics/wte_owner_reported_reward_events.jsonl'
       - '.github/workflows/nic-owner-reported-reward-pr.yml'
 
@@ -24,5 +27,9 @@ jobs:
         run: python -m py_compile src/nic_owner_reported_rewards.py
       - name: Run owner-reported reward regression tests
         run: PYTHONPATH=. python tests/test_nic_owner_reported_rewards.py
+      - name: Run rewarded-format learning regression tests
+        run: PYTHONPATH=. python tests/test_nic_rewarded_format_learning.py
+      - name: Compile candidate generator
+        run: python -m py_compile src/candidate_generation_4.py src/nic_rewarded_format_learning.py
       - name: Validate owner-reported reward ledger
         run: python -c "import json,pathlib; [json.loads(x) for x in pathlib.Path('analytics/wte_owner_reported_reward_events.jsonl').read_text().splitlines()]"
