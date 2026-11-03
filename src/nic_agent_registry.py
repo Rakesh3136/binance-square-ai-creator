@@ -114,14 +114,9 @@ def build_registry() -> dict:
     for definition in REGISTRY:
         modules = definition["modules"]
         missing = [name for name in modules if not (ROOT / "src" / name).is_file()]
-        import re
         wired = [
             name for name in definition["workflow_entrypoints"]
-            if re.search(
-                rf"(?:^|\\s)python\\s+src/{re.escape(name)}(?:\\s|$)",
-                workflow,
-                flags=re.MULTILINE,
-            )
+            if any(f"python src/{name}" in line for line in workflow.splitlines())
         ]
         expected_wiring_missing = [
             name for name in definition["workflow_entrypoints"]
