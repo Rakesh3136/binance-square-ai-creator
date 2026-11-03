@@ -1,0 +1,25 @@
+name: NIC Editorial Quality Gate PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/nic_editorial_quality_gate.py'
+      - 'tests/test_nic_editorial_quality_gate.py'
+      - '.github/workflows/nic-editorial-quality-gate-pr.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  editorial-quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile editorial quality gate
+        run: python -m py_compile src/nic_editorial_quality_gate.py
+      - name: Run editorial quality gate regression tests
+        run: python tests/test_nic_editorial_quality_gate.py
