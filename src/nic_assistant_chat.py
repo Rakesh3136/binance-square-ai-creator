@@ -36,7 +36,7 @@ def _model_tool_definitions() -> list[dict[str, Any]]:
             "type": "function",
             "name": item["name"],
             "description": item["description"],
-            "parameters": item["parameters"],
+            "parameters": {**item["parameters"], "required": []},
             "strict": True,
         }
         for item in tool_catalog()
@@ -79,18 +79,21 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
     while True:
         output_items = getattr(response, "output", None) or []
         calls = [item for item in output_items if getattr(item, "type", None) == "function_call"]
-        if not calls or calls_used >= max_tool_calls:
+        if not calls:
             break
         call = calls[0]
         call_name = getattr(call, "name", "")
         call_id = getattr(call, "call_id", "")
         raw_arguments = getattr(call, "arguments", "{}")
-        try:
-            arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
-            result = execute_tool(call_name, arguments)
-            tool_output = {"ok": True, "result": result}
-        except (ToolExecutionError, ValueError, TypeError) as exc:
-            tool_output = {"ok": False, "error": str(exc)}
+        if calls_used >= max_tool_calls:
+            tool_output = {"ok": False, "error": "tool_call_limit_reached"}
+        else:
+            try:
+                arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
+                result = execute_tool(call_name, arguments)
+                tool_output = {"ok": True, "result": result}
+            except (ToolExecutionError, ValueError, TypeError) as exc:
+                tool_output = {"ok": False, "error": str(exc)}
         if not call_id:
             raise RuntimeError("model tool call did not include a call_id")
         response = client.responses.create(
@@ -103,9 +106,13 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                 "output": json.dumps(tool_output, ensure_ascii=False),
             }],
             max_output_tokens=1200,
-            **({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": False} if tools else {}),
+            **({"tools": tools, "tool_choice": ("none" if calls_used >= max_tool_calls else "auto"),
+                "parallel_tool_calls": False} if tools else {}),
         )
-        calls_used += 1
+        if calls_used < max_tool_calls:
+            calls_used += 1
+        else:
+            break
     reply = getattr(response, "output_text", None)
     if not isinstance(reply, str) or not reply.strip():
         raise RuntimeError("model returned no text response")
