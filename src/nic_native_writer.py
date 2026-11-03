@@ -385,6 +385,10 @@ def build(ctx):
         # the compacting routine may otherwise drop the final block on longer posts.
         parts=[hook,evidence_block,middle + " " + close]
         cohort_learning_applied=True
+    # Exactly one genuine reader question belongs at the end. Any rhetorical
+    # question mark inside a hook/body is converted to sentence punctuation.
+    parts=[re.sub(r"\?+", ".", str(part)).strip() for part in parts]
+    question=str(question or "").strip().rstrip(" ?.")+"?"
     post=compact_post(parts,question)
     contract_checks = {
         "character_count": len(post),
