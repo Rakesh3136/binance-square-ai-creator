@@ -139,6 +139,7 @@ def build_learning_artifact(
             "collection_status": "complete" if profile.get("posts_status") == "PROFILE_POSTS_COMPLETE_WINDOW" else "partial",
             "window_7d_complete": profile.get("window_7d_complete") is True,
             "window_14d_complete": profile.get("window_14d_complete") is True,
+            "window_pre_period_14d_complete": profile.get("window_pre_period_14d_complete") is True,
             "profile_resolution_method": profile.get("profile_resolution_method"),
             "profile_resolution_evidence_url": profile.get("profile_resolution_evidence_url"),
             "profile_resolution_note": profile.get("profile_resolution_note"),
@@ -154,7 +155,7 @@ def build_learning_artifact(
             by_creator_collection[_norm(name)] = collection
 
     creators = []
-    coverage = {"leaderboard_creators": len(entries), "identity_verified": 0, "complete_7d": 0, "complete_14d": 0, "missing_or_partial": 0}
+    coverage = {"leaderboard_creators": len(entries), "identity_verified": 0, "complete_7d": 0, "complete_14d": 0, "complete_pre_period_14d": 0, "missing_or_partial": 0}
     period_rewards: list[float] = []
     for entry in entries:
         name = str(entry.get("creator") or "")
@@ -172,19 +173,27 @@ def build_learning_artifact(
         ]
         seven_start = period_start
         fourteen_start = (period_start - timedelta(days=7)) if period_start else None
+        pre_period_14d_start = (period_start - timedelta(days=14)) if period_start else None
         def in_window(post: dict[str, Any], start: datetime | None, end: datetime | None) -> bool:
             stamp = _parse_date(post.get("published_at_utc") or post.get("published_at") or post.get("posted_at") or post.get("created_at"))
             return bool(stamp and start and end and start <= stamp <= end)
         posts_7d = [p for p in all_creator_posts if in_window(p, seven_start, period_end)]
         posts_14d = [p for p in all_creator_posts if in_window(p, fourteen_start, period_end)]
+        posts_pre_period_14d = [
+            p for p in all_creator_posts
+            if in_window(p, pre_period_14d_start, period_start - timedelta(microseconds=1) if period_start else None)
+        ]
         collection_status = str(collection.get("collection_status") or "missing")
         complete_7d = identity_verified and collection_status == "complete" and collection.get("window_7d_complete") is True
         complete_14d = identity_verified and collection_status == "complete" and collection.get("window_14d_complete") is True
+        complete_pre_period_14d = identity_verified and collection_status == "complete" and collection.get("window_pre_period_14d_complete") is True
         if complete_7d:
             coverage["complete_7d"] += 1
         if complete_14d:
             coverage["complete_14d"] += 1
-        if not (complete_7d and complete_14d):
+        if complete_pre_period_14d:
+            coverage["complete_pre_period_14d"] += 1
+        if not (complete_7d and complete_14d and complete_pre_period_14d):
             coverage["missing_or_partial"] += 1
         if isinstance(reward, (int, float)):
             period_rewards.append(float(reward))
@@ -211,6 +220,7 @@ def build_learning_artifact(
                 "collection_status": collection_status,
                 "window_7d_complete": complete_7d,
                 "window_14d_complete": complete_14d,
+                "window_pre_period_14d_complete": complete_pre_period_14d,
             },
             "post_cohort_7d": {
                 "window_start_utc": entry.get("period_start"),
@@ -222,10 +232,21 @@ def build_learning_artifact(
                 "window_end_utc": entry.get("period_end"),
                 **_aggregate(posts_14d),
             },
+            "post_cohort_pre_period_14d": {
+                "window_start_utc": pre_period_14d_start.isoformat() if pre_period_14d_start else None,
+                "window_end_exclusive_utc": entry.get("period_start"),
+                **_aggregate(posts_pre_period_14d),
+            },
             "attribution_policy": "Creator-period reward is NOT attributed to any individual post. Post features are descriptive cohort observations only.",
         })
 
-    eligible = [c for c in creators if c["profile"]["identity_match"] == "verified" and c["profile"]["window_7d_complete"]]
+    eligible = [
+        c for c in creators
+        if c["profile"]["identity_match"] == "verified"
+        and c["profile"]["window_7d_complete"]
+        and c["profile"]["window_14d_complete"]
+        and c["profile"]["window_pre_period_14d_complete"]
+    ]
     eligible_sorted = sorted(eligible, key=lambda c: float(c["creator_period_reward"].get("amount") or 0), reverse=True)
     split = len(eligible_sorted) // 2
     high_group = eligible_sorted[:split] if split else []
@@ -243,6 +264,7 @@ def build_learning_artifact(
         len(entries) > 0
         and coverage["complete_7d"] == len(entries)
         and coverage["complete_14d"] == len(entries)
+        and coverage["complete_pre_period_14d"] == len(entries)
     )
     # One unresolved public profile should not discard otherwise verified cohort
     # evidence. Keep the missing creator visible in coverage, but permit cautious
@@ -250,7 +272,9 @@ def build_learning_artifact(
     # complete windows and the comparison still has enough creators/posts per tier.
     covered_both_windows = sum(
         1 for c in creators
-        if c["profile"]["window_7d_complete"] and c["profile"]["window_14d_complete"]
+        if c["profile"]["window_7d_complete"]
+        and c["profile"]["window_14d_complete"]
+        and c["profile"]["window_pre_period_14d_complete"]
     )
     minimum_covered = (4 * len(entries) + 4) // 5  # ceil(80% of the observed leaderboard)
     cohort_coverage_sufficient = len(entries) > 0 and covered_both_windows >= minimum_covered
@@ -279,10 +303,11 @@ def build_learning_artifact(
         "reward_granularity": "creator_period",
         "learning_status": "COHORT_HYPOTHESES_READY" if comparison_ready else "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE",
         "coverage": coverage,
-        "coverage_status": "FULL_7_AND_14_DAY_LEADERBOARD_COVERAGE" if all_leaderboard_windows_complete else "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE",
+        "coverage_status": "FULL_7_DAY_PLUS_PRE_PERIOD_14_DAY_LEADERBOARD_COVERAGE" if all_leaderboard_windows_complete else "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE",
         "learning_coverage_policy": {
             "minimum_verified_creator_window_coverage": 0.8,
-            "creators_complete_for_both_windows": covered_both_windows,
+            "required_windows": ["exact_reward_7d", "14d_lookback", "14d_pre_period"],
+            "creators_complete_for_all_required_windows": covered_both_windows,
             "creators_required_for_learning": minimum_covered,
             "partial_coverage_warning": None if all_leaderboard_windows_complete else "Learning hypotheses use only identity-verified creators with complete windows; missing leaderboard creators are excluded and full leaderboard coverage remains incomplete.",
         },
