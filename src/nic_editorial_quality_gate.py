@@ -100,7 +100,7 @@ def fallback_publication_block(report):
     }
     if report.get("emergency_fallback") is True or "LOCAL_FALLBACK" in modes:
         return "deterministic_emergency_fallback_not_publishable"
-    if str(report.get("model") or "").strip().lower() == "deterministic-emergency-fallback":
+    if any(str(value or "").strip().lower() == "deterministic-emergency-fallback" for value in (report.get("model"), draft.get("model"))):
         return "deterministic_emergency_fallback_not_publishable"
     return ""
 
