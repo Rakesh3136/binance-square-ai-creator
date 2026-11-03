@@ -71,7 +71,7 @@ class NativeWriterQuestionTests(unittest.TestCase):
                     for seed in range(4)
                 ]
                 recent_log.write_text(
-                    "".join(json.dumps({"text": question}) + "\\n" for question in prior_questions),
+                    "".join(json.dumps({"text": question}) + "\n" for question in prior_questions),
                     encoding="utf-8",
                 )
                 for seed in range(4):
