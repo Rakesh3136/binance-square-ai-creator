@@ -37,3 +37,22 @@ def test_current_publication_context_lane_overrides_stale_os_lane():
         {"content_lane": "market_setup"},
     )
     assert lane == "research_insight"
+
+def test_deterministic_emergency_fallback_is_never_publication_eligible():
+    report = {
+        "model": "deterministic-emergency-fallback",
+        "generation_mode": "LOCAL_FALLBACK",
+        "emergency_fallback": True,
+        "draft": {"post": "Generic market prose.", "generation_mode": "LOCAL_FALLBACK"},
+    }
+    assert gate.fallback_publication_block(report) == "deterministic_emergency_fallback_not_publishable"
+
+
+def test_native_ai_draft_is_not_blocked_by_fallback_guard():
+    report = {
+        "model": "gemini-3.6-flash",
+        "generation_mode": "GEMINI",
+        "draft": {"post": "Asset-specific researched editorial.", "generation_mode": "GEMINI"},
+    }
+    assert gate.fallback_publication_block(report) == ""
+
