@@ -32,6 +32,7 @@ class CreatorPeriodLearningTests(unittest.TestCase):
                     "collection_status": "complete",
                     "window_7d_complete": True,
                     "window_14d_complete": True,
+                    "window_pre_period_14d_complete": True,
                 }
                 for name in names
             ],
@@ -65,6 +66,8 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         self.assertEqual(creator["post_cohort_7d"]["post_count"], 3)
         self.assertEqual(creator["post_cohort_14d"]["post_count"], 4)
         self.assertEqual(creator["post_cohort_14d"]["window_start_utc"], "2026-10-05T00:00:00+00:00")
+        self.assertEqual(creator["post_cohort_pre_period_14d"]["window_start_utc"], "2026-09-28T00:00:00+00:00")
+        self.assertEqual(creator["post_cohort_pre_period_14d"]["post_count"], 1)
         # The first day of the preceding week must not be clipped to 23:59:59.
         self.posts_input["posts"].append({
             "creator": "Creator A",
@@ -77,6 +80,7 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         })
         artifact = build_learning_artifact(self.leaderboard, self.posts_input, "2026-10-24T00:00:00Z")
         self.assertEqual(artifact["creator_periods"][0]["post_cohort_14d"]["post_count"], 5)
+        self.assertEqual(artifact["creator_periods"][0]["post_cohort_pre_period_14d"]["post_count"], 2)
         self.assertEqual(creator["creator_period_reward"]["amount"], 1000)
         self.assertEqual(creator["creator_period_reward"]["granularity"], "creator_period_only")
         self.assertIn("NOT attributed", creator["attribution_policy"])
@@ -120,6 +124,16 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         )
         self.assertEqual(artifact["coverage_status"], "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE")
 
+
+    def test_missing_pre_period_14_day_window_blocks_learning(self):
+        self.posts_input["creator_collections"][0]["window_pre_period_14d_complete"] = False
+        artifact = build_learning_artifact(self.leaderboard, self.posts_input, "2026-10-24T00:00:00Z")
+        self.assertEqual(artifact["coverage"]["complete_7d"], 4)
+        self.assertEqual(artifact["coverage"]["complete_14d"], 4)
+        self.assertEqual(artifact["coverage"]["complete_pre_period_14d"], 3)
+        self.assertEqual(artifact["learning_status"], "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE")
+        self.assertEqual(artifact["coverage_status"], "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE")
+
     def test_nine_of_ten_verified_creator_cohorts_can_produce_cautious_learning(self):
         leaderboard = copy.deepcopy(self.leaderboard)
         post_input = copy.deepcopy(self.posts_input)
@@ -139,6 +153,7 @@ class CreatorPeriodLearningTests(unittest.TestCase):
             post_input["creator_collections"].append({
                 "creator": name, "profile_url": profile_url, "identity_match": "verified",
                 "collection_status": "complete", "window_7d_complete": True, "window_14d_complete": True,
+                "window_pre_period_14d_complete": True,
             })
             for day, body in [
                 ("2026-10-06T10:00:00Z", f"$BTC volume and risk boundary for {name}"),
@@ -157,9 +172,10 @@ class CreatorPeriodLearningTests(unittest.TestCase):
         self.assertEqual(artifact["coverage"]["leaderboard_creators"], 10)
         self.assertEqual(artifact["coverage"]["complete_7d"], 9)
         self.assertEqual(artifact["coverage"]["complete_14d"], 9)
+        self.assertEqual(artifact["coverage"]["complete_pre_period_14d"], 9)
         self.assertEqual(artifact["learning_status"], "COHORT_HYPOTHESES_READY")
         self.assertEqual(artifact["coverage_status"], "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE")
-        self.assertEqual(artifact["learning_coverage_policy"]["creators_complete_for_both_windows"], 9)
+        self.assertEqual(artifact["learning_coverage_policy"]["creators_complete_for_all_required_windows"], 9)
         self.assertIn("full leaderboard coverage remains incomplete", artifact["learning_coverage_policy"]["partial_coverage_warning"])
         self.assertEqual(
             artifact["reward_tier_cohort_comparison"]["status"],
@@ -188,6 +204,7 @@ class CreatorPeriodLearningTests(unittest.TestCase):
                 "creator": "小二哥哥68", "profile_url": profile_url,
                 "identity_match": "verified", "collection_status": "complete",
                 "window_7d_complete": True, "window_14d_complete": True,
+                "window_pre_period_14d_complete": True,
             }],
             "posts": [{
                 "creator": "小二哥哥68",
