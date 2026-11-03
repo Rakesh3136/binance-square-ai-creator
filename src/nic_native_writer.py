@@ -193,6 +193,68 @@ def build(ctx):
         body=structure
         close="That keeps the read falsifiable: the next measurable reaction either supports the structure or weakens it."
         question=question
+    # Make the four bounded iterations materially different in their evidence
+    # angle, not merely different in paragraph order. This branch is intentionally
+    # limited to research-led stories; conditional setup levels and verified news
+    # facts above remain untouched.
+    if cat in {"research_insight", "market_mechanism", "data_surprise"}:
+        price_fact = f"price near {obs}" if last else "no verified last price in the current packet"
+        move_fact = f"a {move:+.1f}% 24-hour move" if move else "no verified 24-hour percentage move"
+        volume_fact = f"{voltext} in quote volume" if vol else "no usable quote-volume figure"
+        if strategy_id == "asset_specific_research_edge":
+            middle_options = [
+                f"The asset-specific evidence is {price_fact}; that is the observation this ${s} thesis must explain.",
+                f"For ${s}, the central research question is whether {price_fact} is supported by a separate catalyst.",
+            ]
+            close_options = [
+                f"This remains a ${s}-specific hypothesis; new evidence about this asset should change the read, not a recycled market narrative.",
+                f"The conclusion should stay limited to ${s}: if fresh asset-level evidence disagrees, the explanation needs to change.",
+            ]
+        elif strategy_id == "evidence_led_research":
+            middle_options = [
+                f"The measurable snapshot records {move_fact}, {price_fact}, and {volume_fact}; these are observations, not a causal explanation.",
+                f"Evidence first: {price_fact}, {move_fact}, and {volume_fact}. The figures describe the snapshot without proving why the move occurred.",
+            ]
+            close_options = [
+                "Those measurements establish what the snapshot contains, not what caused it; an independent source or later observation is needed to test the explanation.",
+                "Do not turn correlation into a catalyst claim: the next independent observation must support the mechanism before the conclusion gets stronger.",
+            ]
+        elif strategy_id == "structure_and_confirmation":
+            if lo is not None and hi is not None:
+                structure_fact = f"The observed 1H range is ${price(lo)} to ${price(hi)}, with {price_fact}."
+            else:
+                structure_fact = f"A reliable 1H high-low range is not present in this packet; the only safe reference is {price_fact}."
+            middle_options = [
+                structure_fact + " The next reaction should be judged against that observed boundary.",
+                structure_fact + " A single print does not establish acceptance beyond the range.",
+            ]
+            close_options = [
+                "A move beyond an observed boundary matters only if price can hold there; a quick return inside weakens the interpretation.",
+                "Treat the range as context, not a prediction: acceptance and a retest would add evidence, while rejection would weaken the thesis.",
+            ]
+        elif strategy_id == "participation_and_relative_strength":
+            middle_options = [
+                f"The participation record contains {volume_fact} alongside {move_fact}; without a comparable baseline, unusual accumulation is not established.",
+                f"The available participation evidence is {volume_fact}. It can be described, but not called expanding or unusually strong without a baseline.",
+            ]
+            close_options = [
+                "Volume is an observation, not proof of buyer strength; compare a later snapshot before calling participation persistent.",
+                "If the next price move lacks supporting participation evidence, the strength narrative should remain unproven.",
+            ]
+        else:
+            middle_options = [middle]
+            close_options = [close]
+        middle = fresh(middle_options, used)
+        close = fresh(close_options, used)
+        # Preserve the explicit high-earner cohort hypothesis when it is present.
+        # Strategy diversity must not silently erase the learned risk-aware
+        # discussion cue that the existing creator-period regression protects.
+        if cohort_guidance == "risk_aware_discussion":
+            close = (
+                "Trader test: if price reverses as volume fades, the demand thesis "
+                "weakens; follow-through needs independent catalyst evidence."
+            )
+
     def compact_post(parts, question_text, limit=700):
         kept=list(parts)
         # Keep hook/evidence first; remove lower-priority prose before evidence.
