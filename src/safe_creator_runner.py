@@ -266,6 +266,7 @@ def is_no_original_draft_failure(message):
         "repeats_recent_published_sentence",
         "final_gate_originality_conflict",
         "near_duplicate_of_recent_publication",
+        "no_fresh_reader_question_variant",
     )
     return any(marker in text for marker in markers)
 
