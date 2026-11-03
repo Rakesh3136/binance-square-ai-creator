@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-11-03T16:29:34.884437+00:00",
+  "generated_at": "2026-11-03T16:32:31.643270+00:00",
   "mission": "autonomous_binance_square_creator",
   "orchestration_authority": ".github/workflows/autonomous-market-creator.yml",
   "publication_authority": "src/binance_square_publisher.py",
@@ -289,18 +289,20 @@
       "purpose": "Provide the existing authenticated chat and owner-control API.",
       "skills": [
         "assistant_chat",
-        "owner_control_api"
+        "owner_control_api",
+        "bounded_read_only_tool_execution"
       ],
       "modules": [
         "nic_assistant_chat.py",
-        "nic_control_gate.py"
+        "nic_control_gate.py",
+        "nic_tool_registry.py"
       ],
       "workflow_entrypoints": [],
-      "state": "service_present_tools_not_connected",
+      "state": "service_present_read_only_tools_connected",
       "limitations": [
-        "Chat service explicitly does not expose tool execution; dashboard chat is not yet a universal agent operator."
+        "Chat can call only three bounded read-only tools; no publication, trading, shell, arbitrary writes, or universal executor integration."
       ],
-      "module_count": 2,
+      "module_count": 3,
       "modules_present": true,
       "missing_modules": [],
       "workflow_wired_modules": [],
