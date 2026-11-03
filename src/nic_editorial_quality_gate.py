@@ -86,6 +86,25 @@ def write_json(path,value):
  path.write_text(serialized+"\n",encoding="utf-8")
  # Validate the exact bytes before downstream gates consume this artifact.
  json.loads(path.read_text(encoding="utf-8"))
+def fallback_publication_block(report):
+    """Never auto-publish deterministic rescue prose as if it were an AI-researched post.
+
+    Emergency copy may be retained as a draft for inspection, but it is not
+    eligible for publication: it lacks the asset-specific editorial reasoning
+    and source-backed thesis required by the creator contract.
+    """
+    draft = report.get("draft") if isinstance(report.get("draft"), dict) else {}
+    modes = {
+        str(report.get("generation_mode") or "").strip().upper(),
+        str(draft.get("generation_mode") or "").strip().upper(),
+    }
+    if report.get("emergency_fallback") is True or "LOCAL_FALLBACK" in modes:
+        return "deterministic_emergency_fallback_not_publishable"
+    if str(report.get("model") or "").strip().lower() == "deterministic-emergency-fallback":
+        return "deterministic_emergency_fallback_not_publishable"
+    return ""
+
+
 def main():
  path=resolve();report=load_json(path);draft=report.get("draft") if isinstance(report.get("draft"),dict) else report;text=str(draft.get("post") or draft.get("text") or report.get("post") or report.get("text") or "").strip()
  if not text:raise SystemExit("NIC editorial gate: empty draft")
@@ -99,6 +118,8 @@ def main():
  draft.update({"text":text,"post":text,"content_lane":lane,"resolved_asset":asset,"reader_facing_sanitized":True,"internal_telemetry_removed":before!=text,"template_opening_detected":generic,"question_count":text.count("?")});ok=text.count("?")==1 and len(text)<=MAX_CHARS and conversion_status=="PASS";report["nic_editorial_quality_gate"]={"version":"3.6+6.6","status":"PASS" if ok else "BLOCK","lane":lane,"resolved_asset":asset,"asset_source":asset_source,"conversion_repairs":conversion_repairs,"checked_at":datetime.now(timezone.utc).isoformat(),"conversion_status":conversion_status,"rules":{"max_characters":MAX_CHARS,"exactly_one_question":True,"no_fact_invention":True,"truthful_reader_action_required":True,"no_trade_pressure":True}}
  report["draft"]=draft
  reasons=[]
+ fallback_reason=fallback_publication_block(report)
+ if fallback_reason: reasons.append(fallback_reason)
  if len(text)>MAX_CHARS: reasons.append(f"character_limit_exceeded:{len(text)}>{MAX_CHARS}")
  if text.count("?")!=1: reasons.append(f"question_count_invalid:{text.count('?')}!=1")
  if not asset: reasons.append("asset_unresolved")
