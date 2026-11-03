@@ -23,6 +23,6 @@ jobs:
       - name: Compile owner-reported reward loader
         run: python -m py_compile src/nic_owner_reported_rewards.py
       - name: Run owner-reported reward regression tests
-        run: python -m unittest tests.test_nic_owner_reported_rewards -v
+        run: python tests/test_nic_owner_reported_rewards.py
       - name: Validate owner-reported reward ledger
         run: python -c "import json,pathlib; [json.loads(x) for x in pathlib.Path('analytics/wte_owner_reported_reward_events.jsonl').read_text().splitlines()]"
