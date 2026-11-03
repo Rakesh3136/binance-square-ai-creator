@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from src.nic_agent_registry import build_registry
 
@@ -32,6 +33,13 @@ class NicAgentRegistryTests(unittest.TestCase):
                 [],
                 agent["agent_id"],
             )
+
+
+    def test_creator_workflow_refreshes_and_persists_dashboard_snapshot(self):
+        workflow = (Path(__file__).resolve().parents[1] /
+                    ".github/workflows/autonomous-market-creator.yml").read_text(encoding="utf-8")
+        self.assertGreaterEqual(workflow.count("python src/nic_dashboard_state.py"), 2)
+        self.assertEqual(workflow.count("data/live/nic_dashboard.json"), 2)
 
     def test_registry_preserves_publication_and_evidence_boundaries(self):
         registry = build_registry()
