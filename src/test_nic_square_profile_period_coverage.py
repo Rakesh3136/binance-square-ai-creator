@@ -67,7 +67,7 @@ class CreatorPeriodCoverageTests(unittest.TestCase):
         ):
             result = research.research_profiles([candidate], now=now, sleep_fn=lambda _: None)
 
-        self.assertEqual(captured["start"].isoformat(), "2026-10-05T00:00:00+00:00")
+        self.assertEqual(captured["start"].isoformat(), "2026-09-28T00:00:00+00:00")
         self.assertEqual(captured["end"].isoformat(), "2026-10-18T23:59:59+00:00")
         creator = result["profiles"][0]
         self.assertTrue(creator["window_7d_complete"])
@@ -77,7 +77,9 @@ class CreatorPeriodCoverageTests(unittest.TestCase):
         self.assertEqual(creator["posts_age_8_to_14_days"], 1)
         self.assertTrue(result["leaderboard_7d_window_coverage_complete"])
         self.assertTrue(result["leaderboard_14d_window_coverage_complete"])
-        self.assertEqual(result["coverage_status"], "FULL_7_AND_14_DAY_LEADERBOARD_COVERAGE")
+        self.assertTrue(result["leaderboard_pre_period_14d_coverage_complete"])
+        self.assertEqual(creator["posts_pre_period_14d"], 1)
+        self.assertEqual(result["coverage_status"], "FULL_7_DAY_PLUS_14_DAY_PRE_PERIOD_LEADERBOARD_COVERAGE")
 
     def test_empty_page_with_more_flag_is_partial_not_complete(self):
         now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)

@@ -175,6 +175,36 @@ class SquareEarningsLearningTests(unittest.TestCase):
         self.assertEqual(plan["research_coverage"]["status"], "PARTIAL_OR_BLOCKED_PROFILE_COVERAGE")
         self.assertEqual(plan["research_coverage"]["public_feed_status"], "PUBLIC_FEED_14D_SAMPLE_GAP_KEEP_COLLECTING")
 
+
+    def test_autonomy_readiness_requires_separate_preceding_14_day_profile_coverage(self):
+        profile_research = {
+            "status": "PROFILE_RESEARCH_COMPLETE",
+            "public_only": True,
+            "profiles_resolved": 1,
+            "candidate_count": 1,
+            "posts_collected_7d": 20,
+            "posts_collected_8_to_14d": 10,
+            "posts_collected_pre_period_14d": 18,
+            "leaderboard_creators_expected": 1,
+            "leaderboard_creators_resolved": 1,
+            "leaderboard_7d_window_coverage_complete": True,
+            "leaderboard_14d_window_coverage_complete": True,
+            "leaderboard_pre_period_14d_coverage_complete": False,
+            "coverage_status": "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE",
+        }
+        plan = build_learning_plan(
+            benchmark_fixture(), {}, [], now=datetime(2026, 10, 21, 12, tzinfo=timezone.utc),
+            creator_profile_research=profile_research,
+            observed_leaderboard_entries=[{"creator": "Creator", "displayed_amount": 800}],
+        )
+        readiness = build_autonomy_readiness(
+            plan,
+            {"status": "PUBLIC_POSTS_CHECKED_NO_RECENT_CLAIMS", "retained_recent_claim_post_count": 0},
+            {"editorial_auto_publication_enabled": False, "requires_human_review_for_editorial": True},
+        )
+        self.assertEqual(readiness["capabilities"]["public_creator_profile_research"]["status"], "INCOMPLETE")
+        self.assertIn("creator_profile_7_14_day_coverage", [row["id"] for row in readiness["blockers"]])
+
     def test_own_account_metrics_use_nested_square_performance_schema(self):
         now = datetime(2026, 10, 21, 12, tzinfo=timezone.utc)
         attribution = [{"canonical_post_id": "374795126927596", "published_at": "2026-10-18T10:00:00+00:00", "category": "research"}]
@@ -312,6 +342,7 @@ class SquareEarningsLearningTests(unittest.TestCase):
             "leaderboard_creators_resolved": 1,
             "leaderboard_7d_window_coverage_complete": True,
             "leaderboard_14d_window_coverage_complete": True,
+            "leaderboard_pre_period_14d_coverage_complete": True,
             "profile_resolution_failures": 0,
             "posts_collected_7d": 2,
             "posts_collected_8_to_14d": 1,
@@ -336,7 +367,7 @@ class SquareEarningsLearningTests(unittest.TestCase):
         )
         self.assertEqual(plan["creator_profile_research"]["status"], "PROFILE_RESEARCH_COMPLETE")
         self.assertEqual(plan["creator_profile_research"]["profiles_resolved"], 1)
-        self.assertEqual(plan["research_coverage"]["status"], "FULL_7_AND_14_DAY_PROFILE_COVERAGE")
+        self.assertEqual(plan["research_coverage"]["status"], "FULL_7_DAY_PLUS_PRE_PERIOD_14_DAY_PROFILE_COVERAGE")
         self.assertEqual(plan["research_coverage"]["public_feed_status"], "PUBLIC_FEED_HAS_7D_AND_14D_SAMPLES")
         self.assertTrue(plan["research_coverage"]["profile_coverage_observed"])
         profile_queue = plan["creator_profile_study_queue"]
@@ -381,6 +412,7 @@ class SquareEarningsLearningTests(unittest.TestCase):
                 "leaderboard_creators_resolved": 12,
                 "leaderboard_7d_window_coverage_complete": True,
                 "leaderboard_14d_window_coverage_complete": True,
+                "leaderboard_pre_period_14d_coverage_complete": True,
                 "posts_collected_7d": 173,
                 "posts_collected_8_to_14d": 47,
                 "seven_day_coverage_observed": True,

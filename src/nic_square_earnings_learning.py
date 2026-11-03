@@ -600,18 +600,20 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
     public_feed_coverage_status = "PUBLIC_FEED_HAS_7D_AND_14D_SAMPLES" if older_count > 0 else "PUBLIC_FEED_14D_SAMPLE_GAP_KEEP_COLLECTING"
     profile_posts_7d = int(profile_research.get("posts_collected_7d") or 0)
     profile_posts_8_to_14d = int(profile_research.get("posts_collected_8_to_14d") or 0)
+    profile_posts_pre_period_14d = int(profile_research.get("posts_collected_pre_period_14d") or 0)
     # A handful of dated posts is not complete coverage. The profile collector
-    # must explicitly verify every observed leaderboard creator's exact 7d and
-    # 14d windows before this status can be FULL.
+    # must explicitly verify the exact reward week, its 14-day lookback, and
+    # the separate 14 days before the reward period before this status can be FULL.
     profile_coverage_observed = (
         bool(profile_research.get("leaderboard_7d_window_coverage_complete"))
         and bool(profile_research.get("leaderboard_14d_window_coverage_complete"))
+        and bool(profile_research.get("leaderboard_pre_period_14d_coverage_complete"))
         and int(profile_research.get("leaderboard_creators_expected") or 0) > 0
         and int(profile_research.get("leaderboard_creators_resolved") or 0)
             == int(profile_research.get("leaderboard_creators_expected") or 0)
     )
     coverage_status = (
-        "FULL_7_AND_14_DAY_PROFILE_COVERAGE" if profile_coverage_observed
+        "FULL_7_DAY_PLUS_PRE_PERIOD_14_DAY_PROFILE_COVERAGE" if profile_coverage_observed
         else "PARTIAL_OR_BLOCKED_PROFILE_COVERAGE"
     )
     return {
@@ -697,12 +699,14 @@ def build_learning_plan(benchmark: dict, patterns: dict, reward_events: list[dic
             "posts_collected_7d": int(profile_research.get("posts_collected_7d") or 0),
             "posts_collected_8_to_14d": int(profile_research.get("posts_collected_8_to_14d") or 0),
             "posts_collected_14d": int(profile_research.get("posts_collected_14d") or 0),
+            "posts_collected_pre_period_14d": int(profile_research.get("posts_collected_pre_period_14d") or 0),
             "seven_day_coverage_observed": bool(profile_research.get("seven_day_coverage_observed", False)),
             "fourteen_day_coverage_observed": bool(profile_research.get("fourteen_day_coverage_observed", False)),
             "leaderboard_creators_expected": int(profile_research.get("leaderboard_creators_expected") or 0),
             "leaderboard_creators_resolved": int(profile_research.get("leaderboard_creators_resolved") or 0),
             "leaderboard_7d_window_coverage_complete": bool(profile_research.get("leaderboard_7d_window_coverage_complete")),
             "leaderboard_14d_window_coverage_complete": bool(profile_research.get("leaderboard_14d_window_coverage_complete")),
+            "leaderboard_pre_period_14d_coverage_complete": bool(profile_research.get("leaderboard_pre_period_14d_coverage_complete")),
             "coverage_status": str(profile_research.get("coverage_status") or "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE"),
             "creator_period_learning_status": str(profile_research.get("creator_period_learning_status") or "NOT_RUN"),
             "creator_period_learning_coverage": profile_research.get("creator_period_learning_coverage"),
@@ -841,6 +845,7 @@ def build_autonomy_readiness(plan: dict, public_wte_claim_discovery: dict | None
         str(profile.get("status") or "") == "PROFILE_RESEARCH_COMPLETE"
         and bool(profile.get("leaderboard_7d_window_coverage_complete"))
         and bool(profile.get("leaderboard_14d_window_coverage_complete"))
+        and bool(profile.get("leaderboard_pre_period_14d_coverage_complete"))
         and int(profile.get("leaderboard_creators_expected") or 0) > 0
         and int(profile.get("leaderboard_creators_resolved") or 0)
             == int(profile.get("leaderboard_creators_expected") or 0)
@@ -904,6 +909,8 @@ def build_autonomy_readiness(plan: dict, public_wte_claim_discovery: dict | None
                 "profiles_resolved": int(profile.get("profiles_resolved") or 0),
                 "posts_7d": int(profile.get("posts_collected_7d") or 0),
                 "posts_8_to_14d": int(profile.get("posts_collected_8_to_14d") or 0),
+                "posts_pre_period_14d": int(profile.get("posts_collected_pre_period_14d") or 0),
+                "pre_period_14d_coverage_complete": bool(profile.get("leaderboard_pre_period_14d_coverage_complete")),
             },
             "public_reward_claim_discovery": {
                 "status": str(discovery.get("status") or "NOT_RUN"),

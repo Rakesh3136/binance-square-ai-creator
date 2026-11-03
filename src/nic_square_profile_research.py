@@ -633,6 +633,8 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
             period_end = period_end or now
             seven_start = period_start or (period_end - timedelta(days=7))
             fourteen_start = (period_start - timedelta(days=7)) if period_start else (period_end - timedelta(days=14))
+            pre_period_14d_start = (period_start - timedelta(days=14)) if period_start else (period_end - timedelta(days=21))
+            fetch_start = min(fourteen_start, pre_period_14d_start)
             profile, uid = _resolve_user(candidate, request_json)
             wanted_name = str(candidate.get("creator") or "").strip().casefold()
             got_name = str(profile.get("observed_display_name") or "").strip().casefold()
@@ -641,23 +643,36 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
             identity_match = "verified" if ((wanted_user and got_user and wanted_user == got_user) or (wanted_name and got_name and wanted_name == got_name)) else "unverified"
             profile["identity_match"] = identity_match
             posts, posts_status, pages = _fetch_profile_posts(
-                uid, profile, now, request_json, sleep_fn, fourteen_start, period_end
+                uid, profile, now, request_json, sleep_fn, fetch_start, period_end
             )
             post_times = [(p, datetime.fromisoformat(p["posted_at"].replace("Z", "+00:00")).astimezone(timezone.utc)) for p in posts]
             seven = [p for p, stamp in post_times if seven_start <= stamp <= period_end]
             fourteen = [p for p, stamp in post_times if fourteen_start <= stamp <= period_end]
             older = [p for p, stamp in post_times if fourteen_start <= stamp < seven_start]
+            pre_period_14d = [p for p, stamp in post_times if pre_period_14d_start <= stamp < seven_start]
             window_complete = posts_status == "PROFILE_POSTS_COMPLETE_WINDOW"
+            resolution_status = (
+                "VERIFIED_PUBLIC_PROFILE_IDENTITY" if identity_match == "verified"
+                else candidate.get("profile_resolution_status") or "UNVERIFIED_PUBLIC_PROFILE_IDENTITY"
+            )
+            resolution_note = (
+                "Fetched public profile username or display name matched the observed leaderboard creator."
+                if identity_match == "verified"
+                else candidate.get("profile_resolution_note")
+            )
             profiles.append({
                 **profile,
                 "period_start_utc": seven_start.isoformat(),
                 "period_end_utc": period_end.isoformat(),
                 "window_7d_complete": bool(window_complete and identity_match == "verified"),
                 "window_14d_complete": bool(window_complete and identity_match == "verified"),
+                "pre_period_14d_start_utc": pre_period_14d_start.isoformat(),
+                "pre_period_14d_end_utc": seven_start.isoformat(),
+                "window_pre_period_14d_complete": bool(window_complete and identity_match == "verified"),
                 "profile_resolution_method": candidate.get("profile_resolution_method"),
                 "profile_resolution_evidence_url": candidate.get("profile_resolution_evidence_url"),
-                "profile_resolution_note": candidate.get("profile_resolution_note"),
-                "profile_resolution_status": candidate.get("profile_resolution_status"),
+                "profile_resolution_note": resolution_note,
+                "profile_resolution_status": resolution_status,
                 "discovery_source": candidate.get("discovery_source"),
                 "earnings_status": candidate.get("earnings_status") or "PUBLIC_RESEARCH_LEAD_NOT_VERIFIED",
                 "claimed_amount": candidate.get("claimed_amount"),
@@ -667,6 +682,7 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
                 "source_url": candidate.get("source_url"),
                 "posts_7d": len(seven), "posts_14d": len(fourteen),
                 "posts_age_8_to_14_days": len(older),
+                "posts_pre_period_14d": len(pre_period_14d),
                 "pages_checked": pages,
                 "posts_status": posts_status,
                 "recent_post_samples": [{
@@ -692,6 +708,11 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
     leaderboard_profiles = [p for p in profiles if str(p.get("creator") or "").strip().casefold() in leaderboard_names]
     all_7d_complete = bool(leaderboard_candidates) and len(leaderboard_profiles) == len(leaderboard_candidates) and all(p.get("window_7d_complete") for p in leaderboard_profiles)
     all_14d_complete = bool(leaderboard_candidates) and len(leaderboard_profiles) == len(leaderboard_candidates) and all(p.get("window_14d_complete") for p in leaderboard_profiles)
+    all_pre_period_14d_complete = (
+        bool(leaderboard_candidates)
+        and len(leaderboard_profiles) == len(leaderboard_candidates)
+        and all(p.get("window_pre_period_14d_complete") for p in leaderboard_profiles)
+    )
     # Do not call a research run "complete" merely because it fetched some posts.
     # When observed Write-to-Earn leaderboard creators are in scope, their exact
     # 7-day and surrounding 14-day windows must be verified before overall status
@@ -700,6 +721,7 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
         bool(leaderboard_candidates)
         and all_7d_complete
         and all_14d_complete
+        and all_pre_period_14d_complete
     )
     status = (
         "PROFILE_RESEARCH_PARTIAL_LEADERBOARD_COVERAGE"
@@ -728,19 +750,24 @@ def research_profiles(candidates: list[dict], now: datetime | None = None,
         "posts_collected_7d": seven_count,
         "posts_collected_8_to_14d": older_count,
         "posts_collected_14d": len(all_posts),
+        "posts_collected_pre_period_14d": sum(int(p.get("posts_pre_period_14d") or 0) for p in profiles),
         "seven_day_coverage_observed": seven_count > 0,
         "fourteen_day_coverage_observed": older_count > 0,
+        "pre_period_14_day_coverage_observed": sum(int(p.get("posts_pre_period_14d") or 0) for p in profiles) > 0,
         "leaderboard_creators_expected": len(leaderboard_candidates),
         "leaderboard_creators_resolved": len(leaderboard_profiles),
         "leaderboard_7d_window_coverage_complete": all_7d_complete,
         "leaderboard_14d_window_coverage_complete": all_14d_complete,
-        "coverage_status": "FULL_7_AND_14_DAY_LEADERBOARD_COVERAGE" if all_7d_complete and all_14d_complete else "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE",
+        "leaderboard_pre_period_14d_coverage_complete": all_pre_period_14d_complete,
+        "coverage_status": "FULL_7_DAY_PLUS_14_DAY_PRE_PERIOD_LEADERBOARD_COVERAGE" if all_7d_complete and all_14d_complete and all_pre_period_14d_complete else "PARTIAL_OR_BLOCKED_LEADERBOARD_COVERAGE",
         "public_metrics_are_not_earnings": True,
         "profiles": profiles,
         "posts": all_posts,
         "failures": failures,
         "policy": {
             "only_public_profile_and_post_data": True,
+            "pre_period_14d_is_separate_from_exact_reward_period": True,
+            "pre_period_14d_window_is_not_attributed_to_the_weekly_reward": True,
             "no_likes_follows_comments_or_publishing": True,
             "unknown_dates_excluded": True,
             "creator_reward_amounts_not_inferred": True,

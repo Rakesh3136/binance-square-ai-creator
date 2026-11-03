@@ -66,7 +66,12 @@ def study(observations, research, now=None):
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     posts = research.get("posts", []) if isinstance(research, dict) else []
+    profiles = research.get("profiles", []) if isinstance(research, dict) else []
     entries = observations.get("entries", []) if isinstance(observations, dict) else []
+    profiles_by_slug = {
+        profile_slug(p.get("creator_profile_url")): p
+        for p in profiles if isinstance(p, dict) and profile_slug(p.get("creator_profile_url"))
+    }
     studies = []
     for entry in entries:
         if not isinstance(entry, dict) or entry.get("status") != "VERIFIED_FIRST_PARTY_DISPLAYED_EARNINGS":
@@ -75,22 +80,37 @@ def study(observations, research, now=None):
         if not start or not end or start > end:
             continue
         slug = profile_slug(entry.get("creator_profile_url"))
+        profile = profiles_by_slug.get(slug) or {}
+        wanted_name = str(entry.get("creator") or "").strip().casefold()
+        observed_name = str(profile.get("observed_display_name") or profile.get("display_name") or "").strip().casefold()
+        identity_verified = (
+            profile.get("identity_match") == "verified"
+            and bool(wanted_name)
+            and observed_name == wanted_name
+        )
+        seven_complete = bool(identity_verified and profile.get("window_7d_complete"))
+        pre14_complete = bool(identity_verified and profile.get("window_pre_period_14d_complete"))
         matching = []
-        for post in posts:
-            if not isinstance(post, dict) or not post_matches_creator(post, slug):
-                continue
-            posted = parse_time(post.get("posted_at"))
-            if posted and start <= posted <= end:
-                matching.append(post)
         lookback_start = end - timedelta(days=14)
         lookback = []
+        pre_period_start = start - timedelta(days=14)
+        pre_period = []
         for post in posts:
             if not isinstance(post, dict) or not post_matches_creator(post, slug):
                 continue
+            if not identity_verified:
+                continue
             posted = parse_time(post.get("posted_at"))
-            if posted and lookback_start <= posted <= end:
+            if not posted:
+                continue
+            if start <= posted <= end:
+                matching.append(post)
+            if lookback_start <= posted <= end:
                 lookback.append(post)
-        def summarize(window_posts):
+            if pre_period_start <= posted < start:
+                pre_period.append(post)
+
+        def summarize(window_posts, empty_reason="NO_MATCHING_CREATOR_POSTS_RETRIEVED_FOR_THIS_WINDOW"):
             def distribution(field):
                 return dict(Counter(str(p.get(field) or "unknown") for p in window_posts).most_common())
             return {
@@ -109,11 +129,17 @@ def study(observations, research, now=None):
                     "shares": p.get("shares"),
                 } for p in window_posts],
                 "history_sufficient_for_pattern_claims": bool(window_posts),
-                "empty_history_reason": None if window_posts else "NO_MATCHING_CREATOR_POSTS_RETRIEVED_FOR_THIS_WINDOW",
+                "empty_history_reason": None if window_posts else empty_reason,
             }
+
+        identity_reason = None if identity_verified else "PUBLIC_PROFILE_IDENTITY_NOT_VERIFIED"
         studies.append({
             "creator": entry.get("creator"),
             "creator_profile_url": entry.get("creator_profile_url"),
+            "profile_identity_verified": identity_verified,
+            "profile_resolution_status": profile.get("profile_resolution_status") or "UNRESOLVED",
+            "profile_window_7d_complete": seven_complete,
+            "profile_pre_period_14d_complete": pre14_complete,
             "displayed_amount": entry.get("displayed_amount"),
             "currency": entry.get("currency"),
             "rank": entry.get("rank"),
@@ -123,33 +149,61 @@ def study(observations, research, now=None):
             "leaderboard_evidence_ref": entry.get("evidence_ref"),
             "evidence_type": "FIRST_PARTY_WRITE_TO_EARN_DISPLAY",
             "posts_found_in_earnings_period": len(matching),
-            "exact_earnings_period": summarize(matching),
+            "exact_earnings_period": summarize(matching, identity_reason or "NO_MATCHING_POSTS_IN_REWARD_PERIOD"),
             "fourteen_day_lookback": {
                 "start": lookback_start.isoformat(),
                 "end": end.isoformat(),
-                **summarize(lookback),
+                **summarize(lookback, identity_reason or "NO_MATCHING_POSTS_IN_14_DAY_LOOKBACK"),
             },
-            "interpretation": "Creator-level earnings are displayed for this period; individual post earnings are unknown. Post patterns are hypotheses to test, not causal attribution.",
+            "pre_period_14_day_history": {
+                "start": pre_period_start.isoformat(),
+                "end_exclusive": start.isoformat(),
+                "coverage_complete": pre14_complete,
+                **summarize(pre_period, identity_reason or "NO_POSTS_RETRIEVED_IN_14_DAYS_BEFORE_REWARD_PERIOD"),
+            },
+            "interpretation": "Creator-level earnings are displayed for this period; individual post earnings are unknown. The exact reward week and the preceding 14-day history are separate descriptive samples, not causal attribution.",
             "independently_verified_payment": False,
             "individual_post_reward_attribution": False,
         })
+    exact_count = sum(s["exact_earnings_period"]["post_count"] > 0 for s in studies)
+    lookback_count = sum(s["fourteen_day_lookback"]["post_count"] > 0 for s in studies)
+    pre_period_count = sum(s["pre_period_14_day_history"]["post_count"] > 0 for s in studies)
+    verified_profiles = sum(bool(s["profile_identity_verified"]) for s in studies)
+    complete_7d = sum(bool(s["profile_window_7d_complete"]) for s in studies)
+    complete_pre14 = sum(bool(s["profile_pre_period_14d_complete"]) for s in studies)
+    coverage_complete = bool(studies) and (
+        verified_profiles == len(studies)
+        and complete_7d == len(studies)
+        and complete_pre14 == len(studies)
+    )
     return {
-        "schema": "NIC-WEEKLY-EARNER-STUDY-1.0",
+        "schema": "NIC-WEEKLY-EARNER-STUDY-1.1",
         "generated_at": now.astimezone(timezone.utc).isoformat(),
-        "status": "WEEKLY_EARNER_STUDY_READY" if studies else "NO_VALID_WEEKLY_EARNER_OBSERVATIONS",
+        "status": (
+            "WEEKLY_EARNER_STUDY_READY" if coverage_complete
+            else "WEEKLY_EARNER_STUDY_PARTIAL" if studies
+            else "NO_VALID_WEEKLY_EARNER_OBSERVATIONS"
+        ),
         "source_observation_count": len(entries),
         "creator_periods_studied": len(studies),
-        "creator_periods_with_exact_period_posts": sum(s["exact_earnings_period"]["post_count"] > 0 for s in studies),
-        "creator_periods_with_14_day_posts": sum(s["fourteen_day_lookback"]["post_count"] > 0 for s in studies),
+        "creator_periods_with_verified_profile_identity": verified_profiles,
+        "creator_periods_with_complete_7d_coverage": complete_7d,
+        "creator_periods_with_complete_pre_period_14d_coverage": complete_pre14,
+        "creator_periods_with_exact_period_posts": exact_count,
+        "creator_periods_with_14_day_posts": lookback_count,
+        "creator_periods_with_pre_period_14d_posts": pre_period_count,
+        "coverage_status": "FULL_7D_PLUS_PRECEDING_14D_PROFILE_COVERAGE" if coverage_complete else "PARTIAL_OR_BLOCKED_PROFILE_COVERAGE",
         "studies": studies,
         "policy": {
             "requires_first_party_observed_earnings": True,
             "reports_exact_earnings_period_separately_from_14_day_lookback": True,
+            "reports_preceding_14_day_history_separately": True,
+            "requires_verified_public_profile_identity_for_post_matching": True,
             "matches_public_posts_only_to_creator_profile_and_dates": True,
             "empty_history_is_reported_not_filled_with_out_of_period_posts": True,
             "does_not_infer_per_post_earnings": True,
             "public_engagement_is_not_earnings": True,
-            "missing_profile_url_means_no_creator_match": True,
+            "missing_profile_identity_means_no_creator_post_match": True,
         },
     }
 
