@@ -12,7 +12,7 @@
 </head>
 <body><main>
 <div class="top"><div class="brand"><div class="muted">AUTONOMOUS CRYPTO INTELLIGENCE</div><h1>NIC Command Center</h1></div><div id="status" class="pill">Connecting…</div></div>
-<nav style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0"><a class="pill" href="#overview">Overview</a><a class="pill" href="#activity">Activity</a><a class="pill" href="#reasoning">Reasoning</a><a class="pill" href="#learning">Learning</a><a class="pill" href="#brain">Brain Map</a><a class="pill" href="#assistant">Chat & Controls</a></nav>
+<nav style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0"><a class="pill" href="#overview">Overview</a><a class="pill" href="#activity">Activity</a><a class="pill" href="#reasoning">Reasoning</a><a class="pill" href="#learning">Learning</a><a class="pill" href="#brain">Brain Map</a><a class="pill" href="#specialists">Specialist Agents</a><a class="pill" href="#assistant">Chat & Controls</a></nav>
 <div id="overview" class="grid">
 <div class="card"><div class="muted">NIC VERSION</div><div id="version" class="big">—</div></div>
 <div class="card"><div class="muted">SYMBOL</div><div id="symbol" class="big">—</div></div>
@@ -21,6 +21,7 @@
 <div id="reasoning" class="card wide"><div class="muted">CURRENT THESIS</div><p id="thesis">Waiting for NIC state…</p><div class="mono" id="meta">—</div></div>
 <div id="brain" class="card wide"><div class="muted">NIC BRAIN MAP</div><div id="brainMap" style="display:grid;gap:8px;margin-top:10px">Market Scan → Signal Router → Evidence → Adversarial → Decision → Publish → Outcome → Learning</div><div class="mono" id="brainMeta">Loading pipeline state…</div></div>
 <div class="card wide"><div class="muted">AGENT MESH</div><div id="agents" style="display:grid;gap:8px;margin-top:10px"></div><div class="mono" id="meshMeta">Loading mesh…</div></div>
+<div id="specialists" class="card wide"><div class="muted">SPECIALIST AGENTS & CAPABILITIES</div><div id="specialistAgents" style="display:grid;gap:8px;margin-top:10px">Loading verified agent registry…</div><div class="mono" id="specialistMeta">Registry status unavailable until loaded.</div></div>
 <div class="card wide"><div class="muted">SYSTEM SIGNALS</div><div id="signals" style="display:grid;gap:6px;margin-top:10px"></div></div>
 <div id="learning" class="card wide"><div class="muted">NIC LEARNING STATE</div><p id="learningText">Reading outcome memory…</p><div class="mono" id="learningMeta">—</div></div>
 <div class="card wide"><div class="muted">LIVE ACTIVITY</div><div id="activity" class="activity">Waiting for events…</div></div>
@@ -60,6 +61,20 @@ async function refresh(){
   $('thesis').textContent=n.thesis||n.editorial_thesis||'—';
   $('meta').textContent='thesis '+(n.thesis_id||'—')+' • hook '+(n.hook_family||'—')+' • '+(s.generated_at||'—');
   if(s.mesh){$('meshMeta').textContent=(s.mesh.logical_agents||0)+' logical agents • '+(s.mesh.active_agents||0)+' active • validation '+(s.mesh.validation?.status||'—');$('agents').innerHTML=(s.agents||[]).map(a=>'<div class="card" style="padding:10px"><b>'+esc(a.module)+'</b> <span class="mono">'+esc(a.decision)+'</span><br><span class="muted">'+esc(a.reason||'No reason recorded')+'</span></div>').join('')||'No specialist artifacts available';}
+  try{
+   const registry=await get('data/live/nic_agent_registry.json');
+   $('specialistMeta').textContent=(registry.operational_agent_count||0)+' workflow-wired roles • '+(registry.agent_count||0)+' registered roles • '+(registry.not_implemented_agent_count||0)+' not implemented';
+   $('specialistAgents').innerHTML=(registry.agents||[]).map(a=>{
+    const state=String(a.state||'unknown').replaceAll('_',' ').toUpperCase();
+    const skills=(a.skills||[]).map(esc).join(' · ');
+    const limitation=(a.limitations||[]).map(esc).join(' ');
+    const modules=(a.modules||[]).map(esc).join(', ');
+    return '<div class="card" style="padding:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>'+esc(a.name||a.agent_id)+'</b><span class="mono">'+esc(state)+'</span></div><div class="muted" style="margin-top:5px">'+esc(a.purpose||'')+'</div><div class="small" style="margin-top:5px">Skills: '+skills+'</div><div class="small">Modules: '+modules+'</div><div class="small muted" style="margin-top:4px">'+limitation+'</div></div>';
+   }).join('')||'No specialist roles are registered.';
+  }catch(_){
+   $('specialistAgents').textContent='NIC specialist registry is not available yet.';
+   $('specialistMeta').textContent='No registry artifact could be loaded; no agent status is simulated.';
+  }
   $('signals').innerHTML='';
   const checks=[['NIC state','data/live/nic_core_state.json'],['Activity stream','data/live/nic_activity.jsonl'],['Signal router','data/live/signal_first_routing.json'],['Market regime','data/live/market_regime.json'],['Creator decision','data/live/creator_brain_decision.json'],['Prediction outcomes','data/live/creator_24_1_prediction_outcomes.json']];
   for(const [label,path] of checks){try{await get(path);$('signals').insertAdjacentHTML('beforeend','<div>● '+esc(label)+' <span class="muted">AVAILABLE</span></div>')}catch(_){$('signals').insertAdjacentHTML('beforeend','<div>○ '+esc(label)+' <span class="muted">NOT AVAILABLE</span></div>')}}
