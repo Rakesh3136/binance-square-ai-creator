@@ -3,6 +3,7 @@ import unittest
 from src.bounded_editorial_improvement import (
     generate_and_select, score_candidate, MAX_CANDIDATES,
 )
+from src import nic21_originality_visual_truth as final_gate
 
 
 def draft(text, symbol="ETH"):
@@ -36,7 +37,26 @@ class BoundedEditorialImprovementTests(unittest.TestCase):
         self.assertFalse(selected["editorial_iteration"]["selection_is_reward_prediction"])
         self.assertEqual(selected["editorial_iteration"]["reward_claim"], "NOT_CLAIMED")
         self.assertTrue(selected["editorial_iteration"]["quality_and_publication_gates_remain_authoritative"])
+        self.assertIn("alternate_candidates", selected["editorial_iteration"])
+        self.assertLessEqual(len(selected["editorial_iteration"]["alternate_candidates"]), MAX_CANDIDATES - 1)
 
+
+
+    def test_candidate_screening_uses_exact_final_gate_cosine_threshold(self):
+        common = "price volume market evidence structure reaction confirmation risk invalidation trader participation liquidity catalyst support resistance trend demand supply funding basis".split()
+        old_body = " ".join(common * 6)
+        new_body = " ".join(list(reversed(common)) * 6 + ["macro", "regulation", "exchange"])
+        old = "$ETH " + old_body + ". What would change your read?"
+        current = "$ETH " + new_body + ". Which evidence would change your interpretation?"
+        self.assertLess(final_gate.jaccard(old, current), 0.88)
+        self.assertGreaterEqual(
+            final_gate.token_cosine_similarity(old, current),
+            final_gate.SIMILARITY_BLOCK,
+        )
+        report = score_candidate(draft(current), {"recent_publication_texts": [old]})
+        self.assertIn("final_gate_originality_conflict", report["issues"])
+        self.assertFalse(report["eligible"])
+        self.assertGreater(report["final_gate_originality_conflict_count"], 0)
 
     def test_recent_publication_similarity_blocks_duplicate_and_selects_different_candidate(self):
         repeated = (
