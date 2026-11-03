@@ -34,10 +34,15 @@ def fresh(options,used):
         if " ".join(re.sub(r"[^a-z0-9 ]","",x.lower()).split()) not in used:return x
     return options[0]
 def fresh_question(options,used,seed):
-    if not options:return "What new evidence would change your view?"
+    if not options:
+        raise RuntimeError("no_fresh_reader_question_variant")
     offset=int(seed or 0)%len(options)
     ordered=list(options[offset:])+list(options[:offset])
-    return fresh(ordered,used)
+    for option in ordered:
+        normalized=" ".join(re.sub(r"[^a-z0-9 ]","",option.lower()).split())
+        if normalized not in used:
+            return option
+    raise RuntimeError("no_fresh_reader_question_variant")
 def question_options_for(story_type,s):
     variants={
         "breakout_retest":[
