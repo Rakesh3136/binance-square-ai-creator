@@ -246,5 +246,23 @@ def build(ctx):
         parts=[hook,evidence_block,middle + " " + close]
         cohort_learning_applied=True
     post=compact_post(parts,question)
-    if post.count("?")!=1 or dollar not in post or not 280<=len(post)<=700:raise RuntimeError("NIC Native Writer failed local publication contract")
+    contract_checks = {
+        "character_count": len(post),
+        "minimum_characters": 280,
+        "maximum_characters": 700,
+        "question_count": post.count("?"),
+        "required_question_count": 1,
+        "cashtag_present": dollar.lower() in post.lower(),
+    }
+    contract_failures = []
+    if not 280 <= len(post) <= 700:
+        contract_failures.append("length_out_of_bounds")
+    if post.count("?") != 1:
+        contract_failures.append("must_have_exactly_one_reader_question")
+    if dollar.lower() not in post.lower():
+        contract_failures.append("missing_selected_asset_cashtag")
+    if contract_failures:
+        detail = {"status": "LOCAL_CONTRACT_REJECTED", "failures": contract_failures,
+                  "checks": contract_checks, "strategy": strategy_id, "story_type": story_type}
+        raise RuntimeError("NIC Native Writer local contract rejected: " + json.dumps(detail, sort_keys=True))
     return {"research":{"summary":f"NIC verified {dollar} using the frozen opportunity and supplied market evidence.","strongest_signal":s,"opportunity_score":num(sel.get("adjusted_score") or sel.get("raw_score") or 0),"source_mode":"NIC_NATIVE_EVIDENCE_SYNTHESIS"},"critique":{"summary":"Native NIC review bounds claims by supplied evidence and keeps uncertainty explicit.","alternative_hypothesis":"The observed move may be temporary rather than structural.","disconfirming_test":"A materially different next reaction or failed evidence condition weakens the thesis."},"draft":{"post":post,"text":post,"hook":hook,"discussion_question":question,"quality_score":84,"editorial_style":"NIC_NATIVE_WRITER","generation_mode":"NIC_NATIVE","symbol":s,"content_category":cat,"publication_status":"DRAFT_ONLY_NOT_PUBLISHED"},"visual_plan":{"type":"candlestick_chart" if cat not in {"crypto_meme","community","commentary","education"} else "none","use_visual":bool(it.get("candles_1h")),"purpose":"Show only the frozen asset and supplied evidence."},"native_writer":{"version":"1.1","provider":"NIC","external_text_model":False,"evidence_bound":True,"creator_period_learning_status":period_learning.get("learning_status","NOT_AVAILABLE"),"creator_period_learning_applied":cohort_learning_applied,"creator_period_learning_rule":cohort_guidance if cohort_learning_applied else None,"creator_period_reward_granularity":"creator_period_only","generated_at":datetime.now(timezone.utc).isoformat()}}
