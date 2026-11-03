@@ -123,8 +123,14 @@ class BoundedEditorialImprovementTests(unittest.TestCase):
     def test_fails_closed_when_all_candidates_are_invalid(self):
         def build(_ctx):
             return draft("ETH will definitely pump. Guaranteed profit. What now?")
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as caught:
             generate_and_select({}, build, max_candidates=2)
+        message = str(caught.exception)
+        self.assertIn('"status": "NO_ELIGIBLE_NATIVE_CANDIDATE"', message)
+        self.assertIn('"strategy": "asset_specific_research_edge"', message)
+        self.assertIn('"must_have_exactly_one_reader_question"', message)
+        self.assertIn('"length_out_of_bounds"', message)
+        self.assertIn('"quality_and_publication_gates_remain_authoritative": true', message)
 
 
 if __name__ == "__main__":
