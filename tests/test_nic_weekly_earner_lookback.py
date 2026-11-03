@@ -17,7 +17,16 @@ class WeeklyEarnerLookbackTests(unittest.TestCase):
             "period_start": "2026-10-12T00:00:00Z", "period_end": "2026-10-19T00:00:00Z",
             "source_url": "https://www.binance.com/en/square/WriteToEarn", "evidence_ref": "test-fixture"
         }]}
-        research = {"posts": [
+        profile = {
+            "creator": "Creator",
+            "creator_profile_url": "https://www.binance.com/en/square/profile/creator",
+            "observed_display_name": "Creator",
+            "identity_match": "verified",
+            "profile_resolution_status": "VERIFIED_PUBLIC_PROFILE_IDENTITY",
+            "window_7d_complete": True,
+            "window_pre_period_14d_complete": True,
+        }
+        research = {"profiles": [profile], "posts": [
             {"creator_profile_url": "https://www.binance.com/en/square/profile/creator",
              "posted_at": "2026-10-06T12:00:00Z", "post_id": "old", "archetype": "analysis", "format": "text"},
             {"creator_profile_url": "https://www.binance.com/en/square/profile/creator",
@@ -30,6 +39,7 @@ class WeeklyEarnerLookbackTests(unittest.TestCase):
         self.assertEqual(item["exact_earnings_period"]["post_count"], 1)
         self.assertEqual(item["fourteen_day_lookback"]["post_count"], 2)
         self.assertEqual(result["creator_periods_with_14_day_posts"], 1)
+        self.assertEqual(item["pre_period_14_day_history"]["post_count"], 1)
         self.assertFalse(item["individual_post_reward_attribution"])
         self.assertNotIn("future", [p["post_id"] for p in item["fourteen_day_lookback"]["posts"]])
 
