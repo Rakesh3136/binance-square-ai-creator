@@ -5,6 +5,8 @@ on:
     paths:
       - "src/nic_agent_registry.py"
       - "src/test_nic_agent_registry.py"
+      - "src/test_nic_dashboard_registry.py"
+      - "dashboard/index.html"
       - ".github/workflows/autonomous-market-creator.yml"
       - ".github/workflows/nic-agent-registry-tests.yml"
   push:
@@ -27,6 +29,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile registry and tests
-        run: python -m py_compile src/nic_agent_registry.py src/test_nic_agent_registry.py
+        run: python -m py_compile src/nic_agent_registry.py src/test_nic_agent_registry.py src/test_nic_dashboard_registry.py
       - name: Verify registry modules, workflow wiring, and authority boundaries
-        run: python -m unittest -v src.test_nic_agent_registry
+        run: python -m unittest -v src.test_nic_agent_registry src.test_nic_dashboard_registry
