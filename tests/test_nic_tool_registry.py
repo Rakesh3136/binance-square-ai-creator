@@ -79,6 +79,46 @@ class NICToolRegistryTests(unittest.TestCase):
         self.assertIsNone(result["summary"]["verified_usdc_7d"])
         self.assertFalse(result["evidence_policy"]["owner_reported_is_independent_verification"])
 
+    def test_reward_tool_exposes_bounded_exact_post_owner_feedback(self):
+        report = {
+            "verified_reward_events_7d": 0,
+            "verified_usdc_7d": None,
+            "owner_reported_usdc_14d": 0.77,
+            "owner_reported_events_14d": 1,
+        }
+        learning = {
+            "owner_reported_reward_feedback": {
+                "status": "OWNER_REPORTED_FEEDBACK_AVAILABLE_NOT_INDEPENDENTLY_VERIFIED",
+                "accepted_report_count": 2,
+                "rejected_report_count": 0,
+                "7_day": {"reported_event_count": 0, "reported_usdc": None},
+                "14_day": {"reported_event_count": 1, "reported_usdc": 0.77},
+                "entries": [
+                    {
+                        "post_id": "376457571598023",
+                        "public_post_url": "https://www.binance.com/en/square/post/376457571598023",
+                        "reported_reward_usdc": 0.77,
+                        "currency": "USDC",
+                        "content_lane": "technical_setup",
+                        "content_format": "4h_chart_annotated_setup",
+                        "verification_status": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED",
+                        "evidence_type": "ACCOUNT_OWNER_REPORTED_EXACT_POST_REWARD",
+                    },
+                    {"post_id": "older-post", "reported_reward_usdc": 0.201},
+                ],
+            }
+        }
+        with patch("src.nic_tool_registry._read_json", side_effect=[report, learning]):
+            result = execute_tool("get_reward_learning_status")
+        feedback = result["owner_reported_reward_feedback"]
+        self.assertEqual(feedback["entries_returned"], 2)
+        self.assertEqual(feedback["entries"][0]["post_id"], "376457571598023")
+        self.assertEqual(feedback["entries"][0]["reported_reward_usdc"], 0.77)
+        self.assertEqual(feedback["entries"][0]["content_format"], "4h_chart_annotated_setup")
+        self.assertFalse(result["evidence_policy"]["owner_reported_is_independent_verification"])
+        self.assertTrue(result["evidence_policy"]["owner_reported_entries_are_post_level_learning_feedback"])
+        self.assertIsNone(result["summary"]["verified_usdc_7d"])
+
     def test_creator_period_tool_never_claims_post_attribution(self):
         sample = {
             "learning_status": "BLOCKED_INSUFFICIENT_VERIFIED_COVERAGE",
