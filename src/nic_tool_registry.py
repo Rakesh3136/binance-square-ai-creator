@@ -39,6 +39,10 @@ TOOLS: dict[str, dict[str, Any]] = {
         "description": "List a bounded sample of creator profiles NIC is studying, with public engagement clearly separated from earnings.",
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
     },
+    "get_reward_pattern_insights": {
+        "description": "Read bounded content-format and hook observations from NIC's reward pattern lab, keeping owner-reported and verified reward evidence separate.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
 }
 
 
@@ -259,6 +263,56 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str
             "coverage": coverage,
             "creators": summaries,
             "attribution_policy": "Creator-period rewards are cohort-level evidence and are never assigned to individual posts.",
+        }
+
+    if name == "get_reward_pattern_insights":
+        data = _read_json("data/live/nic_revenue_pattern_lab.json")
+        observations = data.get("observations", [])
+        patterns = []
+        if isinstance(observations, list):
+            for item in observations:
+                if not isinstance(item, dict):
+                    continue
+                owner_count = item.get("owner_reported_posts", 0)
+                verified_count = item.get("verified_posts", 0)
+                if not owner_count and not verified_count:
+                    continue
+                examples = item.get("owner_reported_examples", [])
+                patterns.append({
+                    "content_lane": item.get("content_lane"),
+                    "content_format": item.get("content_format"),
+                    "hook_type": item.get("hook_type"),
+                    "observed_posts": item.get("posts"),
+                    "verified_posts": verified_count,
+                    "verified_revenue_usdc": item.get("verified_revenue"),
+                    "owner_reported_posts": owner_count,
+                    "owner_reported_revenue_usdc": item.get("owner_reported_revenue_usdc"),
+                    "owner_reported_evidence": item.get("owner_reported_evidence"),
+                    "owner_reported_examples": [
+                        {
+                            "post_id": example.get("post_id"),
+                            "summary": example.get("summary"),
+                            "public_post_url": example.get("public_post_url"),
+                            "evidence": example.get("evidence"),
+                        }
+                        for example in examples[:5] if isinstance(example, dict)
+                    ] if isinstance(examples, list) else [],
+                })
+        return {
+            "source": "data/live/nic_revenue_pattern_lab.json",
+            "status": data.get("status"),
+            "generated_at": data.get("generated_at"),
+            "verified_observation_groups": data.get("verified_observation_groups"),
+            "owner_reported_reward_events_loaded": data.get("owner_reported_reward_events_loaded"),
+            "patterns_returned": len(patterns[:12]),
+            "patterns": patterns[:12],
+            "next_experiments": data.get("next_experiments", [])[:8],
+            "evidence_policy": {
+                "owner_reported_patterns_are_independently_verified": False,
+                "public_views_are_reward_evidence": False,
+                "creator_period_totals_are_individual_post_rewards": False,
+                "use": "Directional hypotheses only; require fresh NIC post outcomes before changing content policy.",
+            },
         }
 
     if name == "list_creator_study_queue":
