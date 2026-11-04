@@ -35,9 +35,13 @@ def recent():
                 if len(s.split())>=6:out.add(s)
     return out
 def fresh(options,used):
+    """Choose and reserve a genuinely unused sentence; never recycle on exhaustion."""
     for x in options:
-        if " ".join(re.sub(r"[^a-z0-9 ]","",x.lower()).split()) not in used:return x
-    return options[0]
+        normalized=" ".join(re.sub(r"[^a-z0-9 ]","",x.lower()).split())
+        if normalized and normalized not in used:
+            used.add(normalized)
+            return x
+    raise RuntimeError("no_fresh_editorial_sentence_variant")
 def fresh_question(options,used,seed):
     if not options:
         raise RuntimeError("no_fresh_reader_question_variant")
