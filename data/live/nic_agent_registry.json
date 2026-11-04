@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-11-04T06:55:24.941253+00:00",
+  "generated_at": "2026-11-04T10:27:19.974191+00:00",
   "mission": "autonomous_binance_square_creator",
   "orchestration_authority": ".github/workflows/autonomous-market-creator.yml",
   "publication_authority": "src/binance_square_publisher.py",
@@ -290,7 +290,12 @@
       "skills": [
         "assistant_chat",
         "owner_control_api",
-        "bounded_read_only_tool_execution"
+        "bounded_read_only_tool_execution",
+        "agent_registry_read",
+        "publication_audit_read",
+        "reward_learning_read",
+        "creator_cohort_read",
+        "research_queue_read"
       ],
       "modules": [
         "nic_assistant_chat.py",
@@ -300,7 +305,7 @@
       "workflow_entrypoints": [],
       "state": "service_present_read_only_tools_connected",
       "limitations": [
-        "Chat can call only three bounded read-only tools; no publication, trading, shell, arbitrary writes, or universal executor integration."
+        "Chat exposes seven bounded read-only tools; no publication, trading, shell, arbitrary writes, or universal executor integration."
       ],
       "module_count": 3,
       "modules_present": true,
