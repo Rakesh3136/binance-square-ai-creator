@@ -258,6 +258,19 @@ def local_or_emergency(original_error):
     emergency_verified_draft(original_error); return 'EMERGENCY_SUCCESS'
 
 
+def is_no_original_draft_failure(message):
+    text=str(message or "").lower()
+    markers=(
+        "no candidate passing its local rubric",
+        "no_eligible_native_candidate",
+        "repeats_recent_published_sentence",
+        "final_gate_originality_conflict",
+        "near_duplicate_of_recent_publication",
+        "no_fresh_reader_question_variant",
+    )
+    return any(marker in text for marker in markers)
+
+
 def main():
     try:
         report_path=run_creator()
@@ -268,6 +281,22 @@ def main():
         return 0
     except Exception as exc:
         message=str(exc)
+        if is_no_original_draft_failure(message):
+            save_status(
+                'AI_BLOCKED_NO_ORIGINAL_DRAFT',
+                'All native candidates failed originality or editorial screening; no fallback prose was substituted.',
+                error=message,
+                requests=0,
+                daily_limit=0,
+                generation_mode='NIC_NATIVE_BLOCKED',
+                fallback_status='NOT_RUN_TO_PROTECT_ORIGINALITY',
+            )
+            print(json.dumps({
+                'status': 'AI_BLOCKED_NO_ORIGINAL_DRAFT',
+                'fallback_status': 'NOT_RUN_TO_PROTECT_ORIGINALITY',
+                'publication_allowed': False,
+            }, indent=2))
+            return 1
         print(f'NIC native creator failed; switching to dependency-free verified creator. Original error: {message}')
         fallback_status=local_or_emergency(message)
         save_status('AI_SUCCESS','NIC native creator failed; verified local creator preserved the cycle',error=message,requests=0,daily_limit=0,generation_mode='LOCAL_FALLBACK',fallback_status=fallback_status)

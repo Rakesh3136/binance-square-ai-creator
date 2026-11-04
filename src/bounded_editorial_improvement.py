@@ -186,6 +186,7 @@ def score_candidate(result: dict[str, Any], context: dict[str, Any],
         "final_gate_originality_conflicts": final_gate_conflicts,
         "final_gate_originality_conflict_count": len(final_gate_conflicts),
         "repeated_recent_published_sentence_count": len(repeated_sentences),
+        "repeated_recent_published_sentences": repeated_sentences,
         "presentation_strategy": result.get("iteration_presentation_strategy"),
     }
 
@@ -237,6 +238,8 @@ def generate_and_select(context: dict[str, Any],
                     "character_count": report.get("character_count"),
                     "question_count": report.get("question_count"),
                     "issues": report.get("issues", []),
+                    "repeated_recent_published_sentences": report.get("repeated_recent_published_sentences", []),
+                    "final_gate_originality_conflicts": report.get("final_gate_originality_conflicts", []),
                 }
                 for report, _ in scored
             ],

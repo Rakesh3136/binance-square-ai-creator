@@ -121,6 +121,10 @@ class BoundedEditorialImprovementTests(unittest.TestCase):
         blocked = score_candidate(draft(repeated_post), context)
         self.assertIn("repeats_recent_published_sentence", blocked["issues"])
         self.assertEqual(blocked["repeated_recent_published_sentence_count"], 1)
+        self.assertEqual(
+            blocked["repeated_recent_published_sentences"],
+            ["the useful test is whether the next reaction holds that structure rather than reversing it immediately"],
+        )
         self.assertFalse(blocked["eligible"])
 
         def build(ctx):
