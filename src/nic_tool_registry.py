@@ -172,6 +172,29 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str
 
     if name == "get_reward_learning_status":
         data = _read_json("data/intelligence/nic_square_earnings_learning_report.json")
+        learning = _read_json("data/live/nic_square_earnings_learning.json")
+        feedback = learning.get("owner_reported_reward_feedback")
+        feedback = feedback if isinstance(feedback, dict) else {}
+        raw_entries = feedback.get("entries")
+        entries = []
+        if isinstance(raw_entries, list):
+            for item in raw_entries[:20]:
+                if not isinstance(item, dict):
+                    continue
+                entries.append({
+                    "post_id": item.get("post_id"),
+                    "post_url": item.get("public_post_url"),
+                    "reported_reward_usdc": item.get("reported_reward_usdc"),
+                    "currency": item.get("currency"),
+                    "reported_at": item.get("reported_at"),
+                    "content_lane": item.get("content_lane"),
+                    "content_format": item.get("content_format"),
+                    "hook_type": item.get("hook_type"),
+                    "summary": item.get("summary"),
+                    "owner_reported_views": item.get("owner_reported_views"),
+                    "verification_status": item.get("verification_status"),
+                    "evidence_type": item.get("evidence_type"),
+                })
         fields = (
             "generated_at", "status", "weekly_goal_usdc",
             "verified_reward_events_7d", "verified_usdc_7d",
@@ -186,8 +209,18 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str
         return {
             "source": "data/intelligence/nic_square_earnings_learning_report.json",
             "summary": {key: data[key] for key in fields if key in data},
+            "owner_reported_reward_feedback": {
+                "status": feedback.get("status"),
+                "accepted_report_count": feedback.get("accepted_report_count"),
+                "rejected_report_count": feedback.get("rejected_report_count"),
+                "7_day": feedback.get("7_day", {}),
+                "14_day": feedback.get("14_day", {}),
+                "entries_returned": len(entries),
+                "entries": entries,
+            },
             "evidence_policy": {
                 "owner_reported_is_independent_verification": False,
+                "owner_reported_entries_are_post_level_learning_feedback": True,
                 "public_views_or_engagement_are_earnings": False,
                 "creator_period_totals_attribute_to_individual_posts": False,
             },
