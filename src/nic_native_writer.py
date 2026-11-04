@@ -25,9 +25,14 @@ def recent():
     for row in RECENT_LOG.read_text(encoding="utf-8").splitlines()[-12:]:
         try:o=json.loads(row)
         except Exception:continue
-        for s in re.split(r"[.!?]+",str(o.get("text") or o.get("post") or o.get("content") or "")):
-            s=" ".join(re.sub(r"[^a-z0-9 ]","",s.lower()).split())
-            if len(s.split())>=6:out.add(s)
+        # Publication records can store the rendered post and the editorial
+        # question separately. Inspect both so a question cannot be recycled
+        # merely because the logger omitted it from the post text field.
+        candidates=(o.get("text"),o.get("post"),o.get("content"),o.get("discussion_question"),o.get("reader_question"))
+        for candidate in candidates:
+            for s in re.split(r"[.!?]+",str(candidate or "")):
+                s=" ".join(re.sub(r"[^a-z0-9 ]","",s.lower()).split())
+                if len(s.split())>=6:out.add(s)
     return out
 def fresh(options,used):
     for x in options:
@@ -40,7 +45,13 @@ def fresh_question(options,used,seed):
     ordered=list(options[offset:])+list(options[:offset])
     for option in ordered:
         normalized=" ".join(re.sub(r"[^a-z0-9 ]","",option.lower()).split())
-        if normalized not in used:
+        # Compare normalized whole questions and conservative containment.
+        # Some historical loggers append punctuation or surrounding post copy;
+        # exact-only matching allowed the same reader prompt to slip through.
+        if normalized not in used and not any(
+            len(seen) >= 24 and (normalized in seen or seen in normalized)
+            for seen in used
+        ):
             return option
     raise RuntimeError("no_fresh_reader_question_variant")
 def question_options_for(story_type,s):
