@@ -78,6 +78,19 @@ class NativeWriterQuestionTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "no_fresh_reader_question_variant"):
                         nic_native_writer.build({**self.context, "iteration_seed": seed})
 
+
+    def test_fresh_sentence_reserves_selection_and_never_reuses_exhausted_variant(self):
+        used = {"the first sentence was already published"}
+        options = [
+            "The first sentence was already published.",
+            "A different evidence-led sentence is available here.",
+        ]
+        selected = nic_native_writer.fresh(options, used)
+        self.assertEqual(selected, options[1])
+        self.assertIn("a different evidenceled sentence is available here", used)
+        with self.assertRaisesRegex(RuntimeError, "no_fresh_editorial_sentence_variant"):
+            nic_native_writer.fresh(options, used)
+
     def test_writer_uses_iteration_seed_to_cover_each_trade_style_once(self):
         styles = []
         for seed in range(4):
