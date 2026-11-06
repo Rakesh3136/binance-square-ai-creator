@@ -107,6 +107,7 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str
                 for a in agents if isinstance(a, dict)
             ] if isinstance(agents, list) else [],
             "policy": data.get("policy", {}),
+            "specialist_runtime": data.get("specialist_runtime", {}),
         }
 
     if name == "get_creator_dashboard":
