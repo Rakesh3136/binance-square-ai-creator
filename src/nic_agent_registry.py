@@ -147,7 +147,9 @@ def build_registry() -> dict:
         "operational_agent_count": sum(a["state"] == "workflow_wired" for a in agents),
         "not_implemented_agent_count": sum(a["state"] == "not_implemented" for a in agents),
         "policy": {
-            "logical_mesh_nodes_are_not_independent_agents": True,
+            "permanent_synthetic_agent_population": False,
+            "task_scoped_specialists_created_only_when_needed": True,
+            "specialists_use_role_allowlisted_read_tools": True,
             "only_publisher_may_publish": True,
             "quality_gates_must_not_be_weakened": True,
             "reward_claims_require_explicit_evidence_class": True,
