@@ -71,6 +71,16 @@ class DynamicAgentRuntimeTests(unittest.TestCase):
         self.assertIn("owner-reported", result["findings"])
         self.assertEqual(client.responses.calls[0]["tools"][0]["name"], "get_reward_learning_status")
 
+    def test_retired_300_node_mesh_and_generated_artifact_are_absent(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1]
+        self.assertFalse((root / "src/agent_mesh_300.py").exists())
+        self.assertFalse((root / "data/live/agent_mesh_300.json").exists())
+        for relative in ("src/creator_agent_supervisor.py", "src/agent_strategy_bridge.py"):
+            source = (root / relative).read_text(encoding="utf-8")
+            self.assertNotIn("agent_mesh_300", source)
+            self.assertNotIn("300-agent", source)
+
     def test_unknown_specialist_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "specialist_not_allowed"):
             run_specialist(
