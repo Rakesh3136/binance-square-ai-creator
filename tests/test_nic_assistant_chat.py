@@ -88,5 +88,40 @@ class NICAssistantChatTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             advisor_reply("Hello", client=FakeClient("  "))
 
+
+    def test_chat_creates_a_task_scoped_specialist_on_demand(self):
+        class DelegationResponses:
+            def __init__(self):
+                self.calls = []
+                self.responses = [
+                    SimpleNamespace(
+                        id="outer-1", output_text="",
+                        output=[SimpleNamespace(
+                            type="function_call", name="delegate_to_specialist",
+                            arguments='{"specialist":"reward_analyst","task":"Audit reward evidence"}',
+                            call_id="delegate-1",
+                        )],
+                    ),
+                    SimpleNamespace(id="outer-2", output_text="NIC completed a reward evidence review.", output=[]),
+                ]
+            def create(self, **kwargs):
+                self.calls.append(kwargs)
+                return self.responses.pop(0)
+
+        client = SimpleNamespace(responses=DelegationResponses())
+        specialist_result = {
+            "agent_id": "nic-agent-test123", "specialist": "reward_analyst",
+            "lifecycle": "ephemeral_task_scoped", "status": "completed",
+            "result": "Owner reports remain distinct from verified payouts.",
+        }
+        with patch("src.nic_assistant_chat.run_specialist_agent", return_value=specialist_result) as run:
+            result = advisor_reply("Audit our reward evidence", client=client, model="test-model")
+        self.assertEqual(result, "NIC completed a reward evidence review.")
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[2], "reward_analyst")
+        self.assertEqual(run.call_args.args[3], "Audit reward evidence")
+        self.assertIn("delegate_to_specialist", {x["name"] for x in client.responses.calls[0]["tools"]})
+        self.assertIn('"lifecycle": "ephemeral_task_scoped"', client.responses.calls[1]["input"][0]["output"])
+
 if __name__ == "__main__":
     unittest.main()
