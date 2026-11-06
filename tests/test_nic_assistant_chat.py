@@ -88,5 +88,48 @@ class NICAssistantChatTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             advisor_reply("Hello", client=FakeClient("  "))
 
+    def test_chat_can_spawn_a_task_scoped_specialist_and_synthesize_its_findings(self):
+        class SpecialistResponses:
+            def __init__(self):
+                self.calls = []
+                self.responses = [
+                    SimpleNamespace(
+                        id="response-specialist-request", output_text="",
+                        output=[SimpleNamespace(
+                            type="function_call", name="spawn_specialist",
+                            arguments='{"specialty":"reward_analyst","task":"Audit reward evidence","context":"Review owner-reported and verified entries."}',
+                            call_id="spawn-1",
+                        )],
+                    ),
+                    SimpleNamespace(
+                        id="response-final", output_text="NIC checked reward evidence with a temporary specialist.",
+                        output=[],
+                    ),
+                ]
+            def create(self, **kwargs):
+                self.calls.append(kwargs)
+                return self.responses.pop(0)
+
+        client = SimpleNamespace(responses=SpecialistResponses())
+        worker_result = {
+            "specialty": "reward_analyst",
+            "status": "completed",
+            "findings": "Owner-reported and verified totals remain separate.",
+            "publication_authority": False,
+            "trading_authority": False,
+        }
+        with patch("src.nic_assistant_chat.run_specialist", return_value=worker_result) as spawn:
+            result = advisor_reply("Audit reward learning deeply", client=client, model="test-model")
+        self.assertIn("temporary specialist", result)
+        spawn.assert_called_once()
+        kwargs = spawn.call_args.kwargs
+        self.assertEqual(kwargs["specialty"], "reward_analyst")
+        self.assertEqual(kwargs["task"], "Audit reward evidence")
+        first, second = client.responses.calls
+        self.assertTrue(any(item["name"] == "spawn_specialist" for item in first["tools"]))
+        self.assertEqual(second["input"][0]["type"], "function_call_output")
+        self.assertIn("owner-reported", second["input"][0]["output"])
+
+
 if __name__ == "__main__":
     unittest.main()
