@@ -47,9 +47,9 @@ class NicAgentRegistryTests(unittest.TestCase):
             registry["publication_authority"],
             "src/binance_square_publisher.py",
         )
-        self.assertTrue(
-            registry["policy"]["logical_mesh_nodes_are_not_independent_agents"]
-        )
+        self.assertFalse(registry["policy"]["permanent_synthetic_agent_population"])
+        self.assertTrue(registry["policy"]["task_scoped_specialists_created_only_when_needed"])
+        self.assertTrue(registry["policy"]["specialists_use_role_allowlisted_read_tools"])
         self.assertTrue(registry["policy"]["only_publisher_may_publish"])
         self.assertTrue(registry["policy"]["quality_gates_must_not_be_weakened"])
 
