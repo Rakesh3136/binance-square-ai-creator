@@ -17,6 +17,7 @@ class NicAgentRegistryTests(unittest.TestCase):
             "service_present_read_only_tools_connected",
         )
         self.assertIn("nic_tool_registry.py", by_id["chat_operator"]["modules"])
+        self.assertIn("nic_dynamic_agent_runtime.py", by_id["chat_operator"]["modules"])
         self.assertIn("bounded_read_only_tool_execution", by_id["chat_operator"]["skills"])
         self.assertEqual(
             by_id["audience_analytics"]["state"],
