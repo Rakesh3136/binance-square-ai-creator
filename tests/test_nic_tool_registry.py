@@ -11,6 +11,7 @@ class NICToolRegistryTests(unittest.TestCase):
             "get_agent_registry", "get_creator_dashboard", "list_recent_research",
             "get_latest_publication", "get_reward_learning_status",
             "get_creator_period_coverage", "list_creator_study_queue",
+            "get_reward_pattern_insights",
         })
         self.assertNotIn("publish_post", names)
         self.assertNotIn("run_shell", names)
@@ -118,6 +119,38 @@ class NICToolRegistryTests(unittest.TestCase):
         self.assertFalse(result["evidence_policy"]["owner_reported_is_independent_verification"])
         self.assertTrue(result["evidence_policy"]["owner_reported_entries_are_post_level_learning_feedback"])
         self.assertIsNone(result["summary"]["verified_usdc_7d"])
+
+    def test_reward_pattern_tool_exposes_owner_examples_without_upgrading_evidence(self):
+        sample = {
+            "status": "COLLECTING_VERIFIED_REWARD_EVIDENCE",
+            "verified_observation_groups": 0,
+            "owner_reported_reward_events_loaded": 2,
+            "observations": [{
+                "content_lane": "technical_setup",
+                "content_format": "4h_chart_annotated_setup",
+                "hook_type": "risk_reward_accumulation_question",
+                "posts": 1,
+                "verified_posts": 0,
+                "verified_revenue": 0,
+                "owner_reported_posts": 1,
+                "owner_reported_revenue_usdc": 0.77,
+                "owner_reported_evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED",
+                "owner_reported_examples": [{
+                    "post_id": "376457571598023",
+                    "summary": "A setup with staged levels and invalidation.",
+                    "public_post_url": "https://www.binance.com/en/square/post/376457571598023",
+                    "evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED",
+                }],
+            }],
+            "next_experiments": [{"test_family": "risk_reward_accumulation_question"}],
+        }
+        with patch("src.nic_tool_registry._read_json", return_value=sample):
+            result = execute_tool("get_reward_pattern_insights")
+        self.assertEqual(result["owner_reported_reward_events_loaded"], 2)
+        self.assertEqual(result["patterns"][0]["owner_reported_revenue_usdc"], 0.77)
+        self.assertEqual(result["patterns"][0]["owner_reported_examples"][0]["post_id"], "376457571598023")
+        self.assertFalse(result["evidence_policy"]["owner_reported_patterns_are_independently_verified"])
+        self.assertEqual(result["patterns"][0]["verified_posts"], 0)
 
     def test_creator_period_tool_never_claims_post_attribution(self):
         sample = {
