@@ -6,14 +6,13 @@ editorial director. Agents never receive posting credentials and deterministic
 gates remain authoritative.
 """
 from __future__ import annotations
-import json, re, sys
+import json, re
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data/live/creator_agent_supervisor.json"
 STRATEGY = ROOT / "data/live/agent_strategy.json"
-MESH = ROOT / "data/live/agent_mesh_300.json"
 
 
 def load(path: str) -> dict:
@@ -36,26 +35,15 @@ def clean_symbol(value):
     return re.sub(r"[^A-Z0-9]", "", str(value or "").upper().replace("USDT", ""))
 
 
-def run_300_agent_mesh() -> dict:
-    """Run and validate the 300 logical specialist network for this cycle."""
-    try:
-        sys.path.insert(0, str(ROOT / "src"))
-        from agent_mesh_300 import main as mesh_main
-
-        mesh = mesh_main()
-    except Exception as exc:
-        raise RuntimeError(f"300-agent mesh failed: {exc}") from exc
-
-    agents = mesh.get("agents") or []
-    ids = [a.get("id") for a in agents if isinstance(a, dict)]
-    if (
-        mesh.get("logical_agent_count") != 300
-        or len(agents) != 300
-        or len(ids) != 300
-        or len(set(ids)) != 300
-    ):
-        raise RuntimeError("300-agent mesh validation failed: expected 300 unique logical agents")
-    return mesh
+def task_dispatch_status() -> dict:
+    """Report the on-demand specialist architecture without a permanent agent mesh."""
+    return {
+        "version": "TASK_SCOPED_ON_DEMAND",
+        "logical_agent_count": 0,
+        "active_agent_count": 0,
+        "shared_blackboard": {"top_candidates": []},
+        "policy": "No permanent synthetic agent population; create workers only for concrete tasks.",
+    }
 
 
 def main() -> None:
@@ -69,11 +57,9 @@ def main() -> None:
     learning = load("data/intelligence/learning.json")
     performance = load("analytics/square_performance_state.json")
 
-    # Run the logical 300-agent network only after the fresh market, flow, news,
-    # and research layers have populated the blackboard. It can enrich strategy,
-    # but publication authority remains downstream and deterministic.
-    mesh = run_300_agent_mesh()
-    top_candidates = ((mesh.get("shared_blackboard") or {}).get("top_candidates") or [])
+    # Temporary model-backed specialists are created by NIC chat only when needed.
+    dispatch_status = task_dispatch_status()
+    top_candidates = []
 
     selected = preflight.get("selected_opportunity") or {}
     selected = selected if isinstance(selected, dict) else {}
@@ -101,12 +87,6 @@ def main() -> None:
     regime = rotation.get("market_regime") or "unknown"
     leaders = rotation.get("leaders") or []
     laggards = rotation.get("laggards") or []
-
-    mesh_consensus = {}
-    for candidate in top_candidates:
-        if isinstance(candidate, dict) and clean_symbol(candidate.get("symbol")) == symbol:
-            mesh_consensus = candidate
-            break
 
     selected_symbol = clean_symbol(selected.get("symbol"))
     context_symbol = clean_symbol(context.get("symbol"))
@@ -162,7 +142,7 @@ def main() -> None:
         "blind": int(performance.get("feed_records", 0) or 0) == 0,
     }
     strategy = {
-        "version": "1.3-300-agent-mesh",
+        "version": "1.4-task-scoped-specialists",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "symbol": symbol,
         "category": category,
@@ -179,11 +159,10 @@ def main() -> None:
         "authoritative_asset_source": "publication_context",
         "selected_asset_aligned": selected_matches,
         "do_not_publish_if": blockers,
-        "agent_mesh": {
-            "version": mesh.get("version"),
-            "logical_agents": mesh.get("logical_agent_count", 300),
-            "active_agents": mesh.get("active_agent_count", 0),
-            "consensus": mesh_consensus,
+        "agent_dispatch": {
+            "mode": "task_scoped_on_demand",
+            "permanent_agent_population": 0,
+            "specialist_creation_runtime": "src/nic_dynamic_agent_runtime.py",
             "publish_authority": "downstream_strategy_and_editorial_gates",
             "trading_authority": False,
             "revenue_observation_only": True,
@@ -193,7 +172,7 @@ def main() -> None:
     STRATEGY.write_text(json.dumps(strategy, indent=2, ensure_ascii=False), encoding="utf-8")
 
     result = {
-        "version": "1.3-300-agent-mesh",
+        "version": "1.4-task-scoped-specialists",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "decision": decision,
         "publish_intent": publish,
@@ -209,18 +188,18 @@ def main() -> None:
         "agents": {
             "research": {"status": "READY", "role": "verify market/news/flow evidence", "authority": "evidence"},
             "strategy": {"status": "READY" if symbol else "BLOCKED", "role": "select one differentiated thesis", "authority": "publication_context"},
-            "mesh": {"status": "READY", "role": "aggregate 300 sparse specialist signals", "authority": "evidence_only"},
+            "specialist_dispatch": {"status": "AVAILABLE_ON_DEMAND", "role": "create task-scoped model-backed workers", "authority": "bounded_read_only_tools"},
             "editorial": {"status": "READY" if publish else "WAIT", "role": "shape one human-style authoring pass", "authority": "editorial_gates"},
             "outcome": {"status": "READY", "role": "bind prior calls to outcomes and lessons", "authority": "performance_ledger"},
             "revenue": {"status": "OBSERVE_ONLY", "role": "measure eligible reader-intent signals", "authority": "analytics"},
             "safety": {"status": "READY", "role": "prevent manipulation, spam, duplication and unsupported claims", "authority": "deterministic_gates"},
         },
         "strategy_artifact": str(STRATEGY.relative_to(ROOT)),
-        "mesh_artifact": str(MESH.relative_to(ROOT)),
+        "agent_dispatch_mode": "task_scoped_on_demand",
         "performance_health": performance_health,
         "policy": {
-            "logical_agent_count": 300,
-            "sparse_network": True,
+            "permanent_agent_population": 0,
+            "task_scoped_specialists": True,
             "single_authoritative_asset": True,
             "publication_context_wins": True,
             "one_authoring_pass": True,
@@ -239,10 +218,8 @@ def main() -> None:
         "thesis": thesis,
         "performance_blind": performance_health["blind"],
         "selected_asset_aligned": selected_matches,
-        "mesh_version": mesh.get("version"),
-        "logical_agents": 300,
-        "active_agents": mesh.get("active_agent_count", 0),
-        "mesh_consensus_found": bool(mesh_consensus),
+        "agent_dispatch_mode": dispatch_status.get("version"),
+        "permanent_agent_population": 0,
     }))
 
 
