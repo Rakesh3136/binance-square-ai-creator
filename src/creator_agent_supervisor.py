@@ -40,8 +40,6 @@ def task_dispatch_status() -> dict:
     return {
         "version": "TASK_SCOPED_ON_DEMAND",
         "permanent_agent_population": 0,
-        "active_agent_count": 0,
-        "shared_blackboard": {"top_candidates": []},
         "policy": "No permanent synthetic agent population; create workers only for concrete tasks.",
     }
 
@@ -59,7 +57,6 @@ def main() -> None:
 
     # Temporary model-backed specialists are created by NIC chat only when needed.
     dispatch_status = task_dispatch_status()
-    top_candidates = []
 
     selected = preflight.get("selected_opportunity") or {}
     selected = selected if isinstance(selected, dict) else {}
