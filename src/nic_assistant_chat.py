@@ -15,6 +15,7 @@ from urllib.parse import unquote
 
 from src.nic_control_gate import ControlGate
 from src.nic_tool_registry import ToolExecutionError, execute_tool, tool_catalog
+from src.nic_agent_factory import SPECIALISTS, run_specialist_agent
 
 SYSTEM_INSTRUCTIONS = """You are NIC's creator-workflow assistant.
 NIC's primary mission is original, high-quality Binance Square content that can
@@ -30,8 +31,8 @@ executor confirms it. No plugins are connected by this chat service."""
 
 
 def _model_tool_definitions() -> list[dict[str, Any]]:
-    """Translate the local allowlist into Responses API function tools."""
-    return [
+    """Translate the local allowlist and the on-demand delegation tool for Responses API."""
+    definitions = [
         {
             "type": "function",
             "name": item["name"],
@@ -41,7 +42,22 @@ def _model_tool_definitions() -> list[dict[str, Any]]:
         }
         for item in tool_catalog()
     ]
-
+    definitions.append({
+        "type": "function",
+        "name": "delegate_to_specialist",
+        "description": "Create and run one temporary NIC specialist for a concrete subtask. The specialist receives only its narrow read-only tool allowlist.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "specialist": {"type": "string", "enum": sorted(SPECIALISTS)},
+                "task": {"type": "string", "minLength": 1, "maxLength": 2400},
+            },
+            "required": ["specialist", "task"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    })
+    return definitions
 
 def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                   client: Any | None = None, model: str | None = None,
@@ -76,6 +92,7 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
         **({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": False} if tools else {}),
     )
     calls_used = 0
+    agents_created = 0
     while True:
         output_items = getattr(response, "output", None) or []
         calls = [item for item in output_items if getattr(item, "type", None) == "function_call"]
@@ -90,7 +107,18 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
         else:
             try:
                 arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
-                result = execute_tool(call_name, arguments)
+                if call_name == "delegate_to_specialist":
+                    if agents_created >= 2:
+                        raise ToolExecutionError("per_turn_agent_creation_limit_reached")
+                    if not isinstance(arguments, dict) or set(arguments) != {"specialist", "task"}:
+                        raise ToolExecutionError("specialist_arguments_invalid")
+                    agents_created += 1
+                    result = run_specialist_agent(
+                        client, selected_model, arguments["specialist"], arguments["task"],
+                        tool_catalog=tool_catalog(), execute_tool=execute_tool, max_tool_calls=2,
+                    )
+                else:
+                    result = execute_tool(call_name, arguments)
                 tool_output = {"ok": True, "result": result}
             except (ToolExecutionError, ValueError, TypeError) as exc:
                 tool_output = {"ok": False, "error": str(exc)}
