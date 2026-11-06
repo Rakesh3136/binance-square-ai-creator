@@ -10,6 +10,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.nic_dynamic_agent_runtime import specialist_catalog
+
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/autonomous-market-creator.yml"
 OUT = ROOT / "data/live/nic_agent_registry.json"
@@ -155,6 +157,13 @@ def build_registry() -> dict:
             "reward_claims_require_explicit_evidence_class": True,
         },
         "agents": agents,
+        "specialist_runtime": {
+            "mode": "task_scoped_on_demand",
+            "max_specialists_per_request": 2,
+            "specialties": specialist_catalog(),
+            "workers_reply_to": "NIC_orchestrator_only",
+            "worker_tools": "role_allowlisted_read_only",
+        },
     }
 
 
