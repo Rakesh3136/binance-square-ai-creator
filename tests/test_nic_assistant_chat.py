@@ -128,7 +128,7 @@ class NICAssistantChatTests(unittest.TestCase):
         first, second = client.responses.calls
         self.assertTrue(any(item["name"] == "spawn_specialist" for item in first["tools"]))
         self.assertEqual(second["input"][0]["type"], "function_call_output")
-        self.assertIn("owner-reported", second["input"][0]["output"])
+        self.assertIn("Owner-reported", second["input"][0]["output"])
 
 
 if __name__ == "__main__":
