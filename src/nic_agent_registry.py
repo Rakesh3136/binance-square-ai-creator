@@ -100,7 +100,7 @@ REGISTRY = [
         "name": "NIC Chat Operator",
         "purpose": "Provide the existing authenticated chat and owner-control API.",
         "skills": ["assistant_chat", "owner_control_api", "bounded_read_only_tool_execution", "dynamic_task_specialist_creation", "agent_registry_read", "publication_audit_read", "reward_learning_read", "creator_cohort_read", "research_queue_read"],
-        "modules": ["nic_assistant_chat.py", "nic_control_gate.py", "nic_tool_registry.py"],
+        "modules": ["nic_assistant_chat.py", "nic_control_gate.py", "nic_tool_registry.py", "nic_dynamic_agent_runtime.py"],
         "workflow_entrypoints": [],
         "state": "service_present_read_only_tools_connected",
         "limitations": ["Chat can create up to two ephemeral model-backed specialists per request; each has a fixed read-only tool allowlist and no publication, trading, shell, secret, or file-write authority."],
