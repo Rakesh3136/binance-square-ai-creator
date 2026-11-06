@@ -39,7 +39,7 @@ def task_dispatch_status() -> dict:
     """Report the on-demand specialist architecture without a permanent agent mesh."""
     return {
         "version": "TASK_SCOPED_ON_DEMAND",
-        "logical_agent_count": 0,
+        "permanent_agent_population": 0,
         "active_agent_count": 0,
         "shared_blackboard": {"top_candidates": []},
         "policy": "No permanent synthetic agent population; create workers only for concrete tasks.",
