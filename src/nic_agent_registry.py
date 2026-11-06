@@ -10,6 +10,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.nic_dynamic_agent_runtime import specialist_catalog
+
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/autonomous-market-creator.yml"
 OUT = ROOT / "data/live/nic_agent_registry.json"
@@ -99,11 +101,11 @@ REGISTRY = [
         "agent_id": "chat_operator",
         "name": "NIC Chat Operator",
         "purpose": "Provide the existing authenticated chat and owner-control API.",
-        "skills": ["assistant_chat", "owner_control_api", "bounded_read_only_tool_execution", "agent_registry_read", "publication_audit_read", "reward_learning_read", "creator_cohort_read", "research_queue_read"],
-        "modules": ["nic_assistant_chat.py", "nic_control_gate.py", "nic_tool_registry.py"],
+        "skills": ["assistant_chat", "owner_control_api", "bounded_read_only_tool_execution", "dynamic_task_specialist_creation", "agent_registry_read", "publication_audit_read", "reward_learning_read", "creator_cohort_read", "research_queue_read"],
+        "modules": ["nic_assistant_chat.py", "nic_control_gate.py", "nic_tool_registry.py", "nic_dynamic_agent_runtime.py"],
         "workflow_entrypoints": [],
         "state": "service_present_read_only_tools_connected",
-        "limitations": ["Chat exposes seven bounded read-only tools; no publication, trading, shell, arbitrary writes, or universal executor integration."],
+        "limitations": ["Chat can create up to two ephemeral model-backed specialists per request; each has a fixed read-only tool allowlist and no publication, trading, shell, secret, or file-write authority."],
     },
 ]
 
@@ -147,12 +149,21 @@ def build_registry() -> dict:
         "operational_agent_count": sum(a["state"] == "workflow_wired" for a in agents),
         "not_implemented_agent_count": sum(a["state"] == "not_implemented" for a in agents),
         "policy": {
-            "logical_mesh_nodes_are_not_independent_agents": True,
+            "permanent_synthetic_agent_population": False,
+            "task_scoped_specialists_created_only_when_needed": True,
+            "specialists_use_role_allowlisted_read_tools": True,
             "only_publisher_may_publish": True,
             "quality_gates_must_not_be_weakened": True,
             "reward_claims_require_explicit_evidence_class": True,
         },
         "agents": agents,
+        "specialist_runtime": {
+            "mode": "task_scoped_on_demand",
+            "max_specialists_per_request": 2,
+            "specialties": specialist_catalog(),
+            "workers_reply_to": "NIC_orchestrator_only",
+            "worker_tools": "role_allowlisted_read_only",
+        },
     }
 
 

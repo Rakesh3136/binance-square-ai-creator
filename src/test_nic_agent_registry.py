@@ -17,6 +17,7 @@ class NicAgentRegistryTests(unittest.TestCase):
             "service_present_read_only_tools_connected",
         )
         self.assertIn("nic_tool_registry.py", by_id["chat_operator"]["modules"])
+        self.assertIn("nic_dynamic_agent_runtime.py", by_id["chat_operator"]["modules"])
         self.assertIn("bounded_read_only_tool_execution", by_id["chat_operator"]["skills"])
         self.assertEqual(
             by_id["audience_analytics"]["state"],
@@ -47,9 +48,9 @@ class NicAgentRegistryTests(unittest.TestCase):
             registry["publication_authority"],
             "src/binance_square_publisher.py",
         )
-        self.assertTrue(
-            registry["policy"]["logical_mesh_nodes_are_not_independent_agents"]
-        )
+        self.assertFalse(registry["policy"]["permanent_synthetic_agent_population"])
+        self.assertTrue(registry["policy"]["task_scoped_specialists_created_only_when_needed"])
+        self.assertTrue(registry["policy"]["specialists_use_role_allowlisted_read_tools"])
         self.assertTrue(registry["policy"]["only_publisher_may_publish"])
         self.assertTrue(registry["policy"]["quality_gates_must_not_be_weakened"])
 
