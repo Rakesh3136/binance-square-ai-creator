@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'src/nic_assistant_chat.py'
+      - 'src/nic_dynamic_agent_runtime.py'
+      - 'tests/test_nic_dynamic_agent_runtime.py'
       - 'src/nic_assistant_chat_client.py'
       - 'tests/test_nic_assistant_chat.py'
       - 'tests/test_nic_assistant_chat_client.py'
@@ -47,10 +49,11 @@ jobs:
           python -m pip install --no-cache-dir -r requirements.txt
           python -m pip install pytest
       - name: Compile assistant and control-gate modules
-        run: python -m py_compile src/nic_assistant_chat.py src/nic_assistant_chat_client.py src/nic_control_gate.py src/nic_tool_registry.py
+        run: python -m py_compile src/nic_assistant_chat.py src/nic_dynamic_agent_runtime.py src/nic_assistant_chat_client.py src/nic_control_gate.py src/nic_tool_registry.py
       - name: Test assistant adapter without API credentials
         run: |
           python tests/test_nic_assistant_chat.py
+          python tests/test_nic_dynamic_agent_runtime.py
           python tests/test_nic_assistant_chat_client.py
           python tests/test_nic_assistant_control_api.py
           python tests/test_nic_tool_registry.py
