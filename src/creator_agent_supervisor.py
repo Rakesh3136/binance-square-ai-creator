@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data/live/creator_agent_supervisor.json"
 STRATEGY = ROOT / "data/live/agent_strategy.json"
-MESH = ROOT / "data/live/agent_mesh_300.json"
+MESH = ROOT / "data/live/nic_capability_plan.json"
 
 
 def load(path: str) -> dict:
@@ -36,27 +36,22 @@ def clean_symbol(value):
     return re.sub(r"[^A-Z0-9]", "", str(value or "").upper().replace("USDT", ""))
 
 
-def run_300_agent_mesh() -> dict:
-    """Run and validate the 300 logical specialist network for this cycle."""
+def run_dynamic_capability_plan() -> dict:
+    """Select only evidence-supported workflow capabilities; instantiate no fake agents."""
     try:
         sys.path.insert(0, str(ROOT / "src"))
-        from agent_mesh_300 import main as mesh_main
-
-        mesh = mesh_main()
+        from nic_capability_planner import main as planner_main
+        plan = planner_main()
     except Exception as exc:
-        raise RuntimeError(f"300-agent mesh failed: {exc}") from exc
-
-    agents = mesh.get("agents") or []
-    ids = [a.get("id") for a in agents if isinstance(a, dict)]
+        raise RuntimeError(f"dynamic capability planner failed: {exc}") from exc
     if (
-        mesh.get("logical_agent_count") != 300
-        or len(agents) != 300
-        or len(ids) != 300
-        or len(set(ids)) != 300
+        plan.get("legacy_300_mesh_retired") is not True
+        or plan.get("logical_agent_count") != 0
+        or plan.get("agents") != []
+        or not isinstance(plan.get("selected_capabilities"), list)
     ):
-        raise RuntimeError("300-agent mesh validation failed: expected 300 unique logical agents")
-    return mesh
-
+        raise RuntimeError("dynamic capability plan validation failed")
+    return plan
 
 def main() -> None:
     cadence = load("data/live/autonomous_cadence_6.json")
@@ -72,7 +67,7 @@ def main() -> None:
     # Run the logical 300-agent network only after the fresh market, flow, news,
     # and research layers have populated the blackboard. It can enrich strategy,
     # but publication authority remains downstream and deterministic.
-    mesh = run_300_agent_mesh()
+    mesh = run_dynamic_capability_plan()
     top_candidates = ((mesh.get("shared_blackboard") or {}).get("top_candidates") or [])
 
     selected = preflight.get("selected_opportunity") or {}
@@ -162,7 +157,7 @@ def main() -> None:
         "blind": int(performance.get("feed_records", 0) or 0) == 0,
     }
     strategy = {
-        "version": "1.3-300-agent-mesh",
+        "version": "1.4-dynamic-capability-plan",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "symbol": symbol,
         "category": category,
@@ -206,14 +201,10 @@ def main() -> None:
             "aligned": selected_matches,
             "stale_selection_is_not_used_for_strategy": not selected_matches,
         },
-        "agents": {
-            "research": {"status": "READY", "role": "verify market/news/flow evidence", "authority": "evidence"},
-            "strategy": {"status": "READY" if symbol else "BLOCKED", "role": "select one differentiated thesis", "authority": "publication_context"},
-            "mesh": {"status": "READY", "role": "aggregate 300 sparse specialist signals", "authority": "evidence_only"},
-            "editorial": {"status": "READY" if publish else "WAIT", "role": "shape one human-style authoring pass", "authority": "editorial_gates"},
-            "outcome": {"status": "READY", "role": "bind prior calls to outcomes and lessons", "authority": "performance_ledger"},
-            "revenue": {"status": "OBSERVE_ONLY", "role": "measure eligible reader-intent signals", "authority": "analytics"},
-            "safety": {"status": "READY", "role": "prevent manipulation, spam, duplication and unsupported claims", "authority": "deterministic_gates"},
+        "capability_execution": {
+            "selected": mesh.get("selected_capabilities", []),
+            "agent_instances_created": 0,
+            "note": "Pipeline capabilities are selected from evidence; model-backed task specialists are created on demand by NIC chat.",
         },
         "strategy_artifact": str(STRATEGY.relative_to(ROOT)),
         "mesh_artifact": str(MESH.relative_to(ROOT)),
