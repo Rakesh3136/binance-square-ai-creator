@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-11-06T07:16:46.952339+00:00",
+  "generated_at": "2026-11-07T07:41:39.577698+00:00",
   "mission": "autonomous_binance_square_creator",
   "orchestration_authority": ".github/workflows/autonomous-market-creator.yml",
   "publication_authority": "src/binance_square_publisher.py",
@@ -8,7 +8,9 @@
   "operational_agent_count": 6,
   "not_implemented_agent_count": 1,
   "policy": {
-    "logical_mesh_nodes_are_not_independent_agents": true,
+    "permanent_synthetic_agent_population": false,
+    "task_scoped_specialists_created_only_when_needed": true,
+    "specialists_use_role_allowlisted_read_tools": true,
     "only_publisher_may_publish": true,
     "quality_gates_must_not_be_weakened": true,
     "reward_claims_require_explicit_evidence_class": true
@@ -291,6 +293,7 @@
         "assistant_chat",
         "owner_control_api",
         "bounded_read_only_tool_execution",
+        "dynamic_task_specialist_creation",
         "agent_registry_read",
         "publication_audit_read",
         "reward_learning_read",
@@ -300,19 +303,91 @@
       "modules": [
         "nic_assistant_chat.py",
         "nic_control_gate.py",
-        "nic_tool_registry.py"
+        "nic_tool_registry.py",
+        "nic_dynamic_agent_runtime.py"
       ],
       "workflow_entrypoints": [],
       "state": "service_present_read_only_tools_connected",
       "limitations": [
-        "Chat exposes seven bounded read-only tools; no publication, trading, shell, arbitrary writes, or universal executor integration."
+        "Chat can create up to two ephemeral model-backed specialists per request; each has a fixed read-only tool allowlist and no publication, trading, shell, secret, or file-write authority."
       ],
-      "module_count": 3,
+      "module_count": 4,
       "modules_present": true,
       "missing_modules": [],
       "workflow_wired_modules": [],
       "workflow_wiring_missing": [],
       "model_backed_independent_agent": false
     }
-  ]
+  ],
+  "specialist_runtime": {
+    "mode": "task_scoped_on_demand",
+    "max_specialists_per_request": 2,
+    "specialties": [
+      {
+        "specialty": "research_analyst",
+        "purpose": "Find and summarize existing market, creator, and research evidence.",
+        "tools": [
+          "search_public_news",
+          "get_live_market_data",
+          "get_verified_research_evidence",
+          "list_recent_research",
+          "list_creator_study_queue",
+          "get_creator_period_coverage"
+        ]
+      },
+      {
+        "specialty": "reward_analyst",
+        "purpose": "Audit reward evidence, attribution boundaries, and creator-period learning.",
+        "tools": [
+          "get_reward_learning_status",
+          "get_reward_pattern_insights",
+          "get_creator_period_coverage",
+          "get_latest_publication"
+        ]
+      },
+      {
+        "specialty": "performance_auditor",
+        "purpose": "Check publication records and distinguish reach, publication, and verified rewards.",
+        "tools": [
+          "get_latest_publication",
+          "get_reward_learning_status",
+          "get_reward_pattern_insights"
+        ]
+      },
+      {
+        "specialty": "creator_strategist",
+        "purpose": "Develop creator strategy from creator cohorts, reward feedback, and observed research.",
+        "tools": [
+          "list_creator_study_queue",
+          "get_creator_period_coverage",
+          "get_reward_learning_status",
+          "get_reward_pattern_insights",
+          "search_public_news"
+        ]
+      },
+      {
+        "specialty": "editorial_coach",
+        "purpose": "Improve originality, clarity, structure, audience relevance, and factual caution in draft content.",
+        "tools": [
+          "list_recent_research",
+          "search_public_news",
+          "get_live_market_data",
+          "get_verified_research_evidence"
+        ]
+      },
+      {
+        "specialty": "fact_checker",
+        "purpose": "Check claims against available publication and research records; flag unsupported claims.",
+        "tools": [
+          "list_recent_research",
+          "get_verified_research_evidence",
+          "search_public_news",
+          "get_live_market_data",
+          "get_latest_publication"
+        ]
+      }
+    ],
+    "workers_reply_to": "NIC_orchestrator_only",
+    "worker_tools": "role_allowlisted_read_only"
+  }
 }
