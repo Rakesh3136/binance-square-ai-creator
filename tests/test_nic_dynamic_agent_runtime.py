@@ -81,6 +81,13 @@ class DynamicAgentRuntimeTests(unittest.TestCase):
             self.assertNotIn("agent_mesh_300", source)
             self.assertNotIn("300-agent", source)
 
+    def test_research_specialist_has_live_news_and_market_access(self):
+        allowed = set(SPECIALIST_PROFILES["research_analyst"]["tools"])
+        self.assertIn("search_public_news", allowed)
+        self.assertIn("get_live_market_data", allowed)
+        self.assertIn("get_verified_research_evidence", allowed)
+        self.assertNotIn("publish_post", allowed)
+
     def test_unknown_specialist_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "specialist_not_allowed"):
             run_specialist(

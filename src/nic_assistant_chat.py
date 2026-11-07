@@ -45,7 +45,7 @@ def _model_tool_definitions() -> list[dict[str, Any]]:
             "type": "function",
             "name": item["name"],
             "description": item["description"],
-            "parameters": {**item["parameters"], "required": []},
+            "parameters": item["parameters"],
             "strict": True,
         }
         for item in tool_catalog()

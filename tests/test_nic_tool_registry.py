@@ -11,6 +11,8 @@ class NICToolRegistryTests(unittest.TestCase):
             "get_agent_registry", "get_creator_dashboard", "list_recent_research",
             "get_latest_publication", "get_reward_learning_status",
             "get_creator_period_coverage", "list_creator_study_queue",
+            "get_live_market_data", "search_public_news",
+            "get_verified_research_evidence", "get_reward_pattern_insights",
         })
         self.assertNotIn("publish_post", names)
         self.assertNotIn("run_shell", names)
@@ -154,6 +156,98 @@ class NICToolRegistryTests(unittest.TestCase):
     def test_no_file_write_or_subprocess_capability_is_exposed(self):
         names = {item["name"] for item in tool_catalog()}
         self.assertFalse(names.intersection({"write_file", "run_command", "publish_post"}))
+
+    def test_live_market_data_is_allowlisted_and_uses_fixed_binance_host(self):
+        import json
+        class FakeResponse:
+            def __init__(self, payload):
+                self.payload = json.dumps(payload).encode("utf-8")
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+            def read(self):
+                return self.payload
+        ticker = {"symbol": "BTCUSDT", "lastPrice": "90000", "priceChangePercent": "1.5"}
+        candles = [[1, "10", "12", "9", "11", "100", 2, "1100"]]
+        with patch("src.nic_tool_registry.urllib.request.urlopen", side_effect=[FakeResponse(ticker), FakeResponse(candles)]) as fetch:
+            result = execute_tool("get_live_market_data", {"symbol": "BTCUSDT", "interval": "1h"})
+        self.assertEqual(result["source"], "Binance public Spot REST API")
+        self.assertEqual(result["ticker_24h"]["lastPrice"], "90000")
+        self.assertEqual(result["recent_candles"][0]["close"], "11")
+        self.assertTrue(all(request.args[0].full_url.startswith("https://api.binance.com/api/v3/") for request in fetch.call_args_list))
+        self.assertEqual(result["evidence_class"], "LIVE_PUBLIC_MARKET_OBSERVATION")
+
+    def test_live_market_data_rejects_arbitrary_symbols_and_extra_arguments(self):
+        with self.assertRaisesRegex(ToolExecutionError, "market_symbol_or_interval_invalid"):
+            execute_tool("get_live_market_data", {"symbol": "BTCUSDT.evil", "interval": "1h"})
+        with self.assertRaisesRegex(ToolExecutionError, "market_arguments_invalid"):
+            execute_tool("get_live_market_data", {"symbol": "BTCUSDT", "interval": "1h", "url": "https://evil.test"})
+
+    def test_public_news_search_is_discovery_only(self):
+        class FakeResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+            def read(self):
+                return b"<rss><channel><item><title>Bitcoin ETF update</title><link>https://example.test/story</link><pubDate>Sat, 07 Nov 2026 10:00:00 GMT</pubDate><source>Example</source><description>Primary source update</description></item></channel></rss>"
+        with patch("src.nic_tool_registry.urllib.request.urlopen", return_value=FakeResponse()) as fetch:
+            result = execute_tool("search_public_news", {"query": "Bitcoin ETF"})
+        self.assertEqual(result["result_count"], 1)
+        self.assertEqual(result["results"][0]["title"], "Bitcoin ETF update")
+        self.assertIn("DISCOVERY_ONLY", result["results"][0]["evidence_class"])
+        self.assertTrue(fetch.call_args.args[0].full_url.startswith("https://news.google.com/rss/search?"))
+
+    def test_reward_pattern_insights_keep_owner_reported_separate(self):
+        sample = {
+            "generated_at": "2026-11-07T07:12:39Z",
+            "status": "COLLECTING_VERIFIED_REWARD_EVIDENCE",
+            "accepted_verified_reward_events": 0,
+            "rejected_reward_events": 1,
+            "observations": [{
+                "content_lane": "technical_setup",
+                "content_format": "4h_chart_annotated_setup",
+                "hook_type": "risk_reward_accumulation_question",
+                "posts": 1,
+                "verified_posts": 0,
+                "verified_revenue": 0,
+                "owner_reported_posts": 1,
+                "owner_reported_revenue_usdc": 0.77,
+                "owner_reported_examples": [{
+                    "post_id": "376457571598023",
+                    "public_post_url": "https://www.binance.com/en/square/post/376457571598023",
+                    "evidence": "OWNER_REPORTED_NOT_INDEPENDENTLY_VERIFIED"
+                }]
+            }],
+            "next_experiments": [{"test_family": "risk_reward_accumulation_question"}]
+        }
+        with patch("src.nic_tool_registry._read_json", return_value=sample):
+            result = execute_tool("get_reward_pattern_insights")
+        row = result["observations"][0]
+        self.assertEqual(row["owner_reported_reward_usdc"], 0.77)
+        self.assertEqual(row["verified_reward_usdc"], 0)
+        self.assertEqual(row["owner_reported_examples"][0]["post_id"], "376457571598023")
+        self.assertFalse(result["evidence_policy"]["owner_reported_is_independently_verified"])
+
+    def test_verified_research_evidence_preserves_unknown_freshness(self):
+        sample = {
+            "generated_at": "2026-11-06T07:16:43Z",
+            "status": "READY",
+            "count": 1,
+            "records": [{
+                "title": "Headline discovery",
+                "url": "https://example.test",
+                "source_class": "discovery",
+                "retrieval_status": "RETRIEVED",
+                "freshness": "UNKNOWN",
+                "limitations": ["Primary-source verification required"]
+            }]
+        }
+        with patch("src.nic_tool_registry._read_json", return_value=sample):
+            result = execute_tool("get_verified_research_evidence")
+        self.assertEqual(result["records"][0]["freshness"], "UNKNOWN")
+        self.assertIn("not proof", result["policy"])
 
 
 if __name__ == "__main__":

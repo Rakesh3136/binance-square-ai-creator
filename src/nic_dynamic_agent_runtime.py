@@ -12,27 +12,27 @@ from typing import Any, Callable
 SPECIALIST_PROFILES: dict[str, dict[str, Any]] = {
     "research_analyst": {
         "purpose": "Find and summarize existing market, creator, and research evidence.",
-        "tools": ["list_recent_research", "list_creator_study_queue", "get_creator_period_coverage"],
+        "tools": ["search_public_news", "get_live_market_data", "get_verified_research_evidence", "list_recent_research", "list_creator_study_queue", "get_creator_period_coverage"],
     },
     "reward_analyst": {
         "purpose": "Audit reward evidence, attribution boundaries, and creator-period learning.",
-        "tools": ["get_reward_learning_status", "get_creator_period_coverage", "get_latest_publication"],
+        "tools": ["get_reward_learning_status", "get_reward_pattern_insights", "get_creator_period_coverage", "get_latest_publication"],
     },
     "performance_auditor": {
         "purpose": "Check publication records and distinguish reach, publication, and verified rewards.",
-        "tools": ["get_latest_publication", "get_reward_learning_status"],
+        "tools": ["get_latest_publication", "get_reward_learning_status", "get_reward_pattern_insights"],
     },
     "creator_strategist": {
         "purpose": "Develop creator strategy from creator cohorts, reward feedback, and observed research.",
-        "tools": ["list_creator_study_queue", "get_creator_period_coverage", "get_reward_learning_status"],
+        "tools": ["list_creator_study_queue", "get_creator_period_coverage", "get_reward_learning_status", "get_reward_pattern_insights", "search_public_news"],
     },
     "editorial_coach": {
         "purpose": "Improve originality, clarity, structure, audience relevance, and factual caution in draft content.",
-        "tools": ["list_recent_research"],
+        "tools": ["list_recent_research", "search_public_news", "get_live_market_data", "get_verified_research_evidence"],
     },
     "fact_checker": {
         "purpose": "Check claims against available publication and research records; flag unsupported claims.",
-        "tools": ["list_recent_research", "get_latest_publication"],
+        "tools": ["list_recent_research", "get_verified_research_evidence", "search_public_news", "get_live_market_data", "get_latest_publication"],
     },
 }
 
@@ -55,7 +55,7 @@ def _tool_definitions(catalog: list[dict[str, Any]], allowed: set[str]) -> list[
             "type": "function",
             "name": item["name"],
             "description": item["description"],
-            "parameters": {**item["parameters"], "required": []},
+            "parameters": item["parameters"],
             "strict": True,
         }
         for item in catalog
