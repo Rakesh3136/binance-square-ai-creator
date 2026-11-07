@@ -2,9 +2,9 @@ import unittest
 from types import SimpleNamespace
 
 from src.nic_dynamic_agent_runtime import (
-    SPECIALIST_PROFILES,
+    CAPABILITY_TOOLS,
     run_specialist,
-    specialist_catalog,
+    capability_catalog,
 )
 
 
@@ -24,24 +24,24 @@ class FakeClient:
 
 
 class DynamicAgentRuntimeTests(unittest.TestCase):
-    def test_catalog_is_small_and_task_scoped(self):
-        catalog = specialist_catalog()
-        self.assertEqual({item["specialty"] for item in catalog}, set(SPECIALIST_PROFILES))
+    def test_capability_catalog_is_a_skill_library_not_a_fixed_agent_roster(self):
+        catalog = capability_catalog()
+        self.assertEqual({item["capability"] for item in catalog}, set(CAPABILITY_TOOLS))
         self.assertLessEqual(len(catalog), 8)
         self.assertTrue(all(item["tools"] for item in catalog))
+        self.assertFalse(any("specialty" in item for item in catalog))
 
-    def test_worker_executes_only_role_allowlisted_read_tool(self):
+    def test_worker_composes_capabilities_and_executes_only_granted_tools(self):
         first = SimpleNamespace(
-            id="worker-1",
-            output_text="",
+            id="worker-1", output_text="",
             output=[SimpleNamespace(
-                type="function_call",
-                name="get_reward_learning_status",
-                arguments="{}",
-                call_id="worker-call-1",
+                type="function_call", name="get_reward_learning_status",
+                arguments="{}", call_id="worker-call-1",
             )],
         )
-        second = SimpleNamespace(id="worker-2", output_text="Reward evidence is owner-reported.", output=[])
+        second = SimpleNamespace(
+            id="worker-2", output_text="Reward evidence remains separately classified.", output=[]
+        )
         client = FakeClient([first, second])
         executed = []
 
@@ -49,27 +49,31 @@ class DynamicAgentRuntimeTests(unittest.TestCase):
             executed.append((name, arguments))
             return {"owner_reported_events": 2, "verified_events": 0}
 
+        catalog = [
+            {"name": "get_reward_learning_status", "description": "read rewards",
+             "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
+            {"name": "get_agent_registry", "description": "read registry",
+             "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
+            {"name": "search_public_news", "description": "news",
+             "parameters": {"type": "object", "properties": {"query": {"type": "string"}},
+                            "required": ["query"], "additionalProperties": False}},
+        ]
         result = run_specialist(
-            client=client,
-            model="test-model",
-            specialty="reward_analyst",
-            task="Audit the current reward evidence",
-            context="Owner supplied reward examples exist.",
-            catalog=[
-                {"name": "get_reward_learning_status", "description": "read rewards",
-                 "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
-                {"name": "get_agent_registry", "description": "read registry",
-                 "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
-            ],
-            execute_tool=execute,
+            client=client, model="test-model", role="Reward and cohort evidence auditor",
+            task="Audit the current reward evidence", context="Owner supplied examples exist.",
+            capabilities=["reward_analytics", "creator_cohorts"],
+            catalog=catalog, execute_tool=execute,
         )
         self.assertEqual(executed, [("get_reward_learning_status", {})])
         self.assertEqual(result["status"], "completed")
-        self.assertEqual(result["specialty"], "reward_analyst")
+        self.assertEqual(result["role"], "Reward and cohort evidence auditor")
+        self.assertEqual(set(result["capabilities"]), {"reward_analytics", "creator_cohorts"})
         self.assertFalse(result["publication_authority"])
         self.assertFalse(result["trading_authority"])
-        self.assertIn("owner-reported", result["findings"])
-        self.assertEqual(client.responses.calls[0]["tools"][0]["name"], "get_reward_learning_status")
+        self.assertEqual(
+            set(item["name"] for item in client.responses.calls[0]["tools"]),
+            {"get_reward_learning_status"},
+        )
 
     def test_retired_300_node_mesh_and_generated_artifact_are_absent(self):
         from pathlib import Path
@@ -81,31 +85,35 @@ class DynamicAgentRuntimeTests(unittest.TestCase):
             self.assertNotIn("agent_mesh_300", source)
             self.assertNotIn("300-agent", source)
 
-    def test_research_specialist_has_live_news_and_market_access(self):
-        allowed = set(SPECIALIST_PROFILES["research_analyst"]["tools"])
-        self.assertIn("search_public_news", allowed)
-        self.assertIn("get_live_market_data", allowed)
-        self.assertIn("get_verified_research_evidence", allowed)
-        self.assertNotIn("publish_post", allowed)
+    def test_invalid_or_privilege_escalating_capabilities_are_rejected(self):
+        for capabilities in ([], ["shell"], ["reward_analytics", "reward_analytics"],
+                             ["reward_analytics", "market_data", "news_discovery",
+                              "research_evidence", "creator_cohorts"]):
+            with self.subTest(capabilities=capabilities):
+                with self.assertRaisesRegex(ValueError, "specialist_capabilities_invalid"):
+                    run_specialist(
+                        client=FakeClient([]), model="test", role="Research helper",
+                        task="research", context="", capabilities=capabilities,
+                        catalog=[], execute_tool=lambda *_: {},
+                    )
 
-    def test_unknown_specialist_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, "specialist_not_allowed"):
+    def test_unknown_or_invalid_role_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "specialist_role_invalid"):
             run_specialist(
-                client=FakeClient([]), model="test", specialty="shell_operator",
-                task="do something", context="", catalog=[], execute_tool=lambda *_: {},
+                client=FakeClient([]), model="test", role="shell\noperator",
+                task="do something", context="", capabilities=["research_evidence"],
+                catalog=[], execute_tool=lambda *_: {},
             )
 
     def test_task_and_context_are_bounded(self):
+        common = dict(
+            client=FakeClient([]), model="test", role="Research helper",
+            capabilities=["research_evidence"], catalog=[], execute_tool=lambda *_: {},
+        )
         with self.assertRaisesRegex(ValueError, "specialist_task_invalid"):
-            run_specialist(
-                client=FakeClient([]), model="test", specialty="research_analyst",
-                task="x" * 4001, context="", catalog=[], execute_tool=lambda *_: {},
-            )
+            run_specialist(**common, task="x" * 4001, context="")
         with self.assertRaisesRegex(ValueError, "specialist_context_invalid"):
-            run_specialist(
-                client=FakeClient([]), model="test", specialty="research_analyst",
-                task="research", context="x" * 8001, catalog=[], execute_tool=lambda *_: {},
-            )
+            run_specialist(**common, task="research", context="x" * 8001)
 
 
 if __name__ == "__main__":

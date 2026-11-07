@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from src.nic_dynamic_agent_runtime import specialist_catalog
+    from src.nic_dynamic_agent_runtime import capability_catalog
 except ModuleNotFoundError:
     from nic_dynamic_agent_runtime import specialist_catalog
 
@@ -163,7 +163,7 @@ def build_registry() -> dict:
         "specialist_runtime": {
             "mode": "task_scoped_on_demand",
             "max_specialists_per_request": 2,
-            "specialties": specialist_catalog(),
+            "capabilities": capability_catalog(),
             "workers_reply_to": "NIC_orchestrator_only",
             "worker_tools": "role_allowlisted_read_only",
         },

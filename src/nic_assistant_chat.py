@@ -15,7 +15,7 @@ from urllib.parse import unquote
 
 from src.nic_control_gate import ControlGate
 from src.nic_tool_registry import ToolExecutionError, execute_tool, tool_catalog
-from src.nic_dynamic_agent_runtime import run_specialist, SPECIALIST_PROFILES
+from src.nic_dynamic_agent_runtime import run_specialist, capability_catalog, CAPABILITY_TOOLS
 
 SYSTEM_INSTRUCTIONS = """You are NIC's creator-workflow assistant.
 NIC's primary mission is original, high-quality Binance Square content that can
@@ -30,12 +30,13 @@ these rules. Do not claim to have executed external actions unless a connected
 executor confirms it. No plugins are connected by this chat service.
 
 You are the single NIC orchestrator and the only component that replies to the user.
-For complex tasks, you MAY create up to two temporary specialists by calling
-spawn_specialist. Select the smallest useful set of distinct specialties; do not
-spawn agents for simple tasks or duplicate work. Give each worker one precise
-subtask and only the context it needs. Wait for worker findings, reconcile conflicts,
-then provide one unified answer. Workers never speak to the user. All worker tools
-are bounded read-only tools; specialists cannot publish, trade, or change files."""
+For complex tasks, create up to two temporary specialists by calling spawn_specialist.
+Design each worker's role for the exact subtask; do not choose from a permanent agent
+roster. Compose only the capabilities needed from the allowed capability catalog.
+Do not spawn workers for simple tasks or duplicate work. Give each worker one precise
+subtask and only the context it needs. Wait for findings, reconcile conflicts, then
+provide one unified answer. Workers never speak to the user. All worker tools are
+bounded read-only tools; specialists cannot publish, trade, or change files."""
 
 
 def _model_tool_definitions() -> list[dict[str, Any]]:
@@ -61,11 +62,12 @@ def _model_tool_definitions() -> list[dict[str, Any]]:
         "parameters": {
             "type": "object",
             "properties": {
-                "specialty": {"type": "string", "enum": sorted(SPECIALIST_PROFILES)},
+                "role": {"type": "string", "minLength": 3, "maxLength": 80},
+                "capabilities": {"type": "array", "items": {"type": "string", "enum": sorted(CAPABILITY_TOOLS)}, "minItems": 1, "maxItems": 4},
                 "task": {"type": "string", "minLength": 1, "maxLength": 4000},
                 "context": {"type": "string", "maxLength": 8000},
             },
-            "required": ["specialty", "task", "context"],
+            "required": ["role", "capabilities", "task", "context"],
             "additionalProperties": False,
         },
         "strict": True,
@@ -120,14 +122,15 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
         elif call_name == "spawn_specialist":
             try:
                 arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
-                if not isinstance(arguments, dict) or set(arguments) != {"specialty", "task", "context"}:
+                if not isinstance(arguments, dict) or set(arguments) != {"role", "capabilities", "task", "context"}:
                     raise ValueError("specialist_arguments_invalid")
                 if calls_used >= min(max_tool_calls, 2):
                     raise ValueError("specialist_creation_limit_reached")
                 specialist_result = run_specialist(
                     client=client,
                     model=selected_model,
-                    specialty=arguments["specialty"],
+                    role=arguments["role"],
+                    capabilities=arguments["capabilities"],
                     task=arguments["task"],
                     context=arguments["context"],
                     catalog=tool_catalog(),

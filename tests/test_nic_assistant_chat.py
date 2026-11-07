@@ -97,7 +97,7 @@ class NICAssistantChatTests(unittest.TestCase):
                         id="response-specialist-request", output_text="",
                         output=[SimpleNamespace(
                             type="function_call", name="spawn_specialist",
-                            arguments='{"specialty":"reward_analyst","task":"Audit reward evidence","context":"Review owner-reported and verified entries."}',
+                            arguments='{"role":"Reward and cohort evidence auditor","capabilities":["reward_analytics","creator_cohorts"],"task":"Audit reward evidence","context":"Review owner-reported and verified entries."}',
                             call_id="spawn-1",
                         )],
                     ),
@@ -112,7 +112,8 @@ class NICAssistantChatTests(unittest.TestCase):
 
         client = SimpleNamespace(responses=SpecialistResponses())
         worker_result = {
-            "specialty": "reward_analyst",
+            "role": "Reward and cohort evidence auditor",
+            "capabilities": ["reward_analytics", "creator_cohorts"],
             "status": "completed",
             "findings": "Owner-reported and verified totals remain separate.",
             "publication_authority": False,
@@ -123,7 +124,7 @@ class NICAssistantChatTests(unittest.TestCase):
         self.assertIn("temporary specialist", result)
         spawn.assert_called_once()
         kwargs = spawn.call_args.kwargs
-        self.assertEqual(kwargs["specialty"], "reward_analyst")
+        self.assertEqual(kwargs["role"], "Reward and cohort evidence auditor")
         self.assertEqual(kwargs["task"], "Audit reward evidence")
         first, second = client.responses.calls
         self.assertTrue(any(item["name"] == "spawn_specialist" for item in first["tools"]))
