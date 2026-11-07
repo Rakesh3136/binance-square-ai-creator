@@ -2,6 +2,15 @@
 
 An autonomous content system for researching crypto topics, creating original Binance Square content, publishing through approved APIs, measuring performance, and improving its strategy.
 
+
+### Live specialist research tools
+
+Task-scoped NIC specialists can use two bounded public-data connectors:
+- Binance public Spot REST ticker and recent candles for one validated USDT symbol.
+- Google News RSS headline discovery for a bounded search query.
+
+They can also read NIC's verified-evidence register and reward-pattern lab. News headlines and retrieved URLs are discovery leads, not publication-grade facts; the fact-checker must verify primary sources. Owner-reported rewards remain separate from independently verified rewards, and creator-period totals are never attributed to individual posts. No tool grants publishing, trading, arbitrary URL fetching, shell, secret, or filesystem-write access.
+
 ## Task-scoped specialist runtime
 
 NIC chat uses one orchestrator that can create up to two temporary, model-backed
