@@ -10,7 +10,10 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.nic_dynamic_agent_runtime import specialist_catalog
+try:
+    from src.nic_dynamic_agent_runtime import specialist_catalog
+except ModuleNotFoundError:
+    from nic_dynamic_agent_runtime import specialist_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/autonomous-market-creator.yml"
