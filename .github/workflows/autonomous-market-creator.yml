@@ -444,6 +444,36 @@ jobs:
           python src/nic_candidate_handoff_4.py
           python src/nic_creative_compiler_13.py
 
+      - name: Preserve native writer rejection diagnostics
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("data/live/creator_status.json")
+          if not path.exists():
+              print("NIC writer diagnostics: creator_status.json was not produced")
+              raise SystemExit(0)
+          status = json.loads(path.read_text(encoding="utf-8"))
+          print(json.dumps({
+              "status": status.get("status"),
+              "message": status.get("message"),
+              "fallback_status": status.get("fallback_status"),
+              "error": status.get("error"),
+              "publication_allowed": status.get("publication_allowed", False),
+          }, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Upload native writer rejection diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nic-native-writer-diagnostics-${{ github.run_id }}
+          path: |
+            data/live/creator_status.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Score and apply human editorial pass
         id: editorial
         if: ${{ steps.cadence.outputs.publish == 'true' }}
