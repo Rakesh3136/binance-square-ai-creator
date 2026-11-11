@@ -71,9 +71,15 @@ class NICAssistantChatTests(unittest.TestCase):
         self.assertEqual(second["input"][0]["type"], "function_call_output")
         self.assertIn('"agent_count": 9', second["input"][0]["output"])
 
+    def test_tool_execution_is_disabled_without_owner_scoped_executor(self):
+        client = FakeClient()
+        advisor_reply("Hello", client=client)
+        self.assertNotIn("tools", client.responses.kwargs)
+
     def test_tool_execution_can_be_disabled(self):
         client = FakeClient()
-        advisor_reply("Hello", client=client, max_tool_calls=0)
+        advisor_reply("Hello", client=client, max_tool_calls=0,
+                      tool_executor=lambda *_: {})
         self.assertNotIn("tools", client.responses.kwargs)
 
     def test_tool_call_limit_is_bounded(self):
