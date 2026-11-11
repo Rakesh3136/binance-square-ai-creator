@@ -61,7 +61,7 @@ class NICAssistantChatTests(unittest.TestCase):
     def test_chat_executes_allowlisted_tool_and_returns_model_summary(self):
         client = FakeToolClient()
         with patch("src.nic_assistant_chat.execute_tool", return_value={"agent_count": 9}) as execute:
-            result = advisor_reply("Check the agent registry", client=client, model="test-model")
+            result = advisor_reply("Check the agent registry", client=client, model="test-model", tool_executor=execute)
         self.assertEqual(result, "Six specialist roles are wired.")
         execute.assert_called_once_with("get_agent_registry", {})
         first, second = client.responses.calls
@@ -120,7 +120,7 @@ class NICAssistantChatTests(unittest.TestCase):
             "trading_authority": False,
         }
         with patch("src.nic_assistant_chat.run_specialist", return_value=worker_result) as spawn:
-            result = advisor_reply("Audit reward learning deeply", client=client, model="test-model")
+            result = advisor_reply("Audit reward learning deeply", client=client, model="test-model", tool_executor=lambda *_: {})
         self.assertIn("temporary specialist", result)
         spawn.assert_called_once()
         kwargs = spawn.call_args.kwargs
