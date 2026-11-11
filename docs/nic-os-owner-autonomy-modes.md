@@ -32,4 +32,4 @@ The tool broker checks the current grant and stop state on every action. Revocat
 
 ## Implementation status
 
-src/nic_os_autonomy_policy.py is a pure policy evaluator with unit tests. It is not an authentication provider, grant database, UI toggle, runtime broker integration or deployed control plane. Do not present Full Power as active until those integrations and end-to-end tests exist.
+Implementation now includes the policy evaluator, persistent SQLite owner-control store, owner-authenticated grant/revoke API routes, and an owner-scoped broker wired into chat, temporary specialists and the owner operator endpoint. GitHub Actions validates the integration. The owner API still uses a static bearer token and server-side owner identity; there is no polished cockpit toggle/countdown, production identity/session hardening, external hard-stop service, or deployed runtime. Full Power is therefore implemented as a tested backend capability but is not live or available to the user until deployment and owner UI setup are completed.
