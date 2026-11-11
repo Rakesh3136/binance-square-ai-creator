@@ -130,7 +130,7 @@ Do not expose private chain-of-thought. Report concise decisions, actions, evide
 ## Initial implementation sequence
 
 1. Architecture, permission and release contracts (this change).
-2. Persistent task/event API and owner-control API integration.
+2. Persistent owner-control store, owner grant/revoke API and tool-broker enforcement (implemented in PR #216; not deployed). Persistent task/event API integration remains.
 3. NIC cockpit: chat, task queue, live activity, approvals, pause/stop.
 4. Isolated browser/terminal worker with visible screen streaming and takeover.
 5. Development lab: branch, patch, tests, PR and release-candidate workflow.
