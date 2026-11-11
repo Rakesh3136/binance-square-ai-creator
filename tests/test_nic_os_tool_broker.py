@@ -69,3 +69,36 @@ def test_each_execution_rechecks_revocation():
         pass
     assert len(store.calls) == 2
     assert len(count) == 1
+
+def test_legacy_stop_check_blocks_before_owner_store(tmp_path):
+    store = FakeStore(True)
+    called = []
+    broker = OwnerAuthorizedToolBroker(
+        store, grant_id="grant-1", task_id="task-1",
+        executor=lambda *args: called.append(args) or {},
+        stop_check=lambda: True,
+    )
+    try:
+        broker.execute("get_live_market_data", {})
+        assert False, "emergency stop must deny"
+    except ToolExecutionError as exc:
+        assert str(exc) == "emergency_stop_active"
+    assert store.calls == []
+    assert called == []
+
+
+def test_environment_emergency_stop_blocks_broker(monkeypatch):
+    store = FakeStore(True)
+    called = []
+    broker = OwnerAuthorizedToolBroker(
+        store, grant_id="grant-1", task_id="task-1",
+        executor=lambda *args: called.append(args) or {},
+    )
+    monkeypatch.setenv("NIC_EMERGENCY_STOP", "1")
+    try:
+        broker.execute("get_live_market_data", {})
+        assert False, "environment stop must deny"
+    except ToolExecutionError as exc:
+        assert str(exc) == "emergency_stop_active"
+    assert store.calls == []
+    assert called == []
