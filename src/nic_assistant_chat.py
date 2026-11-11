@@ -296,10 +296,12 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     })
                     return
                 if self.path == "/control/status":
+                    owner_status = owner_store.status() if owner_store is not None else None
                     self._json(200, {
                         **control.status(),
+                        **(owner_status or {}),
                         "owner_control_store_configured": owner_store is not None,
-                        "owner_control": owner_store.status() if owner_store is not None else None,
+                        "owner_control": owner_status,
                         "tool_execution": "owner_scoped_grant_required",
                         "connected_plugins": [],
                         "external_action_execution": "not_connected",
@@ -454,8 +456,10 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
 def serve() -> None:
     host, port = os.getenv("NIC_CHAT_HOST", "127.0.0.1"), int(os.getenv("NIC_CHAT_PORT", "8765"))
     if host not in ("127.0.0.1", "::1", "localhost"):
-        if not os.getenv("NIC_CHAT_ACCESS_TOKEN") or not os.getenv("NIC_OWNER_CONTROL_TOKEN"):
-            raise RuntimeError("Both chat and owner control tokens are required beyond loopback")
+        required = ("NIC_CHAT_ACCESS_TOKEN", "NIC_OWNER_CONTROL_TOKEN",
+                    "NIC_OS_OWNER_IDENTITY", "NIC_OS_OWNER_DB_PATH")
+        if any(not os.getenv(name, "").strip() for name in required):
+            raise RuntimeError("Chat token, owner token, owner identity and owner database are required beyond loopback")
     server = ThreadingHTTPServer((host, port), make_handler())
     print(f"NIC chat/control API listening on {host}:{port}")
     server.serve_forever()
