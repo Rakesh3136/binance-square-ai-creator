@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from nic_os_autonomy_policy import evaluate_owner_autonomy
+from src.nic_os_autonomy_policy import evaluate_owner_autonomy
 
 
 def _utc(value: datetime | None = None) -> str:
