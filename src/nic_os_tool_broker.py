@@ -1,6 +1,7 @@
 """Fail-closed authorization boundary for NIC model-requested tool calls."""
 from __future__ import annotations
 
+import os
 from typing import Any, Callable
 
 from src.nic_os_owner_control_store import OwnerControlStore
@@ -22,13 +23,19 @@ class OwnerAuthorizedToolBroker:
         grant_id: str | None,
         task_id: str | None,
         executor: Callable[[str, dict[str, Any]], dict[str, Any]] = execute_tool,
+        stop_check: Callable[[], bool] | None = None,
     ):
         self.store = store
         self.grant_id = grant_id
         self.task_id = task_id
         self.executor = executor
+        self.stop_check = stop_check
 
     def execute(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+        if os.getenv("NIC_EMERGENCY_STOP", "").strip().lower() in {"1", "true", "yes", "on"}:
+            raise ToolExecutionError("emergency_stop_active")
+        if self.stop_check is not None and self.stop_check():
+            raise ToolExecutionError("emergency_stop_active")
         if self.store is None or not self.grant_id or not self.task_id:
             raise ToolExecutionError("owner_autonomy_grant_required")
         if not isinstance(name, str) or not name.strip():
