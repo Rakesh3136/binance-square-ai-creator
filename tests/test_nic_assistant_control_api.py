@@ -201,6 +201,9 @@ class NICControlAPITests(unittest.TestCase):
         )
         self.assertEqual(status, 201)
         grant_id = payload["grant"]["grant_id"]
+        status, listed = self.request("/control/autonomy/grants", "owner-test-token")
+        self.assertEqual(status, 200)
+        self.assertEqual(listed["grants"][0]["grant_id"], grant_id)
         status, result = self.request(
             "/operator/execute", "owner-test-token", method="POST",
             payload={"tool": "get_agent_registry", "arguments": {},
