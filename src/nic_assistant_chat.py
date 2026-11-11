@@ -80,7 +80,8 @@ def _model_tool_definitions() -> list[dict[str, Any]]:
 def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                   client: Any | None = None, model: str | None = None,
                   max_tool_calls: int = 3, owner_store: OwnerControlStore | None = None,
-                  autonomy_grant_id: str | None = None, autonomy_task_id: str | None = None) -> str:
+                  autonomy_grant_id: str | None = None, autonomy_task_id: str | None = None,
+                  stop_check: Any | None = None) -> str:
     """Return a creator-workflow reply, executing only bounded read-only tools."""
     if not isinstance(message, str) or not message.strip():
         raise ValueError("message must be a non-empty string")
@@ -102,7 +103,8 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
         from openai import OpenAI
         client = OpenAI()
     selected_model = model or os.getenv("NIC_CHAT_MODEL", "gpt-4.1-mini")
-    broker = OwnerAuthorizedToolBroker(owner_store, grant_id=autonomy_grant_id, task_id=autonomy_task_id)
+    broker = OwnerAuthorizedToolBroker(owner_store, grant_id=autonomy_grant_id, task_id=autonomy_task_id,
+                                       stop_check=stop_check)
     # No grant means no model tools are advertised; the model cannot request an unapproved action.
     tools = _model_tool_definitions() if max_tool_calls and owner_store is not None and autonomy_grant_id and autonomy_task_id else None
     response = client.responses.create(
@@ -338,7 +340,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     if task_id is not None and not isinstance(task_id, str):
                         raise ValueError("autonomy_task_id_invalid")
                     reply = advisor_reply(message, history, owner_store=configured_store,
-                                          autonomy_grant_id=grant_id, autonomy_task_id=task_id)
+                                          autonomy_grant_id=grant_id, autonomy_task_id=task_id, stop_check=control.is_stopped)
                     self._json(200, {"reply": reply, "model": os.getenv("NIC_CHAT_MODEL", "gpt-4.1-mini")})
                 except ValueError as exc:
                     self._json(400, {"error": str(exc)})
