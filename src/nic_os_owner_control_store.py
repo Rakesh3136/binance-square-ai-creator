@@ -199,6 +199,28 @@ class OwnerControlStore:
             db.commit()
             return result
 
+    def list_grants(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        """Return bounded grant metadata for the authenticated owner cockpit."""
+        if not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("grant_list_limit_invalid")
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT grant_id, owner_identity, mode, issued_at, expires_at, "
+                "task_ids, scopes, revoked_at FROM autonomy_grants "
+                "ORDER BY issued_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [{
+            "grant_id": row["grant_id"],
+            "owner_identity": row["owner_identity"],
+            "mode": row["mode"],
+            "issued_at": row["issued_at"],
+            "expires_at": row["expires_at"],
+            "task_ids": json.loads(row["task_ids"]),
+            "scopes": json.loads(row["scopes"]),
+            "revoked": row["revoked_at"] is not None,
+            "revoked_at": row["revoked_at"],
+        } for row in rows]
+
     def status(self) -> dict[str, Any]:
         with self._connect() as db:
             row = db.execute(
