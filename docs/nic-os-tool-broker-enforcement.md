@@ -17,7 +17,8 @@ All control routes require the separate `NIC_OWNER_CONTROL_TOKEN` bearer token. 
 
 - `POST /control/autonomy/grants`: owner issues a grant with explicit `task_ids`, `scopes`, `mode` and `duration_seconds`.
 - `POST /control/autonomy/grants/{grant_id}/revoke`: owner revokes a grant.
-- `GET /control/status`: reports the local stop plus owner-store status.
+- `GET /control/status`: reports the authoritative owner-store stop plus local control status.
+- `GET /control/autonomy/grants`: lists bounded grant metadata for the authenticated owner cockpit.
 - `POST /control/stop` and `POST /control/resume`: update both local and owner-store stop state, and attempt the configured shared GitHub Actions stop update.
 
 The chat request may include `autonomy_grant_id` and `task_id`. Without a valid configured store and both values, the chat model receives no tool definitions and cannot invoke tools. The owner operator endpoint likewise requires a valid grant and task ID.
@@ -25,6 +26,8 @@ The chat request may include `autonomy_grant_id` and `task_id`. Without a valid 
 ## Boundaries and limitations
 
 This is an integration step, not a production-ready owner identity platform. The owner bearer token is a static shared secret; deploy only over TLS, store it in a secret manager, rotate it, and do not expose it to workers or browser JavaScript. The configured owner identity is server-side configuration, never request data. The owner-control database credentials must remain in the API process and outside worker environments.
+
+The existing static NIC dashboard now includes a temporary Full Power grant form, active-grant selection for chat, grant listing and immediate revoke controls. It keeps API tokens in page memory only, not localStorage. The dashboard is not deployed with this backend branch; connect it only after deploying the API behind HTTPS and configuring its server-side secrets.
 
 The current tool catalog remains read-only. This change does not add shell, filesystem write, browser interaction, publishing, financial operations, or deployment tools. Full Power is therefore limited to explicitly scoped tools that exist today; it does not conjure new capabilities. Production release, financial and owner-security actions remain non-delegable.
 
