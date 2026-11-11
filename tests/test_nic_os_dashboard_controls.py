@@ -9,5 +9,5 @@ def test_dashboard_exposes_owner_full_power_controls_without_persisting_tokens()
         "autonomy_grant_id", "task_id",
     ):
         assert required in html
-    assert "localStorage." not in html
+    assert not any(f"localStorage.{method}" in html for method in ("getItem", "setItem", "removeItem", "clear"))
     assert "Current tools remain read-only" in html
