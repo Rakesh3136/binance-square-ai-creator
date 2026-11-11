@@ -5,7 +5,7 @@ from src.nic_os_tool_broker import OwnerAuthorizedToolBroker
 from src.nic_tool_registry import ToolExecutionError
 
 
-NOW = datetime(2026, 11, 11, 12, 0, tzinfo=timezone.utc)
+NOW = datetime.now(timezone.utc)
 
 
 def test_real_owner_store_gates_tool_call_and_revocation(tmp_path):
