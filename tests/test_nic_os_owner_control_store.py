@@ -2,7 +2,7 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from nic_os_owner_control_store import OwnerControlStore
+from src.nic_os_owner_control_store import OwnerControlStore
 
 
 NOW = datetime(2026, 11, 11, 12, 0, tzinfo=timezone.utc)
