@@ -22,13 +22,13 @@ class OwnerAuthorizedToolBroker:
         *,
         grant_id: str | None,
         task_id: str | None,
-        executor: Callable[[str, dict[str, Any]], dict[str, Any]] = execute_tool,
+        executor: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
         stop_check: Callable[[], bool] | None = None,
     ):
         self.store = store
         self.grant_id = grant_id
         self.task_id = task_id
-        self.executor = executor
+        self.executor = executor or execute_tool
         self.stop_check = stop_check
 
     def execute(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
