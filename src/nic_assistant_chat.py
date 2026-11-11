@@ -419,6 +419,9 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                         configured_store.set_emergency_stop(
                             authenticated_owner=owner_identity, active=active
                         )
+                        # Mirror the stop into the legacy in-process action gate too.
+                        # The owner store remains the authoritative chat-tool grant check.
+                        control.set_emergency_stop(active, actor="owner_autonomy_api")
                         self._json(200, {"emergency_stop": active})
                 except (ValueError, PermissionError, RuntimeError) as exc:
                     self._json(409, {"error": str(exc)})
