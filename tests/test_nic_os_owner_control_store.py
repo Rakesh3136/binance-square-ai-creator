@@ -103,6 +103,17 @@ def test_wildcards_and_unbounded_duration_rejected(tmp_path):
                       duration_seconds=43201, now=NOW)
 
 
+def test_owner_can_list_bounded_grant_metadata(tmp_path):
+    s = store(tmp_path)
+    g = grant(s)
+    rows = s.list_grants()
+    assert len(rows) == 1
+    assert rows[0]["grant_id"] == g["grant_id"]
+    assert rows[0]["task_ids"] == ["task-1"]
+    assert rows[0]["revoked"] is False
+    assert rows[0]["scopes"][0]["resource"] == "github:repo"
+
+
 def test_audit_is_append_only(tmp_path):
     s = store(tmp_path)
     s.set_emergency_stop(authenticated_owner="owner:primary", active=False)
