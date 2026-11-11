@@ -287,9 +287,15 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     "external_action_execution": "not_connected",
                 })
                 return
-            if self.path in ("/operator/capabilities", "/control/status", "/control/approvals"):
+            if self.path in ("/operator/capabilities", "/control/status", "/control/approvals", "/control/autonomy/status"):
                 if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                if self.path == "/control/autonomy/status":
+                    if configured_store is None:
+                        self._json(503, {"error": "owner_autonomy_store_not_configured"})
+                    else:
+                        self._json(200, configured_store.status())
                     return
                 if self.path == "/operator/capabilities":
                     self._json(200, {
