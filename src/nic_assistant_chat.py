@@ -16,6 +16,8 @@ from urllib.parse import unquote
 from src.nic_control_gate import ControlGate
 from src.nic_tool_registry import ToolExecutionError, execute_tool, tool_catalog
 from src.nic_dynamic_agent_runtime import run_specialist, capability_catalog, CAPABILITY_TOOLS
+from src.nic_os_owner_control_store import OwnerControlStore
+from src.nic_os_tool_broker import OwnerAuthorizedToolBroker
 
 SYSTEM_INSTRUCTIONS = """You are NIC's creator-workflow assistant.
 NIC's primary mission is original, high-quality Binance Square content that can
@@ -77,7 +79,9 @@ def _model_tool_definitions() -> list[dict[str, Any]]:
 
 def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                   client: Any | None = None, model: str | None = None,
-                  max_tool_calls: int = 3) -> str:
+                  max_tool_calls: int = 3, owner_store: OwnerControlStore | None = None,
+                  autonomy_grant_id: str | None = None, autonomy_task_id: str | None = None,
+                  stop_check: Any | None = None) -> str:
     """Return a creator-workflow reply, executing only bounded read-only tools."""
     if not isinstance(message, str) or not message.strip():
         raise ValueError("message must be a non-empty string")
@@ -99,7 +103,10 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
         from openai import OpenAI
         client = OpenAI()
     selected_model = model or os.getenv("NIC_CHAT_MODEL", "gpt-4.1-mini")
-    tools = _model_tool_definitions() if max_tool_calls else None
+    broker = OwnerAuthorizedToolBroker(owner_store, grant_id=autonomy_grant_id, task_id=autonomy_task_id,
+                                       stop_check=stop_check)
+    # No grant means no model tools are advertised; the model cannot request an unapproved action.
+    tools = _model_tool_definitions() if max_tool_calls and owner_store is not None and autonomy_grant_id and autonomy_task_id else None
     response = client.responses.create(
         model=selected_model,
         instructions=SYSTEM_INSTRUCTIONS,
@@ -134,7 +141,7 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                     task=arguments["task"],
                     context=arguments["context"],
                     catalog=tool_catalog(),
-                    execute_tool=execute_tool,
+                    execute_tool=broker.execute,
                 )
                 tool_output = {"ok": True, "result": specialist_result}
             except (ToolExecutionError, ValueError, TypeError, RuntimeError) as exc:
@@ -142,7 +149,7 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
         else:
             try:
                 arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
-                result = execute_tool(call_name, arguments)
+                result = broker.execute(call_name, arguments)
                 tool_output = {"ok": True, "result": result}
             except (ToolExecutionError, ValueError, TypeError) as exc:
                 tool_output = {"ok": False, "error": str(exc)}
@@ -205,9 +212,14 @@ def sync_github_emergency_stop(enabled: bool) -> None:
         raise RuntimeError("shared_github_stop_update_failed") from exc
 
 
-def make_handler(gate: ControlGate | None = None):
-    """Create HTTP routes for chat and separately authenticated owner controls."""
+def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore | None = None):
+    """Create chat routes and separately authenticated owner control-plane routes."""
     control = gate or ControlGate()
+    configured_store = owner_store
+    owner_identity = os.getenv("NIC_OWNER_IDENTITY", "").strip()
+    owner_db = os.getenv("NIC_OWNER_CONTROL_DB", "").strip()
+    if configured_store is None and owner_identity and owner_db:
+        configured_store = OwnerControlStore(owner_db, owner_identity=owner_identity)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "NICChat/1.1"
@@ -272,13 +284,20 @@ def make_handler(gate: ControlGate | None = None):
                     "model_configured": bool(os.getenv("OPENAI_API_KEY")),
                     "chat_token_configured": bool(os.getenv("NIC_CHAT_ACCESS_TOKEN")),
                     "owner_control_token_configured": bool(os.getenv("NIC_OWNER_CONTROL_TOKEN")),
+                    "owner_autonomy_store_configured": configured_store is not None,
                     "connected_plugins": [],
                     "external_action_execution": "not_connected",
                 })
                 return
-            if self.path in ("/operator/capabilities", "/control/status", "/control/approvals"):
+            if self.path in ("/operator/capabilities", "/control/status", "/control/approvals", "/control/autonomy/status"):
                 if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                if self.path == "/control/autonomy/status":
+                    if configured_store is None:
+                        self._json(503, {"error": "owner_autonomy_store_not_configured"})
+                    else:
+                        self._json(200, configured_store.status())
                     return
                 if self.path == "/operator/capabilities":
                     self._json(200, {
@@ -314,7 +333,14 @@ def make_handler(gate: ControlGate | None = None):
                     message, history = payload.get("message"), payload.get("history", [])
                     if not isinstance(history, list):
                         raise ValueError("history must be a list")
-                    reply = advisor_reply(message, history)
+                    grant_id = payload.get("autonomy_grant_id")
+                    task_id = payload.get("autonomy_task_id")
+                    if grant_id is not None and not isinstance(grant_id, str):
+                        raise ValueError("autonomy_grant_id_invalid")
+                    if task_id is not None and not isinstance(task_id, str):
+                        raise ValueError("autonomy_task_id_invalid")
+                    reply = advisor_reply(message, history, owner_store=configured_store,
+                                          autonomy_grant_id=grant_id, autonomy_task_id=task_id, stop_check=control.is_stopped)
                     self._json(200, {"reply": reply, "model": os.getenv("NIC_CHAT_MODEL", "gpt-4.1-mini")})
                 except ValueError as exc:
                     self._json(400, {"error": str(exc)})
@@ -336,6 +362,71 @@ def make_handler(gate: ControlGate | None = None):
                     self._json(400, {"error": str(exc)})
                 except Exception:
                     self._json(500, {"error": "operator_tool_failed"})
+                return
+
+            if self.path == "/control/autonomy/grants":
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                if configured_store is None or not owner_identity:
+                    self._json(503, {"error": "owner_autonomy_store_not_configured"})
+                    return
+                try:
+                    payload = self._body()
+                    if set(payload) - {"task_ids", "scopes", "duration_seconds"}:
+                        raise ValueError("grant_fields_invalid")
+                    grant = configured_store.issue_grant(
+                        authenticated_owner=owner_identity,
+                        task_ids=payload.get("task_ids"),
+                        scopes=payload.get("scopes"),
+                        duration_seconds=payload.get("duration_seconds", 3600),
+                    )
+                    self._json(201, {"status": "grant_issued", "grant": grant})
+                except (ValueError, PermissionError, RuntimeError) as exc:
+                    self._json(409, {"error": str(exc)})
+                return
+
+            if self.path.startswith("/control/autonomy/grants/") and self.path.endswith("/revoke"):
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                if configured_store is None or not owner_identity:
+                    self._json(503, {"error": "owner_autonomy_store_not_configured"})
+                    return
+                grant_id = unquote(self.path[len("/control/autonomy/grants/"):-len("/revoke")].strip("/"))
+                if not grant_id or "/" in grant_id:
+                    self._json(400, {"error": "grant_id_invalid"})
+                    return
+                try:
+                    revoked = configured_store.revoke_grant(
+                        authenticated_owner=owner_identity, grant_id=grant_id
+                    )
+                    self._json(200, {"revoked": revoked, "grant_id": grant_id})
+                except (ValueError, PermissionError, RuntimeError) as exc:
+                    self._json(409, {"error": str(exc)})
+                return
+
+            if self.path in ("/control/autonomy/status", "/control/autonomy/stop", "/control/autonomy/resume"):
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                if configured_store is None or not owner_identity:
+                    self._json(503, {"error": "owner_autonomy_store_not_configured"})
+                    return
+                try:
+                    if self.path == "/control/autonomy/status":
+                        self._json(200, configured_store.status())
+                    else:
+                        active = self.path.endswith("/stop")
+                        configured_store.set_emergency_stop(
+                            authenticated_owner=owner_identity, active=active
+                        )
+                        # Mirror the stop into the legacy in-process action gate too.
+                        # The owner store remains the authoritative chat-tool grant check.
+                        control.set_emergency_stop(active, actor="owner_autonomy_api")
+                        self._json(200, {"emergency_stop": active})
+                except (ValueError, PermissionError, RuntimeError) as exc:
+                    self._json(409, {"error": str(exc)})
                 return
 
             if self.path.startswith("/control/"):
