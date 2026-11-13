@@ -218,9 +218,15 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
     """Create chat routes and separately authenticated owner control-plane routes."""
     control = gate or ControlGate()
     configured_store = owner_store
-    browser_sessions = OwnerSessionStore(ttl_seconds=int(os.getenv('NIC_OWNER_SESSION_TTL_SECONDS', '1800')))
     owner_identity = os.getenv("NIC_OWNER_IDENTITY", "").strip()
     owner_db = os.getenv("NIC_OWNER_CONTROL_DB", "").strip()
+    session_db = os.getenv("NIC_OWNER_SESSION_DB", "").strip()
+    if not session_db and owner_db:
+        session_db = owner_db + ".sessions.sqlite3"
+    browser_sessions = OwnerSessionStore(
+        ttl_seconds=int(os.getenv("NIC_OWNER_SESSION_TTL_SECONDS", "1800")),
+        database=session_db or None,
+    )
     if configured_store is None and owner_identity and owner_db:
         configured_store = OwnerControlStore(owner_db, owner_identity=owner_identity)
 
