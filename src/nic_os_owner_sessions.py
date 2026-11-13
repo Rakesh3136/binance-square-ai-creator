@@ -6,6 +6,7 @@ owner bearer token is exchanged once and is never stored in this database.
 from __future__ import annotations
 
 import hashlib
+from contextlib import closing
 import os
 import secrets
 import sqlite3
@@ -34,7 +35,7 @@ class OwnerSessionStore:
         if self.database:
             path = Path(self.database)
             path.parent.mkdir(parents=True, exist_ok=True)
-            with self._connect() as db:
+            with closing(self._connect()) as db:
                 db.execute("PRAGMA journal_mode=WAL")
                 db.execute("""
                     CREATE TABLE IF NOT EXISTS owner_browser_sessions (
