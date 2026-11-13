@@ -278,7 +278,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
             return forwarded == "https" or (local and os.getenv("NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST") == "1")
 
         def _owner_authorized(self) -> bool:
-            if self._owner_authorized():
+            if self._authorized("NIC_OWNER_CONTROL_TOKEN"):
                 return True
             if self.command != "GET" and not self._allowed_origin():
                 return False
