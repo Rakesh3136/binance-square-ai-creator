@@ -204,5 +204,18 @@ class OwnerControlStore:
             row = db.execute(
                 "SELECT emergency_stop, updated_at FROM owner_control_state WHERE singleton=1"
             ).fetchone()
-            return {"emergency_stop": True if row is None else bool(row["emergency_stop"]),
-                    "updated_at": None if row is None else row["updated_at"]}
+            grants = db.execute(
+                "SELECT grant_id, mode, issued_at, expires_at, task_ids, scopes, revoked_at "
+                "FROM autonomy_grants ORDER BY issued_at DESC LIMIT 10"
+            ).fetchall()
+            return {
+                "emergency_stop": True if row is None else bool(row["emergency_stop"]),
+                "updated_at": None if row is None else row["updated_at"],
+                "recent_grants": [{
+                    "grant_id": item["grant_id"], "mode": item["mode"],
+                    "issued_at": item["issued_at"], "expires_at": item["expires_at"],
+                    "task_ids": json.loads(item["task_ids"]),
+                    "scopes": json.loads(item["scopes"]),
+                    "revoked": item["revoked_at"] is not None,
+                } for item in grants],
+            }
