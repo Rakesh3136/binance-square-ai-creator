@@ -280,8 +280,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
         def _owner_authorized(self) -> bool:
             if self._authorized("NIC_OWNER_CONTROL_TOKEN"):
                 return True
-            origin = self._allowed_origin()
-            if not origin:
+            if self.command != "GET" and not self._allowed_origin():
                 return False
             return browser_sessions.authorize(self._session_cookie(), self.headers.get("X-NIC-CSRF", ""))
 
