@@ -23,6 +23,11 @@ class OwnerSessionTests(unittest.TestCase):
         now[0] += 61
         self.assertFalse(store.authorize(cookie, csrf))
 
+    def test_cookie_is_not_stored_in_plaintext(self):
+        store = OwnerSessionStore()
+        cookie, _, _ = store.create()
+        self.assertNotEqual(store._digest(cookie), cookie)
+
     def test_ttl_is_bounded(self):
         with self.assertRaises(ValueError):
             OwnerSessionStore(ttl_seconds=1)
