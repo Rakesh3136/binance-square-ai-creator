@@ -13,13 +13,6 @@ from src.nic_os_owner_control_store import OwnerControlStore
 class OwnerSessionApiTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.store = OwnerControlStore(os.path.join(self.tmp.name, "owner.db"), owner_identity="owner-1")
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(owner_store=self.store))
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self.thread.start()
-        host, port = self.server.server_address
-        self.host, self.port = host, port
-        self.origin = f"http://{host}:{port}"
         self.old = {k: os.environ.get(k) for k in (
             "NIC_OWNER_CONTROL_TOKEN", "NIC_OWNER_IDENTITY",
             "NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST", "NIC_CHAT_ALLOWED_ORIGINS",
@@ -28,8 +21,15 @@ class OwnerSessionApiTests(unittest.TestCase):
         os.environ["NIC_OWNER_CONTROL_TOKEN"] = "test-owner-token"
         os.environ["NIC_OWNER_IDENTITY"] = "owner-1"
         os.environ["NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST"] = "1"
-        os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = self.origin
         os.environ["NIC_OWNER_SESSION_TTL_SECONDS"] = "1800"
+        self.store = OwnerControlStore(os.path.join(self.tmp.name, "owner.db"), owner_identity="owner-1")
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(owner_store=self.store))
+        host, port = self.server.server_address
+        self.host, self.port = host, port
+        self.origin = f"http://{host}:{port}"
+        os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = self.origin
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
 
     def tearDown(self):
         self.server.shutdown()
