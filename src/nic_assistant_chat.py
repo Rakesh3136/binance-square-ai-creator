@@ -375,7 +375,8 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     self.send_header("Content-Type", "application/json; charset=utf-8")
                     self.send_header("Content-Length", str(len(body)))
                     self.send_header("Cache-Control", "no-store")
-                    self.send_header("Set-Cookie", "NIC_OWNER_SESSION=" + cookie_value + "; Path=/control; HttpOnly; Secure; SameSite=Strict; Max-Age=" + str(ttl))
+                    secure_flag = "; Secure" if not (self.headers.get("Host", "").split(":", 1)[0].lower() in {"localhost", "127.0.0.1"} and os.getenv("NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST") == "1") else ""
+                    self.send_header("Set-Cookie", "NIC_OWNER_SESSION=" + cookie_value + "; Path=/; HttpOnly" + secure_flag + "; SameSite=Strict; Max-Age=" + str(ttl))
                     self._cors_headers()
                     self.end_headers()
                     self.wfile.write(body)
@@ -393,7 +394,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
-                self.send_header("Set-Cookie", "NIC_OWNER_SESSION=; Path=/control; HttpOnly; Secure; SameSite=Strict; Max-Age=0")
+                self.send_header("Set-Cookie", "NIC_OWNER_SESSION=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0")
                 self._cors_headers()
                 self.end_headers()
                 self.wfile.write(body)
@@ -452,12 +453,13 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     return
                 try:
                     payload = self._body()
-                    if set(payload) - {"task_ids", "scopes", "duration_seconds"}:
+                    if set(payload) - {"task_ids", "scopes", "duration_seconds", "mode"}:
                         raise ValueError("grant_fields_invalid")
                     grant = configured_store.issue_grant(
                         authenticated_owner=owner_identity,
                         task_ids=payload.get("task_ids"),
                         scopes=payload.get("scopes"),
+                        mode=payload.get("mode", "standard"),
                         duration_seconds=payload.get("duration_seconds", 3600),
                     )
                     self._json(201, {"status": "grant_issued", "grant": grant})
