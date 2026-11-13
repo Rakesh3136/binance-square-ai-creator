@@ -278,7 +278,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
             return forwarded == "https" or (local and os.getenv("NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST") == "1")
 
         def _owner_authorized(self) -> bool:
-            if self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+            if self._owner_authorized():
                 return True
             if self.command != "GET" and not self._allowed_origin():
                 return False
@@ -428,7 +428,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path == "/operator/execute":
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 try:
@@ -444,7 +444,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path == "/control/autonomy/grants":
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 if configured_store is None or not owner_identity:
@@ -467,7 +467,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path.startswith("/control/autonomy/grants/") and self.path.endswith("/revoke"):
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 if configured_store is None or not owner_identity:
@@ -487,7 +487,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path in ("/control/autonomy/status", "/control/autonomy/stop", "/control/autonomy/resume"):
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 if configured_store is None or not owner_identity:
@@ -510,7 +510,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path.startswith("/control/"):
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 try:
