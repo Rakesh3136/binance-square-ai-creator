@@ -18,6 +18,8 @@ from src.nic_tool_registry import ToolExecutionError, execute_tool, tool_catalog
 from src.nic_dynamic_agent_runtime import run_specialist, capability_catalog, CAPABILITY_TOOLS
 from src.nic_os_owner_control_store import OwnerControlStore
 from src.nic_os_tool_broker import OwnerAuthorizedToolBroker
+from src.nic_os_owner_sessions import OwnerSessionStore
+from http.cookies import SimpleCookie
 
 SYSTEM_INSTRUCTIONS = """You are NIC's creator-workflow assistant.
 NIC's primary mission is original, high-quality Binance Square content that can
@@ -216,6 +218,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
     """Create chat routes and separately authenticated owner control-plane routes."""
     control = gate or ControlGate()
     configured_store = owner_store
+    browser_sessions = OwnerSessionStore(ttl_seconds=int(os.getenv('NIC_OWNER_SESSION_TTL_SECONDS', '1800')))
     owner_identity = os.getenv("NIC_OWNER_IDENTITY", "").strip()
     owner_db = os.getenv("NIC_OWNER_CONTROL_DB", "").strip()
     if configured_store is None and owner_identity and owner_db:
@@ -239,7 +242,8 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 self.send_header("Access-Control-Allow-Origin", origin)
                 self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+                self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-NIC-CSRF")
+                self.send_header("Access-Control-Allow-Credentials", "true")
                 self.send_header("Access-Control-Max-Age", "600")
 
         def _json(self, status: int, payload: dict[str, Any]) -> None:
@@ -257,6 +261,28 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
             expected = os.getenv(env_name, "")
             supplied = self.headers.get("Authorization", "")
             return bool(expected) and hmac.compare_digest(supplied, "Bearer " + expected)
+
+        def _session_cookie(self) -> str:
+            cookie = SimpleCookie()
+            try:
+                cookie.load(self.headers.get("Cookie", ""))
+                morsel = cookie.get("NIC_OWNER_SESSION")
+                return morsel.value if morsel else ""
+            except Exception:
+                return ""
+
+        def _secure_request(self) -> bool:
+            forwarded = self.headers.get("X-Forwarded-Proto", "").lower()
+            host = self.headers.get("Host", "").split(":", 1)[0].lower()
+            local = host in {"localhost", "127.0.0.1", "::1"}
+            return forwarded == "https" or (local and os.getenv("NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST") == "1")
+
+        def _owner_authorized(self) -> bool:
+            if self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                return True
+            if self.command != "GET" and not self._allowed_origin():
+                return False
+            return browser_sessions.authorize(self._session_cookie(), self.headers.get("X-NIC-CSRF", ""))
 
         def _body(self) -> dict[str, Any]:
             length = int(self.headers.get("Content-Length", "0"))
@@ -289,8 +315,14 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     "external_action_execution": "not_connected",
                 })
                 return
+            if self.path == "/control/session/status":
+                if not self._owner_authorized():
+                    self._json(401, {"authenticated": False})
+                else:
+                    self._json(200, {"authenticated": True, "session_ttl_seconds": int(os.getenv("NIC_OWNER_SESSION_TTL_SECONDS", "1800"))})
+                return
             if self.path in ("/operator/capabilities", "/control/status", "/control/approvals", "/control/autonomy/status"):
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 if self.path == "/control/autonomy/status":
@@ -320,6 +352,53 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
             self._json(404, {"error": "not_found"})
 
         def do_POST(self) -> None:
+            if self.path == "/control/session/login":
+                origin = self._allowed_origin()
+                if not origin or not self._secure_request():
+                    self._json(403, {"error": "owner_session_requires_allowed_origin_and_https"})
+                    return
+                expected = os.getenv("NIC_OWNER_CONTROL_TOKEN", "")
+                if not expected:
+                    self._json(503, {"error": "owner_control_token_not_configured"})
+                    return
+                try:
+                    payload = self._body()
+                    if set(payload) != {"owner_token"} or not isinstance(payload.get("owner_token"), str):
+                        raise ValueError("owner_token_required")
+                    if not hmac.compare_digest(payload["owner_token"], expected):
+                        self._json(401, {"error": "owner_unauthorized"})
+                        return
+                    cookie_value, csrf, ttl = browser_sessions.create()
+                    body = json.dumps({"authenticated": True, "csrf_token": csrf, "expires_in": ttl}).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Cache-Control", "no-store")
+                    secure_flag = "; Secure" if not (self.headers.get("Host", "").split(":", 1)[0].lower() in {"localhost", "127.0.0.1"} and os.getenv("NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST") == "1") else ""
+                    self.send_header("Set-Cookie", "NIC_OWNER_SESSION=" + cookie_value + "; Path=/; HttpOnly" + secure_flag + "; SameSite=Strict; Max-Age=" + str(ttl))
+                    self._cors_headers()
+                    self.end_headers()
+                    self.wfile.write(body)
+                except ValueError as exc:
+                    self._json(400, {"error": str(exc)})
+                return
+
+            if self.path == "/control/session/logout":
+                if not self._owner_authorized():
+                    self._json(401, {"error": "owner_unauthorized"})
+                    return
+                browser_sessions.revoke(self._session_cookie())
+                body = json.dumps({"authenticated": False}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Set-Cookie", "NIC_OWNER_SESSION=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0")
+                self._cors_headers()
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
             if self.path == "/chat":
                 token = os.getenv("NIC_CHAT_ACCESS_TOKEN", "")
                 if not token:
@@ -349,7 +428,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path == "/operator/execute":
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 try:
@@ -365,7 +444,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path == "/control/autonomy/grants":
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 if configured_store is None or not owner_identity:
@@ -373,12 +452,13 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     return
                 try:
                     payload = self._body()
-                    if set(payload) - {"task_ids", "scopes", "duration_seconds"}:
+                    if set(payload) - {"task_ids", "scopes", "duration_seconds", "mode"}:
                         raise ValueError("grant_fields_invalid")
                     grant = configured_store.issue_grant(
                         authenticated_owner=owner_identity,
                         task_ids=payload.get("task_ids"),
                         scopes=payload.get("scopes"),
+                        mode=payload.get("mode", "standard"),
                         duration_seconds=payload.get("duration_seconds", 3600),
                     )
                     self._json(201, {"status": "grant_issued", "grant": grant})
@@ -387,7 +467,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path.startswith("/control/autonomy/grants/") and self.path.endswith("/revoke"):
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 if configured_store is None or not owner_identity:
@@ -407,7 +487,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path in ("/control/autonomy/status", "/control/autonomy/stop", "/control/autonomy/resume"):
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 if configured_store is None or not owner_identity:
@@ -430,7 +510,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 return
 
             if self.path.startswith("/control/"):
-                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
                     return
                 try:
