@@ -16,12 +16,13 @@ class OwnerSessionApiTests(unittest.TestCase):
         self.old = {k: os.environ.get(k) for k in (
             "NIC_OWNER_CONTROL_TOKEN", "NIC_OWNER_IDENTITY",
             "NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST", "NIC_CHAT_ALLOWED_ORIGINS",
-            "NIC_OWNER_SESSION_TTL_SECONDS",
+            "NIC_OWNER_SESSION_TTL_SECONDS", "NIC_OWNER_SESSION_DB",
         )}
         os.environ["NIC_OWNER_CONTROL_TOKEN"] = "test-owner-token"
         os.environ["NIC_OWNER_IDENTITY"] = "owner-1"
         os.environ["NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST"] = "1"
         os.environ["NIC_OWNER_SESSION_TTL_SECONDS"] = "1800"
+        os.environ["NIC_OWNER_SESSION_DB"] = os.path.join(self.tmp.name, "browser-sessions.sqlite3")
         self.store = OwnerControlStore(os.path.join(self.tmp.name, "owner.db"), owner_identity="owner-1")
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(owner_store=self.store))
         host, port = self.server.server_address
@@ -100,6 +101,23 @@ class OwnerSessionApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         status, _, _ = self.call("GET", "/control/autonomy/status", cookie=cookie, csrf=csrf, origin=False)
         self.assertEqual(status, 401)
+
+    def test_browser_session_survives_api_handler_restart(self):
+        status, data, headers = self.call("POST", "/control/session/login", {"owner_token": "test-owner-token"})
+        self.assertEqual(status, 200)
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        csrf = data["csrf_token"]
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(owner_store=self.store))
+        self.host, self.port = self.server.server_address
+        self.origin = f"http://{self.host}:{self.port}"
+        os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = self.origin
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        status, _, _ = self.call("GET", "/control/autonomy/status", cookie=cookie, csrf=csrf, origin=False)
+        self.assertEqual(status, 200)
 
     def test_login_rejects_wrong_origin_and_wrong_owner_token(self):
         status, _, _ = self.call("POST", "/control/session/login", {"owner_token": "bad"}, origin=False)
