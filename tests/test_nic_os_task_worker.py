@@ -29,7 +29,7 @@ def test_worker_runs_only_tasks_with_an_active_exact_task_grant(tmp_path):
     seen = []
     worker = NICTaskWorker(
         tasks, owner,
-        executor=lambda task, grant_id, store: seen.append((task["task_id"], grant_id)) or "Evidence summary",
+        executor=lambda task, grant_id, store, task_store: seen.append((task["task_id"], grant_id)) or "Evidence summary",
     )
     assert worker.run_once()
     assert seen == [(allowed["task_id"], grant["grant_id"])]
@@ -64,7 +64,7 @@ def test_revoked_grant_during_task_pauses_instead_of_completing(tmp_path):
     task = tasks.create_task(owner_id="owner", goal="Revoke during execution")
     grant = issue(owner, task["task_id"])
 
-    def revoke_during_execution(claimed, grant_id, store):
+    def revoke_during_execution(claimed, grant_id, store, task_store):
         store.revoke_grant(authenticated_owner="owner", grant_id=grant_id)
         return "This result must not be committed"
 
