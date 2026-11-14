@@ -16,13 +16,14 @@ class OwnerSessionApiTests(unittest.TestCase):
         self.old = {k: os.environ.get(k) for k in (
             "NIC_OWNER_CONTROL_TOKEN", "NIC_OWNER_IDENTITY",
             "NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST", "NIC_CHAT_ALLOWED_ORIGINS",
-            "NIC_OWNER_SESSION_TTL_SECONDS", "NIC_OWNER_SESSION_DB",
+            "NIC_OWNER_SESSION_TTL_SECONDS", "NIC_OWNER_SESSION_DB", "NIC_TASK_RUNTIME_DB",
         )}
         os.environ["NIC_OWNER_CONTROL_TOKEN"] = "test-owner-token"
         os.environ["NIC_OWNER_IDENTITY"] = "owner-1"
         os.environ["NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST"] = "1"
         os.environ["NIC_OWNER_SESSION_TTL_SECONDS"] = "1800"
         os.environ["NIC_OWNER_SESSION_DB"] = os.path.join(self.tmp.name, "browser-sessions.sqlite3")
+        os.environ["NIC_TASK_RUNTIME_DB"] = os.path.join(self.tmp.name, "tasks.sqlite3")
         self.store = OwnerControlStore(os.path.join(self.tmp.name, "owner.db"), owner_identity="owner-1")
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(owner_store=self.store))
         host, port = self.server.server_address
@@ -118,6 +119,78 @@ class OwnerSessionApiTests(unittest.TestCase):
         self.thread.start()
         status, _, _ = self.call("GET", "/control/autonomy/status", cookie=cookie, csrf=csrf, origin=False)
         self.assertEqual(status, 200)
+
+
+    def test_owner_task_api_create_list_events_and_controls(self):
+        status, _, _ = self.call("GET", "/control/tasks", origin=False)
+        self.assertEqual(status, 401)
+
+        status, data, headers = self.call(
+            "POST", "/control/session/login", {"owner_token": "test-owner-token"}
+        )
+        self.assertEqual(status, 200)
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        csrf = data["csrf_token"]
+
+        status, data, _ = self.call(
+            "POST", "/control/tasks",
+            {"goal": "Research creators and summarize evidence", "priority": 4},
+            cookie, csrf,
+        )
+        self.assertEqual(status, 201)
+        task_id = data["task"]["task_id"]
+        self.assertEqual(data["task"]["status"], "queued")
+
+        status, data, _ = self.call("GET", "/control/tasks", cookie=cookie, csrf=csrf, origin=False)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["tasks"][0]["task_id"], task_id)
+
+        status, data, _ = self.call(
+            "GET", f"/control/tasks/{task_id}", cookie=cookie, csrf=csrf, origin=False
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(data["task"]["goal"], "Research creators and summarize evidence")
+
+        status, data, _ = self.call(
+            "GET", f"/control/tasks/{task_id}/events", cookie=cookie, csrf=csrf, origin=False
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(data["events"][0]["event_type"], "task.created")
+
+        status, data, _ = self.call("POST", f"/control/tasks/{task_id}/pause", {}, cookie, csrf)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["status"], "task_paused")
+
+        status, data, _ = self.call("POST", f"/control/tasks/{task_id}/resume", {}, cookie, csrf)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["status"], "task_resumed")
+
+        status, data, _ = self.call("POST", f"/control/tasks/{task_id}/cancel", {}, cookie, csrf)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["status"], "task_cancelled")
+        self.assertEqual(data["task"]["status"], "cancelled")
+
+    def test_task_api_does_not_disclose_another_owner_task(self):
+        from src.nic_os_task_runtime import TaskRuntimeStore
+        task_store = TaskRuntimeStore(os.environ["NIC_TASK_RUNTIME_DB"])
+        private = task_store.create_task(owner_id="different-owner", goal="private")
+        status, data, _ = self.call(
+            "POST", "/control/session/login", {"owner_token": "test-owner-token"}
+        )
+        self.assertEqual(status, 200)
+        cookie = data_headers = None
+        # Login cookie is required in addition to the CSRF token.
+        status, data, headers = self.call(
+            "POST", "/control/session/login", {"owner_token": "test-owner-token"}
+        )
+        self.assertEqual(status, 200)
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        csrf = data["csrf_token"]
+        status, data, _ = self.call(
+            "GET", f"/control/tasks/{private['task_id']}", cookie=cookie, csrf=csrf, origin=False
+        )
+        self.assertEqual(status, 404)
+        self.assertEqual(data["error"], "task_not_found")
 
     def test_login_rejects_wrong_origin_and_wrong_owner_token(self):
         status, _, _ = self.call("POST", "/control/session/login", {"owner_token": "bad"}, origin=False)
