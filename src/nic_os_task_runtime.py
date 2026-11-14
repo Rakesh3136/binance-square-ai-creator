@@ -253,6 +253,54 @@ class TaskRuntimeStore:
             db.commit()
         return self.get_task(task_id)
 
+
+    def resume_task(self, task_id: str, *, owner_id: str) -> dict[str, Any]:
+        """Resume an owner-paused task without resetting its retry budget."""
+        now = _now(self.clock())
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM nic_tasks WHERE task_id=?", (task_id,)).fetchone()
+            if row is None:
+                db.rollback()
+                raise KeyError("task_not_found")
+            if row["owner_id"] != owner_id:
+                db.rollback()
+                raise PermissionError("task_owner_mismatch")
+            if row["status"] != "paused":
+                db.rollback()
+                raise ValueError("task_not_paused")
+            db.execute(
+                "UPDATE nic_tasks SET status='queued', updated_at=?, error=NULL WHERE task_id=?",
+                (_stamp(now), task_id),
+            )
+            self._event(db, task_id, now, owner_id, "task.resumed", {"status": "queued"})
+            db.commit()
+        return self.get_task(task_id)
+
+    def cancel_task(self, task_id: str, *, owner_id: str) -> dict[str, Any]:
+        """Owner cancellation revokes any active worker lease immediately."""
+        now = _now(self.clock())
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM nic_tasks WHERE task_id=?", (task_id,)).fetchone()
+            if row is None:
+                db.rollback()
+                raise KeyError("task_not_found")
+            if row["owner_id"] != owner_id:
+                db.rollback()
+                raise PermissionError("task_owner_mismatch")
+            if row["status"] not in {"queued", "running", "paused"}:
+                db.rollback()
+                raise ValueError("task_not_cancellable")
+            db.execute(
+                "UPDATE nic_tasks SET status='cancelled', updated_at=?, lease_id=NULL, "
+                "lease_owner=NULL, lease_expires_at=NULL, error='cancelled_by_owner' WHERE task_id=?",
+                (_stamp(now), task_id),
+            )
+            self._event(db, task_id, now, owner_id, "task.cancelled", {"lease_revoked": True})
+            db.commit()
+        return self.get_task(task_id)
+
     def get_task(self, task_id: str) -> dict[str, Any]:
         with closing(self._connect()) as db:
             row = db.execute("SELECT * FROM nic_tasks WHERE task_id=?", (task_id,)).fetchone()
