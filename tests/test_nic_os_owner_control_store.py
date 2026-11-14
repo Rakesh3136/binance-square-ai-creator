@@ -22,6 +22,25 @@ def grant(s):
     )
 
 
+
+def test_active_task_grants_are_exact_and_stop_aware(tmp_path):
+    s = store(tmp_path)
+    g = grant(s)
+    assert s.active_task_grants() == {"task-1": g["grant_id"]}
+    assert s.task_grant_is_active(task_id="task-1", grant_id=g["grant_id"])
+    assert not s.task_grant_is_active(task_id="task-2", grant_id=g["grant_id"])
+    s.revoke_grant(authenticated_owner="owner:primary", grant_id=g["grant_id"])
+    assert s.active_task_grants() == {}
+    assert not s.task_grant_is_active(task_id="task-1", grant_id=g["grant_id"])
+
+
+def test_active_task_grants_returns_empty_when_emergency_stop_is_active(tmp_path):
+    s = store(tmp_path)
+    g = grant(s)
+    s.set_emergency_stop(authenticated_owner="owner:primary", active=True)
+    assert s.active_task_grants() == {}
+    assert not s.task_grant_is_active(task_id="task-1", grant_id=g["grant_id"])
+
 def test_bootstrap_fails_closed_and_owner_can_clear_stop(tmp_path):
     s = store(tmp_path)
     assert s.status()["emergency_stop"] is True
