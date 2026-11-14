@@ -53,7 +53,7 @@ async function refreshTasks(){
  try{
   const r=await request("/control/tasks?limit=50");
   const tasks=r.tasks||[];
-  $("taskMsg").textContent=tasks.length+" saved task(s) · queue only; no worker execution is connected";
+  $("taskMsg").textContent=tasks.length+" saved task(s) · execution requires an enabled trusted scheduler and an active owner grant";
   $("taskList").innerHTML=tasks.length?tasks.map(t=>{
    const status=String(t.status||"unknown").toUpperCase();
    let actions="";
