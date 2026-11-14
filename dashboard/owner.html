@@ -64,7 +64,8 @@ async function refreshTasks(){
    return '<div class="task"><b>'+escapeHtml(status)+'</b> · '+escapeHtml(t.attempts)+'/'+escapeHtml(t.max_attempts)+' attempts<br>'+escapeHtml(t.goal)+'<br><code>'+escapeHtml(t.task_id)+'</code><div class="row"><button data-task-authorize="'+escapeHtml(t.task_id)+'">Set up owner grant</button><button data-task-events="'+escapeHtml(t.task_id)+'">Activity</button>'+actions+'</div></div>';
   }).join(""):"No tasks yet.";
   document.querySelectorAll("[data-task-action]").forEach(b=>b.addEventListener("click",()=>taskAction(b.dataset.taskId,b.dataset.taskAction)));
-  document.querySelectorAll("[data-task-events]").forEach(b=>b.addEventListener("click",()=>showTaskEvents(b.dataset.taskEvents)));\n  document.querySelectorAll("[data-task-authorize]").forEach(b=>b.addEventListener("click",()=>prepareTaskGrant(b.dataset.taskAuthorize)));
+  document.querySelectorAll("[data-task-events]").forEach(b=>b.addEventListener("click",()=>showTaskEvents(b.dataset.taskEvents)));
+  document.querySelectorAll("[data-task-authorize]").forEach(b=>b.addEventListener("click",()=>prepareTaskGrant(b.dataset.taskAuthorize)));
  }catch(e){$("taskMsg").textContent="Task queue unavailable: "+e.message}
 }
 async function taskAction(id,action){
