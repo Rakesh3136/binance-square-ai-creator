@@ -134,7 +134,8 @@ class TaskRuntimeStore:
             db.commit()
         return self.get_task(task_id)
 
-    def claim_next(self, *, worker_id: str, lease_seconds: int = 90) -> dict[str, Any] | None:
+    def claim_next(self, *, worker_id: str, lease_seconds: int = 90,
+                   eligible_task_ids: list[str] | None = None) -> dict[str, Any] | None:
         if not isinstance(worker_id, str) or not worker_id.strip() or len(worker_id) > 200:
             raise ValueError("worker_id_invalid")
         if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 15 <= lease_seconds <= 900:
@@ -156,10 +157,27 @@ class TaskRuntimeStore:
                 )
                 self._event(db, row["task_id"], now, "runtime", "task.lease_expired",
                             {"next_status": next_status})
-            row = db.execute(
-                "SELECT task_id FROM nic_tasks WHERE status='queued' "
-                "ORDER BY priority DESC, created_at ASC LIMIT 1"
-            ).fetchone()
+            if eligible_task_ids is not None:
+                if not isinstance(eligible_task_ids, list) or any(
+                    not isinstance(item, str) or not item for item in eligible_task_ids
+                ):
+                    db.rollback()
+                    raise ValueError("eligible_task_ids_invalid")
+                if not eligible_task_ids:
+                    db.commit()
+                    return None
+                placeholders = ",".join("?" for _ in eligible_task_ids)
+                row = db.execute(
+                    "SELECT task_id FROM nic_tasks WHERE status='queued' "
+                    f"AND task_id IN ({placeholders}) "
+                    "ORDER BY priority DESC, created_at ASC LIMIT 1",
+                    tuple(dict.fromkeys(eligible_task_ids)),
+                ).fetchone()
+            else:
+                row = db.execute(
+                    "SELECT task_id FROM nic_tasks WHERE status='queued' "
+                    "ORDER BY priority DESC, created_at ASC LIMIT 1"
+                ).fetchone()
             if row is None:
                 db.commit()
                 return None
