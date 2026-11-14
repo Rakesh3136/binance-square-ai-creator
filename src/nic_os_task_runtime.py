@@ -166,12 +166,13 @@ class TaskRuntimeStore:
                 if not eligible_task_ids:
                     db.commit()
                     return None
-                placeholders = ",".join("?" for _ in eligible_task_ids)
+                eligible_ids = tuple(dict.fromkeys(eligible_task_ids))
+                placeholders = ",".join("?" for _ in eligible_ids)
                 row = db.execute(
                     "SELECT task_id FROM nic_tasks WHERE status='queued' "
                     f"AND task_id IN ({placeholders}) "
                     "ORDER BY priority DESC, created_at ASC LIMIT 1",
-                    tuple(dict.fromkeys(eligible_task_ids)),
+                    eligible_ids,
                 ).fetchone()
             else:
                 row = db.execute(
