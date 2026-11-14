@@ -38,6 +38,17 @@ def test_worker_runs_only_tasks_with_an_active_exact_task_grant(tmp_path):
     assert tasks.get_task(blocked["task_id"])["status"] == "queued"
 
 
+
+def test_worker_never_claims_another_owner_task_even_if_grant_mentions_its_id(tmp_path):
+    tasks, owner = make_stores(tmp_path)
+    foreign = tasks.create_task(owner_id="different-owner", goal="Foreign task")
+    issue(owner, foreign["task_id"])
+    called = []
+    worker = NICTaskWorker(tasks, owner, executor=lambda *args: called.append(True) or "bad")
+    assert worker.run_once() is False
+    assert called == []
+    assert tasks.get_task(foreign["task_id"])["status"] == "queued"
+
 def test_worker_does_not_claim_when_emergency_stop_is_active(tmp_path):
     tasks, owner = make_stores(tmp_path)
     task = tasks.create_task(owner_id="owner", goal="Stop test")
