@@ -187,6 +187,22 @@ class OwnerSessionApiTests(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(data["error"], "task_not_found")
 
+
+    def test_direct_operator_tool_execution_requires_task_bound_grant(self):
+        status, data, headers = self.call(
+            "POST", "/control/session/login", {"owner_token": "test-owner-token"}
+        )
+        self.assertEqual(status, 200)
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        csrf = data["csrf_token"]
+        status, data, _ = self.call(
+            "POST", "/operator/execute",
+            {"tool": "get_live_market_data", "arguments": {}},
+            cookie, csrf,
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(data["error"], "operator_execution_requires_exact_task_bound_grant")
+
     def test_login_rejects_wrong_origin_and_wrong_owner_token(self):
         status, _, _ = self.call("POST", "/control/session/login", {"owner_token": "bad"}, origin=False)
         self.assertEqual(status, 403)
