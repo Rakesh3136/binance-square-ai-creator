@@ -211,6 +211,40 @@ class TaskRuntimeStore:
         task["lease_id"] = lease_id
         return task
 
+
+    def renew_lease(self, task_id: str, *, worker_id: str, lease_id: str,
+                    lease_seconds: int = 90) -> dict[str, Any]:
+        """Extend a live worker lease; fail if owner pause/cancel or expiry fenced it."""
+        if not isinstance(worker_id, str) or not worker_id.strip() or len(worker_id) > 200:
+            raise ValueError("worker_id_invalid")
+        if not isinstance(lease_id, str) or not lease_id:
+            raise ValueError("lease_id_invalid")
+        if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 15 <= lease_seconds <= 900:
+            raise ValueError("lease_seconds_must_be_between_15_and_900")
+        now = _now(self.clock())
+        expiry = now + timedelta(seconds=lease_seconds)
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM nic_tasks WHERE task_id=?", (task_id,)).fetchone()
+            if row is None:
+                db.rollback()
+                raise KeyError("task_not_found")
+            if (row["status"] != "running" or row["lease_owner"] != worker_id
+                or not secrets.compare_digest(row["lease_id"] or "", lease_id)):
+                db.rollback()
+                raise PermissionError("worker_lease_lost")
+            if row["lease_expires_at"] <= _stamp(now):
+                db.rollback()
+                raise PermissionError("worker_lease_expired")
+            db.execute(
+                "UPDATE nic_tasks SET lease_expires_at=?, updated_at=? WHERE task_id=?",
+                (_stamp(expiry), _stamp(now), task_id),
+            )
+            self._event(db, task_id, now, worker_id, "task.lease_renewed",
+                        {"lease_expires_at": _stamp(expiry)})
+            db.commit()
+        return self.get_task(task_id)
+
     def transition(self, task_id: str, *, new_status: str, actor: str,
                    lease_id: str | None = None, result: dict[str, Any] | None = None,
                    error: str | None = None) -> dict[str, Any]:
