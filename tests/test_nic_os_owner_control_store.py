@@ -26,11 +26,11 @@ def grant(s):
 def test_active_task_grants_are_exact_and_stop_aware(tmp_path):
     s = store(tmp_path)
     g = grant(s)
-    assert s.active_task_grants() == {"task-1": g["grant_id"]}
-    assert s.task_grant_is_active(task_id="task-1", grant_id=g["grant_id"])
-    assert not s.task_grant_is_active(task_id="task-2", grant_id=g["grant_id"])
+    assert s.active_task_grants(now=NOW) == {"task-1": g["grant_id"]}
+    assert s.task_grant_is_active(task_id="task-1", grant_id=g["grant_id"], now=NOW)
+    assert not s.task_grant_is_active(task_id="task-2", grant_id=g["grant_id"], now=NOW)
     s.revoke_grant(authenticated_owner="owner:primary", grant_id=g["grant_id"])
-    assert s.active_task_grants() == {}
+    assert s.active_task_grants(now=NOW) == {}
     assert not s.task_grant_is_active(task_id="task-1", grant_id=g["grant_id"])
 
 
