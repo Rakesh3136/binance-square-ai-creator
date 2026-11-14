@@ -72,6 +72,7 @@ class NICTaskWorker:
             worker_id=self.worker_id,
             lease_seconds=self.lease_seconds,
             eligible_task_ids=list(grants),
+            owner_id=self.owner_store.owner_identity,
         )
         if task is None:
             return False
