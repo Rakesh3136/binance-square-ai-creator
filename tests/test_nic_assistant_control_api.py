@@ -9,6 +9,7 @@ from urllib.error import HTTPError
 
 from src.nic_assistant_chat import make_handler
 from src.nic_control_gate import ControlGate
+from src.nic_os_owner_control_store import OwnerControlStore
 
 
 class NICControlAPITests(unittest.TestCase):
@@ -16,6 +17,8 @@ class NICControlAPITests(unittest.TestCase):
         self._old_chat = os.environ.get("NIC_CHAT_ACCESS_TOKEN")
         self._old_owner = os.environ.get("NIC_OWNER_CONTROL_TOKEN")
         self._old_origins = os.environ.get("NIC_CHAT_ALLOWED_ORIGINS")
+        self._old_owner_identity = os.environ.get("NIC_OS_OWNER_IDENTITY")
+        os.environ["NIC_OS_OWNER_IDENTITY"] = "owner-test"
         os.environ["NIC_CHAT_ACCESS_TOKEN"] = "chat-test-token"
         os.environ["NIC_OWNER_CONTROL_TOKEN"] = "owner-test-token"
         os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = "https://example.github.io"
@@ -24,7 +27,9 @@ class NICControlAPITests(unittest.TestCase):
         self.addCleanup(self.shared_stop_mock.stop)
         self.gate = ControlGate(self._temp_path())
         self.gate.set_emergency_stop(False)
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.gate))
+        self.owner_store = OwnerControlStore(self._temp_path(), owner_identity="owner-test")
+        self.owner_store.set_emergency_stop(authenticated_owner="owner-test", active=False)
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.gate, self.owner_store))
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.base = f"http://127.0.0.1:{self.server.server_port}"
@@ -53,6 +58,17 @@ class NICControlAPITests(unittest.TestCase):
             os.environ.pop("NIC_CHAT_ALLOWED_ORIGINS", None)
         else:
             os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = self._old_origins
+        if self._old_owner_identity is None:
+            os.environ.pop("NIC_OS_OWNER_IDENTITY", None)
+        else:
+            os.environ["NIC_OS_OWNER_IDENTITY"] = self._old_owner_identity
+
+    def issue_grant(self, resource):
+        return self.owner_store.issue_grant(
+            authenticated_owner="owner-test", task_ids=["task-1"],
+            scopes=[{"resource": resource, "actions": ["execute"]}],
+            duration_seconds=3600,
+        )
 
     def request(self, path, token=None, method="GET", payload=None, origin=None):
         headers = {}
@@ -150,21 +166,63 @@ class NICControlAPITests(unittest.TestCase):
         self.assertEqual(status, 401)
 
     def test_operator_rejects_unapproved_or_mutating_tools(self):
+        grant = self.issue_grant("nic_tool:publish_post")
         status, payload = self.request(
             "/operator/execute", "owner-test-token", method="POST",
-            payload={"tool": "publish_post", "arguments": {"text": "unsafe"}}
+            payload={"tool": "publish_post", "arguments": {"text": "unsafe"},
+                     "autonomy_grant_id": grant["grant_id"], "task_id": "task-1"}
         )
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"], "tool_not_allowed")
 
     def test_operator_rejects_path_injection_arguments(self):
+        grant = self.issue_grant("nic_tool:get_agent_registry")
         status, payload = self.request(
             "/operator/execute", "owner-test-token", method="POST",
-            payload={"tool": "get_agent_registry", "arguments": {"path": "../../.env"}}
+            payload={"tool": "get_agent_registry", "arguments": {"path": "../../.env"},
+                     "autonomy_grant_id": grant["grant_id"], "task_id": "task-1"}
         )
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"], "tool_arguments_not_supported")
 
+
+    def test_owner_can_issue_and_revoke_scoped_autonomy_grants(self):
+        status, _ = self.request(
+            "/control/autonomy/grants", "wrong", method="POST",
+            payload={"task_ids": ["task-1"],
+                     "scopes": [{"resource": "nic_tool:get_agent_registry", "actions": ["execute"]}]}
+        )
+        self.assertEqual(status, 401)
+        status, payload = self.request(
+            "/control/autonomy/grants", "owner-test-token", method="POST",
+            payload={"task_ids": ["task-1"],
+                     "scopes": [{"resource": "nic_tool:get_agent_registry", "actions": ["execute"]}],
+                     "mode": "full_power", "duration_seconds": 600}
+        )
+        self.assertEqual(status, 201)
+        grant_id = payload["grant"]["grant_id"]
+        status, listed = self.request("/control/autonomy/grants", "owner-test-token")
+        self.assertEqual(status, 200)
+        self.assertEqual(listed["grants"][0]["grant_id"], grant_id)
+        status, result = self.request(
+            "/operator/execute", "owner-test-token", method="POST",
+            payload={"tool": "get_agent_registry", "arguments": {},
+                     "autonomy_grant_id": grant_id, "task_id": "task-1"}
+        )
+        self.assertIn(status, (200, 400))
+        status, revoked = self.request(
+            f"/control/autonomy/grants/{grant_id}/revoke", "owner-test-token",
+            method="POST", payload={}
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(revoked["revoked"])
+        status, denied = self.request(
+            "/operator/execute", "owner-test-token", method="POST",
+            payload={"tool": "get_agent_registry", "arguments": {},
+                     "autonomy_grant_id": grant_id, "task_id": "task-1"}
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("owner_authorization_denied:owner_grant_revoked", denied["error"])
 
 if __name__ == "__main__":
     unittest.main()
