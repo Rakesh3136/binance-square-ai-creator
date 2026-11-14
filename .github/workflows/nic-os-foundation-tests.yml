@@ -11,6 +11,8 @@ on:
       - "src/nic_assistant_chat.py"
       - "src/nic_os_owner_sessions.py"
       - "src/nic_os_task_runtime.py"
+      - "src/nic_os_task_worker.py"
+      - "src/nic_os_owner_control_store.py"
       - "dashboard/owner.html"
       - "tests/test_nic_os_owner_dashboard.py"
       - "tests/test_nic_os_release_policy.py"
@@ -23,6 +25,10 @@ on:
       - "tests/test_nic_os_owner_sessions.py"
       - "tests/test_nic_os_owner_session_api.py"
       - "tests/test_nic_os_task_runtime.py"
+      - "tests/test_nic_os_task_worker.py"
+      - "tests/test_nic_os_owner_control_store.py"
+      - "tests/test_nic_os_tool_broker_integration.py"
+      - "tests/test_nic_os_owner_session_api.py"
       - "docs/nic-os-*.md"
       - ".github/workflows/nic-os-foundation-tests.yml"
   push:
@@ -35,6 +41,7 @@ on:
       - "feat/nic-owner-control-cockpit"
       - "feat/nic-persistent-owner-sessions"
       - "feat/nic-persistent-task-runtime"
+      - "feat/nic-task-worker-scheduler"
     paths:
       - "src/nic_os_release_policy.py"
       - "src/nic_os_activity_ledger.py"
@@ -69,4 +76,4 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Test NIC OS safety and tool execution boundaries
-        run: python -m pytest -q tests/test_nic_os_release_policy.py tests/test_nic_os_activity_ledger.py tests/test_nic_os_autonomy_policy.py tests/test_nic_os_owner_control_store.py tests/test_nic_os_tool_broker.py tests/test_nic_os_tool_broker_integration.py tests/test_nic_assistant_chat.py tests/test_nic_os_owner_sessions.py tests/test_nic_os_owner_session_api.py tests/test_nic_os_task_runtime.py tests/test_nic_os_owner_dashboard.py
+        run: python -m pytest -q tests/test_nic_os_release_policy.py tests/test_nic_os_activity_ledger.py tests/test_nic_os_autonomy_policy.py tests/test_nic_os_owner_control_store.py tests/test_nic_os_tool_broker.py tests/test_nic_os_tool_broker_integration.py tests/test_nic_assistant_chat.py tests/test_nic_os_owner_sessions.py tests/test_nic_os_owner_session_api.py tests/test_nic_os_task_runtime.py tests/test_nic_os_task_worker.py tests/test_nic_os_owner_dashboard.py
