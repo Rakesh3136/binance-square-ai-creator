@@ -135,7 +135,8 @@ class TaskRuntimeStore:
         return self.get_task(task_id)
 
     def claim_next(self, *, worker_id: str, lease_seconds: int = 90,
-                   eligible_task_ids: list[str] | None = None) -> dict[str, Any] | None:
+                   eligible_task_ids: list[str] | None = None,
+                   owner_id: str | None = None) -> dict[str, Any] | None:
         if not isinstance(worker_id, str) or not worker_id.strip() or len(worker_id) > 200:
             raise ValueError("worker_id_invalid")
         if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 15 <= lease_seconds <= 900:
@@ -168,17 +169,26 @@ class TaskRuntimeStore:
                     return None
                 eligible_ids = tuple(dict.fromkeys(eligible_task_ids))
                 placeholders = ",".join("?" for _ in eligible_ids)
+                owner_clause = " AND owner_id=?" if owner_id is not None else ""
+                params = eligible_ids + ((owner_id,) if owner_id is not None else ())
                 row = db.execute(
                     "SELECT task_id FROM nic_tasks WHERE status='queued' "
-                    f"AND task_id IN ({placeholders}) "
+                    f"AND task_id IN ({placeholders}){owner_clause} "
                     "ORDER BY priority DESC, created_at ASC LIMIT 1",
-                    eligible_ids,
+                    params,
                 ).fetchone()
             else:
-                row = db.execute(
-                    "SELECT task_id FROM nic_tasks WHERE status='queued' "
-                    "ORDER BY priority DESC, created_at ASC LIMIT 1"
-                ).fetchone()
+                if owner_id is None:
+                    row = db.execute(
+                        "SELECT task_id FROM nic_tasks WHERE status='queued' "
+                        "ORDER BY priority DESC, created_at ASC LIMIT 1"
+                    ).fetchone()
+                else:
+                    row = db.execute(
+                        "SELECT task_id FROM nic_tasks WHERE status='queued' AND owner_id=? "
+                        "ORDER BY priority DESC, created_at ASC LIMIT 1",
+                        (owner_id,),
+                    ).fetchone()
             if row is None:
                 db.commit()
                 return None
