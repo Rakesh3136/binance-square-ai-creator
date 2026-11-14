@@ -20,6 +20,7 @@ from src.nic_os_owner_control_store import OwnerControlStore
 from src.nic_os_tool_broker import OwnerAuthorizedToolBroker
 from src.nic_os_owner_sessions import OwnerSessionStore
 from src.nic_os_task_runtime import TaskRuntimeStore
+from src.nic_os_task_worker import start_configured_worker
 from http.cookies import SimpleCookie
 
 SYSTEM_INSTRUCTIONS = """You are NIC's creator-workflow assistant.
@@ -237,6 +238,9 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
     configured_tasks = task_store
     if configured_tasks is None and task_db:
         configured_tasks = TaskRuntimeStore(task_db)
+    # Optional trusted in-process worker. Disabled unless explicitly enabled in
+    # service configuration; never started by a browser/chat request.
+    background_worker = start_configured_worker(configured_tasks, configured_store)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "NICChat/1.1"
@@ -327,6 +331,8 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     "owner_autonomy_store_configured": configured_store is not None,
                     "connected_plugins": [],
                     "external_action_execution": "not_connected",
+                    "task_worker_enabled": background_worker is not None,
+                    "task_worker_mode": "trusted_in_process_read_only" if background_worker else "disabled",
                 })
                 return
             if self.path == "/control/session/status":
@@ -525,8 +531,20 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     return
                 try:
                     payload = self._body()
-                    result = execute_tool(payload.get("tool"), payload.get("arguments", {}))
-                    self._json(200, {"status": "completed", "tool": payload.get("tool"), "result": result})
+                    if set(payload) != {"tool", "arguments", "autonomy_grant_id", "autonomy_task_id"}:
+                        raise ValueError("operator_execution_requires_exact_task_bound_grant")
+                    if not isinstance(payload.get("tool"), str) or not isinstance(payload.get("arguments"), dict):
+                        raise ValueError("operator_tool_arguments_invalid")
+                    if not isinstance(payload.get("autonomy_grant_id"), str) or not isinstance(payload.get("autonomy_task_id"), str):
+                        raise ValueError("operator_task_grant_required")
+                    broker = OwnerAuthorizedToolBroker(
+                        configured_store,
+                        grant_id=payload["autonomy_grant_id"],
+                        task_id=payload["autonomy_task_id"],
+                        stop_check=control.is_stopped,
+                    )
+                    result = broker.execute(payload["tool"], payload["arguments"])
+                    self._json(200, {"status": "completed", "tool": payload["tool"], "result": result})
                 except ToolExecutionError as exc:
                     self._json(400, {"error": str(exc)})
                 except ValueError as exc:

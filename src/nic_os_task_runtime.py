@@ -134,19 +134,30 @@ class TaskRuntimeStore:
             db.commit()
         return self.get_task(task_id)
 
-    def claim_next(self, *, worker_id: str, lease_seconds: int = 90) -> dict[str, Any] | None:
+    def claim_next(self, *, worker_id: str, lease_seconds: int = 90,
+                   eligible_task_ids: list[str] | None = None,
+                   owner_id: str | None = None) -> dict[str, Any] | None:
         if not isinstance(worker_id, str) or not worker_id.strip() or len(worker_id) > 200:
             raise ValueError("worker_id_invalid")
         if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 15 <= lease_seconds <= 900:
             raise ValueError("lease_seconds_must_be_between_15_and_900")
+        if owner_id is not None and (not isinstance(owner_id, str) or not owner_id.strip() or len(owner_id) > 200):
+            raise ValueError("owner_id_invalid")
         now = _now(self.clock())
         expiry = now + timedelta(seconds=lease_seconds)
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
-            expired = db.execute(
-                "SELECT task_id, attempts, max_attempts FROM nic_tasks "
-                "WHERE status='running' AND lease_expires_at <= ?", (_stamp(now),)
-            ).fetchall()
+            if owner_id is None:
+                expired = db.execute(
+                    "SELECT task_id, attempts, max_attempts FROM nic_tasks "
+                    "WHERE status='running' AND lease_expires_at <= ?", (_stamp(now),)
+                ).fetchall()
+            else:
+                expired = db.execute(
+                    "SELECT task_id, attempts, max_attempts FROM nic_tasks "
+                    "WHERE status='running' AND lease_expires_at <= ? AND owner_id=?",
+                    (_stamp(now), owner_id),
+                ).fetchall()
             for row in expired:
                 next_status = "queued" if row["attempts"] < row["max_attempts"] else "failed"
                 db.execute(
@@ -156,10 +167,37 @@ class TaskRuntimeStore:
                 )
                 self._event(db, row["task_id"], now, "runtime", "task.lease_expired",
                             {"next_status": next_status})
-            row = db.execute(
-                "SELECT task_id FROM nic_tasks WHERE status='queued' "
-                "ORDER BY priority DESC, created_at ASC LIMIT 1"
-            ).fetchone()
+            if eligible_task_ids is not None:
+                if not isinstance(eligible_task_ids, list) or any(
+                    not isinstance(item, str) or not item for item in eligible_task_ids
+                ):
+                    db.rollback()
+                    raise ValueError("eligible_task_ids_invalid")
+                if not eligible_task_ids:
+                    db.commit()
+                    return None
+                eligible_ids = tuple(dict.fromkeys(eligible_task_ids))
+                placeholders = ",".join("?" for _ in eligible_ids)
+                owner_clause = " AND owner_id=?" if owner_id is not None else ""
+                params = eligible_ids + ((owner_id,) if owner_id is not None else ())
+                row = db.execute(
+                    "SELECT task_id FROM nic_tasks WHERE status='queued' "
+                    f"AND task_id IN ({placeholders}){owner_clause} "
+                    "ORDER BY priority DESC, created_at ASC LIMIT 1",
+                    params,
+                ).fetchone()
+            else:
+                if owner_id is None:
+                    row = db.execute(
+                        "SELECT task_id FROM nic_tasks WHERE status='queued' "
+                        "ORDER BY priority DESC, created_at ASC LIMIT 1"
+                    ).fetchone()
+                else:
+                    row = db.execute(
+                        "SELECT task_id FROM nic_tasks WHERE status='queued' AND owner_id=? "
+                        "ORDER BY priority DESC, created_at ASC LIMIT 1",
+                        (owner_id,),
+                    ).fetchone()
             if row is None:
                 db.commit()
                 return None
@@ -179,6 +217,40 @@ class TaskRuntimeStore:
         task = self.get_task(task_id)
         task["lease_id"] = lease_id
         return task
+
+
+    def renew_lease(self, task_id: str, *, worker_id: str, lease_id: str,
+                    lease_seconds: int = 90) -> dict[str, Any]:
+        """Extend a live worker lease; fail if owner pause/cancel or expiry fenced it."""
+        if not isinstance(worker_id, str) or not worker_id.strip() or len(worker_id) > 200:
+            raise ValueError("worker_id_invalid")
+        if not isinstance(lease_id, str) or not lease_id:
+            raise ValueError("lease_id_invalid")
+        if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 15 <= lease_seconds <= 900:
+            raise ValueError("lease_seconds_must_be_between_15_and_900")
+        now = _now(self.clock())
+        expiry = now + timedelta(seconds=lease_seconds)
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM nic_tasks WHERE task_id=?", (task_id,)).fetchone()
+            if row is None:
+                db.rollback()
+                raise KeyError("task_not_found")
+            if (row["status"] != "running" or row["lease_owner"] != worker_id
+                or not secrets.compare_digest(row["lease_id"] or "", lease_id)):
+                db.rollback()
+                raise PermissionError("worker_lease_lost")
+            if row["lease_expires_at"] <= _stamp(now):
+                db.rollback()
+                raise PermissionError("worker_lease_expired")
+            db.execute(
+                "UPDATE nic_tasks SET lease_expires_at=?, updated_at=? WHERE task_id=?",
+                (_stamp(expiry), _stamp(now), task_id),
+            )
+            self._event(db, task_id, now, worker_id, "task.lease_renewed",
+                        {"lease_expires_at": _stamp(expiry)})
+            db.commit()
+        return self.get_task(task_id)
 
     def transition(self, task_id: str, *, new_status: str, actor: str,
                    lease_id: str | None = None, result: dict[str, Any] | None = None,

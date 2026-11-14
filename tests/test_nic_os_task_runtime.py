@@ -36,6 +36,23 @@ class TaskRuntimeTests(unittest.TestCase):
         self.assertEqual(done["status"], "completed")
         self.assertEqual(done["result"], {"summary": "done"})
 
+
+    def test_live_worker_can_renew_lease_but_not_after_owner_cancellation(self):
+        task = self.store.create_task(owner_id="owner", goal="lease heartbeat")
+        claim = self.store.claim_next(worker_id="worker", lease_seconds=15)
+        renewed = self.store.renew_lease(
+            task["task_id"], worker_id="worker", lease_id=claim["lease_id"], lease_seconds=30
+        )
+        self.assertGreater(
+            datetime.fromisoformat(renewed["lease_expires_at"]),
+            datetime.fromisoformat(claim["lease_expires_at"]),
+        )
+        self.store.cancel_task(task["task_id"], owner_id="owner")
+        with self.assertRaises(PermissionError):
+            self.store.renew_lease(
+                task["task_id"], worker_id="worker", lease_id=claim["lease_id"], lease_seconds=30
+            )
+
     def test_priority_order(self):
         low = self.store.create_task(owner_id="owner", goal="low", priority=0)
         high = self.store.create_task(owner_id="owner", goal="high", priority=5)

@@ -155,7 +155,7 @@ class NICControlAPITests(unittest.TestCase):
             payload={"tool": "publish_post", "arguments": {"text": "unsafe"}}
         )
         self.assertEqual(status, 400)
-        self.assertEqual(payload["error"], "tool_not_allowed")
+        self.assertEqual(payload["error"], "operator_execution_requires_exact_task_bound_grant")
 
     def test_operator_rejects_path_injection_arguments(self):
         status, payload = self.request(
@@ -163,7 +163,7 @@ class NICControlAPITests(unittest.TestCase):
             payload={"tool": "get_agent_registry", "arguments": {"path": "../../.env"}}
         )
         self.assertEqual(status, 400)
-        self.assertEqual(payload["error"], "tool_arguments_not_supported")
+        self.assertEqual(payload["error"], "operator_execution_requires_exact_task_bound_grant")
 
 
 if __name__ == "__main__":
