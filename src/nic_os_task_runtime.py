@@ -147,10 +147,17 @@ class TaskRuntimeStore:
         expiry = now + timedelta(seconds=lease_seconds)
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
-            expired = db.execute(
-                "SELECT task_id, attempts, max_attempts FROM nic_tasks "
-                "WHERE status='running' AND lease_expires_at <= ?", (_stamp(now),)
-            ).fetchall()
+            if owner_id is None:
+                expired = db.execute(
+                    "SELECT task_id, attempts, max_attempts FROM nic_tasks "
+                    "WHERE status='running' AND lease_expires_at <= ?", (_stamp(now),)
+                ).fetchall()
+            else:
+                expired = db.execute(
+                    "SELECT task_id, attempts, max_attempts FROM nic_tasks "
+                    "WHERE status='running' AND lease_expires_at <= ? AND owner_id=?",
+                    (_stamp(now), owner_id),
+                ).fetchall()
             for row in expired:
                 next_status = "queued" if row["attempts"] < row["max_attempts"] else "failed"
                 db.execute(
