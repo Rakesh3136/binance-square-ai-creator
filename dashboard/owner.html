@@ -19,7 +19,7 @@
 <div class="grid">
 <div class="panel"><div class="muted">Autonomy state</div><h2 id="modeState">—</h2><div id="stopState" class="status">Loading…</div><div class="row"><button id="stop" class="danger">Emergency STOP</button><button id="resume" class="primary">Resume NIC</button></div><div class="hint">STOP is separate from autonomy grants. It blocks the broker path; external publishing/worker kill coverage must be verified separately.</div></div>
 <div class="panel"><div class="muted">Owner session</div><h2>Authenticated control</h2><div id="sessionInfo" class="status">Session active in this browser tab.</div><div class="row"><button id="refresh">Refresh status</button><button id="logout">Sign out</button></div><div class="hint">Session expires automatically. Signing out revokes this browser session.</div></div>
-<div class="panel wide"><div class="muted">Grant scoped autonomy</div><h2>Enable a task for NIC</h2>
+<div class="panel wide" id="grantPanel"><div class="muted">Grant scoped autonomy</div><h2>Enable a task for NIC</h2>
 <label>Autonomy mode</label><div class="switches"><label><input type="radio" name="mode" value="standard" checked style="width:auto"> Standard</label><label><input type="radio" name="mode" value="full_power" style="width:auto"> Full Power</label></div>
 <div class="hint">Both modes are bounded by the exact scopes below. Full Power does not bypass owner safeguards or grant wildcard permissions.</div>
 <label for="task">Task ID (required)</label><input id="task" maxlength="120" placeholder="e.g. research-creator-cohort-2026-11-13">
@@ -29,7 +29,7 @@
 </div>
 <div class="panel wide"><div class="muted">Current & recent grants</div><h2>Grant ledger</h2><div id="grants" class="hint">No grant data loaded.</div></div>
 <div class="panel wide"><div class="muted">Persistent task queue</div><h2>NIC task workspace</h2>
-<p class="hint">Tasks are saved and can be managed here. Queueing a task does not mean a worker has started it; execution and live streaming are not connected yet.</p>
+<p class="hint">Tasks are saved here. A task runs only when the trusted scheduler is enabled and you issue an active grant for its exact task ID and selected tools. Live streaming is not connected yet.</p>
 <label for="taskGoal">Task goal</label><textarea id="taskGoal" maxlength="8000" placeholder="Describe what NIC should work on..."></textarea>
 <label for="taskPriority">Priority</label><select id="taskPriority"><option value="0">Normal</option><option value="2">High</option><option value="-2">Low</option></select>
 <div class="row"><button id="createTask" class="primary">Add task to NIC queue</button><button id="refreshTasks">Refresh tasks</button></div>
@@ -61,16 +61,21 @@ async function refreshTasks(){
    if(t.status==="paused")actions+='<button data-task-action="resume" data-task-id="'+escapeHtml(t.task_id)+'">Resume</button>';
    if(["queued","running","paused"].includes(t.status))actions+='<button class="danger" data-task-action="cancel" data-task-id="'+escapeHtml(t.task_id)+'">Cancel</button>';
    if(t.status==="failed"&&t.attempts<t.max_attempts)actions+='<button data-task-action="retry" data-task-id="'+escapeHtml(t.task_id)+'">Retry</button>';
-   return '<div class="task"><b>'+escapeHtml(status)+'</b> · '+escapeHtml(t.attempts)+'/'+escapeHtml(t.max_attempts)+' attempts<br>'+escapeHtml(t.goal)+'<br><code>'+escapeHtml(t.task_id)+'</code><div class="row"><button data-task-events="'+escapeHtml(t.task_id)+'">Activity</button>'+actions+'</div></div>';
+   return '<div class="task"><b>'+escapeHtml(status)+'</b> · '+escapeHtml(t.attempts)+'/'+escapeHtml(t.max_attempts)+' attempts<br>'+escapeHtml(t.goal)+'<br><code>'+escapeHtml(t.task_id)+'</code><div class="row"><button data-task-authorize="'+escapeHtml(t.task_id)+'">Set up owner grant</button><button data-task-events="'+escapeHtml(t.task_id)+'">Activity</button>'+actions+'</div></div>';
   }).join(""):"No tasks yet.";
   document.querySelectorAll("[data-task-action]").forEach(b=>b.addEventListener("click",()=>taskAction(b.dataset.taskId,b.dataset.taskAction)));
-  document.querySelectorAll("[data-task-events]").forEach(b=>b.addEventListener("click",()=>showTaskEvents(b.dataset.taskEvents)));
+  document.querySelectorAll("[data-task-events]").forEach(b=>b.addEventListener("click",()=>showTaskEvents(b.dataset.taskEvents)));\n  document.querySelectorAll("[data-task-authorize]").forEach(b=>b.addEventListener("click",()=>prepareTaskGrant(b.dataset.taskAuthorize)));
  }catch(e){$("taskMsg").textContent="Task queue unavailable: "+e.message}
 }
 async function taskAction(id,action){
  if(action==="cancel"&&!confirm("Cancel this NIC task and revoke its current worker lease?"))return;
  try{await request("/control/tasks/"+encodeURIComponent(id)+"/"+action,"POST",{});await refreshTasks()}
  catch(e){$("taskMsg").textContent=e.message}
+}
+function prepareTaskGrant(id){
+ $("task").value=id;
+ $("grantPanel").scrollIntoView({behavior:"smooth",block:"start"});
+ msg("grantMsg","Task ID selected. Choose only the tools this task needs, then review and issue the grant.","hint");
 }
 async function showTaskEvents(id){
  try{const r=await request("/control/tasks/"+encodeURIComponent(id)+"/events");$("taskEvents").textContent=(r.events||[]).map(e=>e.occurred_at+" · "+e.actor+" · "+e.event_type+" · "+JSON.stringify(e.details)).join("\n")||"No events"}
@@ -79,7 +84,7 @@ async function showTaskEvents(id){
 $("createTask").onclick=async()=>{
  const goal=$("taskGoal").value.trim();
  if(!goal){$("taskMsg").textContent="Enter a task goal first.";return}
- try{await request("/control/tasks","POST",{goal,priority:Number($("taskPriority").value),max_attempts:3});$("taskGoal").value="";await refreshTasks()}
+ try{const r=await request("/control/tasks","POST",{goal,priority:Number($("taskPriority").value),max_attempts:3});$("taskGoal").value="";$("task").value=r.task.task_id;await refreshTasks();msg("grantMsg","Task created. Review exact tool scopes and issue an owner grant to allow the scheduler to run it.","good");$("grantPanel").scrollIntoView({behavior:"smooth",block:"start"})}
  catch(e){$("taskMsg").textContent=e.message}
 };
 $("refreshTasks").onclick=()=>refreshTasks();
