@@ -75,6 +75,22 @@ def test_revoked_grant_during_task_pauses_instead_of_completing(tmp_path):
     assert current["error"] == "owner_stop_or_grant_revoked"
 
 
+
+def test_owner_cancellation_during_model_call_fences_worker_result(tmp_path):
+    tasks, owner = make_stores(tmp_path)
+    task = tasks.create_task(owner_id="owner", goal="Owner cancels while model works")
+    issue(owner, task["task_id"])
+
+    def cancel_during_execution(claimed, grant_id, store, task_store):
+        task_store.cancel_task(claimed["task_id"], owner_id="owner")
+        return "Late output must not overwrite cancellation"
+
+    worker = NICTaskWorker(tasks, owner, executor=cancel_during_execution)
+    assert worker.run_once()
+    current = tasks.get_task(task["task_id"])
+    assert current["status"] == "cancelled"
+    assert current["result"] is None
+
 def test_worker_failure_is_bounded_and_recorded_without_exception_details(tmp_path):
     tasks, owner = make_stores(tmp_path)
     task = tasks.create_task(owner_id="owner", goal="Fail safely", max_attempts=2)
