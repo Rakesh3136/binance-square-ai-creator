@@ -5,7 +5,7 @@
 <meta name="referrer" content="same-origin">
 <title>NIC OS · Owner Cockpit</title>
 <style>
-:root{color-scheme:dark;font:15px/1.5 Inter,system-ui,sans-serif;background:#080d14;color:#edf3fa}*{box-sizing:border-box}body{margin:0}main{max-width:1000px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.muted,.hint{color:#93a4b7}.muted{font-size:12px;letter-spacing:.08em;text-transform:uppercase}.pill{border:1px solid #344356;border-radius:999px;padding:7px 12px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:20px}.panel{background:#101925;border:1px solid #26384c;border-radius:16px;padding:18px}.wide{grid-column:1/-1}h1{font-size:28px;margin:2px 0}h2{font-size:18px;margin:0 0 12px}label{display:block;font-size:13px;color:#c1ccda;margin:12px 0 5px}input,select,textarea,button{font:inherit;color:inherit;background:#0a111b;border:1px solid #40536a;border-radius:10px;padding:10px;width:100%}textarea{min-height:88px;resize:vertical}button{cursor:pointer;width:auto;padding:10px 14px}button:disabled{opacity:.4;cursor:not-allowed}.primary{background:#164e38;border-color:#23734e}.danger{background:#6d2027;border-color:#a43c45}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.row button{flex:1}.status{padding:12px;border-radius:10px;background:#0a111b;border:1px solid #26384c;margin:12px 0}.good{color:#7de2aa}.bad{color:#ff9b9b}.grant{border-top:1px solid #2a394b;padding:12px 0;overflow-wrap:anywhere}.grant code{font-size:12px}.hint{font-size:12px;margin-top:6px}.hidden{display:none}.switches{display:flex;gap:10px;flex-wrap:wrap}.switches label{margin:4px 0;padding:8px 12px;border:1px solid #344356;border-radius:10px}.foot{font-size:12px;color:#8392a4;margin:18px 0}@media(max-width:650px){main{padding:14px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+:root{color-scheme:dark;font:15px/1.5 Inter,system-ui,sans-serif;background:#080d14;color:#edf3fa}*{box-sizing:border-box}body{margin:0}main{max-width:1000px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.muted,.hint{color:#93a4b7}.muted{font-size:12px;letter-spacing:.08em;text-transform:uppercase}.pill{border:1px solid #344356;border-radius:999px;padding:7px 12px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:20px}.panel{background:#101925;border:1px solid #26384c;border-radius:16px;padding:18px}.wide{grid-column:1/-1}h1{font-size:28px;margin:2px 0}h2{font-size:18px;margin:0 0 12px}label{display:block;font-size:13px;color:#c1ccda;margin:12px 0 5px}input,select,textarea,button{font:inherit;color:inherit;background:#0a111b;border:1px solid #40536a;border-radius:10px;padding:10px;width:100%}textarea{min-height:88px;resize:vertical}button{cursor:pointer;width:auto;padding:10px 14px}button:disabled{opacity:.4;cursor:not-allowed}.primary{background:#164e38;border-color:#23734e}.danger{background:#6d2027;border-color:#a43c45}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.row button{flex:1}.status{padding:12px;border-radius:10px;background:#0a111b;border:1px solid #26384c;margin:12px 0}.good{color:#7de2aa}.bad{color:#ff9b9b}.grant{border-top:1px solid #2a394b;padding:12px 0;overflow-wrap:anywhere}.grant code{font-size:12px}.task{border-top:1px solid #2a394b;padding:12px 0;overflow-wrap:anywhere}.task pre{white-space:pre-wrap;overflow-wrap:anywhere}.task .row{margin-top:8px}.hint{font-size:12px;margin-top:6px}.hidden{display:none}.switches{display:flex;gap:10px;flex-wrap:wrap}.switches label{margin:4px 0;padding:8px 12px;border:1px solid #344356;border-radius:10px}.foot{font-size:12px;color:#8392a4;margin:18px 0}@media(max-width:650px){main{padding:14px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
 </style></head>
 <body><main>
 <header class="top"><div><div class="muted">Neural Intelligence Core · Owner-only</div><h1>NIC OS Cockpit</h1><div class="hint">Permissioned autonomy · persistent owner controls</div></div><div id="connection" class="pill">Locked · not connected</div></header>
@@ -28,6 +28,16 @@
 <div class="row"><button id="issue" class="primary">Review & issue grant</button></div><div id="grantMsg" class="hint" role="status"></div>
 </div>
 <div class="panel wide"><div class="muted">Current & recent grants</div><h2>Grant ledger</h2><div id="grants" class="hint">No grant data loaded.</div></div>
+<div class="panel wide"><div class="muted">Persistent task queue</div><h2>NIC task workspace</h2>
+<p class="hint">Tasks are saved and can be managed here. Queueing a task does not mean a worker has started it; execution and live streaming are not connected yet.</p>
+<label for="taskGoal">Task goal</label><textarea id="taskGoal" maxlength="8000" placeholder="Describe what NIC should work on..."></textarea>
+<label for="taskPriority">Priority</label><select id="taskPriority"><option value="0">Normal</option><option value="2">High</option><option value="-2">Low</option></select>
+<div class="row"><button id="createTask" class="primary">Add task to NIC queue</button><button id="refreshTasks">Refresh tasks</button></div>
+<div id="taskMsg" class="hint" role="status">No task data loaded.</div>
+<div id="taskList"></div>
+<h2 style="margin-top:14px">Task activity</h2><pre id="taskEvents" class="status hint">Select a task's activity to view its event history.</pre>
+</div>
+
 </div></section>
 <p class="foot">Owner controls are never delegated to NIC. Production deployment, financial actions, security-policy changes and emergency-stop permission changes remain non-delegable. This page does not deploy NIC or enable tools that the backend has not implemented.</p>
 </main>
@@ -36,8 +46,43 @@ const $=id=>document.getElementById(id);let csrf=null;let api="";
 function msg(id,text,cls="hint"){const el=$(id);el.textContent=text;el.className=cls}
 
 async function request(path,method="GET",body){const headers={"X-NIC-CSRF":csrf||""};if(body!==undefined)headers["Content-Type"]="application/json";const res=await fetch(api+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:"include",cache:"no-store"});const data=await res.json().catch(()=>({error:"invalid_server_response"}));if(!res.ok)throw Error(data.error||("HTTP "+res.status));return data}
-async function refresh(){const s=await request("/control/autonomy/status");$("stopState").textContent=s.emergency_stop?"EMERGENCY STOP ACTIVE":"Emergency stop is clear";$("stopState").className="status "+(s.emergency_stop?"bad":"good");$("modeState").textContent=s.emergency_stop?"Stopped":"Ready for scoped grants";$("stop").disabled=!!s.emergency_stop;$("resume").disabled=!s.emergency_stop;const grants=s.recent_grants||[];$("grants").innerHTML=grants.length?grants.map(g=>{const scopes=(g.scopes||[]).map(x=>x.resource+" → "+(x.actions||[]).join(",")).join("\n");return '<div class="grant"><b>'+escapeHtml(g.mode.toUpperCase())+'</b> · '+(g.revoked?'<span class="bad">REVOKED</span>':'<span class="good">ISSUED</span>')+'<br><code>'+escapeHtml(g.grant_id)+'</code><br>Task: '+escapeHtml((g.task_ids||[]).join(", "))+'<br>Expires: '+escapeHtml(g.expires_at)+'<pre>'+escapeHtml(scopes)+'</pre>'+(!g.revoked?'<button data-revoke="'+escapeHtml(g.grant_id)+'" class="danger">Revoke grant</button>':'')+'</div>'}).join(""):"No grants have been issued.";document.querySelectorAll("[data-revoke]").forEach(b=>b.addEventListener("click",()=>revoke(b.dataset.revoke)))}
+async function refresh(){const s=await request("/control/autonomy/status");$("stopState").textContent=s.emergency_stop?"EMERGENCY STOP ACTIVE":"Emergency stop is clear";$("stopState").className="status "+(s.emergency_stop?"bad":"good");$("modeState").textContent=s.emergency_stop?"Stopped":"Ready for scoped grants";$("stop").disabled=!!s.emergency_stop;$("resume").disabled=!s.emergency_stop;const grants=s.recent_grants||[];$("grants").innerHTML=grants.length?grants.map(g=>{const scopes=(g.scopes||[]).map(x=>x.resource+" → "+(x.actions||[]).join(",")).join("\n");return '<div class="grant"><b>'+escapeHtml(g.mode.toUpperCase())+'</b> · '+(g.revoked?'<span class="bad">REVOKED</span>':'<span class="good">ISSUED</span>')+'<br><code>'+escapeHtml(g.grant_id)+'</code><br>Task: '+escapeHtml((g.task_ids||[]).join(", "))+'<br>Expires: '+escapeHtml(g.expires_at)+'<pre>'+escapeHtml(scopes)+'</pre>'+(!g.revoked?'<button data-revoke="'+escapeHtml(g.grant_id)+'" class="danger">Revoke grant</button>':'')+'</div>'}).join(""):"No grants have been issued.";document.querySelectorAll("[data-revoke]").forEach(b=>b.addEventListener("click",()=>revoke(b.dataset.revoke)));await refreshTasks()}
 function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+async function refreshTasks(){
+ try{
+  const r=await request("/control/tasks?limit=50");
+  const tasks=r.tasks||[];
+  $("taskMsg").textContent=tasks.length+" saved task(s) · queue only; no worker execution is connected";
+  $("taskList").innerHTML=tasks.length?tasks.map(t=>{
+   const status=String(t.status||"unknown").toUpperCase();
+   let actions="";
+   if(["queued","running"].includes(t.status))actions+='<button data-task-action="pause" data-task-id="'+escapeHtml(t.task_id)+'">Pause</button>';
+   if(t.status==="paused")actions+='<button data-task-action="resume" data-task-id="'+escapeHtml(t.task_id)+'">Resume</button>';
+   if(["queued","running","paused"].includes(t.status))actions+='<button class="danger" data-task-action="cancel" data-task-id="'+escapeHtml(t.task_id)+'">Cancel</button>';
+   if(t.status==="failed"&&t.attempts<t.max_attempts)actions+='<button data-task-action="retry" data-task-id="'+escapeHtml(t.task_id)+'">Retry</button>';
+   return '<div class="task"><b>'+escapeHtml(status)+'</b> · '+escapeHtml(t.attempts)+'/'+escapeHtml(t.max_attempts)+' attempts<br>'+escapeHtml(t.goal)+'<br><code>'+escapeHtml(t.task_id)+'</code><div class="row"><button data-task-events="'+escapeHtml(t.task_id)+'">Activity</button>'+actions+'</div></div>';
+  }).join(""):"No tasks yet.";
+  document.querySelectorAll("[data-task-action]").forEach(b=>b.addEventListener("click",()=>taskAction(b.dataset.taskId,b.dataset.taskAction)));
+  document.querySelectorAll("[data-task-events]").forEach(b=>b.addEventListener("click",()=>showTaskEvents(b.dataset.taskEvents)));
+ }catch(e){$("taskMsg").textContent="Task queue unavailable: "+e.message}
+}
+async function taskAction(id,action){
+ if(action==="cancel"&&!confirm("Cancel this NIC task and revoke its current worker lease?"))return;
+ try{await request("/control/tasks/"+encodeURIComponent(id)+"/"+action,"POST",{});await refreshTasks()}
+ catch(e){$("taskMsg").textContent=e.message}
+}
+async function showTaskEvents(id){
+ try{const r=await request("/control/tasks/"+encodeURIComponent(id)+"/events");$("taskEvents").textContent=(r.events||[]).map(e=>e.occurred_at+" · "+e.actor+" · "+e.event_type+" · "+JSON.stringify(e.details)).join("\n")||"No events"}
+ catch(e){$("taskEvents").textContent=e.message}
+}
+$("createTask").onclick=async()=>{
+ const goal=$("taskGoal").value.trim();
+ if(!goal){$("taskMsg").textContent="Enter a task goal first.";return}
+ try{await request("/control/tasks","POST",{goal,priority:Number($("taskPriority").value),max_attempts:3});$("taskGoal").value="";await refreshTasks()}
+ catch(e){$("taskMsg").textContent=e.message}
+};
+$("refreshTasks").onclick=()=>refreshTasks();
 $("login").onclick=async()=>{api=location.origin;if(location.protocol!=="https:"&&!(["localhost","127.0.0.1"].includes(location.hostname))){msg("loginMsg","HTTPS is required for owner sign-in.","bad");return}const token=$("ownerToken").value;$("ownerToken").value="";if(!token){msg("loginMsg","Enter the owner token.","bad");return}try{const res=await fetch(api+"/control/session/login",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",cache:"no-store",body:JSON.stringify({owner_token:token})});const data=await res.json();if(!res.ok)throw Error(data.error||"Sign-in failed");csrf=data.csrf_token;$("loginPanel").classList.add("hidden");$("cockpit").classList.remove("hidden");$("connection").textContent="Owner session active";await refresh();msg("sessionInfo","Session active · "+Math.round(data.expires_in/60)+" minute expiry","good")}catch(e){msg("loginMsg",e.message,"bad")}};
 $("refresh").onclick=()=>refresh().catch(e=>msg("sessionInfo",e.message,"bad"));
 $("stop").onclick=async()=>{if(!confirm("Activate NIC emergency STOP? This blocks the broker tool path."))return;try{await request("/control/autonomy/stop","POST",{});await refresh()}catch(e){msg("stopState",e.message,"bad")}};
