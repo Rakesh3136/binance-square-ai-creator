@@ -174,11 +174,6 @@ class OwnerSessionApiTests(unittest.TestCase):
         from src.nic_os_task_runtime import TaskRuntimeStore
         task_store = TaskRuntimeStore(os.environ["NIC_TASK_RUNTIME_DB"])
         private = task_store.create_task(owner_id="different-owner", goal="private")
-        status, data, _ = self.call(
-            "POST", "/control/session/login", {"owner_token": "test-owner-token"}
-        )
-        self.assertEqual(status, 200)
-        cookie = data_headers = None
         # Login cookie is required in addition to the CSRF token.
         status, data, headers = self.call(
             "POST", "/control/session/login", {"owner_token": "test-owner-token"}
