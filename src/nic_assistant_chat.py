@@ -531,8 +531,20 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     return
                 try:
                     payload = self._body()
-                    result = execute_tool(payload.get("tool"), payload.get("arguments", {}))
-                    self._json(200, {"status": "completed", "tool": payload.get("tool"), "result": result})
+                    if set(payload) != {"tool", "arguments", "autonomy_grant_id", "autonomy_task_id"}:
+                        raise ValueError("operator_execution_requires_exact_task_bound_grant")
+                    if not isinstance(payload.get("tool"), str) or not isinstance(payload.get("arguments"), dict):
+                        raise ValueError("operator_tool_arguments_invalid")
+                    if not isinstance(payload.get("autonomy_grant_id"), str) or not isinstance(payload.get("autonomy_task_id"), str):
+                        raise ValueError("operator_task_grant_required")
+                    broker = OwnerAuthorizedToolBroker(
+                        configured_store,
+                        grant_id=payload["autonomy_grant_id"],
+                        task_id=payload["autonomy_task_id"],
+                        stop_check=control.is_stopped,
+                    )
+                    result = broker.execute(payload["tool"], payload["arguments"])
+                    self._json(200, {"status": "completed", "tool": payload["tool"], "result": result})
                 except ToolExecutionError as exc:
                     self._json(400, {"error": str(exc)})
                 except ValueError as exc:
