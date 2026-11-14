@@ -254,6 +254,31 @@ class TaskRuntimeStore:
         return self.get_task(task_id)
 
 
+
+    def pause_task(self, task_id: str, *, owner_id: str) -> dict[str, Any]:
+        """Owner pause revokes an active worker lease so it cannot commit late output."""
+        now = _now(self.clock())
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM nic_tasks WHERE task_id=?", (task_id,)).fetchone()
+            if row is None:
+                db.rollback()
+                raise KeyError("task_not_found")
+            if row["owner_id"] != owner_id:
+                db.rollback()
+                raise PermissionError("task_owner_mismatch")
+            if row["status"] not in {"queued", "running"}:
+                db.rollback()
+                raise ValueError("task_not_pausable")
+            db.execute(
+                "UPDATE nic_tasks SET status='paused', updated_at=?, lease_id=NULL, "
+                "lease_owner=NULL, lease_expires_at=NULL WHERE task_id=?",
+                (_stamp(now), task_id),
+            )
+            self._event(db, task_id, now, owner_id, "task.paused", {"lease_revoked": True})
+            db.commit()
+        return self.get_task(task_id)
+
     def resume_task(self, task_id: str, *, owner_id: str) -> dict[str, Any]:
         """Resume an owner-paused task without resetting its retry budget."""
         now = _now(self.clock())
@@ -301,9 +326,12 @@ class TaskRuntimeStore:
             db.commit()
         return self.get_task(task_id)
 
-    def get_task(self, task_id: str) -> dict[str, Any]:
+    def get_task(self, task_id: str, *, owner_id: str | None = None) -> dict[str, Any]:
         with closing(self._connect()) as db:
-            row = db.execute("SELECT * FROM nic_tasks WHERE task_id=?", (task_id,)).fetchone()
+            if owner_id is None:
+                row = db.execute("SELECT * FROM nic_tasks WHERE task_id=?", (task_id,)).fetchone()
+            else:
+                row = db.execute("SELECT * FROM nic_tasks WHERE task_id=? AND owner_id=?", (task_id, owner_id)).fetchone()
         if row is None:
             raise KeyError("task_not_found")
         return self._decode(row)

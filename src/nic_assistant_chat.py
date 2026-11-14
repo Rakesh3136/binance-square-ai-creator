@@ -11,7 +11,7 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit, parse_qs
 
 from src.nic_control_gate import ControlGate
 from src.nic_tool_registry import ToolExecutionError, execute_tool, tool_catalog
@@ -19,6 +19,7 @@ from src.nic_dynamic_agent_runtime import run_specialist, capability_catalog, CA
 from src.nic_os_owner_control_store import OwnerControlStore
 from src.nic_os_tool_broker import OwnerAuthorizedToolBroker
 from src.nic_os_owner_sessions import OwnerSessionStore
+from src.nic_os_task_runtime import TaskRuntimeStore
 from http.cookies import SimpleCookie
 
 SYSTEM_INSTRUCTIONS = """You are NIC's creator-workflow assistant.
@@ -214,12 +215,16 @@ def sync_github_emergency_stop(enabled: bool) -> None:
         raise RuntimeError("shared_github_stop_update_failed") from exc
 
 
-def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore | None = None):
+def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore | None = None,
+                 task_store: TaskRuntimeStore | None = None):
     """Create chat routes and separately authenticated owner control-plane routes."""
     control = gate or ControlGate()
     configured_store = owner_store
     owner_identity = os.getenv("NIC_OWNER_IDENTITY", "").strip()
     owner_db = os.getenv("NIC_OWNER_CONTROL_DB", "").strip()
+    task_db = os.getenv("NIC_TASK_RUNTIME_DB", "").strip()
+    if not task_db and owner_db:
+        task_db = owner_db + ".tasks.sqlite3"
     session_db = os.getenv("NIC_OWNER_SESSION_DB", "").strip()
     if not session_db and owner_db:
         session_db = owner_db + ".sessions.sqlite3"
@@ -229,6 +234,9 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
     )
     if configured_store is None and owner_identity and owner_db:
         configured_store = OwnerControlStore(owner_db, owner_identity=owner_identity)
+    configured_tasks = task_store
+    if configured_tasks is None and task_db:
+        configured_tasks = TaskRuntimeStore(task_db)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "NICChat/1.1"
@@ -327,6 +335,37 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 else:
                     self._json(200, {"authenticated": True, "session_ttl_seconds": int(os.getenv("NIC_OWNER_SESSION_TTL_SECONDS", "1800"))})
                 return
+
+            task_path = urlsplit(self.path).path
+            if task_path == "/control/tasks" or task_path.startswith("/control/tasks/"):
+                if not self._owner_authorized():
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                if configured_tasks is None or not owner_identity:
+                    self._json(503, {"error": "task_runtime_not_configured"})
+                    return
+                try:
+                    if task_path == "/control/tasks":
+                        query = parse_qs(urlsplit(self.path).query)
+                        limit = int(query.get("limit", ["50"])[0])
+                        self._json(200, {"tasks": configured_tasks.list_tasks(owner_id=owner_identity, limit=limit)})
+                        return
+                    parts = [unquote(part) for part in task_path[len("/control/tasks/"):].split("/") if part]
+                    if len(parts) == 1:
+                        self._json(200, {"task": configured_tasks.get_task(parts[0], owner_id=owner_identity)})
+                        return
+                    if len(parts) == 2 and parts[1] == "events":
+                        query = parse_qs(urlsplit(self.path).query)
+                        limit = int(query.get("limit", ["100"])[0])
+                        self._json(200, {"events": configured_tasks.list_events(parts[0], owner_id=owner_identity, limit=limit)})
+                        return
+                    self._json(404, {"error": "not_found"})
+                except KeyError:
+                    self._json(404, {"error": "task_not_found"})
+                except (ValueError, TypeError) as exc:
+                    self._json(400, {"error": str(exc)})
+                return
+
             if self.path in ("/operator/capabilities", "/control/status", "/control/approvals", "/control/autonomy/status"):
                 if not self._owner_authorized():
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
@@ -403,6 +442,53 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                 self._cors_headers()
                 self.end_headers()
                 self.wfile.write(body)
+                return
+
+
+            task_path = urlsplit(self.path).path
+            if task_path == "/control/tasks" or task_path.startswith("/control/tasks/"):
+                if not self._owner_authorized():
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                if configured_tasks is None or not owner_identity:
+                    self._json(503, {"error": "task_runtime_not_configured"})
+                    return
+                try:
+                    payload = self._body()
+                    if task_path == "/control/tasks":
+                        if set(payload) - {"goal", "priority", "max_attempts"}:
+                            raise ValueError("task_fields_invalid")
+                        task = configured_tasks.create_task(
+                            owner_id=owner_identity,
+                            goal=payload.get("goal"),
+                            priority=payload.get("priority", 0),
+                            max_attempts=payload.get("max_attempts", 3),
+                        )
+                        self._json(201, {"status": "task_created", "task": task})
+                        return
+                    parts = [unquote(part) for part in task_path[len("/control/tasks/"):].split("/") if part]
+                    if len(parts) != 2 or parts[1] not in {"pause", "resume", "cancel", "retry"}:
+                        self._json(404, {"error": "not_found"})
+                        return
+                    if payload:
+                        raise ValueError("task_action_body_must_be_empty")
+                    task_id, action = parts
+                    if action == "pause":
+                        task = configured_tasks.pause_task(task_id, owner_id=owner_identity)
+                    elif action == "resume":
+                        task = configured_tasks.resume_task(task_id, owner_id=owner_identity)
+                    elif action == "cancel":
+                        task = configured_tasks.cancel_task(task_id, owner_id=owner_identity)
+                    else:
+                        task = configured_tasks.retry_task(task_id, owner_id=owner_identity)
+                    status_label = {"pause": "task_paused", "resume": "task_resumed", "cancel": "task_cancelled", "retry": "task_requeued"}[action]
+                    self._json(200, {"status": status_label, "task": task})
+                except KeyError:
+                    self._json(404, {"error": "task_not_found"})
+                except PermissionError as exc:
+                    self._json(403, {"error": str(exc)})
+                except (ValueError, TypeError) as exc:
+                    self._json(400, {"error": str(exc)})
                 return
 
             if self.path == "/chat":
