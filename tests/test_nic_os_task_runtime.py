@@ -94,6 +94,25 @@ class TaskRuntimeTests(unittest.TestCase):
             with self.assertRaises(sqlite3.IntegrityError):
                 db.execute("DELETE FROM nic_task_events WHERE task_id=?", (task["task_id"],))
 
+
+    def test_owner_can_resume_paused_task(self):
+        task = self.store.create_task(owner_id="owner", goal="pause and resume")
+        self.store.transition(task["task_id"], new_status="paused", actor="owner")
+        with self.assertRaises(PermissionError):
+            self.store.resume_task(task["task_id"], owner_id="intruder")
+        resumed = self.store.resume_task(task["task_id"], owner_id="owner")
+        self.assertEqual(resumed["status"], "queued")
+        self.assertEqual(resumed["attempts"], 0)
+
+    def test_owner_cancel_revokes_running_worker_lease(self):
+        task = self.store.create_task(owner_id="owner", goal="cancel running task")
+        claim = self.store.claim_next(worker_id="worker")
+        cancelled = self.store.cancel_task(task["task_id"], owner_id="owner")
+        self.assertEqual(cancelled["status"], "cancelled")
+        with self.assertRaises(PermissionError):
+            self.store.transition(task["task_id"], new_status="completed", actor="worker",
+                                  lease_id=claim["lease_id"], result={"late": True})
+
     def test_database_permissions_are_restricted(self):
         self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600)
 
