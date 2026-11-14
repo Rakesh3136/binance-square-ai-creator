@@ -19,12 +19,19 @@ log = logging.getLogger(__name__)
 
 
 def _model_task_executor(task: dict[str, Any], grant_id: str,
-                         owner_store: OwnerControlStore) -> str:
+                         owner_store: OwnerControlStore,
+                         task_store: TaskRuntimeStore) -> str:
     """Run one task through NIC's existing broker-gated, read-only chat runtime."""
     from src.nic_assistant_chat import advisor_reply
 
     def stopped() -> bool:
-        return bool(owner_store.status().get("emergency_stop", True))
+        if owner_store.status().get("emergency_stop", True):
+            return True
+        try:
+            current = task_store.get_task(task["task_id"])
+        except KeyError:
+            return True
+        return current["status"] != "running" or current.get("lease_id") != task.get("lease_id")
 
     return advisor_reply(
         task["goal"],
@@ -46,7 +53,7 @@ class NICTaskWorker:
         owner_store: OwnerControlStore,
         *,
         worker_id: str = "nic-trusted-runtime",
-        executor: Callable[[dict[str, Any], str, OwnerControlStore], str] | None = None,
+        executor: Callable[[dict[str, Any], str, OwnerControlStore, TaskRuntimeStore], str] | None = None,
         poll_seconds: float = 2.0,
         lease_seconds: int = 300,
     ):
@@ -79,14 +86,39 @@ class NICTaskWorker:
         task_id = task["task_id"]
         grant_id = grants.get(task_id)
         if not grant_id:
-            # Defensive fence: the queue query should only claim a listed task.
             self.task_store.transition(
                 task_id, new_status="paused", actor=self.worker_id,
                 lease_id=task["lease_id"], error="owner_grant_not_found",
             )
             return True
+
+        heartbeat_stop = threading.Event()
+        heartbeat_failed = threading.Event()
+
+        def heartbeat() -> None:
+            interval = max(1.0, min(60.0, self.lease_seconds / 3.0))
+            while not heartbeat_stop.wait(interval):
+                try:
+                    self.task_store.renew_lease(
+                        task_id, worker_id=self.worker_id,
+                        lease_id=task["lease_id"], lease_seconds=self.lease_seconds,
+                    )
+                except Exception:
+                    heartbeat_failed.set()
+                    return
+
+        heartbeat_thread = threading.Thread(
+            target=heartbeat, name="nic-task-lease-heartbeat", daemon=True
+        )
+        heartbeat_thread.start()
         try:
-            result = self.executor(task, grant_id, self.owner_store)
+            result = self.executor(task, grant_id, self.owner_store, self.task_store)
+            current = self.task_store.get_task(task_id)
+            # Owner pause/cancel revokes the lease; a stale worker may never commit.
+            if current["status"] != "running" or current.get("lease_id") != task["lease_id"]:
+                return True
+            if heartbeat_failed.is_set():
+                raise RuntimeError("worker_lease_renewal_failed")
             if not isinstance(result, str) or not result.strip():
                 raise RuntimeError("task_executor_returned_empty_result")
             if not self.owner_store.task_grant_is_active(task_id=task_id, grant_id=grant_id):
@@ -100,19 +132,20 @@ class NICTaskWorker:
                 lease_id=task["lease_id"], result={"summary": result[:18000]},
             )
         except Exception as exc:
-            # Never log credentials, request bodies, or model/tool payloads.
             try:
                 current = self.task_store.get_task(task_id)
-                if current["status"] == "running":
+                if current["status"] == "running" and current.get("lease_id") == task["lease_id"]:
                     self.task_store.transition(
                         task_id, new_status="failed", actor=self.worker_id,
                         lease_id=task["lease_id"],
                         error=(type(exc).__name__ + ": task execution failed")[:2000],
                     )
             except Exception:
-                # The lease may have been revoked by owner pause/cancel or expired.
                 pass
             log.warning("NIC task %s failed (%s)", task_id, type(exc).__name__)
+        finally:
+            heartbeat_stop.set()
+            heartbeat_thread.join(timeout=2.0)
         return True
 
     def start(self) -> None:
