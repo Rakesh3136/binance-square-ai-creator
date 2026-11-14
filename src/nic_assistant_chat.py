@@ -481,7 +481,7 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                         task = configured_tasks.cancel_task(task_id, owner_id=owner_identity)
                     else:
                         task = configured_tasks.retry_task(task_id, owner_id=owner_identity)
-                    status_label = "task_requeued" if action == "retry" else "task_" + action + "d"
+                    status_label = {"pause": "task_paused", "resume": "task_resumed", "cancel": "task_cancelled", "retry": "task_requeued"}[action]
                     self._json(200, {"status": status_label, "task": task})
                 except KeyError:
                     self._json(404, {"error": "task_not_found"})
