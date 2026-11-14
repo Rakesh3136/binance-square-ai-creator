@@ -200,9 +200,9 @@ class OwnerControlStore:
             return result
 
 
-    def active_task_grants(self) -> dict[str, str]:
+    def active_task_grants(self, *, now: datetime | None = None) -> dict[str, str]:
         """Return the newest currently active grant ID for each explicitly covered task."""
-        now = datetime.now(timezone.utc).isoformat()
+        now_stamp = _utc(now)
         with self._connect() as db:
             state = db.execute(
                 "SELECT emergency_stop FROM owner_control_state WHERE singleton=1"
@@ -213,7 +213,7 @@ class OwnerControlStore:
                 "SELECT grant_id, task_ids FROM autonomy_grants "
                 "WHERE owner_identity=? AND revoked_at IS NULL AND expires_at>? "
                 "ORDER BY issued_at DESC",
-                (self.owner_identity, now),
+                (self.owner_identity, now_stamp),
             ).fetchall()
         covered: dict[str, str] = {}
         for row in rows:
@@ -221,9 +221,10 @@ class OwnerControlStore:
                 covered.setdefault(task_id, row["grant_id"])
         return covered
 
-    def task_grant_is_active(self, *, task_id: str, grant_id: str) -> bool:
+    def task_grant_is_active(self, *, task_id: str, grant_id: str,
+                             now: datetime | None = None) -> bool:
         """Recheck owner stop, grant expiry/revocation and exact task binding."""
-        now = datetime.now(timezone.utc).isoformat()
+        now_stamp = _utc(now)
         with self._connect() as db:
             state = db.execute(
                 "SELECT emergency_stop FROM owner_control_state WHERE singleton=1"
@@ -233,7 +234,7 @@ class OwnerControlStore:
             row = db.execute(
                 "SELECT task_ids FROM autonomy_grants WHERE grant_id=? AND owner_identity=? "
                 "AND revoked_at IS NULL AND expires_at>?",
-                (grant_id, self.owner_identity, now),
+                (grant_id, self.owner_identity, now_stamp),
             ).fetchone()
         return bool(row and task_id in json.loads(row["task_ids"]))
 
