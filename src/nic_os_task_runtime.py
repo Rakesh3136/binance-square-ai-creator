@@ -141,6 +141,8 @@ class TaskRuntimeStore:
             raise ValueError("worker_id_invalid")
         if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 15 <= lease_seconds <= 900:
             raise ValueError("lease_seconds_must_be_between_15_and_900")
+        if owner_id is not None and (not isinstance(owner_id, str) or not owner_id.strip() or len(owner_id) > 200):
+            raise ValueError("owner_id_invalid")
         now = _now(self.clock())
         expiry = now + timedelta(seconds=lease_seconds)
         with closing(self._connect()) as db:
