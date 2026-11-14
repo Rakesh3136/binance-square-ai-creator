@@ -109,7 +109,7 @@ class TaskRuntimeTests(unittest.TestCase):
         claim = self.store.claim_next(worker_id="worker")
         cancelled = self.store.cancel_task(task["task_id"], owner_id="owner")
         self.assertEqual(cancelled["status"], "cancelled")
-        with self.assertRaises(PermissionError):
+        with self.assertRaises(ValueError):
             self.store.transition(task["task_id"], new_status="completed", actor="worker",
                                   lease_id=claim["lease_id"], result={"late": True})
 
