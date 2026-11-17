@@ -9,6 +9,9 @@ from urllib.error import HTTPError
 
 from src.nic_assistant_chat import make_handler
 from src.nic_control_gate import ControlGate
+from src.nic_os_owner_control_store import OwnerControlStore
+from src.nic_os_task_runtime import TaskRuntimeStore
+from src.nic_os_task_worker import NICTaskWorker
 
 
 class NICControlAPITests(unittest.TestCase):
@@ -16,22 +19,30 @@ class NICControlAPITests(unittest.TestCase):
         self._old_chat = os.environ.get("NIC_CHAT_ACCESS_TOKEN")
         self._old_owner = os.environ.get("NIC_OWNER_CONTROL_TOKEN")
         self._old_origins = os.environ.get("NIC_CHAT_ALLOWED_ORIGINS")
+        self._old_identity = os.environ.get("NIC_OWNER_IDENTITY")
         os.environ["NIC_CHAT_ACCESS_TOKEN"] = "chat-test-token"
         os.environ["NIC_OWNER_CONTROL_TOKEN"] = "owner-test-token"
         os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = "https://example.github.io"
+        os.environ["NIC_OWNER_IDENTITY"] = "owner-test"
         self.shared_stop_mock = patch("src.nic_assistant_chat.sync_github_emergency_stop")
         self.sync_shared_stop = self.shared_stop_mock.start()
         self.addCleanup(self.shared_stop_mock.stop)
         self.gate = ControlGate(self._temp_path())
         self.gate.set_emergency_stop(False)
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.gate))
+        self.owner_store = OwnerControlStore(self._temp_path(".sqlite3"), owner_identity="owner-test")
+        self.owner_store.set_emergency_stop(authenticated_owner="owner-test", active=False)
+        self.task_store = TaskRuntimeStore(self._temp_path(".tasks.sqlite3"))
+        self.server = ThreadingHTTPServer(
+            ("127.0.0.1", 0),
+            make_handler(self.gate, owner_store=self.owner_store, task_store=self.task_store),
+        )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.base = f"http://127.0.0.1:{self.server.server_port}"
 
-    def _temp_path(self):
+    def _temp_path(self, suffix=".json"):
         import tempfile
-        fd, path = tempfile.mkstemp(prefix="nic-control-test-", suffix=".json")
+        fd, path = tempfile.mkstemp(prefix="nic-control-test-", suffix=suffix)
         os.close(fd)
         os.unlink(path)
         self.addCleanup(lambda: os.path.exists(path) and os.unlink(path))
@@ -53,6 +64,10 @@ class NICControlAPITests(unittest.TestCase):
             os.environ.pop("NIC_CHAT_ALLOWED_ORIGINS", None)
         else:
             os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = self._old_origins
+        if self._old_identity is None:
+            os.environ.pop("NIC_OWNER_IDENTITY", None)
+        else:
+            os.environ["NIC_OWNER_IDENTITY"] = self._old_identity
 
     def request(self, path, token=None, method="GET", payload=None, origin=None):
         headers = {}
@@ -115,6 +130,43 @@ class NICControlAPITests(unittest.TestCase):
         self.assertFalse(payload["emergency_stop"])
         self.sync_shared_stop.assert_called_with(False)
         self.assertEqual(payload["shared_stop"], "INACTIVE")
+        self.assertFalse(self.owner_store.status()["emergency_stop"])
+
+    def test_legacy_stop_and_resume_gate_the_persistent_worker(self):
+        task = self.task_store.create_task(owner_id="owner-test", goal="Run only after owner resumes")
+        self.owner_store.issue_grant(
+            authenticated_owner="owner-test",
+            task_ids=[task["task_id"]],
+            scopes=[{"resource": "nic_tool:get_live_market_data", "actions": ["execute"]}],
+            duration_seconds=3600,
+        )
+        seen = []
+        worker = NICTaskWorker(
+            self.task_store, self.owner_store,
+            executor=lambda claimed, grant_id, owner, tasks: seen.append(claimed["task_id"]) or "done",
+        )
+
+        status, stopped = self.request("/control/stop", "owner-test-token", method="POST", payload={})
+        self.assertEqual(status, 200)
+        self.assertTrue(stopped["emergency_stop"])
+        self.assertTrue(self.owner_store.status()["emergency_stop"])
+        self.assertFalse(worker.run_once())
+        self.assertEqual(seen, [])
+
+        status, resumed = self.request("/control/resume", "owner-test-token", method="POST", payload={})
+        self.assertEqual(status, 200)
+        self.assertFalse(resumed["emergency_stop"])
+        self.assertFalse(self.owner_store.status()["emergency_stop"])
+        self.assertTrue(worker.run_once())
+        self.assertEqual(seen, [task["task_id"]])
+        self.assertEqual(self.task_store.get_task(task["task_id"])["status"], "completed")
+
+    def test_autonomy_stop_also_propagates_to_shared_publisher_flag(self):
+        status, payload = self.request("/control/autonomy/stop", "owner-test-token", method="POST", payload={})
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["emergency_stop"])
+        self.assertEqual(payload["shared_stop"], "ACTIVE")
+        self.sync_shared_stop.assert_called_with(True)
 
     def test_approval_list_is_owner_authenticated_and_actions_are_one_time(self):
         details = {"post_id": "draft-1", "destination": "Binance Square"}
