@@ -16,9 +16,14 @@ class NICControlAPITests(unittest.TestCase):
         self._old_chat = os.environ.get("NIC_CHAT_ACCESS_TOKEN")
         self._old_owner = os.environ.get("NIC_OWNER_CONTROL_TOKEN")
         self._old_origins = os.environ.get("NIC_CHAT_ALLOWED_ORIGINS")
+        self._old_journal = os.environ.get("NIC_TRANSPARENCY_JOURNAL_PATH")
         os.environ["NIC_CHAT_ACCESS_TOKEN"] = "chat-test-token"
         os.environ["NIC_OWNER_CONTROL_TOKEN"] = "owner-test-token"
         os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = "https://example.github.io"
+        self.journal_path = self._temp_path()
+        with open(self.journal_path, "w", encoding="utf-8") as journal_file:
+            json.dump({"schema_version": "3.0", "lessons": [{"source": "test", "text": "Keep evidence provenance."}]}, journal_file)
+        os.environ["NIC_TRANSPARENCY_JOURNAL_PATH"] = self.journal_path
         self.shared_stop_mock = patch("src.nic_assistant_chat.sync_github_emergency_stop")
         self.sync_shared_stop = self.shared_stop_mock.start()
         self.addCleanup(self.shared_stop_mock.stop)
@@ -53,6 +58,10 @@ class NICControlAPITests(unittest.TestCase):
             os.environ.pop("NIC_CHAT_ALLOWED_ORIGINS", None)
         else:
             os.environ["NIC_CHAT_ALLOWED_ORIGINS"] = self._old_origins
+        if self._old_journal is None:
+            os.environ.pop("NIC_TRANSPARENCY_JOURNAL_PATH", None)
+        else:
+            os.environ["NIC_TRANSPARENCY_JOURNAL_PATH"] = self._old_journal
 
     def request(self, path, token=None, method="GET", payload=None, origin=None):
         headers = {}
@@ -94,6 +103,21 @@ class NICControlAPITests(unittest.TestCase):
                                        origin="https://attacker.example")
         self.assertEqual(status, 403)
         self.assertEqual(payload["error"], "origin_not_allowed")
+
+    def test_transparency_journal_is_owner_authenticated_and_excludes_hidden_reasoning(self):
+        status, payload = self.request("/journal")
+        self.assertEqual(status, 401)
+        status, payload = self.request("/journal", "owner-test-token")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["source"], "nic_transparency_journal")
+        self.assertFalse(payload["chain_of_thought_exposed"])
+        self.assertEqual(payload["journal"]["lessons"][0]["text"], "Keep evidence provenance.")
+
+    def test_missing_transparency_journal_is_not_reported_as_empty_success(self):
+        os.environ["NIC_TRANSPARENCY_JOURNAL_PATH"] = self.journal_path + ".missing"
+        status, payload = self.request("/journal", "owner-test-token")
+        self.assertEqual(status, 404)
+        self.assertEqual(payload["error"], "transparency_journal_not_available")
 
     def test_control_routes_require_owner_token(self):
         status, _ = self.request("/control/status")
