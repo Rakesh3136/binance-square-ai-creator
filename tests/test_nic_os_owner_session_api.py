@@ -13,6 +13,9 @@ from src.nic_os_owner_control_store import OwnerControlStore
 class OwnerSessionApiTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
+        self.shared_stop_mock = patch("src.nic_assistant_chat.sync_github_emergency_stop")
+        self.sync_shared_stop = self.shared_stop_mock.start()
+        self.addCleanup(self.shared_stop_mock.stop)
         self.old = {k: os.environ.get(k) for k in (
             "NIC_OWNER_CONTROL_TOKEN", "NIC_OWNER_IDENTITY",
             "NIC_OWNER_SESSION_ALLOW_INSECURE_LOCALHOST", "NIC_CHAT_ALLOWED_ORIGINS",
@@ -76,6 +79,7 @@ class OwnerSessionApiTests(unittest.TestCase):
         status, data, _ = self.call("POST", "/control/autonomy/resume", {}, cookie, csrf)
         self.assertEqual(status, 200)
         self.assertFalse(data["emergency_stop"])
+        self.sync_shared_stop.assert_called_with(False)
 
         status, data, _ = self.call("POST", "/control/autonomy/grants", {
             "mode": "full_power", "task_ids": ["task-1"],
@@ -97,6 +101,7 @@ class OwnerSessionApiTests(unittest.TestCase):
         status, _, _ = self.call("POST", "/control/autonomy/stop", {}, cookie, csrf)
         self.assertEqual(status, 200)
         self.assertTrue(self.store.status()["emergency_stop"])
+        self.sync_shared_stop.assert_called_with(True)
 
         status, _, _ = self.call("POST", "/control/session/logout", {}, cookie, csrf)
         self.assertEqual(status, 200)
