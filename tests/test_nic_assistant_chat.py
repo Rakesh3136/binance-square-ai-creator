@@ -71,6 +71,37 @@ class NICAssistantChatTests(unittest.TestCase):
         self.assertEqual(second["input"][0]["type"], "function_call_output")
         self.assertIn('"agent_count": 9', second["input"][0]["output"])
 
+    def test_tool_execution_is_written_to_activity_journal(self):
+        from src.nic_assistant_chat import _execute_tool_with_activity
+        with patch("src.nic_assistant_chat.execute_tool", return_value={"ok": True}) as execute, \
+             patch("src.nic_assistant_chat.ActivityJournal") as journal_class:
+            result = _execute_tool_with_activity(
+                "get_agent_registry", {}, "chat-test-1", "nic_orchestrator"
+            )
+        self.assertEqual(result, {"ok": True})
+        execute.assert_called_once_with("get_agent_registry", {})
+        journal_class.return_value.append.assert_called_once_with({
+            "task_id": "chat-test-1",
+            "actor": "nic_orchestrator",
+            "action": "get_agent_registry",
+            "status": "completed",
+            "summary": "Tool get_agent_registry completed. Result details are available in the task response.",
+            "error_code": None,
+        })
+
+    def test_failed_tool_execution_is_recorded_before_error_is_raised(self):
+        from src.nic_assistant_chat import _execute_tool_with_activity
+        with patch("src.nic_assistant_chat.execute_tool", side_effect=ValueError("tool failed")), \
+             patch("src.nic_assistant_chat.ActivityJournal") as journal_class:
+            with self.assertRaisesRegex(ValueError, "tool failed"):
+                _execute_tool_with_activity(
+                    "get_agent_registry", {}, "chat-test-2", "nic_orchestrator"
+                )
+        event = journal_class.return_value.append.call_args.args[0]
+        self.assertEqual(event["status"], "failed")
+        self.assertEqual(event["error_code"], "ValueError")
+        self.assertNotIn("tool failed", event["summary"])
+
     def test_tool_execution_can_be_disabled(self):
         client = FakeClient()
         advisor_reply("Hello", client=client, max_tool_calls=0)

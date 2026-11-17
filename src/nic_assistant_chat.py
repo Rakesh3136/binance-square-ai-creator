@@ -9,12 +9,14 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from pathlib import Path
 from urllib.parse import unquote
 
 from src.nic_control_gate import ControlGate
+from src.nic_activity_journal import ActivityJournal
 from src.nic_tool_registry import ToolExecutionError, execute_tool, tool_catalog
 from src.nic_dynamic_agent_runtime import run_specialist, capability_catalog, CAPABILITY_TOOLS
 
@@ -76,6 +78,40 @@ def _model_tool_definitions() -> list[dict[str, Any]]:
     return definitions
 
 
+
+def _record_activity(task_id: str, actor: str, action: str, status: str,
+                     summary: str, error_code: str | None = None) -> None:
+    """Best-effort audit logging; journal failures must not change task execution."""
+    try:
+        ActivityJournal().append({
+            "task_id": task_id,
+            "actor": actor[:80],
+            "action": action[:120],
+            "status": status[:40],
+            "summary": summary[:1200],
+            "error_code": error_code[:120] if error_code else None,
+        })
+    except Exception:
+        # Runtime storage may be unavailable (for example, read-only deployment).
+        # Keep the task result truthful; health/operations can surface the outage.
+        return
+
+
+def _execute_tool_with_activity(name: str, arguments: dict[str, Any],
+                                task_id: str, actor: str) -> dict[str, Any]:
+    """Execute one allowlisted tool and record its observable result."""
+    try:
+        result = execute_tool(name, arguments)
+    except Exception as exc:
+        _record_activity(task_id, actor, name, "failed",
+                         f"Tool {name} failed during execution.",
+                         type(exc).__name__)
+        raise
+    _record_activity(task_id, actor, name, "completed",
+                     f"Tool {name} completed. Result details are available in the task response.")
+    return result
+
+
 def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                   client: Any | None = None, model: str | None = None,
                   max_tool_calls: int = 3) -> str:
@@ -88,6 +124,7 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
         raise ValueError("history must be a list")
     if not isinstance(max_tool_calls, int) or not 0 <= max_tool_calls <= 3:
         raise ValueError("max_tool_calls must be between 0 and 3")
+    task_id = "chat-" + uuid.uuid4().hex[:16]
     normalized: list[dict[str, str]] = []
     for item in history[-12:]:
         if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
@@ -135,15 +172,22 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                     task=arguments["task"],
                     context=arguments["context"],
                     catalog=tool_catalog(),
-                    execute_tool=execute_tool,
+                    execute_tool=lambda name, args: _execute_tool_with_activity(
+                        name, args, task_id, "specialist:" + arguments["role"]
+                    ),
                 )
+                _record_activity(task_id, "nic_orchestrator", "spawn_specialist", "completed",
+                                 "Temporary specialist completed its assigned read-only task.")
                 tool_output = {"ok": True, "result": specialist_result}
             except (ToolExecutionError, ValueError, TypeError, RuntimeError) as exc:
+                _record_activity(task_id, "nic_orchestrator", "spawn_specialist", "failed",
+                                 "Temporary specialist could not complete its assigned task.",
+                                 type(exc).__name__)
                 tool_output = {"ok": False, "error": str(exc)}
         else:
             try:
                 arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
-                result = execute_tool(call_name, arguments)
+                result = _execute_tool_with_activity(call_name, arguments, task_id, "nic_orchestrator")
                 tool_output = {"ok": True, "result": result}
             except (ToolExecutionError, ValueError, TypeError) as exc:
                 tool_output = {"ok": False, "error": str(exc)}
@@ -277,6 +321,22 @@ def make_handler(gate: ControlGate | None = None):
                     "external_action_execution": "not_connected",
                 })
                 return
+            if self.path == "/activity":
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                try:
+                    events = ActivityJournal().list_events(100)
+                except (OSError, ValueError):
+                    self._json(503, {"error": "activity_journal_unavailable"})
+                    return
+                self._json(200, {
+                    "events": events,
+                    "source": "nic_activity_journal",
+                    "append_only": True,
+                    "chain_of_thought_exposed": False,
+                })
+                return
             if self.path == "/journal":
                 if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
                     self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
@@ -327,6 +387,20 @@ def make_handler(gate: ControlGate | None = None):
             self._json(404, {"error": "not_found"})
 
         def do_POST(self) -> None:
+            if self.path == "/activity":
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                try:
+                    event = self._body()
+                    saved = ActivityJournal().append(event)
+                    self._json(201, {"event": saved, "source": "nic_activity_journal"})
+                except ValueError as exc:
+                    self._json(400, {"error": str(exc)})
+                except (OSError, RuntimeError):
+                    self._json(503, {"error": "activity_journal_write_failed"})
+                return
+
             if self.path == "/chat":
                 token = os.getenv("NIC_CHAT_ACCESS_TOKEN", "")
                 if not token:
