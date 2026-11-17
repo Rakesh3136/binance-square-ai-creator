@@ -344,6 +344,20 @@ def make_handler(gate: ControlGate | None = None):
             self._json(404, {"error": "not_found"})
 
         def do_POST(self) -> None:
+            if self.path == "/activity":
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                try:
+                    event = self._body()
+                    saved = ActivityJournal().append(event)
+                    self._json(201, {"event": saved, "source": "nic_activity_journal"})
+                except ValueError as exc:
+                    self._json(400, {"error": str(exc)})
+                except (OSError, RuntimeError):
+                    self._json(503, {"error": "activity_journal_write_failed"})
+                return
+
             if self.path == "/chat":
                 token = os.getenv("NIC_CHAT_ACCESS_TOKEN", "")
                 if not token:
