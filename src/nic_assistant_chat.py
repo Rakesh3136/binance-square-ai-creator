@@ -608,13 +608,27 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                         self._json(200, configured_store.status())
                     else:
                         active = self.path.endswith("/stop")
+                        # Stop is fail-closed: persist it before attempting shared propagation.
+                        # Resume clears the shared publisher flag first, then the owner store,
+                        # and only then the legacy in-process gate.
+                        if not active:
+                            sync_github_emergency_stop(False)
                         configured_store.set_emergency_stop(
                             authenticated_owner=owner_identity, active=active
                         )
-                        # Mirror the stop into the legacy in-process action gate too.
-                        # The owner store remains the authoritative chat-tool grant check.
                         control.set_emergency_stop(active, actor="owner_autonomy_api")
-                        self._json(200, {"emergency_stop": active})
+                        if active:
+                            try:
+                                sync_github_emergency_stop(True)
+                            except RuntimeError:
+                                self._json(503, {
+                                    "emergency_stop": True,
+                                    "shared_stop": "UPDATE_FAILED",
+                                    "warning": "NIC remains locally stopped, but the shared publisher stop could not be updated.",
+                                })
+                                return
+                        self._json(200, {"emergency_stop": active,
+                                         "shared_stop": "ACTIVE" if active else "INACTIVE"})
                 except (ValueError, PermissionError, RuntimeError) as exc:
                     self._json(409, {"error": str(exc)})
                 return
@@ -625,20 +639,30 @@ def make_handler(gate: ControlGate | None = None, owner_store: OwnerControlStore
                     return
                 try:
                     if self.path == "/control/stop":
-                        # Stop locally first; then propagate to the shared Actions flag.
+                        # Stop every local execution boundary before shared propagation.
                         local = control.set_emergency_stop(True, actor="owner_api")
+                        if configured_store is not None and owner_identity:
+                            configured_store.set_emergency_stop(
+                                authenticated_owner=owner_identity, active=True
+                            )
                         try:
                             sync_github_emergency_stop(True)
                         except RuntimeError:
-                            self._json(503, {**local, "shared_stop": "UPDATE_FAILED", "warning": "Local gate is stopped, but the GitHub Actions control flag could not be updated."})
+                            self._json(503, {**local, "emergency_stop": True,
+                                             "shared_stop": "UPDATE_FAILED",
+                                             "warning": "NIC remains locally stopped, but the shared publisher stop could not be updated."})
                             return
-                        self._json(200, {**local, "shared_stop": "ACTIVE"})
+                        self._json(200, {**local, "emergency_stop": True, "shared_stop": "ACTIVE"})
                         return
                     if self.path == "/control/resume":
-                        # Never resume local execution if the shared flag cannot be cleared.
+                        # Never resume any local execution boundary until shared stop clears.
                         sync_github_emergency_stop(False)
+                        if configured_store is not None and owner_identity:
+                            configured_store.set_emergency_stop(
+                                authenticated_owner=owner_identity, active=False
+                            )
                         local = control.set_emergency_stop(False, actor="owner_api")
-                        self._json(200, {**local, "shared_stop": "INACTIVE"})
+                        self._json(200, {**local, "emergency_stop": False, "shared_stop": "INACTIVE"})
                         return
                     prefix = "/control/approvals/"
                     if self.path.startswith(prefix):
