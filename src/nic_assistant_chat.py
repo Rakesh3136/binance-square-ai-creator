@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from src.nic_control_gate import ControlGate
+from src.nic_activity_journal import ActivityJournal
 from src.nic_tool_registry import ToolExecutionError, execute_tool, tool_catalog
 from src.nic_dynamic_agent_runtime import run_specialist, capability_catalog, CAPABILITY_TOOLS
 
@@ -275,6 +276,22 @@ def make_handler(gate: ControlGate | None = None):
                     "owner_control_token_configured": bool(os.getenv("NIC_OWNER_CONTROL_TOKEN")),
                     "connected_plugins": [],
                     "external_action_execution": "not_connected",
+                })
+                return
+            if self.path == "/activity":
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                try:
+                    events = ActivityJournal().list_events(100)
+                except (OSError, ValueError):
+                    self._json(503, {"error": "activity_journal_unavailable"})
+                    return
+                self._json(200, {
+                    "events": events,
+                    "source": "nic_activity_journal",
+                    "append_only": True,
+                    "chain_of_thought_exposed": False,
                 })
                 return
             if self.path == "/journal":
