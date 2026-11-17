@@ -9,6 +9,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from pathlib import Path
@@ -77,6 +78,40 @@ def _model_tool_definitions() -> list[dict[str, Any]]:
     return definitions
 
 
+
+def _record_activity(task_id: str, actor: str, action: str, status: str,
+                     summary: str, error_code: str | None = None) -> None:
+    """Best-effort audit logging; journal failures must not change task execution."""
+    try:
+        ActivityJournal().append({
+            "task_id": task_id,
+            "actor": actor[:80],
+            "action": action[:120],
+            "status": status[:40],
+            "summary": summary[:1200],
+            "error_code": error_code[:120] if error_code else None,
+        })
+    except Exception:
+        # Runtime storage may be unavailable (for example, read-only deployment).
+        # Keep the task result truthful; health/operations can surface the outage.
+        return
+
+
+def _execute_tool_with_activity(name: str, arguments: dict[str, Any],
+                                task_id: str, actor: str) -> dict[str, Any]:
+    """Execute one allowlisted tool and record its observable result."""
+    try:
+        result = execute_tool(name, arguments)
+    except Exception as exc:
+        _record_activity(task_id, actor, name, "failed",
+                         f"Tool {name} failed during execution.",
+                         type(exc).__name__)
+        raise
+    _record_activity(task_id, actor, name, "completed",
+                     f"Tool {name} completed. Result details are available in the task response.")
+    return result
+
+
 def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                   client: Any | None = None, model: str | None = None,
                   max_tool_calls: int = 3) -> str:
@@ -89,6 +124,7 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
         raise ValueError("history must be a list")
     if not isinstance(max_tool_calls, int) or not 0 <= max_tool_calls <= 3:
         raise ValueError("max_tool_calls must be between 0 and 3")
+    task_id = "chat-" + uuid.uuid4().hex[:16]
     normalized: list[dict[str, str]] = []
     for item in history[-12:]:
         if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
@@ -136,15 +172,22 @@ def advisor_reply(message: str, history: list[dict[str, str]] | None = None, *,
                     task=arguments["task"],
                     context=arguments["context"],
                     catalog=tool_catalog(),
-                    execute_tool=execute_tool,
+                    execute_tool=lambda name, args: _execute_tool_with_activity(
+                        name, args, task_id, "specialist:" + arguments["role"]
+                    ),
                 )
+                _record_activity(task_id, "nic_orchestrator", "spawn_specialist", "completed",
+                                 "Temporary specialist completed its assigned read-only task.")
                 tool_output = {"ok": True, "result": specialist_result}
             except (ToolExecutionError, ValueError, TypeError, RuntimeError) as exc:
+                _record_activity(task_id, "nic_orchestrator", "spawn_specialist", "failed",
+                                 "Temporary specialist could not complete its assigned task.",
+                                 type(exc).__name__)
                 tool_output = {"ok": False, "error": str(exc)}
         else:
             try:
                 arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
-                result = execute_tool(call_name, arguments)
+                result = _execute_tool_with_activity(call_name, arguments, task_id, "nic_orchestrator")
                 tool_output = {"ok": True, "result": result}
             except (ToolExecutionError, ValueError, TypeError) as exc:
                 tool_output = {"ok": False, "error": str(exc)}
