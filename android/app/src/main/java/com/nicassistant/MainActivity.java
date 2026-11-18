@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private EditText server, chatToken, ownerToken, message;
+    private final JSONArray conversationHistory = new JSONArray();
     private TextView output, status;
     private LinearLayout root;
     private String base() { return server.getText().toString().trim().replaceAll("/+$", ""); }
@@ -75,9 +76,16 @@ public class MainActivity extends Activity {
             String prompt = message.getText().toString().trim();
             if (prompt.isEmpty()) { show("Enter a message first."); return; }
             work("Sending", () -> {
-                JSONObject body = new JSONObject(); body.put("message", prompt); body.put("history", new JSONArray());
+                JSONObject body = new JSONObject(); body.put("message", prompt); body.put("history", conversationHistory);
                 JSONObject response = new JSONObject(request("/chat", chatToken.getText().toString(), body));
-                return response.optString("reply", "No reply returned");
+                String reply = response.optString("reply", "No reply returned");
+                JSONObject userTurn = new JSONObject(); userTurn.put("role", "user"); userTurn.put("content", prompt);
+                JSONObject assistantTurn = new JSONObject(); assistantTurn.put("role", "assistant"); assistantTurn.put("content", reply);
+                synchronized (conversationHistory) {
+                    conversationHistory.put(userTurn); conversationHistory.put(assistantTurn);
+                    while (conversationHistory.length() > 24) conversationHistory.remove(0);
+                }
+                return reply;
             });
         });
         addLabel("Owner activity", 19, true);
