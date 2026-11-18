@@ -1,6 +1,6 @@
 {
   "schema": "NIC-FORECAST-LAB-2.0",
-  "generated_at": "2026-11-18T06:28:04.925419+00:00",
+  "generated_at": "2026-11-18T09:45:46.179653+00:00",
   "results": [
     {
       "status": "READY",
@@ -8,12 +8,12 @@
       "regime": "TREND_UP_EXTENDED",
       "current_features": {
         "trend": 1,
-        "momentum": 50.894085281980736,
-        "rsi": 90.04854368932037,
-        "volume_ratio": 6.429057140945091,
-        "distance_ema20": 51.760097302014984,
-        "range_position": 0.9718181818181819,
-        "price": 0.2194
+        "momentum": 72.48226950354612,
+        "rsi": 90.23034154090546,
+        "volume_ratio": 1.5034378359625715,
+        "distance_ema20": 44.31300273157264,
+        "range_position": 0.9651851851851851,
+        "price": 0.2432
       },
       "hypotheses": {
         "BULLISH": {
@@ -21,18 +21,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.4875,
-              "mean_signed_return": 0.0282
+              "hit_rate": 0.475,
+              "mean_signed_return": 0.1515
             },
             "12": {
               "samples": 80,
               "hit_rate": 0.4375,
-              "mean_signed_return": 0.3971
+              "mean_signed_return": 1.215
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.3875,
-              "mean_signed_return": 3.3392
+              "hit_rate": 0.425,
+              "mean_signed_return": 7.0784
             },
             "predictivity": {
               "minimum_events": 30,
@@ -41,15 +41,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4157,
-                    "mean_signed_return": 0.0337
+                    "hit_rate": 0.4209,
+                    "mean_signed_return": 0.6165
                   },
                   "conditional": {
-                    "samples": 187,
-                    "hit_rate": 0.139,
-                    "mean_signed_return": -0.5856
+                    "samples": 189,
+                    "hit_rate": 0.1534,
+                    "mean_signed_return": 1.1521
                   },
-                  "lift": -0.2767,
+                  "lift": -0.2675,
                   "eligible": true,
                   "predictive": false
                 },
@@ -57,15 +57,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4157,
-                    "mean_signed_return": 0.0337
+                    "hit_rate": 0.4209,
+                    "mean_signed_return": 0.6165
                   },
                   "conditional": {
                     "samples": 253,
-                    "hit_rate": 0.3834,
-                    "mean_signed_return": 0.7916
+                    "hit_rate": 0.3953,
+                    "mean_signed_return": 2.1162
                   },
-                  "lift": -0.0323,
+                  "lift": -0.0256,
                   "eligible": true,
                   "predictive": false
                 },
@@ -73,15 +73,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4157,
-                    "mean_signed_return": 0.0337
+                    "hit_rate": 0.4209,
+                    "mean_signed_return": 0.6165
                   },
                   "conditional": {
-                    "samples": 152,
-                    "hit_rate": 0.4539,
-                    "mean_signed_return": -0.0145
+                    "samples": 150,
+                    "hit_rate": 0.46,
+                    "mean_signed_return": 0.0646
                   },
-                  "lift": 0.0382,
+                  "lift": 0.0391,
                   "eligible": true,
                   "predictive": false
                 },
@@ -89,13 +89,259 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4157,
-                    "mean_signed_return": 0.0337
+                    "hit_rate": 0.4209,
+                    "mean_signed_return": 0.6165
                   },
                   "conditional": {
-                    "samples": 529,
-                    "hit_rate": 0.4216,
-                    "mean_signed_return": -0.5403
+                    "samples": 528,
+                    "hit_rate": 0.4261,
+                    "mean_signed_return": -0.1181
+                  },
+                  "lift": 0.0052,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4209,
+                    "mean_signed_return": 0.6165
+                  },
+                  "conditional": {
+                    "samples": 552,
+                    "hit_rate": 0.4022,
+                    "mean_signed_return": 0.2606
+                  },
+                  "lift": -0.0187,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        },
+        "BEARISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.475,
+              "mean_signed_return": -0.1515
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.5625,
+              "mean_signed_return": -1.215
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.575,
+              "mean_signed_return": -7.0784
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.5722,
+                    "mean_signed_return": -0.6165
+                  },
+                  "conditional": {
+                    "samples": 386,
+                    "hit_rate": 0.4456,
+                    "mean_signed_return": -0.3543
+                  },
+                  "lift": -0.1266,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.5722,
+                    "mean_signed_return": -0.6165
+                  },
+                  "conditional": {
+                    "samples": 311,
+                    "hit_rate": 0.5531,
+                    "mean_signed_return": 0.5809
+                  },
+                  "lift": -0.0191,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.5722,
+                    "mean_signed_return": -0.6165
+                  },
+                  "conditional": {
+                    "samples": 150,
+                    "hit_rate": 0.54,
+                    "mean_signed_return": -0.0646
+                  },
+                  "lift": -0.0322,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.5722,
+                    "mean_signed_return": -0.6165
+                  },
+                  "conditional": {
+                    "samples": 487,
+                    "hit_rate": 0.6119,
+                    "mean_signed_return": -0.6812
+                  },
+                  "lift": 0.0397,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.5722,
+                    "mean_signed_return": -0.6165
+                  },
+                  "conditional": {
+                    "samples": 552,
+                    "hit_rate": 0.5906,
+                    "mean_signed_return": -0.2606
+                  },
+                  "lift": 0.0184,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        }
+      },
+      "decision": "BEARISH",
+      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
+      "as_of": "2026-11-18T09:00:00+00:00",
+      "market_data_provenance": {
+        "provider": "Binance Spot Market Data API",
+        "endpoint": "https://data-api.binance.vision/api/v3/klines",
+        "instrument": "MMTUSDT",
+        "interval": "1h",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:28.152891+00:00",
+        "source_policy": "closed_1h_only",
+        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
+      }
+    },
+    {
+      "status": "READY",
+      "symbol": "ZKP",
+      "regime": "TREND_UP_EXTENDED",
+      "current_features": {
+        "trend": 1,
+        "momentum": 28.881987577639755,
+        "rsi": 97.24770642201831,
+        "volume_ratio": 5.608278563893118,
+        "distance_ema20": 22.065573448819144,
+        "range_position": 0.7956204379562046,
+        "price": 0.0415
+      },
+      "hypotheses": {
+        "BULLISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.325,
+              "mean_signed_return": -0.8482
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.45,
+              "mean_signed_return": -0.5662
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.375,
+              "mean_signed_return": -1.09
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3652,
+                    "mean_signed_return": -1.0981
+                  },
+                  "conditional": {
+                    "samples": 141,
+                    "hit_rate": 0.1418,
+                    "mean_signed_return": -2.9071
+                  },
+                  "lift": -0.2234,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3652,
+                    "mean_signed_return": -1.0981
+                  },
+                  "conditional": {
+                    "samples": 240,
+                    "hit_rate": 0.3083,
+                    "mean_signed_return": -1.2093
+                  },
+                  "lift": -0.0569,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3652,
+                    "mean_signed_return": -1.0981
+                  },
+                  "conditional": {
+                    "samples": 135,
+                    "hit_rate": 0.437,
+                    "mean_signed_return": -1.1778
+                  },
+                  "lift": 0.0718,
+                  "eligible": true,
+                  "predictive": true
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3652,
+                    "mean_signed_return": -1.0981
+                  },
+                  "conditional": {
+                    "samples": 547,
+                    "hit_rate": 0.3711,
+                    "mean_signed_return": -1.0381
                   },
                   "lift": 0.0059,
                   "eligible": true,
@@ -105,22 +351,24 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4157,
-                    "mean_signed_return": 0.0337
+                    "hit_rate": 0.3652,
+                    "mean_signed_return": -1.0981
                   },
                   "conditional": {
-                    "samples": 552,
-                    "hit_rate": 0.3967,
-                    "mean_signed_return": -0.3465
+                    "samples": 562,
+                    "hit_rate": 0.3541,
+                    "mean_signed_return": -1.1685
                   },
-                  "lift": -0.019,
+                  "lift": -0.0111,
                   "eligible": true,
                   "predictive": false
                 }
               ],
               "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
               "trusted_features": [],
-              "candidate_features": []
+              "candidate_features": [
+                "volume_expansion"
+              ]
             }
           }
         },
@@ -129,18 +377,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.475,
-              "mean_signed_return": -0.0282
+              "hit_rate": 0.6,
+              "mean_signed_return": 0.8482
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.5625,
-              "mean_signed_return": -0.3971
+              "hit_rate": 0.5125,
+              "mean_signed_return": 0.5662
             },
             "24": {
               "samples": 80,
               "hit_rate": 0.6125,
-              "mean_signed_return": -3.3392
+              "mean_signed_return": 1.09
             },
             "predictivity": {
               "minimum_events": 30,
@@ -149,15 +397,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.5774,
-                    "mean_signed_return": -0.0337
+                    "hit_rate": 0.6052,
+                    "mean_signed_return": 1.0981
                   },
                   "conditional": {
-                    "samples": 388,
-                    "hit_rate": 0.4485,
-                    "mean_signed_return": -0.3322
+                    "samples": 434,
+                    "hit_rate": 0.5276,
+                    "mean_signed_return": 0.5103
                   },
-                  "lift": -0.1289,
+                  "lift": -0.0776,
                   "eligible": true,
                   "predictive": false
                 },
@@ -165,15 +413,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.5774,
-                    "mean_signed_return": -0.0337
+                    "hit_rate": 0.6052,
+                    "mean_signed_return": 1.0981
                   },
                   "conditional": {
-                    "samples": 311,
-                    "hit_rate": 0.5531,
-                    "mean_signed_return": 0.5809
+                    "samples": 295,
+                    "hit_rate": 0.5492,
+                    "mean_signed_return": 0.8374
                   },
-                  "lift": -0.0243,
+                  "lift": -0.056,
                   "eligible": true,
                   "predictive": false
                 },
@@ -181,15 +429,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.5774,
-                    "mean_signed_return": -0.0337
+                    "hit_rate": 0.6052,
+                    "mean_signed_return": 1.0981
                   },
                   "conditional": {
-                    "samples": 152,
-                    "hit_rate": 0.5461,
-                    "mean_signed_return": 0.0145
+                    "samples": 135,
+                    "hit_rate": 0.5481,
+                    "mean_signed_return": 1.1778
                   },
-                  "lift": -0.0313,
+                  "lift": -0.0571,
                   "eligible": true,
                   "predictive": false
                 },
@@ -197,15 +445,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.5774,
-                    "mean_signed_return": -0.0337
+                    "hit_rate": 0.6052,
+                    "mean_signed_return": 1.0981
                   },
                   "conditional": {
-                    "samples": 487,
-                    "hit_rate": 0.6181,
-                    "mean_signed_return": 0.0069
+                    "samples": 470,
+                    "hit_rate": 0.6447,
+                    "mean_signed_return": 1.3908
                   },
-                  "lift": 0.0407,
+                  "lift": 0.0395,
                   "eligible": true,
                   "predictive": false
                 },
@@ -213,15 +461,15 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.5774,
-                    "mean_signed_return": -0.0337
+                    "hit_rate": 0.6052,
+                    "mean_signed_return": 1.0981
                   },
                   "conditional": {
-                    "samples": 552,
-                    "hit_rate": 0.596,
-                    "mean_signed_return": 0.3465
+                    "samples": 562,
+                    "hit_rate": 0.6157,
+                    "mean_signed_return": 1.1685
                   },
-                  "lift": 0.0186,
+                  "lift": 0.0105,
                   "eligible": true,
                   "predictive": false
                 }
@@ -235,31 +483,31 @@
       },
       "decision": "BEARISH",
       "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
+      "as_of": "2026-11-18T09:00:00+00:00",
       "market_data_provenance": {
         "provider": "Binance Spot Market Data API",
         "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "MMTUSDT",
+        "instrument": "ZKPUSDT",
         "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:45.965643+00:00",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:29.324812+00:00",
         "source_policy": "closed_1h_only",
         "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
       }
     },
     {
       "status": "READY",
-      "symbol": "USDE",
-      "regime": "HIGH_FLOW",
+      "symbol": "RWUSD",
+      "regime": "RANGE",
       "current_features": {
         "trend": 1,
-        "momentum": -0.0199880071956815,
-        "rsi": 53.84615384615384,
-        "volume_ratio": 3.2520588836501876,
-        "distance_ema20": -0.010247523552719962,
-        "range_position": 0.2857142857142857,
-        "price": 1.0004
+        "momentum": 0.010001000100001711,
+        "rsi": 60.0,
+        "volume_ratio": 0.36963678804797395,
+        "distance_ema20": 0.0070913292258723,
+        "range_position": 0.75,
+        "price": 1.0
       },
       "hypotheses": {
         "BULLISH": {
@@ -267,18 +515,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.3125,
-              "mean_signed_return": -0.0004
+              "hit_rate": 0.325,
+              "mean_signed_return": -0.0014
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.3875,
-              "mean_signed_return": -0.0032
+              "hit_rate": 0.2625,
+              "mean_signed_return": -0.003
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.2875,
-              "mean_signed_return": -0.0052
+              "hit_rate": 0.3875,
+              "mean_signed_return": 0.0
             },
             "predictivity": {
               "minimum_events": 30,
@@ -287,15 +535,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4104,
-                    "mean_signed_return": -0.0016
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0001
                   },
                   "conditional": {
-                    "samples": 254,
-                    "hit_rate": 0.2598,
-                    "mean_signed_return": -0.0096
+                    "samples": 307,
+                    "hit_rate": 0.2866,
+                    "mean_signed_return": -0.003
                   },
-                  "lift": -0.1506,
+                  "lift": -0.0821,
                   "eligible": true,
                   "predictive": false
                 },
@@ -303,15 +551,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4104,
-                    "mean_signed_return": -0.0016
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0001
                   },
                   "conditional": {
-                    "samples": 220,
-                    "hit_rate": 0.3318,
-                    "mean_signed_return": -0.0062
+                    "samples": 211,
+                    "hit_rate": 0.2559,
+                    "mean_signed_return": -0.0054
                   },
-                  "lift": -0.0786,
+                  "lift": -0.1128,
                   "eligible": true,
                   "predictive": false
                 },
@@ -319,15 +567,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4104,
-                    "mean_signed_return": -0.0016
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0001
                   },
                   "conditional": {
-                    "samples": 136,
-                    "hit_rate": 0.4044,
-                    "mean_signed_return": 0.0018
+                    "samples": 177,
+                    "hit_rate": 0.4068,
+                    "mean_signed_return": 0.0014
                   },
-                  "lift": -0.006,
+                  "lift": 0.0381,
                   "eligible": true,
                   "predictive": false
                 },
@@ -335,15 +583,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4104,
-                    "mean_signed_return": -0.0016
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0001
                   },
                   "conditional": {
-                    "samples": 541,
-                    "hit_rate": 0.414,
-                    "mean_signed_return": -0.0009
+                    "samples": 560,
+                    "hit_rate": 0.3696,
+                    "mean_signed_return": -0.0
                   },
-                  "lift": 0.0036,
+                  "lift": 0.0009,
                   "eligible": true,
                   "predictive": false
                 },
@@ -351,13 +599,13 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4104,
-                    "mean_signed_return": -0.0016
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0001
                   },
                   "conditional": {
                     "samples": 575,
-                    "hit_rate": 0.4104,
-                    "mean_signed_return": -0.0016
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0001
                   },
                   "lift": 0.0,
                   "eligible": true,
@@ -375,18 +623,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.4375,
-              "mean_signed_return": 0.0004
+              "hit_rate": 0.375,
+              "mean_signed_return": 0.0014
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.45,
-              "mean_signed_return": 0.0032
+              "hit_rate": 0.4625,
+              "mean_signed_return": 0.003
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.5125,
-              "mean_signed_return": 0.0052
+              "hit_rate": 0.3875,
+              "mean_signed_return": -0.0
             },
             "predictivity": {
               "minimum_events": 30,
@@ -395,15 +643,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4504,
-                    "mean_signed_return": 0.0016
+                    "hit_rate": 0.3826,
+                    "mean_signed_return": 0.0001
                   },
                   "conditional": {
-                    "samples": 321,
-                    "hit_rate": 0.3645,
-                    "mean_signed_return": -0.0047
+                    "samples": 268,
+                    "hit_rate": 0.3358,
+                    "mean_signed_return": -0.0033
                   },
-                  "lift": -0.0859,
+                  "lift": -0.0468,
                   "eligible": true,
                   "predictive": false
                 },
@@ -411,15 +659,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4504,
-                    "mean_signed_return": 0.0016
+                    "hit_rate": 0.3826,
+                    "mean_signed_return": 0.0001
                   },
                   "conditional": {
-                    "samples": 233,
-                    "hit_rate": 0.4034,
-                    "mean_signed_return": -0.0026
+                    "samples": 200,
+                    "hit_rate": 0.25,
+                    "mean_signed_return": -0.0065
                   },
-                  "lift": -0.047,
+                  "lift": -0.1326,
                   "eligible": true,
                   "predictive": false
                 },
@@ -427,15 +675,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4504,
-                    "mean_signed_return": 0.0016
+                    "hit_rate": 0.3826,
+                    "mean_signed_return": 0.0001
                   },
                   "conditional": {
-                    "samples": 136,
-                    "hit_rate": 0.4412,
-                    "mean_signed_return": -0.0018
+                    "samples": 177,
+                    "hit_rate": 0.3559,
+                    "mean_signed_return": -0.0014
                   },
-                  "lift": -0.0092,
+                  "lift": -0.0267,
                   "eligible": true,
                   "predictive": false
                 },
@@ -443,15 +691,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4504,
-                    "mean_signed_return": 0.0016
+                    "hit_rate": 0.3826,
+                    "mean_signed_return": 0.0001
                   },
                   "conditional": {
-                    "samples": 522,
-                    "hit_rate": 0.4617,
-                    "mean_signed_return": 0.0022
+                    "samples": 567,
+                    "hit_rate": 0.3845,
+                    "mean_signed_return": 0.0004
                   },
-                  "lift": 0.0113,
+                  "lift": 0.0019,
                   "eligible": true,
                   "predictive": false
                 },
@@ -459,13 +707,13 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4504,
-                    "mean_signed_return": 0.0016
+                    "hit_rate": 0.3826,
+                    "mean_signed_return": 0.0001
                   },
                   "conditional": {
                     "samples": 575,
-                    "hit_rate": 0.4504,
-                    "mean_signed_return": 0.0016
+                    "hit_rate": 0.3826,
+                    "mean_signed_return": 0.0001
                   },
                   "lift": 0.0,
                   "eligible": true,
@@ -481,31 +729,523 @@
       },
       "decision": "BEARISH",
       "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
+      "as_of": "2026-11-18T09:00:00+00:00",
       "market_data_provenance": {
         "provider": "Binance Spot Market Data API",
         "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "USDEUSDT",
+        "instrument": "RWUSDUSDT",
         "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:47.272444+00:00",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:30.495064+00:00",
         "source_policy": "closed_1h_only",
         "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
       }
     },
     {
       "status": "READY",
-      "symbol": "QNT",
+      "symbol": "RLUSD",
+      "regime": "HIGH_FLOW",
+      "current_features": {
+        "trend": 1,
+        "momentum": 0.009989012086708549,
+        "rsi": 53.84615384614991,
+        "volume_ratio": 3.6138875731971534,
+        "distance_ema20": 0.011610349768287342,
+        "range_position": 0.7500000000001388,
+        "price": 1.0012
+      },
+      "hypotheses": {
+        "BULLISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.2875,
+              "mean_signed_return": -0.0041
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.2875,
+              "mean_signed_return": -0.0051
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.3875,
+              "mean_signed_return": -0.0019
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3774,
+                    "mean_signed_return": -0.001
+                  },
+                  "conditional": {
+                    "samples": 253,
+                    "hit_rate": 0.3083,
+                    "mean_signed_return": -0.008
+                  },
+                  "lift": -0.0691,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3774,
+                    "mean_signed_return": -0.001
+                  },
+                  "conditional": {
+                    "samples": 203,
+                    "hit_rate": 0.33,
+                    "mean_signed_return": -0.0053
+                  },
+                  "lift": -0.0474,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3774,
+                    "mean_signed_return": -0.001
+                  },
+                  "conditional": {
+                    "samples": 195,
+                    "hit_rate": 0.4,
+                    "mean_signed_return": 0.0019
+                  },
+                  "lift": 0.0226,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3774,
+                    "mean_signed_return": -0.001
+                  },
+                  "conditional": {
+                    "samples": 538,
+                    "hit_rate": 0.3866,
+                    "mean_signed_return": -0.0002
+                  },
+                  "lift": 0.0092,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3774,
+                    "mean_signed_return": -0.001
+                  },
+                  "conditional": {
+                    "samples": 575,
+                    "hit_rate": 0.3774,
+                    "mean_signed_return": -0.001
+                  },
+                  "lift": 0.0,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        },
+        "BEARISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.4,
+              "mean_signed_return": 0.0041
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.4375,
+              "mean_signed_return": 0.0051
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.375,
+              "mean_signed_return": 0.0019
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4696,
+                    "mean_signed_return": 0.001
+                  },
+                  "conditional": {
+                    "samples": 322,
+                    "hit_rate": 0.4161,
+                    "mean_signed_return": -0.0046
+                  },
+                  "lift": -0.0535,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4696,
+                    "mean_signed_return": 0.001
+                  },
+                  "conditional": {
+                    "samples": 224,
+                    "hit_rate": 0.4107,
+                    "mean_signed_return": -0.0034
+                  },
+                  "lift": -0.0589,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4696,
+                    "mean_signed_return": 0.001
+                  },
+                  "conditional": {
+                    "samples": 195,
+                    "hit_rate": 0.4256,
+                    "mean_signed_return": -0.0019
+                  },
+                  "lift": -0.044,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4696,
+                    "mean_signed_return": 0.001
+                  },
+                  "conditional": {
+                    "samples": 548,
+                    "hit_rate": 0.4763,
+                    "mean_signed_return": 0.0015
+                  },
+                  "lift": 0.0067,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4696,
+                    "mean_signed_return": 0.001
+                  },
+                  "conditional": {
+                    "samples": 575,
+                    "hit_rate": 0.4696,
+                    "mean_signed_return": 0.001
+                  },
+                  "lift": 0.0,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        }
+      },
+      "decision": "BEARISH",
+      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
+      "as_of": "2026-11-18T09:00:00+00:00",
+      "market_data_provenance": {
+        "provider": "Binance Spot Market Data API",
+        "endpoint": "https://data-api.binance.vision/api/v3/klines",
+        "instrument": "RLUSDUSDT",
+        "interval": "1h",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:31.682201+00:00",
+        "source_policy": "closed_1h_only",
+        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
+      }
+    },
+    {
+      "status": "READY",
+      "symbol": "XUSD",
+      "regime": "HIGH_FLOW",
+      "current_features": {
+        "trend": 1,
+        "momentum": 0.009991008092713471,
+        "rsi": 75.0,
+        "volume_ratio": 13.215465601656176,
+        "distance_ema20": 0.009057046277405334,
+        "range_position": 0.7499999999995837,
+        "price": 1.001
+      },
+      "hypotheses": {
+        "BULLISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.2125,
+              "mean_signed_return": -0.0041
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.25,
+              "mean_signed_return": -0.0076
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.425,
+              "mean_signed_return": 0.003
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0014
+                  },
+                  "conditional": {
+                    "samples": 217,
+                    "hit_rate": 0.2949,
+                    "mean_signed_return": -0.0106
+                  },
+                  "lift": -0.0738,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0014
+                  },
+                  "conditional": {
+                    "samples": 208,
+                    "hit_rate": 0.2644,
+                    "mean_signed_return": -0.0104
+                  },
+                  "lift": -0.1043,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0014
+                  },
+                  "conditional": {
+                    "samples": 128,
+                    "hit_rate": 0.3672,
+                    "mean_signed_return": -0.001
+                  },
+                  "lift": -0.0015,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0014
+                  },
+                  "conditional": {
+                    "samples": 533,
+                    "hit_rate": 0.3827,
+                    "mean_signed_return": -0.0003
+                  },
+                  "lift": 0.014,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0014
+                  },
+                  "conditional": {
+                    "samples": 575,
+                    "hit_rate": 0.3687,
+                    "mean_signed_return": -0.0014
+                  },
+                  "lift": 0.0,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        },
+        "BEARISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.425,
+              "mean_signed_return": 0.0041
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.5375,
+              "mean_signed_return": 0.0076
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.375,
+              "mean_signed_return": -0.003
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4661,
+                    "mean_signed_return": 0.0014
+                  },
+                  "conditional": {
+                    "samples": 358,
+                    "hit_rate": 0.405,
+                    "mean_signed_return": -0.0042
+                  },
+                  "lift": -0.0611,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4661,
+                    "mean_signed_return": 0.0014
+                  },
+                  "conditional": {
+                    "samples": 219,
+                    "hit_rate": 0.4155,
+                    "mean_signed_return": -0.0032
+                  },
+                  "lift": -0.0506,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4661,
+                    "mean_signed_return": 0.0014
+                  },
+                  "conditional": {
+                    "samples": 128,
+                    "hit_rate": 0.4531,
+                    "mean_signed_return": 0.001
+                  },
+                  "lift": -0.013,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4661,
+                    "mean_signed_return": 0.0014
+                  },
+                  "conditional": {
+                    "samples": 535,
+                    "hit_rate": 0.4879,
+                    "mean_signed_return": 0.0041
+                  },
+                  "lift": 0.0218,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4661,
+                    "mean_signed_return": 0.0014
+                  },
+                  "conditional": {
+                    "samples": 575,
+                    "hit_rate": 0.4661,
+                    "mean_signed_return": 0.0014
+                  },
+                  "lift": 0.0,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        }
+      },
+      "decision": "BEARISH",
+      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
+      "as_of": "2026-11-18T09:00:00+00:00",
+      "market_data_provenance": {
+        "provider": "Binance Spot Market Data API",
+        "endpoint": "https://data-api.binance.vision/api/v3/klines",
+        "instrument": "XUSDUSDT",
+        "interval": "1h",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:32.864853+00:00",
+        "source_policy": "closed_1h_only",
+        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
+      }
+    },
+    {
+      "status": "READY",
+      "symbol": "BRKBB",
       "regime": "HIGH_FLOW",
       "current_features": {
         "trend": -1,
-        "momentum": -0.3329065300896161,
-        "rsi": 56.94692903995236,
-        "volume_ratio": 3.0393779526996836,
-        "distance_ema20": 1.128922601507898,
-        "range_position": 0.7019704433497554,
-        "price": 155.68
+        "momentum": 0.02044327842041227,
+        "rsi": 37.10756562017505,
+        "volume_ratio": 3.259973843814195,
+        "distance_ema20": -0.07788799562040705,
+        "range_position": 0.41574167507568294,
+        "price": 587.11
       },
       "hypotheses": {
         "BULLISH": {
@@ -513,18 +1253,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.5125,
-              "mean_signed_return": 0.0067
+              "hit_rate": 0.725,
+              "mean_signed_return": 0.286
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.5875,
-              "mean_signed_return": 0.2183
+              "hit_rate": 0.7,
+              "mean_signed_return": 0.4393
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.6375,
-              "mean_signed_return": 1.5163
+              "hit_rate": 0.775,
+              "mean_signed_return": 0.7135
             },
             "predictivity": {
               "minimum_events": 30,
@@ -532,432 +1272,78 @@
                 {
                   "feature": "trend_aligned",
                   "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4365,
-                    "mean_signed_return": -0.523
+                    "samples": 525,
+                    "hit_rate": 0.5695,
+                    "mean_signed_return": 0.3363
                   },
                   "conditional": {
-                    "samples": 245,
-                    "hit_rate": 0.3347,
-                    "mean_signed_return": -1.372
+                    "samples": 332,
+                    "hit_rate": 0.5211,
+                    "mean_signed_return": 0.2343
                   },
-                  "lift": -0.1018,
+                  "lift": -0.0484,
                   "eligible": true,
                   "predictive": false
                 },
                 {
                   "feature": "momentum_aligned",
                   "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4365,
-                    "mean_signed_return": -0.523
-                  },
-                  "conditional": {
-                    "samples": 257,
-                    "hit_rate": 0.4241,
-                    "mean_signed_return": -0.7182
-                  },
-                  "lift": -0.0124,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4365,
-                    "mean_signed_return": -0.523
-                  },
-                  "conditional": {
-                    "samples": 164,
-                    "hit_rate": 0.4085,
-                    "mean_signed_return": -0.5957
-                  },
-                  "lift": -0.028,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4365,
-                    "mean_signed_return": -0.523
-                  },
-                  "conditional": {
-                    "samples": 536,
-                    "hit_rate": 0.444,
-                    "mean_signed_return": -0.5091
-                  },
-                  "lift": 0.0075,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4365,
-                    "mean_signed_return": -0.523
-                  },
-                  "conditional": {
-                    "samples": 555,
-                    "hit_rate": 0.4324,
-                    "mean_signed_return": -0.6281
-                  },
-                  "lift": -0.0041,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        },
-        "BEARISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.4875,
-              "mean_signed_return": -0.0067
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.4125,
-              "mean_signed_return": -0.2183
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.3625,
-              "mean_signed_return": -1.5163
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5635,
-                    "mean_signed_return": 0.523
-                  },
-                  "conditional": {
-                    "samples": 330,
-                    "hit_rate": 0.4879,
-                    "mean_signed_return": -0.1073
-                  },
-                  "lift": -0.0756,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5635,
-                    "mean_signed_return": 0.523
-                  },
-                  "conditional": {
-                    "samples": 317,
-                    "hit_rate": 0.5521,
-                    "mean_signed_return": 0.3614
-                  },
-                  "lift": -0.0114,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5635,
-                    "mean_signed_return": 0.523
-                  },
-                  "conditional": {
-                    "samples": 164,
-                    "hit_rate": 0.5915,
-                    "mean_signed_return": 0.5957
-                  },
-                  "lift": 0.028,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5635,
-                    "mean_signed_return": 0.523
-                  },
-                  "conditional": {
-                    "samples": 504,
-                    "hit_rate": 0.5615,
-                    "mean_signed_return": 0.5667
-                  },
-                  "lift": -0.002,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5635,
-                    "mean_signed_return": 0.523
-                  },
-                  "conditional": {
-                    "samples": 555,
-                    "hit_rate": 0.5676,
-                    "mean_signed_return": 0.6281
-                  },
-                  "lift": 0.0041,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        }
-      },
-      "decision": "BULLISH",
-      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
-      "market_data_provenance": {
-        "provider": "Binance Spot Market Data API",
-        "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "QNTUSDT",
-        "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:48.592675+00:00",
-        "source_policy": "closed_1h_only",
-        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
-      }
-    },
-    {
-      "status": "READY",
-      "symbol": "BFUSD",
-      "regime": "HIGH_FLOW",
-      "current_features": {
-        "trend": 1,
-        "momentum": -0.010004001600638635,
-        "rsi": 33.33333333333333,
-        "volume_ratio": 7.5232725050644955,
-        "distance_ema20": -0.011940455493963942,
-        "range_position": 0.0,
-        "price": 0.9995
-      },
-      "hypotheses": {
-        "BULLISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.1875,
-              "mean_signed_return": -0.005
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.225,
-              "mean_signed_return": -0.0022
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.25,
-              "mean_signed_return": -0.0066
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.313,
-                    "mean_signed_return": -0.0012
-                  },
-                  "conditional": {
-                    "samples": 298,
-                    "hit_rate": 0.3289,
-                    "mean_signed_return": 0.0003
-                  },
-                  "lift": 0.0159,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.313,
-                    "mean_signed_return": -0.0012
-                  },
-                  "conditional": {
-                    "samples": 164,
-                    "hit_rate": 0.1707,
-                    "mean_signed_return": -0.0068
-                  },
-                  "lift": -0.1423,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.313,
-                    "mean_signed_return": -0.0012
-                  },
-                  "conditional": {
-                    "samples": 138,
-                    "hit_rate": 0.2246,
-                    "mean_signed_return": -0.0048
-                  },
-                  "lift": -0.0884,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.313,
-                    "mean_signed_return": -0.0012
-                  },
-                  "conditional": {
-                    "samples": 541,
-                    "hit_rate": 0.3253,
-                    "mean_signed_return": -0.0011
-                  },
-                  "lift": 0.0123,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.313,
-                    "mean_signed_return": -0.0012
-                  },
-                  "conditional": {
-                    "samples": 575,
-                    "hit_rate": 0.313,
-                    "mean_signed_return": -0.0012
-                  },
-                  "lift": 0.0,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        },
-        "BEARISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.45,
-              "mean_signed_return": 0.005
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.425,
-              "mean_signed_return": 0.0022
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.4375,
-              "mean_signed_return": 0.0066
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3357,
-                    "mean_signed_return": 0.0012
+                    "samples": 525,
+                    "hit_rate": 0.5695,
+                    "mean_signed_return": 0.3363
                   },
                   "conditional": {
                     "samples": 277,
-                    "hit_rate": 0.3249,
-                    "mean_signed_return": 0.0028
+                    "hit_rate": 0.5162,
+                    "mean_signed_return": 0.1568
                   },
-                  "lift": -0.0108,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3357,
-                    "mean_signed_return": 0.0012
-                  },
-                  "conditional": {
-                    "samples": 163,
-                    "hit_rate": 0.184,
-                    "mean_signed_return": -0.0077
-                  },
-                  "lift": -0.1517,
+                  "lift": -0.0533,
                   "eligible": true,
                   "predictive": false
                 },
                 {
                   "feature": "volume_expansion",
                   "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3357,
-                    "mean_signed_return": 0.0012
+                    "samples": 525,
+                    "hit_rate": 0.5695,
+                    "mean_signed_return": 0.3363
                   },
                   "conditional": {
-                    "samples": 138,
-                    "hit_rate": 0.4565,
-                    "mean_signed_return": 0.0048
+                    "samples": 117,
+                    "hit_rate": 0.6581,
+                    "mean_signed_return": 0.4374
                   },
-                  "lift": 0.1208,
+                  "lift": 0.0886,
                   "eligible": true,
                   "predictive": true
                 },
                 {
                   "feature": "rsi_not_extreme",
                   "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3357,
-                    "mean_signed_return": 0.0012
+                    "samples": 525,
+                    "hit_rate": 0.5695,
+                    "mean_signed_return": 0.3363
                   },
                   "conditional": {
-                    "samples": 558,
-                    "hit_rate": 0.3387,
-                    "mean_signed_return": 0.0016
+                    "samples": 452,
+                    "hit_rate": 0.5973,
+                    "mean_signed_return": 0.4503
                   },
-                  "lift": 0.003,
+                  "lift": 0.0278,
                   "eligible": true,
                   "predictive": false
                 },
                 {
                   "feature": "near_ema20",
                   "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3357,
-                    "mean_signed_return": 0.0012
+                    "samples": 525,
+                    "hit_rate": 0.5695,
+                    "mean_signed_return": 0.3363
                   },
                   "conditional": {
-                    "samples": 575,
-                    "hit_rate": 0.3357,
-                    "mean_signed_return": 0.0012
+                    "samples": 525,
+                    "hit_rate": 0.5695,
+                    "mean_signed_return": 0.3363
                   },
                   "lift": 0.0,
                   "eligible": true,
@@ -971,35 +1357,143 @@
               ]
             }
           }
+        },
+        "BEARISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.275,
+              "mean_signed_return": -0.286
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.3,
+              "mean_signed_return": -0.4393
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.225,
+              "mean_signed_return": -0.7135
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 525,
+                    "hit_rate": 0.4305,
+                    "mean_signed_return": -0.3363
+                  },
+                  "conditional": {
+                    "samples": 193,
+                    "hit_rate": 0.3472,
+                    "mean_signed_return": -0.5117
+                  },
+                  "lift": -0.0833,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 525,
+                    "hit_rate": 0.4305,
+                    "mean_signed_return": -0.3363
+                  },
+                  "conditional": {
+                    "samples": 247,
+                    "hit_rate": 0.3725,
+                    "mean_signed_return": -0.5343
+                  },
+                  "lift": -0.058,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 525,
+                    "hit_rate": 0.4305,
+                    "mean_signed_return": -0.3363
+                  },
+                  "conditional": {
+                    "samples": 117,
+                    "hit_rate": 0.3419,
+                    "mean_signed_return": -0.4374
+                  },
+                  "lift": -0.0886,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 525,
+                    "hit_rate": 0.4305,
+                    "mean_signed_return": -0.3363
+                  },
+                  "conditional": {
+                    "samples": 493,
+                    "hit_rate": 0.4483,
+                    "mean_signed_return": -0.301
+                  },
+                  "lift": 0.0178,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 525,
+                    "hit_rate": 0.4305,
+                    "mean_signed_return": -0.3363
+                  },
+                  "conditional": {
+                    "samples": 525,
+                    "hit_rate": 0.4305,
+                    "mean_signed_return": -0.3363
+                  },
+                  "lift": 0.0,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
         }
       },
-      "decision": "BEARISH",
+      "decision": "BULLISH",
       "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
+      "as_of": "2026-11-18T09:00:00+00:00",
       "market_data_provenance": {
         "provider": "Binance Spot Market Data API",
         "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "BFUSDUSDT",
+        "instrument": "BRKBBUSDT",
         "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:49.901821+00:00",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:34.041931+00:00",
         "source_policy": "closed_1h_only",
         "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
       }
     },
     {
       "status": "READY",
-      "symbol": "TOWNS",
+      "symbol": "RIF",
       "regime": "RANGE",
       "current_features": {
         "trend": 1,
-        "momentum": -0.3802281368821214,
-        "rsi": 54.320987654321016,
-        "volume_ratio": 1.4102303688213262,
-        "distance_ema20": 0.9095927614800825,
-        "range_position": 0.47222222222222454,
-        "price": 0.001048
+        "momentum": 0.7736943907156624,
+        "rsi": 64.00000000000009,
+        "volume_ratio": 1.28687007601836,
+        "distance_ema20": 0.2714420046659116,
+        "range_position": 0.4117647058823525,
+        "price": 0.0521
       },
       "hypotheses": {
         "BULLISH": {
@@ -1007,18 +1501,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.275,
-              "mean_signed_return": -0.9299
+              "hit_rate": 0.3875,
+              "mean_signed_return": -0.7272
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.2375,
-              "mean_signed_return": -1.3699
+              "hit_rate": 0.3125,
+              "mean_signed_return": -1.1634
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.0875,
-              "mean_signed_return": -3.883
+              "hit_rate": 0.125,
+              "mean_signed_return": -2.2247
             },
             "predictivity": {
               "minimum_events": 30,
@@ -1027,15 +1521,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3913,
-                    "mean_signed_return": -1.2767
+                    "hit_rate": 0.2904,
+                    "mean_signed_return": -1.2517
                   },
                   "conditional": {
-                    "samples": 128,
-                    "hit_rate": 0.1328,
-                    "mean_signed_return": -3.693
+                    "samples": 89,
+                    "hit_rate": 0.1348,
+                    "mean_signed_return": -2.3386
                   },
-                  "lift": -0.2585,
+                  "lift": -0.1556,
                   "eligible": true,
                   "predictive": false
                 },
@@ -1043,15 +1537,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3913,
-                    "mean_signed_return": -1.2767
+                    "hit_rate": 0.2904,
+                    "mean_signed_return": -1.2517
                   },
                   "conditional": {
-                    "samples": 240,
-                    "hit_rate": 0.4083,
-                    "mean_signed_return": -1.0002
+                    "samples": 206,
+                    "hit_rate": 0.2961,
+                    "mean_signed_return": -1.1361
                   },
-                  "lift": 0.017,
+                  "lift": 0.0057,
                   "eligible": true,
                   "predictive": false
                 },
@@ -1059,15 +1553,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3913,
-                    "mean_signed_return": -1.2767
+                    "hit_rate": 0.2904,
+                    "mean_signed_return": -1.2517
                   },
                   "conditional": {
-                    "samples": 138,
-                    "hit_rate": 0.3768,
-                    "mean_signed_return": -1.5382
+                    "samples": 164,
+                    "hit_rate": 0.311,
+                    "mean_signed_return": -1.0193
                   },
-                  "lift": -0.0145,
+                  "lift": 0.0206,
                   "eligible": true,
                   "predictive": false
                 },
@@ -1075,15 +1569,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3913,
-                    "mean_signed_return": -1.2767
+                    "hit_rate": 0.2904,
+                    "mean_signed_return": -1.2517
                   },
                   "conditional": {
-                    "samples": 537,
-                    "hit_rate": 0.3985,
-                    "mean_signed_return": -1.2332
+                    "samples": 551,
+                    "hit_rate": 0.2995,
+                    "mean_signed_return": -1.209
                   },
-                  "lift": 0.0072,
+                  "lift": 0.0091,
                   "eligible": true,
                   "predictive": false
                 },
@@ -1091,15 +1585,15 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3913,
-                    "mean_signed_return": -1.2767
+                    "hit_rate": 0.2904,
+                    "mean_signed_return": -1.2517
                   },
                   "conditional": {
-                    "samples": 554,
-                    "hit_rate": 0.3736,
-                    "mean_signed_return": -1.5191
+                    "samples": 569,
+                    "hit_rate": 0.2847,
+                    "mean_signed_return": -1.2943
                   },
-                  "lift": -0.0177,
+                  "lift": -0.0057,
                   "eligible": true,
                   "predictive": false
                 }
@@ -1115,18 +1609,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.7125,
-              "mean_signed_return": 0.9299
+              "hit_rate": 0.6,
+              "mean_signed_return": 0.7272
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.7375,
-              "mean_signed_return": 1.3699
+              "hit_rate": 0.65,
+              "mean_signed_return": 1.1634
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.9,
-              "mean_signed_return": 3.883
+              "hit_rate": 0.8125,
+              "mean_signed_return": 2.2247
             },
             "predictivity": {
               "minimum_events": 30,
@@ -1135,15 +1629,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6035,
-                    "mean_signed_return": 1.2767
+                    "hit_rate": 0.6783,
+                    "mean_signed_return": 1.2517
                   },
                   "conditional": {
-                    "samples": 447,
-                    "hit_rate": 0.5324,
-                    "mean_signed_return": 0.5848
+                    "samples": 486,
+                    "hit_rate": 0.6543,
+                    "mean_signed_return": 1.0527
                   },
-                  "lift": -0.0711,
+                  "lift": -0.024,
                   "eligible": true,
                   "predictive": false
                 },
@@ -1151,15 +1645,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6035,
-                    "mean_signed_return": 1.2767
+                    "hit_rate": 0.6783,
+                    "mean_signed_return": 1.2517
                   },
                   "conditional": {
-                    "samples": 325,
-                    "hit_rate": 0.6123,
-                    "mean_signed_return": 1.4233
+                    "samples": 345,
+                    "hit_rate": 0.6783,
+                    "mean_signed_return": 1.2844
                   },
-                  "lift": 0.0088,
+                  "lift": 0.0,
                   "eligible": true,
                   "predictive": false
                 },
@@ -1167,15 +1661,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6035,
-                    "mean_signed_return": 1.2767
+                    "hit_rate": 0.6783,
+                    "mean_signed_return": 1.2517
                   },
                   "conditional": {
-                    "samples": 138,
-                    "hit_rate": 0.6159,
-                    "mean_signed_return": 1.5382
+                    "samples": 164,
+                    "hit_rate": 0.6524,
+                    "mean_signed_return": 1.0193
                   },
-                  "lift": 0.0124,
+                  "lift": -0.0259,
                   "eligible": true,
                   "predictive": false
                 },
@@ -1183,151 +1677,13 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6035,
-                    "mean_signed_return": 1.2767
+                    "hit_rate": 0.6783,
+                    "mean_signed_return": 1.2517
                   },
                   "conditional": {
-                    "samples": 480,
-                    "hit_rate": 0.6062,
-                    "mean_signed_return": 1.4122
-                  },
-                  "lift": 0.0027,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.6035,
-                    "mean_signed_return": 1.2767
-                  },
-                  "conditional": {
-                    "samples": 554,
-                    "hit_rate": 0.6209,
-                    "mean_signed_return": 1.5191
-                  },
-                  "lift": 0.0174,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        }
-      },
-      "decision": "BEARISH",
-      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
-      "market_data_provenance": {
-        "provider": "Binance Spot Market Data API",
-        "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "TOWNSUSDT",
-        "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:51.205974+00:00",
-        "source_policy": "closed_1h_only",
-        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
-      }
-    },
-    {
-      "status": "READY",
-      "symbol": "FORM",
-      "regime": "HIGH_FLOW",
-      "current_features": {
-        "trend": -1,
-        "momentum": -0.9362200117027486,
-        "rsi": 57.55395683453244,
-        "volume_ratio": 2.198851477141873,
-        "distance_ema20": 0.18986355388359577,
-        "range_position": 0.563829787234043,
-        "price": 0.1693
-      },
-      "hypotheses": {
-        "BULLISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.5,
-              "mean_signed_return": -0.1975
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.525,
-              "mean_signed_return": -0.2869
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.5875,
-              "mean_signed_return": -0.421
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.48,
-                    "mean_signed_return": -1.0337
-                  },
-                  "conditional": {
-                    "samples": 201,
-                    "hit_rate": 0.3184,
-                    "mean_signed_return": -2.3775
-                  },
-                  "lift": -0.1616,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.48,
-                    "mean_signed_return": -1.0337
-                  },
-                  "conditional": {
-                    "samples": 265,
-                    "hit_rate": 0.3736,
-                    "mean_signed_return": -1.5556
-                  },
-                  "lift": -0.1064,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.48,
-                    "mean_signed_return": -1.0337
-                  },
-                  "conditional": {
-                    "samples": 158,
-                    "hit_rate": 0.4747,
-                    "mean_signed_return": -1.3512
-                  },
-                  "lift": -0.0053,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.48,
-                    "mean_signed_return": -1.0337
-                  },
-                  "conditional": {
-                    "samples": 553,
-                    "hit_rate": 0.4991,
-                    "mean_signed_return": -0.9256
+                    "samples": 466,
+                    "hit_rate": 0.6974,
+                    "mean_signed_return": 1.3222
                   },
                   "lift": 0.0191,
                   "eligible": true,
@@ -1337,617 +1693,15 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.48,
-                    "mean_signed_return": -1.0337
+                    "hit_rate": 0.6783,
+                    "mean_signed_return": 1.2517
                   },
                   "conditional": {
-                    "samples": 556,
-                    "hit_rate": 0.482,
-                    "mean_signed_return": -1.0594
+                    "samples": 569,
+                    "hit_rate": 0.6837,
+                    "mean_signed_return": 1.2943
                   },
-                  "lift": 0.002,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        },
-        "BEARISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.4875,
-              "mean_signed_return": 0.1975
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.4375,
-              "mean_signed_return": 0.2869
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.4125,
-              "mean_signed_return": 0.421
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5148,
-                    "mean_signed_return": 1.0337
-                  },
-                  "conditional": {
-                    "samples": 374,
-                    "hit_rate": 0.4278,
-                    "mean_signed_return": 0.3115
-                  },
-                  "lift": -0.087,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5148,
-                    "mean_signed_return": 1.0337
-                  },
-                  "conditional": {
-                    "samples": 309,
-                    "hit_rate": 0.4239,
-                    "mean_signed_return": 0.5936
-                  },
-                  "lift": -0.0909,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5148,
-                    "mean_signed_return": 1.0337
-                  },
-                  "conditional": {
-                    "samples": 158,
-                    "hit_rate": 0.5253,
-                    "mean_signed_return": 1.3512
-                  },
-                  "lift": 0.0105,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5148,
-                    "mean_signed_return": 1.0337
-                  },
-                  "conditional": {
-                    "samples": 507,
-                    "hit_rate": 0.5266,
-                    "mean_signed_return": 1.0754
-                  },
-                  "lift": 0.0118,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5148,
-                    "mean_signed_return": 1.0337
-                  },
-                  "conditional": {
-                    "samples": 556,
-                    "hit_rate": 0.5126,
-                    "mean_signed_return": 1.0594
-                  },
-                  "lift": -0.0022,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        }
-      },
-      "decision": "BULLISH",
-      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
-      "market_data_provenance": {
-        "provider": "Binance Spot Market Data API",
-        "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "FORMUSDT",
-        "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:52.519764+00:00",
-        "source_policy": "closed_1h_only",
-        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
-      }
-    },
-    {
-      "status": "READY",
-      "symbol": "PLUME",
-      "regime": "TREND_DOWN",
-      "current_features": {
-        "trend": -1,
-        "momentum": -2.8029678483099785,
-        "rsi": 52.419354838709644,
-        "volume_ratio": 3.2708513991366983,
-        "distance_ema20": -0.6731341444944583,
-        "range_position": 0.4647887323943664,
-        "price": 0.01179
-      },
-      "hypotheses": {
-        "BULLISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.475,
-              "mean_signed_return": 0.4278
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.6,
-              "mean_signed_return": 0.3099
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.5375,
-              "mean_signed_return": -0.2325
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4209,
-                    "mean_signed_return": -1.0796
-                  },
-                  "conditional": {
-                    "samples": 189,
-                    "hit_rate": 0.2646,
-                    "mean_signed_return": -2.8984
-                  },
-                  "lift": -0.1563,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4209,
-                    "mean_signed_return": -1.0796
-                  },
-                  "conditional": {
-                    "samples": 225,
-                    "hit_rate": 0.3467,
-                    "mean_signed_return": -1.7301
-                  },
-                  "lift": -0.0742,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4209,
-                    "mean_signed_return": -1.0796
-                  },
-                  "conditional": {
-                    "samples": 152,
-                    "hit_rate": 0.4211,
-                    "mean_signed_return": -0.6921
-                  },
-                  "lift": 0.0002,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4209,
-                    "mean_signed_return": -1.0796
-                  },
-                  "conditional": {
-                    "samples": 552,
-                    "hit_rate": 0.4257,
-                    "mean_signed_return": -1.0582
-                  },
-                  "lift": 0.0048,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.4209,
-                    "mean_signed_return": -1.0796
-                  },
-                  "conditional": {
-                    "samples": 560,
-                    "hit_rate": 0.4125,
-                    "mean_signed_return": -1.1811
-                  },
-                  "lift": -0.0084,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        },
-        "BEARISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.475,
-              "mean_signed_return": -0.4278
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.4,
-              "mean_signed_return": -0.3099
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.4625,
-              "mean_signed_return": 0.2325
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5739,
-                    "mean_signed_return": 1.0796
-                  },
-                  "conditional": {
-                    "samples": 386,
-                    "hit_rate": 0.4948,
-                    "mean_signed_return": 0.189
-                  },
-                  "lift": -0.0791,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5739,
-                    "mean_signed_return": 1.0796
-                  },
-                  "conditional": {
-                    "samples": 342,
-                    "hit_rate": 0.5263,
-                    "mean_signed_return": 0.6272
-                  },
-                  "lift": -0.0476,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5739,
-                    "mean_signed_return": 1.0796
-                  },
-                  "conditional": {
-                    "samples": 152,
-                    "hit_rate": 0.5789,
-                    "mean_signed_return": 0.6921
-                  },
-                  "lift": 0.005,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5739,
-                    "mean_signed_return": 1.0796
-                  },
-                  "conditional": {
-                    "samples": 468,
-                    "hit_rate": 0.5684,
-                    "mean_signed_return": 1.2548
-                  },
-                  "lift": -0.0055,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.5739,
-                    "mean_signed_return": 1.0796
-                  },
-                  "conditional": {
-                    "samples": 560,
-                    "hit_rate": 0.5821,
-                    "mean_signed_return": 1.1811
-                  },
-                  "lift": 0.0082,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        }
-      },
-      "decision": "BULLISH",
-      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
-      "market_data_provenance": {
-        "provider": "Binance Spot Market Data API",
-        "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "PLUMEUSDT",
-        "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:53.829472+00:00",
-        "source_policy": "closed_1h_only",
-        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
-      }
-    },
-    {
-      "status": "READY",
-      "symbol": "SAPIEN",
-      "regime": "HIGH_FLOW",
-      "current_features": {
-        "trend": -1,
-        "momentum": 1.5978695073235683,
-        "rsi": 64.30020283975658,
-        "volume_ratio": 2.06973711359577,
-        "distance_ema20": 2.8240429402544898,
-        "range_position": 0.9733333333333345,
-        "price": 0.03815
-      },
-      "hypotheses": {
-        "BULLISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.2625,
-              "mean_signed_return": -0.9964
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.225,
-              "mean_signed_return": -1.5838
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.3,
-              "mean_signed_return": -2.0241
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.2991,
-                    "mean_signed_return": -1.6952
-                  },
-                  "conditional": {
-                    "samples": 76,
-                    "hit_rate": 0.0789,
-                    "mean_signed_return": -3.389
-                  },
-                  "lift": -0.2202,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.2991,
-                    "mean_signed_return": -1.6952
-                  },
-                  "conditional": {
-                    "samples": 216,
-                    "hit_rate": 0.2176,
-                    "mean_signed_return": -2.379
-                  },
-                  "lift": -0.0815,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.2991,
-                    "mean_signed_return": -1.6952
-                  },
-                  "conditional": {
-                    "samples": 165,
-                    "hit_rate": 0.3636,
-                    "mean_signed_return": -1.2496
-                  },
-                  "lift": 0.0645,
-                  "eligible": true,
-                  "predictive": true
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.2991,
-                    "mean_signed_return": -1.6952
-                  },
-                  "conditional": {
-                    "samples": 548,
-                    "hit_rate": 0.3047,
-                    "mean_signed_return": -1.5792
-                  },
-                  "lift": 0.0056,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.2991,
-                    "mean_signed_return": -1.6952
-                  },
-                  "conditional": {
-                    "samples": 565,
-                    "hit_rate": 0.2885,
-                    "mean_signed_return": -1.7855
-                  },
-                  "lift": -0.0106,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": [
-                "volume_expansion"
-              ]
-            }
-          }
-        },
-        "BEARISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.7375,
-              "mean_signed_return": 0.9964
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.775,
-              "mean_signed_return": 1.5838
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.7,
-              "mean_signed_return": 2.0241
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.6887,
-                    "mean_signed_return": 1.6952
-                  },
-                  "conditional": {
-                    "samples": 499,
-                    "hit_rate": 0.6533,
-                    "mean_signed_return": 1.4373
-                  },
-                  "lift": -0.0354,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.6887,
-                    "mean_signed_return": 1.6952
-                  },
-                  "conditional": {
-                    "samples": 353,
-                    "hit_rate": 0.6317,
-                    "mean_signed_return": 1.2607
-                  },
-                  "lift": -0.057,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.6887,
-                    "mean_signed_return": 1.6952
-                  },
-                  "conditional": {
-                    "samples": 165,
-                    "hit_rate": 0.6242,
-                    "mean_signed_return": 1.2496
-                  },
-                  "lift": -0.0645,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.6887,
-                    "mean_signed_return": 1.6952
-                  },
-                  "conditional": {
-                    "samples": 471,
-                    "hit_rate": 0.7155,
-                    "mean_signed_return": 1.8048
-                  },
-                  "lift": 0.0268,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.6887,
-                    "mean_signed_return": 1.6952
-                  },
-                  "conditional": {
-                    "samples": 565,
-                    "hit_rate": 0.6991,
-                    "mean_signed_return": 1.7855
-                  },
-                  "lift": 0.0104,
+                  "lift": 0.0054,
                   "eligible": true,
                   "predictive": false
                 }
@@ -1961,31 +1715,31 @@
       },
       "decision": "BEARISH",
       "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
+      "as_of": "2026-11-18T09:00:00+00:00",
       "market_data_provenance": {
         "provider": "Binance Spot Market Data API",
         "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "SAPIENUSDT",
+        "instrument": "RIFUSDT",
         "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:55.131990+00:00",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:35.191349+00:00",
         "source_policy": "closed_1h_only",
         "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
       }
     },
     {
       "status": "READY",
-      "symbol": "ROSE",
-      "regime": "RANGE",
+      "symbol": "PNUT",
+      "regime": "TREND_UP",
       "current_features": {
         "trend": 1,
-        "momentum": -2.254098360655732,
-        "rsi": 64.00000000000004,
-        "volume_ratio": 1.4966677171007743,
-        "distance_ema20": 0.3845374095976517,
-        "range_position": 0.6562500000000004,
-        "price": 0.00477
+        "momentum": 1.0309278350515427,
+        "rsi": 62.500000000000014,
+        "volume_ratio": 3.753077586360302,
+        "distance_ema20": 0.21487003988349684,
+        "range_position": 0.6428571428571421,
+        "price": 0.0294
       },
       "hypotheses": {
         "BULLISH": {
@@ -1993,18 +1747,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.2625,
-              "mean_signed_return": -1.4078
+              "hit_rate": 0.3,
+              "mean_signed_return": -1.3371
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.25,
-              "mean_signed_return": -2.3987
+              "hit_rate": 0.2375,
+              "mean_signed_return": -1.8305
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.075,
-              "mean_signed_return": -4.7137
+              "hit_rate": 0.1125,
+              "mean_signed_return": -2.8851
             },
             "predictivity": {
               "minimum_events": 30,
@@ -2013,15 +1767,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3496,
-                    "mean_signed_return": -1.4951
+                    "hit_rate": 0.3322,
+                    "mean_signed_return": -1.4109
                   },
                   "conditional": {
-                    "samples": 77,
-                    "hit_rate": 0.1558,
-                    "mean_signed_return": -4.04
+                    "samples": 83,
+                    "hit_rate": 0.1566,
+                    "mean_signed_return": -2.5364
                   },
-                  "lift": -0.1938,
+                  "lift": -0.1756,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2029,15 +1783,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3496,
-                    "mean_signed_return": -1.4951
+                    "hit_rate": 0.3322,
+                    "mean_signed_return": -1.4109
                   },
                   "conditional": {
-                    "samples": 226,
-                    "hit_rate": 0.3009,
-                    "mean_signed_return": -1.925
+                    "samples": 240,
+                    "hit_rate": 0.2833,
+                    "mean_signed_return": -1.8113
                   },
-                  "lift": -0.0487,
+                  "lift": -0.0489,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2045,15 +1799,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3496,
-                    "mean_signed_return": -1.4951
+                    "hit_rate": 0.3322,
+                    "mean_signed_return": -1.4109
                   },
                   "conditional": {
                     "samples": 156,
-                    "hit_rate": 0.359,
-                    "mean_signed_return": -1.3285
+                    "hit_rate": 0.3269,
+                    "mean_signed_return": -1.5578
                   },
-                  "lift": 0.0094,
+                  "lift": -0.0053,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2061,15 +1815,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3496,
-                    "mean_signed_return": -1.4951
+                    "hit_rate": 0.3322,
+                    "mean_signed_return": -1.4109
                   },
                   "conditional": {
-                    "samples": 559,
-                    "hit_rate": 0.356,
-                    "mean_signed_return": -1.4395
+                    "samples": 531,
+                    "hit_rate": 0.3484,
+                    "mean_signed_return": -1.3036
                   },
-                  "lift": 0.0064,
+                  "lift": 0.0162,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2077,15 +1831,15 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3496,
-                    "mean_signed_return": -1.4951
+                    "hit_rate": 0.3322,
+                    "mean_signed_return": -1.4109
                   },
                   "conditional": {
-                    "samples": 556,
-                    "hit_rate": 0.3363,
-                    "mean_signed_return": -1.6225
+                    "samples": 559,
+                    "hit_rate": 0.3148,
+                    "mean_signed_return": -1.6021
                   },
-                  "lift": -0.0133,
+                  "lift": -0.0174,
                   "eligible": true,
                   "predictive": false
                 }
@@ -2101,18 +1855,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.725,
-              "mean_signed_return": 1.4078
+              "hit_rate": 0.6625,
+              "mean_signed_return": 1.3371
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.7375,
-              "mean_signed_return": 2.3987
+              "hit_rate": 0.725,
+              "mean_signed_return": 1.8305
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.9125,
-              "mean_signed_return": 4.7137
+              "hit_rate": 0.85,
+              "mean_signed_return": 2.8851
             },
             "predictivity": {
               "minimum_events": 30,
@@ -2121,15 +1875,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6296,
-                    "mean_signed_return": 1.4951
+                    "hit_rate": 0.6191,
+                    "mean_signed_return": 1.4109
                   },
                   "conditional": {
-                    "samples": 498,
-                    "hit_rate": 0.6004,
-                    "mean_signed_return": 1.1016
+                    "samples": 492,
+                    "hit_rate": 0.5854,
+                    "mean_signed_return": 1.221
                   },
-                  "lift": -0.0292,
+                  "lift": -0.0337,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2137,13 +1891,397 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6296,
-                    "mean_signed_return": 1.4951
+                    "hit_rate": 0.6191,
+                    "mean_signed_return": 1.4109
                   },
                   "conditional": {
-                    "samples": 330,
-                    "hit_rate": 0.5879,
-                    "mean_signed_return": 1.2208
+                    "samples": 300,
+                    "hit_rate": 0.5767,
+                    "mean_signed_return": 1.0921
+                  },
+                  "lift": -0.0424,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.6191,
+                    "mean_signed_return": 1.4109
+                  },
+                  "conditional": {
+                    "samples": 156,
+                    "hit_rate": 0.6282,
+                    "mean_signed_return": 1.5578
+                  },
+                  "lift": 0.0091,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.6191,
+                    "mean_signed_return": 1.4109
+                  },
+                  "conditional": {
+                    "samples": 487,
+                    "hit_rate": 0.6181,
+                    "mean_signed_return": 1.4914
+                  },
+                  "lift": -0.001,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.6191,
+                    "mean_signed_return": 1.4109
+                  },
+                  "conditional": {
+                    "samples": 559,
+                    "hit_rate": 0.6351,
+                    "mean_signed_return": 1.6021
+                  },
+                  "lift": 0.016,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        }
+      },
+      "decision": "BEARISH",
+      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
+      "as_of": "2026-11-18T09:00:00+00:00",
+      "market_data_provenance": {
+        "provider": "Binance Spot Market Data API",
+        "endpoint": "https://data-api.binance.vision/api/v3/klines",
+        "instrument": "PNUTUSDT",
+        "interval": "1h",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:36.364798+00:00",
+        "source_policy": "closed_1h_only",
+        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
+      }
+    },
+    {
+      "status": "READY",
+      "symbol": "WBETH",
+      "regime": "RANGE",
+      "current_features": {
+        "trend": -1,
+        "momentum": 0.32620641422720364,
+        "rsi": 60.60322218059195,
+        "volume_ratio": 1.2366265032168393,
+        "distance_ema20": -0.05717985943763937,
+        "range_position": 0.7011469610890758,
+        "price": 2008.33
+      },
+      "hypotheses": {
+        "BULLISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.5,
+              "mean_signed_return": -0.033
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.4875,
+              "mean_signed_return": -0.2868
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.3625,
+              "mean_signed_return": -0.6984
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4,
+                    "mean_signed_return": -1.0396
+                  },
+                  "conditional": {
+                    "samples": 149,
+                    "hit_rate": 0.3557,
+                    "mean_signed_return": -1.2274
+                  },
+                  "lift": -0.0443,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4,
+                    "mean_signed_return": -1.0396
+                  },
+                  "conditional": {
+                    "samples": 274,
+                    "hit_rate": 0.3978,
+                    "mean_signed_return": -1.0228
+                  },
+                  "lift": -0.0022,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4,
+                    "mean_signed_return": -1.0396
+                  },
+                  "conditional": {
+                    "samples": 143,
+                    "hit_rate": 0.4336,
+                    "mean_signed_return": -0.5576
+                  },
+                  "lift": 0.0336,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4,
+                    "mean_signed_return": -1.0396
+                  },
+                  "conditional": {
+                    "samples": 527,
+                    "hit_rate": 0.3947,
+                    "mean_signed_return": -1.011
+                  },
+                  "lift": -0.0053,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4,
+                    "mean_signed_return": -1.0396
+                  },
+                  "conditional": {
+                    "samples": 571,
+                    "hit_rate": 0.3975,
+                    "mean_signed_return": -1.0689
+                  },
+                  "lift": -0.0025,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        },
+        "BEARISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.5,
+              "mean_signed_return": 0.033
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.5125,
+              "mean_signed_return": 0.2868
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.6375,
+              "mean_signed_return": 0.6984
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.6,
+                    "mean_signed_return": 1.0396
+                  },
+                  "conditional": {
+                    "samples": 426,
+                    "hit_rate": 0.5845,
+                    "mean_signed_return": 0.974
+                  },
+                  "lift": -0.0155,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.6,
+                    "mean_signed_return": 1.0396
+                  },
+                  "conditional": {
+                    "samples": 301,
+                    "hit_rate": 0.598,
+                    "mean_signed_return": 1.0549
+                  },
+                  "lift": -0.002,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "volume_expansion",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.6,
+                    "mean_signed_return": 1.0396
+                  },
+                  "conditional": {
+                    "samples": 143,
+                    "hit_rate": 0.5664,
+                    "mean_signed_return": 0.5576
+                  },
+                  "lift": -0.0336,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "rsi_not_extreme",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.6,
+                    "mean_signed_return": 1.0396
+                  },
+                  "conditional": {
+                    "samples": 478,
+                    "hit_rate": 0.5983,
+                    "mean_signed_return": 1.1205
+                  },
+                  "lift": -0.0017,
+                  "eligible": true,
+                  "predictive": false
+                },
+                {
+                  "feature": "near_ema20",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.6,
+                    "mean_signed_return": 1.0396
+                  },
+                  "conditional": {
+                    "samples": 571,
+                    "hit_rate": 0.6025,
+                    "mean_signed_return": 1.0689
+                  },
+                  "lift": 0.0025,
+                  "eligible": true,
+                  "predictive": false
+                }
+              ],
+              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
+              "trusted_features": [],
+              "candidate_features": []
+            }
+          }
+        }
+      },
+      "decision": "BEARISH",
+      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
+      "as_of": "2026-11-18T09:00:00+00:00",
+      "market_data_provenance": {
+        "provider": "Binance Spot Market Data API",
+        "endpoint": "https://data-api.binance.vision/api/v3/klines",
+        "instrument": "WBETHUSDT",
+        "interval": "1h",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:37.537716+00:00",
+        "source_policy": "closed_1h_only",
+        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
+      }
+    },
+    {
+      "status": "READY",
+      "symbol": "ASMLB",
+      "regime": "RANGE",
+      "current_features": {
+        "trend": -1,
+        "momentum": -0.13404537471773947,
+        "rsi": 59.69569005965547,
+        "volume_ratio": 1.5873456061881757,
+        "distance_ema20": -0.5770828306133846,
+        "range_position": 0.42283481658346095,
+        "price": 1393.18
+      },
+      "hypotheses": {
+        "BULLISH": {
+          "analogues": 80,
+          "forward": {
+            "6": {
+              "samples": 80,
+              "hit_rate": 0.4625,
+              "mean_signed_return": -0.1801
+            },
+            "12": {
+              "samples": 80,
+              "hit_rate": 0.525,
+              "mean_signed_return": -0.2982
+            },
+            "24": {
+              "samples": 80,
+              "hit_rate": 0.3875,
+              "mean_signed_return": -0.7639
+            },
+            "predictivity": {
+              "minimum_events": 30,
+              "audits": [
+                {
+                  "feature": "trend_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4626,
+                    "mean_signed_return": -0.4527
+                  },
+                  "conditional": {
+                    "samples": 227,
+                    "hit_rate": 0.5286,
+                    "mean_signed_return": 0.0479
+                  },
+                  "lift": 0.066,
+                  "eligible": true,
+                  "predictive": true
+                },
+                {
+                  "feature": "momentum_aligned",
+                  "base": {
+                    "samples": 575,
+                    "hit_rate": 0.4626,
+                    "mean_signed_return": -0.4527
+                  },
+                  "conditional": {
+                    "samples": 278,
+                    "hit_rate": 0.4209,
+                    "mean_signed_return": -0.6551
                   },
                   "lift": -0.0417,
                   "eligible": true,
@@ -2153,15 +2291,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6296,
-                    "mean_signed_return": 1.4951
+                    "hit_rate": 0.4626,
+                    "mean_signed_return": -0.4527
                   },
                   "conditional": {
-                    "samples": 156,
-                    "hit_rate": 0.6282,
-                    "mean_signed_return": 1.3285
+                    "samples": 179,
+                    "hit_rate": 0.4637,
+                    "mean_signed_return": -0.3108
                   },
-                  "lift": -0.0014,
+                  "lift": 0.0011,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2169,15 +2307,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6296,
-                    "mean_signed_return": 1.4951
+                    "hit_rate": 0.4626,
+                    "mean_signed_return": -0.4527
                   },
                   "conditional": {
-                    "samples": 460,
-                    "hit_rate": 0.6761,
-                    "mean_signed_return": 1.8212
+                    "samples": 507,
+                    "hit_rate": 0.4793,
+                    "mean_signed_return": -0.3187
                   },
-                  "lift": 0.0465,
+                  "lift": 0.0167,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2185,180 +2323,44 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6296,
-                    "mean_signed_return": 1.4951
+                    "hit_rate": 0.4626,
+                    "mean_signed_return": -0.4527
                   },
                   "conditional": {
-                    "samples": 556,
-                    "hit_rate": 0.6421,
-                    "mean_signed_return": 1.6225
+                    "samples": 573,
+                    "hit_rate": 0.4607,
+                    "mean_signed_return": -0.47
                   },
-                  "lift": 0.0125,
+                  "lift": -0.0019,
                   "eligible": true,
                   "predictive": false
                 }
               ],
               "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
               "trusted_features": [],
-              "candidate_features": []
+              "candidate_features": [
+                "trend_aligned"
+              ]
             }
           }
-        }
-      },
-      "decision": "BEARISH",
-      "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
-      "market_data_provenance": {
-        "provider": "Binance Spot Market Data API",
-        "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "ROSEUSDT",
-        "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:56.445071+00:00",
-        "source_policy": "closed_1h_only",
-        "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
-      }
-    },
-    {
-      "status": "READY",
-      "symbol": "CGPT",
-      "regime": "RANGE",
-      "current_features": {
-        "trend": 1,
-        "momentum": -1.0262989095574104,
-        "rsi": 51.333333333333336,
-        "volume_ratio": 0.7264307245305283,
-        "distance_ema20": 0.11149971310076001,
-        "range_position": 0.16860465116278994,
-        "price": 0.01543
-      },
-      "hypotheses": {
-        "BULLISH": {
+        },
+        "BEARISH": {
           "analogues": 80,
           "forward": {
             "6": {
               "samples": 80,
               "hit_rate": 0.5375,
-              "mean_signed_return": -0.2054
+              "mean_signed_return": 0.1801
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.4375,
-              "mean_signed_return": -0.3199
-            },
-            "24": {
-              "samples": 80,
-              "hit_rate": 0.3875,
-              "mean_signed_return": -1.1103
-            },
-            "predictivity": {
-              "minimum_events": 30,
-              "audits": [
-                {
-                  "feature": "trend_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3583,
-                    "mean_signed_return": -1.1581
-                  },
-                  "conditional": {
-                    "samples": 144,
-                    "hit_rate": 0.3889,
-                    "mean_signed_return": -1.085
-                  },
-                  "lift": 0.0306,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "momentum_aligned",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3583,
-                    "mean_signed_return": -1.1581
-                  },
-                  "conditional": {
-                    "samples": 249,
-                    "hit_rate": 0.3414,
-                    "mean_signed_return": -1.2463
-                  },
-                  "lift": -0.0169,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "volume_expansion",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3583,
-                    "mean_signed_return": -1.1581
-                  },
-                  "conditional": {
-                    "samples": 130,
-                    "hit_rate": 0.3846,
-                    "mean_signed_return": -0.5108
-                  },
-                  "lift": 0.0263,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "rsi_not_extreme",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3583,
-                    "mean_signed_return": -1.1581
-                  },
-                  "conditional": {
-                    "samples": 533,
-                    "hit_rate": 0.3471,
-                    "mean_signed_return": -1.233
-                  },
-                  "lift": -0.0112,
-                  "eligible": true,
-                  "predictive": false
-                },
-                {
-                  "feature": "near_ema20",
-                  "base": {
-                    "samples": 575,
-                    "hit_rate": 0.3583,
-                    "mean_signed_return": -1.1581
-                  },
-                  "conditional": {
-                    "samples": 562,
-                    "hit_rate": 0.347,
-                    "mean_signed_return": -1.2651
-                  },
-                  "lift": -0.0113,
-                  "eligible": true,
-                  "predictive": false
-                }
-              ],
-              "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
-              "trusted_features": [],
-              "candidate_features": []
-            }
-          }
-        },
-        "BEARISH": {
-          "analogues": 80,
-          "forward": {
-            "6": {
-              "samples": 80,
-              "hit_rate": 0.45,
-              "mean_signed_return": 0.2054
-            },
-            "12": {
-              "samples": 80,
-              "hit_rate": 0.55,
-              "mean_signed_return": 0.3199
+              "hit_rate": 0.475,
+              "mean_signed_return": 0.2982
             },
             "24": {
               "samples": 80,
               "hit_rate": 0.6125,
-              "mean_signed_return": 1.1103
+              "mean_signed_return": 0.7639
             },
             "predictivity": {
               "minimum_events": 30,
@@ -2367,15 +2369,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6348,
-                    "mean_signed_return": 1.1581
+                    "hit_rate": 0.5357,
+                    "mean_signed_return": 0.4527
                   },
                   "conditional": {
-                    "samples": 431,
-                    "hit_rate": 0.645,
-                    "mean_signed_return": 1.1825
+                    "samples": 348,
+                    "hit_rate": 0.5776,
+                    "mean_signed_return": 0.7793
                   },
-                  "lift": 0.0102,
+                  "lift": 0.0419,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2383,15 +2385,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6348,
-                    "mean_signed_return": 1.1581
+                    "hit_rate": 0.5357,
+                    "mean_signed_return": 0.4527
                   },
                   "conditional": {
-                    "samples": 316,
-                    "hit_rate": 0.6297,
-                    "mean_signed_return": 1.1245
+                    "samples": 297,
+                    "hit_rate": 0.4949,
+                    "mean_signed_return": 0.2632
                   },
-                  "lift": -0.0051,
+                  "lift": -0.0408,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2399,15 +2401,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6348,
-                    "mean_signed_return": 1.1581
+                    "hit_rate": 0.5357,
+                    "mean_signed_return": 0.4527
                   },
                   "conditional": {
-                    "samples": 130,
-                    "hit_rate": 0.6,
-                    "mean_signed_return": 0.5108
+                    "samples": 179,
+                    "hit_rate": 0.5307,
+                    "mean_signed_return": 0.3108
                   },
-                  "lift": -0.0348,
+                  "lift": -0.005,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2415,15 +2417,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6348,
-                    "mean_signed_return": 1.1581
+                    "hit_rate": 0.5357,
+                    "mean_signed_return": 0.4527
                   },
                   "conditional": {
-                    "samples": 496,
-                    "hit_rate": 0.6694,
-                    "mean_signed_return": 1.484
+                    "samples": 498,
+                    "hit_rate": 0.5482,
+                    "mean_signed_return": 0.5253
                   },
-                  "lift": 0.0346,
+                  "lift": 0.0125,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2431,15 +2433,15 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6348,
-                    "mean_signed_return": 1.1581
+                    "hit_rate": 0.5357,
+                    "mean_signed_return": 0.4527
                   },
                   "conditional": {
-                    "samples": 562,
-                    "hit_rate": 0.6459,
-                    "mean_signed_return": 1.2651
+                    "samples": 573,
+                    "hit_rate": 0.5375,
+                    "mean_signed_return": 0.47
                   },
-                  "lift": 0.0111,
+                  "lift": 0.0018,
                   "eligible": true,
                   "predictive": false
                 }
@@ -2453,31 +2455,31 @@
       },
       "decision": "BEARISH",
       "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
+      "as_of": "2026-11-18T09:00:00+00:00",
       "market_data_provenance": {
         "provider": "Binance Spot Market Data API",
         "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "CGPTUSDT",
+        "instrument": "ASMLBUSDT",
         "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:57.758649+00:00",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:38.715834+00:00",
         "source_policy": "closed_1h_only",
         "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
       }
     },
     {
       "status": "READY",
-      "symbol": "U",
-      "regime": "HIGH_FLOW",
+      "symbol": "PYPLB",
+      "regime": "RANGE",
       "current_features": {
         "trend": -1,
-        "momentum": -0.039996000399955545,
-        "rsi": 18.181818181818187,
-        "volume_ratio": 3.1624529355369377,
-        "distance_ema20": -0.046122581828345055,
-        "range_position": 0.0,
-        "price": 0.9997
+        "momentum": 0.31136481577582753,
+        "rsi": 26.219512195122135,
+        "volume_ratio": 0.5656303553763496,
+        "distance_ema20": -0.1859364983875733,
+        "range_position": 0.33879781420765176,
+        "price": 57.99
       },
       "hypotheses": {
         "BULLISH": {
@@ -2485,18 +2487,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.575,
-              "mean_signed_return": 0.0098
+              "hit_rate": 0.625,
+              "mean_signed_return": 0.1542
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.55,
-              "mean_signed_return": 0.012
+              "hit_rate": 0.6625,
+              "mean_signed_return": 0.5532
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.575,
-              "mean_signed_return": 0.0126
+              "hit_rate": 0.8375,
+              "mean_signed_return": 0.6007
             },
             "predictivity": {
               "minimum_events": 30,
@@ -2505,15 +2507,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.433,
-                    "mean_signed_return": 0.0001
+                    "hit_rate": 0.5652,
+                    "mean_signed_return": 0.1048
                   },
                   "conditional": {
-                    "samples": 292,
-                    "hit_rate": 0.339,
-                    "mean_signed_return": -0.0064
+                    "samples": 314,
+                    "hit_rate": 0.4904,
+                    "mean_signed_return": -0.0427
                   },
-                  "lift": -0.094,
+                  "lift": -0.0748,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2521,15 +2523,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.433,
-                    "mean_signed_return": 0.0001
+                    "hit_rate": 0.5652,
+                    "mean_signed_return": 0.1048
                   },
                   "conditional": {
-                    "samples": 219,
-                    "hit_rate": 0.347,
-                    "mean_signed_return": -0.0081
+                    "samples": 283,
+                    "hit_rate": 0.4982,
+                    "mean_signed_return": -0.1527
                   },
-                  "lift": -0.086,
+                  "lift": -0.067,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2537,15 +2539,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.433,
-                    "mean_signed_return": 0.0001
+                    "hit_rate": 0.5652,
+                    "mean_signed_return": 0.1048
                   },
                   "conditional": {
-                    "samples": 171,
-                    "hit_rate": 0.4386,
-                    "mean_signed_return": 0.0032
+                    "samples": 151,
+                    "hit_rate": 0.5695,
+                    "mean_signed_return": 0.0297
                   },
-                  "lift": 0.0056,
+                  "lift": 0.0043,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2553,15 +2555,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.433,
-                    "mean_signed_return": 0.0001
+                    "hit_rate": 0.5652,
+                    "mean_signed_return": 0.1048
                   },
                   "conditional": {
-                    "samples": 543,
-                    "hit_rate": 0.4383,
-                    "mean_signed_return": 0.0006
+                    "samples": 491,
+                    "hit_rate": 0.6151,
+                    "mean_signed_return": 0.2809
                   },
-                  "lift": 0.0053,
+                  "lift": 0.0499,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2569,13 +2571,13 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.433,
-                    "mean_signed_return": 0.0001
+                    "hit_rate": 0.5652,
+                    "mean_signed_return": 0.1048
                   },
                   "conditional": {
                     "samples": 575,
-                    "hit_rate": 0.433,
-                    "mean_signed_return": 0.0001
+                    "hit_rate": 0.5652,
+                    "mean_signed_return": 0.1048
                   },
                   "lift": 0.0,
                   "eligible": true,
@@ -2593,18 +2595,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.1625,
-              "mean_signed_return": -0.0098
+              "hit_rate": 0.3625,
+              "mean_signed_return": -0.1542
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.2625,
-              "mean_signed_return": -0.012
+              "hit_rate": 0.3125,
+              "mean_signed_return": -0.5532
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.3,
-              "mean_signed_return": -0.0126
+              "hit_rate": 0.1625,
+              "mean_signed_return": -0.6007
             },
             "predictivity": {
               "minimum_events": 30,
@@ -2613,15 +2615,15 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4557,
-                    "mean_signed_return": -0.0001
+                    "hit_rate": 0.433,
+                    "mean_signed_return": -0.1048
                   },
                   "conditional": {
-                    "samples": 283,
-                    "hit_rate": 0.3746,
-                    "mean_signed_return": -0.0067
+                    "samples": 261,
+                    "hit_rate": 0.341,
+                    "mean_signed_return": -0.2822
                   },
-                  "lift": -0.0811,
+                  "lift": -0.092,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2629,15 +2631,15 @@
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4557,
-                    "mean_signed_return": -0.0001
+                    "hit_rate": 0.433,
+                    "mean_signed_return": -0.1048
                   },
                   "conditional": {
-                    "samples": 212,
-                    "hit_rate": 0.3585,
-                    "mean_signed_return": -0.0085
+                    "samples": 286,
+                    "hit_rate": 0.3741,
+                    "mean_signed_return": -0.352
                   },
-                  "lift": -0.0972,
+                  "lift": -0.0589,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2645,15 +2647,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4557,
-                    "mean_signed_return": -0.0001
+                    "hit_rate": 0.433,
+                    "mean_signed_return": -0.1048
                   },
                   "conditional": {
-                    "samples": 171,
-                    "hit_rate": 0.4386,
-                    "mean_signed_return": -0.0032
+                    "samples": 151,
+                    "hit_rate": 0.4238,
+                    "mean_signed_return": -0.0297
                   },
-                  "lift": -0.0171,
+                  "lift": -0.0092,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2661,29 +2663,29 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4557,
-                    "mean_signed_return": -0.0001
+                    "hit_rate": 0.433,
+                    "mean_signed_return": -0.1048
                   },
                   "conditional": {
-                    "samples": 550,
-                    "hit_rate": 0.4636,
-                    "mean_signed_return": 0.0003
+                    "samples": 490,
+                    "hit_rate": 0.4857,
+                    "mean_signed_return": 0.0274
                   },
-                  "lift": 0.0079,
+                  "lift": 0.0527,
                   "eligible": true,
-                  "predictive": false
+                  "predictive": true
                 },
                 {
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.4557,
-                    "mean_signed_return": -0.0001
+                    "hit_rate": 0.433,
+                    "mean_signed_return": -0.1048
                   },
                   "conditional": {
                     "samples": 575,
-                    "hit_rate": 0.4557,
-                    "mean_signed_return": -0.0001
+                    "hit_rate": 0.433,
+                    "mean_signed_return": -0.1048
                   },
                   "lift": 0.0,
                   "eligible": true,
@@ -2692,38 +2694,40 @@
               ],
               "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
               "trusted_features": [],
-              "candidate_features": []
+              "candidate_features": [
+                "rsi_not_extreme"
+              ]
             }
           }
         }
       },
       "decision": "BULLISH",
       "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
+      "as_of": "2026-11-18T09:00:00+00:00",
       "market_data_provenance": {
         "provider": "Binance Spot Market Data API",
         "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "UUSDT",
+        "instrument": "PYPLBUSDT",
         "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:27:59.068955+00:00",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:39.898369+00:00",
         "source_policy": "closed_1h_only",
         "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
       }
     },
     {
       "status": "READY",
-      "symbol": "EURI",
-      "regime": "HIGH_FLOW",
+      "symbol": "MRNAB",
+      "regime": "RANGE",
       "current_features": {
         "trend": -1,
-        "momentum": -0.3001091305929293,
-        "rsi": 26.88172043010846,
-        "volume_ratio": 2.376184850782349,
-        "distance_ema20": -0.29364254133879,
-        "range_position": 0.08823529411766819,
-        "price": 1.0963
+        "momentum": 0.9435797665369616,
+        "rsi": 61.968838526912116,
+        "volume_ratio": 0.9165774271690619,
+        "distance_ema20": -0.3480999330104928,
+        "range_position": 0.1960670908039322,
+        "price": 207.54
       },
       "hypotheses": {
         "BULLISH": {
@@ -2732,17 +2736,17 @@
             "6": {
               "samples": 80,
               "hit_rate": 0.425,
-              "mean_signed_return": -0.0146
+              "mean_signed_return": -0.1843
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.3,
-              "mean_signed_return": -0.0295
+              "hit_rate": 0.375,
+              "mean_signed_return": -0.8707
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.425,
-              "mean_signed_return": 0.0297
+              "hit_rate": 0.2375,
+              "mean_signed_return": -1.4519
             },
             "predictivity": {
               "minimum_events": 30,
@@ -2751,31 +2755,31 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3757,
-                    "mean_signed_return": -0.074
+                    "hit_rate": 0.4713,
+                    "mean_signed_return": 0.205
                   },
                   "conditional": {
-                    "samples": 193,
-                    "hit_rate": 0.2487,
-                    "mean_signed_return": -0.3115
+                    "samples": 302,
+                    "hit_rate": 0.5662,
+                    "mean_signed_return": 0.9738
                   },
-                  "lift": -0.127,
+                  "lift": 0.0949,
                   "eligible": true,
-                  "predictive": false
+                  "predictive": true
                 },
                 {
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3757,
-                    "mean_signed_return": -0.074
+                    "hit_rate": 0.4713,
+                    "mean_signed_return": 0.205
                   },
                   "conditional": {
-                    "samples": 232,
-                    "hit_rate": 0.3793,
-                    "mean_signed_return": -0.141
+                    "samples": 264,
+                    "hit_rate": 0.4545,
+                    "mean_signed_return": 0.143
                   },
-                  "lift": 0.0036,
+                  "lift": -0.0168,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2783,15 +2787,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3757,
-                    "mean_signed_return": -0.074
+                    "hit_rate": 0.4713,
+                    "mean_signed_return": 0.205
                   },
                   "conditional": {
-                    "samples": 173,
-                    "hit_rate": 0.4104,
-                    "mean_signed_return": -0.0636
+                    "samples": 172,
+                    "hit_rate": 0.5174,
+                    "mean_signed_return": 0.8945
                   },
-                  "lift": 0.0347,
+                  "lift": 0.0461,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2799,15 +2803,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3757,
-                    "mean_signed_return": -0.074
+                    "hit_rate": 0.4713,
+                    "mean_signed_return": 0.205
                   },
                   "conditional": {
-                    "samples": 512,
-                    "hit_rate": 0.3887,
-                    "mean_signed_return": -0.0486
+                    "samples": 509,
+                    "hit_rate": 0.4794,
+                    "mean_signed_return": 0.3526
                   },
-                  "lift": 0.013,
+                  "lift": 0.0081,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2815,22 +2819,24 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.3757,
-                    "mean_signed_return": -0.074
+                    "hit_rate": 0.4713,
+                    "mean_signed_return": 0.205
                   },
                   "conditional": {
-                    "samples": 575,
-                    "hit_rate": 0.3757,
-                    "mean_signed_return": -0.074
+                    "samples": 554,
+                    "hit_rate": 0.4765,
+                    "mean_signed_return": 0.3015
                   },
-                  "lift": 0.0,
+                  "lift": 0.0052,
                   "eligible": true,
                   "predictive": false
                 }
               ],
               "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
               "trusted_features": [],
-              "candidate_features": []
+              "candidate_features": [
+                "trend_aligned"
+              ]
             }
           }
         },
@@ -2839,18 +2845,18 @@
           "forward": {
             "6": {
               "samples": 80,
-              "hit_rate": 0.5625,
-              "mean_signed_return": 0.0146
+              "hit_rate": 0.575,
+              "mean_signed_return": 0.1843
             },
             "12": {
               "samples": 80,
-              "hit_rate": 0.65,
-              "mean_signed_return": 0.0295
+              "hit_rate": 0.6125,
+              "mean_signed_return": 0.8707
             },
             "24": {
               "samples": 80,
-              "hit_rate": 0.55,
-              "mean_signed_return": -0.0297
+              "hit_rate": 0.7625,
+              "mean_signed_return": 1.4519
             },
             "predictivity": {
               "minimum_events": 30,
@@ -2859,31 +2865,31 @@
                   "feature": "trend_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6157,
-                    "mean_signed_return": 0.074
+                    "hit_rate": 0.5287,
+                    "mean_signed_return": -0.205
                   },
                   "conditional": {
-                    "samples": 382,
-                    "hit_rate": 0.5497,
-                    "mean_signed_return": -0.046
+                    "samples": 273,
+                    "hit_rate": 0.6337,
+                    "mean_signed_return": 0.6454
                   },
-                  "lift": -0.066,
+                  "lift": 0.105,
                   "eligible": true,
-                  "predictive": false
+                  "predictive": true
                 },
                 {
                   "feature": "momentum_aligned",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6157,
-                    "mean_signed_return": 0.074
+                    "hit_rate": 0.5287,
+                    "mean_signed_return": -0.205
                   },
                   "conditional": {
-                    "samples": 330,
-                    "hit_rate": 0.6212,
-                    "mean_signed_return": 0.0495
+                    "samples": 311,
+                    "hit_rate": 0.5145,
+                    "mean_signed_return": -0.2577
                   },
-                  "lift": 0.0055,
+                  "lift": -0.0142,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2891,15 +2897,15 @@
                   "feature": "volume_expansion",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6157,
-                    "mean_signed_return": 0.074
+                    "hit_rate": 0.5287,
+                    "mean_signed_return": -0.205
                   },
                   "conditional": {
-                    "samples": 173,
-                    "hit_rate": 0.5838,
-                    "mean_signed_return": 0.0636
+                    "samples": 172,
+                    "hit_rate": 0.4826,
+                    "mean_signed_return": -0.8945
                   },
-                  "lift": -0.0319,
+                  "lift": -0.0461,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2907,15 +2913,15 @@
                   "feature": "rsi_not_extreme",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6157,
-                    "mean_signed_return": 0.074
+                    "hit_rate": 0.5287,
+                    "mean_signed_return": -0.205
                   },
                   "conditional": {
-                    "samples": 431,
-                    "hit_rate": 0.5754,
-                    "mean_signed_return": 0.0393
+                    "samples": 488,
+                    "hit_rate": 0.5184,
+                    "mean_signed_return": -0.2899
                   },
-                  "lift": -0.0403,
+                  "lift": -0.0103,
                   "eligible": true,
                   "predictive": false
                 },
@@ -2923,37 +2929,39 @@
                   "feature": "near_ema20",
                   "base": {
                     "samples": 575,
-                    "hit_rate": 0.6157,
-                    "mean_signed_return": 0.074
+                    "hit_rate": 0.5287,
+                    "mean_signed_return": -0.205
                   },
                   "conditional": {
-                    "samples": 575,
-                    "hit_rate": 0.6157,
-                    "mean_signed_return": 0.074
+                    "samples": 554,
+                    "hit_rate": 0.5235,
+                    "mean_signed_return": -0.3015
                   },
-                  "lift": 0.0,
+                  "lift": -0.0052,
                   "eligible": true,
                   "predictive": false
                 }
               ],
               "validation_type": "FULL_HISTORY_CONDITIONAL_ASSOCIATION_NOT_OUT_OF_SAMPLE",
               "trusted_features": [],
-              "candidate_features": []
+              "candidate_features": [
+                "trend_aligned"
+              ]
             }
           }
         }
       },
       "decision": "BEARISH",
       "decision_rule": "WAIT unless competing sides separate by >5pp average analogue hit rate; historical feature audits are exploratory associations, not out-of-sample proof.",
-      "as_of": "2026-11-18T06:00:00+00:00",
+      "as_of": "2026-11-18T09:00:00+00:00",
       "market_data_provenance": {
         "provider": "Binance Spot Market Data API",
         "endpoint": "https://data-api.binance.vision/api/v3/klines",
-        "instrument": "EURIUSDT",
+        "instrument": "MRNABUSDT",
         "interval": "1h",
-        "closed_candle_open_time": "2026-11-18T05:00:00+00:00",
-        "closed_candle_as_of": "2026-11-18T06:00:00+00:00",
-        "retrieved_at": "2026-11-18T06:28:00.392864+00:00",
+        "closed_candle_open_time": "2026-11-18T08:00:00+00:00",
+        "closed_candle_as_of": "2026-11-18T09:00:00+00:00",
+        "retrieved_at": "2026-11-18T09:45:41.076461+00:00",
         "source_policy": "closed_1h_only",
         "strategy_spec_sha256": "dfad3807da4cbb71ed10edadc1dbb0665f1c6dc75326bf27fa1dc0182b7b130f"
       }
