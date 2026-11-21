@@ -1,4 +1,4 @@
-import json, subprocess, sys, tempfile
+import json, subprocess, sys, tempfile, importlib.util
 from pathlib import Path
 
 SCRIPT=Path("src/nic22_5_publication_eligibility.py")
@@ -51,3 +51,24 @@ def test_stale_research_cannot_authorize():
       "content_director_brief.json":{"generated_at":"2026-10-04T23:59:00+00:00"}
     })
     assert out["eligible"] is False and out["publication_mode"]=="BLOCKED"
+
+
+SPEC=importlib.util.spec_from_file_location("nic22_5_publication_eligibility", SCRIPT)
+MODULE=importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(MODULE)
+
+def test_research_candidate_rejects_non_ascii_and_malformed_symbols():
+    candidate=MODULE.research_candidate({"potential_gems":[
+      {"symbol":"牛来","information_advantage_score":99,"undercoverage_score":99,"evidence_score":99},
+      {"symbol":"BAD/PAIR","information_advantage_score":99,"undercoverage_score":99,"evidence_score":99},
+      {"symbol":"QNT","information_advantage_score":80,"undercoverage_score":70,"evidence_score":60},
+    ]})
+    assert candidate["symbol"]=="QNT"
+
+def test_symbol_validator_accepts_only_ascii_binance_base_symbols():
+    assert MODULE.valid_symbol("BINANCE:QNTUSDT")==""  # exchange-qualified names are not base symbols
+    assert MODULE.valid_symbol("QNTUSDT")=="QNT"
+    assert MODULE.valid_symbol("$QNTUSDT")=="QNT"
+    assert MODULE.valid_symbol("BADUSDTX")==""
+    assert MODULE.valid_symbol("牛来")==""
+    assert MODULE.valid_symbol("BAD/PAIR")==""
