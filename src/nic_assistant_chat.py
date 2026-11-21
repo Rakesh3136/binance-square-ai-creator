@@ -11,6 +11,7 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from pathlib import Path
 from urllib.parse import unquote
 
 from src.nic_control_gate import ControlGate
@@ -274,6 +275,31 @@ def make_handler(gate: ControlGate | None = None):
                     "owner_control_token_configured": bool(os.getenv("NIC_OWNER_CONTROL_TOKEN")),
                     "connected_plugins": [],
                     "external_action_execution": "not_connected",
+                })
+                return
+            if self.path == "/journal":
+                if not self._authorized("NIC_OWNER_CONTROL_TOKEN"):
+                    self._json(401, {"error": "owner_unauthorized_or_token_unconfigured"})
+                    return
+                journal_path = Path(os.getenv(
+                    "NIC_TRANSPARENCY_JOURNAL_PATH",
+                    str(Path(__file__).resolve().parents[1] / "data" / "live" / "nic_transparency_journal.json"),
+                ))
+                try:
+                    raw = journal_path.read_text(encoding="utf-8")
+                    journal = json.loads(raw)
+                    if not isinstance(journal, dict):
+                        raise ValueError("journal_root_must_be_object")
+                except FileNotFoundError:
+                    self._json(404, {"error": "transparency_journal_not_available"})
+                    return
+                except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+                    self._json(503, {"error": "transparency_journal_unreadable"})
+                    return
+                self._json(200, {
+                    "journal": journal,
+                    "source": "nic_transparency_journal",
+                    "chain_of_thought_exposed": False,
                 })
                 return
             if self.path in ("/operator/capabilities", "/control/status", "/control/approvals"):
