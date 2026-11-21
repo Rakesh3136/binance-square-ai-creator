@@ -138,6 +138,9 @@ def main() -> None:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": "Binance Spot public 24hr ticker + public 1h klines + exchangeInfo",
         "quote": QUOTE,
+        # Keep the complete current ticker universe so downstream integrity gates can
+        # verify a selected news asset even when it is not a top mover/volume leader.
+        "all_market_symbols": candidates,
         "top_content_signals": movers,
         "top_gainers": top_gainers,
         "top_losers": top_losers,
