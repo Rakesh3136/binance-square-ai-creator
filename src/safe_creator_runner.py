@@ -291,10 +291,13 @@ def main():
                 generation_mode='NIC_NATIVE_BLOCKED',
                 fallback_status='NOT_RUN_TO_PROTECT_ORIGINALITY',
             )
+            # Emit the bounded writer's structured rejection report to the Actions log.
+            # It contains screening reasons only; it does not print candidate prose or weaken gates.
             print(json.dumps({
                 'status': 'AI_BLOCKED_NO_ORIGINAL_DRAFT',
                 'fallback_status': 'NOT_RUN_TO_PROTECT_ORIGINALITY',
                 'publication_allowed': False,
+                'diagnostic': message[:12000],
             }, indent=2))
             return 1
         print(f'NIC native creator failed; switching to dependency-free verified creator. Original error: {message}')
