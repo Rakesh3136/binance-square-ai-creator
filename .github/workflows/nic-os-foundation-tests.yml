@@ -1,0 +1,47 @@
+name: NIC OS Foundation Tests
+
+on:
+  pull_request:
+    paths:
+      - "src/nic_os_release_policy.py"
+      - "src/nic_os_activity_ledger.py"
+      - "src/nic_os_autonomy_policy.py"
+      - "src/nic_os_owner_control_store.py"
+      - "tests/test_nic_os_release_policy.py"
+      - "tests/test_nic_os_activity_ledger.py"
+      - "tests/test_nic_os_autonomy_policy.py"
+      - "tests/test_nic_os_owner_control_store.py"
+      - "docs/nic-os-*.md"
+      - ".github/workflows/nic-os-foundation-tests.yml"
+  push:
+    branches:
+      - main
+      - "feat/nic-os-foundation"
+      - "feat/nic-owner-power-mode"
+      - "feat/nic-owner-control-plane-store"
+    paths:
+      - "src/nic_os_release_policy.py"
+      - "src/nic_os_autonomy_policy.py"
+      - "src/nic_os_owner_control_store.py"
+      - "tests/test_nic_os_release_policy.py"
+      - "tests/test_nic_os_autonomy_policy.py"
+      - "tests/test_nic_os_owner_control_store.py"
+      - "docs/nic-os-*.md"
+      - ".github/workflows/nic-os-foundation-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  release-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Test NIC OS safety and activity primitives
+        run: python -m pytest -q tests/test_nic_os_release_policy.py tests/test_nic_os_activity_ledger.py tests/test_nic_os_autonomy_policy.py tests/test_nic_os_owner_control_store.py
