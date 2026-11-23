@@ -13,7 +13,7 @@ class NICToolRegistryTests(unittest.TestCase):
             "get_creator_period_coverage", "list_creator_study_queue",
             "get_live_market_data", "search_public_news",
             "get_verified_research_evidence", "get_reward_pattern_insights",
-            "get_nic_design_guidelines",
+            "get_nic_design_guidelines", "build_nic_design_preview",
         })
         self.assertNotIn("publish_post", names)
         self.assertNotIn("run_shell", names)
@@ -26,6 +26,18 @@ class NICToolRegistryTests(unittest.TestCase):
         self.assertTrue(result["preview_policy"]["production_changes"].startswith("owner approval"))
         with self.assertRaisesRegex(ToolExecutionError, "tool_arguments_not_supported"):
             execute_tool("get_nic_design_guidelines", {"write": True})
+
+    def test_design_preview_tool_returns_static_html_without_production_mutation(self):
+        result = execute_tool("build_nic_design_preview", {
+            "goal": "Make assistant easier to use",
+            "surface": "assistant",
+        })
+        self.assertEqual(result["content_type"], "text/html")
+        self.assertIn("<!doctype html>", result["preview_html"])
+        self.assertFalse(result["production_changed"])
+        self.assertTrue(result["owner_approval_required"])
+        with self.assertRaisesRegex(ToolExecutionError, "design_preview_arguments_invalid"):
+            execute_tool("build_nic_design_preview", {"goal": "x", "surface": "assistant", "path": "dashboard/index.html"})
 
     def test_unknown_tools_are_rejected(self):
         with self.assertRaisesRegex(ToolExecutionError, "tool_not_allowed"):
