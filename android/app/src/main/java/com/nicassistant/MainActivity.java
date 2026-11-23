@@ -2,8 +2,11 @@ package com.nicassistant;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.view.View;
+import android.view.Gravity;
 import android.widget.*;
 import org.json.*;
 import java.net.*;
@@ -18,93 +21,118 @@ public class MainActivity extends Activity {
     private final JSONArray conversationHistory = new JSONArray();
     private TextView output, status;
     private LinearLayout root;
+    private static final int BG=Color.rgb(10,14,24), PANEL=Color.rgb(20,27,43), TEXT=Color.rgb(238,243,255), MUTED=Color.rgb(150,164,190), ACCENT=Color.rgb(116,145,255);
     private String base() { return server.getText().toString().trim().replaceAll("/+$", ""); }
-    private String request(String path, String token, JSONObject body) throws Exception {
-        URL url = new URL(base() + path);
-        HttpURLConnection c = (HttpURLConnection) url.openConnection();
-        c.setConnectTimeout(12000); c.setReadTimeout(30000); c.setRequestMethod(body == null ? "GET" : "POST");
-        c.setRequestProperty("Accept", "application/json");
-        if (token != null && !token.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + token);
-        if (body != null) {
-            c.setDoOutput(true); c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            try (OutputStream os = c.getOutputStream()) { os.write(body.toString().getBytes(StandardCharsets.UTF_8)); }
+    private GradientDrawable shape(int color, int radius, int stroke) {
+        GradientDrawable d=new GradientDrawable(); d.setColor(color); d.setCornerRadius(radius);
+        if(stroke!=0)d.setStroke(1,stroke); return d;
+    }
+    private LinearLayout column() { LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
+    private void pad(View v,int l,int t,int r,int b){v.setPadding(l,t,r,b);}
+    private TextView label(String s,int size,int color,boolean bold) {
+        TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(color);
+        if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD); return t;
+    }
+    private void gap(LinearLayout parent,int h){ View v=new View(this); parent.addView(v,new LinearLayout.LayoutParams(1,h)); }
+    private LinearLayout card() {
+        LinearLayout c=column(); c.setBackground(shape(PANEL,24,Color.rgb(39,51,76))); pad(c,18,16,18,16);
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.bottomMargin=14; root.addView(c,p); return c;
+    }
+    private EditText field(LinearLayout parent,String hint,boolean secret) {
+        EditText e=new EditText(this); e.setSingleLine(true); e.setTextColor(TEXT); e.setHintTextColor(MUTED); e.setHint(hint);
+        e.setTextSize(14); e.setBackground(shape(Color.rgb(12,18,31),14,Color.rgb(48,62,91))); pad(e,14,9,14,9);
+        if(secret)e.setInputType(129);
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.topMargin=8; parent.addView(e,p); return e;
+    }
+    private Button button(LinearLayout parent,String text,Runnable action) {
+        Button b=new Button(this); b.setText(text); b.setTextColor(Color.WHITE); b.setAllCaps(false); b.setTextSize(14);
+        b.setBackground(shape(ACCENT,16,0)); LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.topMargin=12; parent.addView(b,p);
+        b.setOnClickListener(v->action.run()); return b;
+    }
+    private void show(String text){runOnUiThread(()->output.setText(text));}
+    private void work(String label,Task task){
+        status.setText(label+"…");
+        io.execute(()->{try{String result=task.run();runOnUiThread(()->status.setText("Connected · ready"));show(result);}
+            catch(Exception e){runOnUiThread(()->status.setText("Connection issue · check setup"));show(e.getMessage()==null?"Request failed":e.getMessage());}});
+    }
+    private boolean configured(){
+        if(base().isEmpty()||base().contains("YOUR-NIC-SERVER")){
+            status.setText("Backend not connected · setup required");
+            show("NIC's cloud server has not been deployed or configured yet. Add the real HTTPS server address when deployment is ready.");
+            return false;
         }
-        int code = c.getResponseCode();
-        InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        if (in != null) { byte[] buf = new byte[4096]; int n; while ((n=in.read(buf))!=-1) bytes.write(buf,0,n); in.close(); }
-        c.disconnect();
-        String text = bytes.toString("UTF-8");
-        if (code < 200 || code >= 300) throw new IOException("HTTP " + code + ": " + text);
-        return text;
+        if(!base().startsWith("https://")){show("For security, NIC requires an HTTPS server address.");return false;}
+        return true;
     }
-    private void addLabel(String s, int size, boolean bold) {
-        TextView t = new TextView(this); t.setText(s); t.setTextSize(size);
-        if (bold) t.setTypeface(null, Typeface.BOLD);
-        t.setPadding(0, 10, 0, 8); root.addView(t);
+    private String request(String path,String token,JSONObject body)throws Exception{
+        URL url=new URL(base()+path); HttpURLConnection c=(HttpURLConnection)url.openConnection();
+        c.setConnectTimeout(12000);c.setReadTimeout(30000);c.setRequestMethod(body==null?"GET":"POST");
+        c.setRequestProperty("Accept","application/json");
+        if(token!=null&&!token.isEmpty())c.setRequestProperty("Authorization","Bearer "+token);
+        if(body!=null){c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json; charset=utf-8");
+            try(OutputStream os=c.getOutputStream()){os.write(body.toString().getBytes(StandardCharsets.UTF_8));}}
+        int code=c.getResponseCode();InputStream in=code>=400?c.getErrorStream():c.getInputStream();
+        ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+        if(in!=null){byte[]buf=new byte[4096];int n;while((n=in.read(buf))!=-1)bytes.write(buf,0,n);in.close();}
+        c.disconnect();String text=bytes.toString("UTF-8");
+        if(code<200||code>=300)throw new IOException("HTTP "+code+": "+text);return text;
     }
-    private EditText field(String hint, boolean secret) {
-        EditText e = new EditText(this); e.setSingleLine(true); e.setHint(hint);
-        if (secret) e.setInputType(129);
-        root.addView(e); return e;
-    }
-    private Button button(String label, Runnable action) {
-        Button b = new Button(this); b.setText(label); root.addView(b);
-        b.setOnClickListener(v -> action.run()); return b;
-    }
-    private void show(String text) { runOnUiThread(() -> output.setText(text)); }
-    private void work(String label, Task task) {
-        status.setText(label + "…");
-        io.execute(() -> { try { String result = task.run(); runOnUiThread(() -> status.setText("Connected / ready")); show(result); }
-            catch (Exception e) { runOnUiThread(() -> status.setText("Request failed")); show(e.getMessage()); } });
-    }
-    interface Task { String run() throws Exception; }
-    @Override public void onCreate(Bundle state) {
-        super.onCreate(state);
-        ScrollView scroll = new ScrollView(this); root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL); root.setPadding(24, 24, 24, 24); scroll.addView(root); setContentView(scroll);
-        addLabel("NIC Assistant", 26, true);
-        addLabel("Android companion • MVP", 14, false);
-        server = field("HTTPS NIC server URL", false); server.setText(BuildConfig.DEFAULT_SERVER_URL);
-        chatToken = field("Chat access token (memory only)", true);
-        ownerToken = field("Owner control token (memory only)", true);
-        status = new TextView(this); root.addView(status);
-        button("Check server", () -> work("Checking server", () -> request("/healthz", null, null)));
-        addLabel("Chat with NIC", 19, true);
-        message = new EditText(this); message.setHint("Message NIC…"); message.setMinLines(2); root.addView(message);
-        button("Send message", () -> {
-            String prompt = message.getText().toString().trim();
-            if (prompt.isEmpty()) { show("Enter a message first."); return; }
-            work("Sending", () -> {
-                JSONObject body = new JSONObject(); body.put("message", prompt); body.put("history", conversationHistory);
-                JSONObject response = new JSONObject(request("/chat", chatToken.getText().toString(), body));
-                String reply = response.optString("reply", "No reply returned");
-                JSONObject userTurn = new JSONObject(); userTurn.put("role", "user"); userTurn.put("content", prompt);
-                JSONObject assistantTurn = new JSONObject(); assistantTurn.put("role", "assistant"); assistantTurn.put("content", reply);
-                synchronized (conversationHistory) {
-                    conversationHistory.put(userTurn); conversationHistory.put(assistantTurn);
-                    while (conversationHistory.length() > 24) conversationHistory.remove(0);
-                }
+    interface Task{String run()throws Exception;}
+    @Override public void onCreate(Bundle state){
+        super.onCreate(state); getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
+        root=column();pad(root,20,22,20,28);scroll.addView(root);setContentView(scroll);
+        LinearLayout hero=column();pad(hero,2,8,2,20);root.addView(hero);
+        TextView eyebrow=label("YOUR PERSONAL AI COMPANION",11,ACCENT,true);hero.addView(eyebrow);
+        TextView title=label("NIC",38,TEXT,true);hero.addView(title);
+        TextView sub=label("Neural Intelligence Companion",15,MUTED,false);hero.addView(sub);gap(hero,14);
+        LinearLayout statusCard=column();statusCard.setBackground(shape(Color.rgb(24,35,54),18,Color.rgb(55,76,116)));pad(statusCard,16,13,16,13);hero.addView(statusCard);
+        status=label("●  Backend not connected · setup required",13,Color.rgb(255,205,112),true);statusCard.addView(status);
+        TextView setupNote=label("Your app is installed. NIC's secure cloud service still needs deployment.",12,MUTED,false);statusCard.addView(setupNote);
+        LinearLayout connection=card();
+        connection.addView(label("01  CONNECTION",11,ACCENT,true));gap(connection,5);
+        connection.addView(label("Connect your NIC server",19,TEXT,true));
+        TextView expl=label("The server address will be provided after the backend is deployed.",12,MUTED,false);connection.addView(expl);
+        server=field(connection,"https://your-secure-nic-server",false);server.setText(BuildConfig.DEFAULT_SERVER_URL);
+        chatToken=field(connection,"Chat access token · session only",true);
+        ownerToken=field(connection,"Owner control token · session only",true);
+        button(connection,"Check connection",()->{if(configured())work("Checking server",()->request("/healthz",null,null));});
+        LinearLayout chat=card();
+        chat.addView(label("02  CONVERSATION",11,ACCENT,true));gap(chat,5);
+        chat.addView(label("Talk to NIC",21,TEXT,true));
+        chat.addView(label("Ask questions, assign tasks and review what NIC is doing.",12,MUTED,false));
+        message=new EditText(this);message.setTextColor(TEXT);message.setHintTextColor(MUTED);message.setHint("Message NIC…");message.setTextSize(15);message.setMinLines(3);
+        message.setGravity(Gravity.TOP);message.setBackground(shape(Color.rgb(12,18,31),16,Color.rgb(48,62,91)));pad(message,14,12,14,12);
+        LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-1,-2);mp.topMargin=12;chat.addView(message,mp);
+        button(chat,"Send to NIC  →",()->{
+            String prompt=message.getText().toString().trim();if(prompt.isEmpty()){show("Write a message first.");return;}if(!configured())return;
+            work("Sending message",()->{
+                JSONObject body=new JSONObject();body.put("message",prompt);synchronized(conversationHistory){body.put("history",conversationHistory);}
+                JSONObject response=new JSONObject(request("/chat",chatToken.getText().toString(),body));
+                String reply=response.optString("reply","No reply returned");
+                JSONObject u=new JSONObject();u.put("role","user");u.put("content",prompt);
+                JSONObject a=new JSONObject();a.put("role","assistant");a.put("content",reply);
+                synchronized(conversationHistory){conversationHistory.put(u);conversationHistory.put(a);while(conversationHistory.length()>24)conversationHistory.remove(0);}
                 return reply;
             });
         });
-        addLabel("Owner activity", 19, true);
-        button("Refresh activity journal", () -> work("Loading activity", () -> {
-            JSONObject data = new JSONObject(request("/activity", ownerToken.getText().toString(), null));
-            JSONArray events = data.optJSONArray("events"); StringBuilder out = new StringBuilder();
-            if (events == null || events.length() == 0) return "No activity events recorded yet.";
-            for (int i=0;i<events.length();i++) {
-                JSONObject e = events.getJSONObject(i);
-                out.append(e.optString("created_at")).append("  ")
-                   .append(e.optString("actor")).append(" / ").append(e.optString("action"))
-                   .append(" — ").append(e.optString("status")).append("\n")
-                   .append(e.optString("summary")).append("\n\n");
-            }
+        LinearLayout activity=card();
+        activity.addView(label("03  TRANSPARENCY",11,ACCENT,true));gap(activity,5);
+        activity.addView(label("Owner activity",20,TEXT,true));
+        activity.addView(label("See recorded tasks and outcomes. Hidden reasoning is never exposed.",12,MUTED,false));
+        button(activity,"Refresh activity journal",()->{if(!configured())return;work("Loading activity",()->{
+            JSONObject data=new JSONObject(request("/activity",ownerToken.getText().toString(),null));JSONArray events=data.optJSONArray("events");
+            if(events==null||events.length()==0)return"No activity events recorded yet.";
+            StringBuilder out=new StringBuilder();for(int i=0;i<events.length();i++){JSONObject e=events.getJSONObject(i);
+                out.append(e.optString("created_at")).append(" · ").append(e.optString("actor")).append(" / ").append(e.optString("action"))
+                .append(" · ").append(e.optString("status")).append("\n").append(e.optString("summary")).append("\n\n");}
             return out.toString();
-        }));
-        addLabel("Response", 18, true);
-        output = new TextView(this); output.setTextIsSelectable(true); output.setTextSize(15); root.addView(output);
-        addLabel("Security: tokens stay in memory for this session and are not saved by this app. Use HTTPS. Chat and owner tokens are separate.", 12, false);
+        });});
+        LinearLayout result=card();result.addView(label("NIC RESPONSE",11,ACCENT,true));gap(result,6);
+        output=label("When the backend is connected, NIC's replies and activity will appear here.",14,MUTED,false);output.setTextIsSelectable(true);result.addView(output);
+        TextView security=label("SECURITY  ·  Tokens remain in memory for this session only. Chat and owner access are separate. HTTPS required.",11,MUTED,false);
+        pad(security,4,4,4,8);root.addView(security);
     }
-    @Override protected void onDestroy() { super.onDestroy(); io.shutdownNow(); }
+    @Override protected void onDestroy(){super.onDestroy();io.shutdownNow();}
 }
