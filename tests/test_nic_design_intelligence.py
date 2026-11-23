@@ -1,6 +1,6 @@
 import unittest
 
-from src.nic_design_intelligence import build_design_brief, get_design_guidelines
+from src.nic_design_intelligence import build_design_brief, get_design_guidelines, render_design_preview
 
 
 class NICDesignIntelligenceTests(unittest.TestCase):
@@ -22,7 +22,21 @@ class NICDesignIntelligenceTests(unittest.TestCase):
         self.assertEqual(brief["goal"], "Make assistant chat easier to use one-handed")
         self.assertTrue(brief["approval_required_before_production"])
         self.assertEqual(brief["file_write_authority"], "none")
-        self.assertIn("isolated preview", brief["deliverables"])
+        self.assertTrue(any("isolated preview" in item for item in brief["deliverables"]))
+
+    def test_preview_is_responsive_static_and_escapes_user_content(self):
+        brief = build_design_brief("<script>alert('x')</script>", "assistant")
+        preview = render_design_preview(brief)
+        self.assertIn("name=\"viewport\"", preview)
+        self.assertIn("@media(max-width:700px)", preview)
+        self.assertIn("&lt;script&gt;", preview)
+        self.assertNotIn("<script>alert", preview)
+        self.assertIn("DESIGN PREVIEW · NOT LIVE", preview)
+        self.assertIn("Owner approval required before release", preview)
+
+    def test_preview_rejects_unapproved_or_invalid_briefs(self):
+        with self.assertRaisesRegex(ValueError, "design_brief_invalid"):
+            render_design_preview({"approval_required_before_production": False})
 
     def test_invalid_surface_and_goal_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "design_goal_invalid"):
