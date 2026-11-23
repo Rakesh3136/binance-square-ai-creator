@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src.nic_design_intelligence import get_design_guidelines
+from src.nic_design_intelligence import build_design_brief, get_design_guidelines, render_design_preview
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS: dict[str, dict[str, Any]] = {
@@ -80,6 +80,18 @@ TOOLS: dict[str, dict[str, Any]] = {
     "get_nic_design_guidelines": {
         "description": "Read NIC's visual design system, product surfaces, accessibility principles, and owner-approval rules for safe self-improving UI proposals.",
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    "build_nic_design_preview": {
+        "description": "Create a static responsive HTML design preview from a bounded goal and NIC surface. Returns preview HTML only; never writes files or changes production.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "goal": {"type": "string", "minLength": 1, "maxLength": 1000},
+                "surface": {"type": "string", "enum": ["home", "assistant", "workspace", "agents", "activity", "creator_studio", "settings"]}
+            },
+            "required": ["goal", "surface"],
+            "additionalProperties": False
+        }
     },
 }
 
@@ -477,6 +489,23 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str
         if args:
             raise ToolExecutionError("tool_arguments_not_supported")
         return get_design_guidelines()
+
+    if name == "build_nic_design_preview":
+        if set(args) != {"goal", "surface"}:
+            raise ToolExecutionError("design_preview_arguments_invalid")
+        try:
+            brief = build_design_brief(args["goal"], args["surface"])
+            preview = render_design_preview(brief)
+        except (TypeError, ValueError) as exc:
+            raise ToolExecutionError(str(exc)) from exc
+        return {
+            "surface": brief["surface"]["id"],
+            "goal": brief["goal"],
+            "content_type": "text/html",
+            "preview_html": preview,
+            "production_changed": False,
+            "owner_approval_required": True,
+        }
 
     if name == "list_creator_study_queue":
         if args:
