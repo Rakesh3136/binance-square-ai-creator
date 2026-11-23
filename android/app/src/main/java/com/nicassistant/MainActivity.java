@@ -38,6 +38,15 @@ public class MainActivity extends Activity {
         LinearLayout c=column(); c.setBackground(shape(PANEL,24,Color.rgb(39,51,76))); pad(c,18,16,18,16);
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.bottomMargin=14; root.addView(c,p); return c;
     }
+    private void featureTile(LinearLayout parent,String icon,String title,String detail,boolean active) {
+        LinearLayout tile=column(); tile.setBackground(shape(Color.rgb(16,24,39),18,Color.rgb(42,57,84))); pad(tile,14,13,14,13);
+        TextView symbol=label(icon,20,ACCENT,true); tile.addView(symbol);
+        TextView name=label(title,15,TEXT,true); LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2); np.topMargin=7; tile.addView(name,np);
+        TextView desc=label(detail,11,MUTED,false); LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2); dp.topMargin=3; tile.addView(desc,dp);
+        TextView state=label(active?"AVAILABLE":"IN DEVELOPMENT",9,active?Color.rgb(84,214,160):Color.rgb(255,205,112),true);
+        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2); sp.topMargin=9; tile.addView(state,sp);
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,1f); p.setMargins(0,0,7,0); parent.addView(tile,p);
+    }
     private EditText field(LinearLayout parent,String hint,boolean secret) {
         EditText e=new EditText(this); e.setSingleLine(true); e.setTextColor(TEXT); e.setHintTextColor(MUTED); e.setHint(hint);
         e.setTextSize(14); e.setBackground(shape(Color.rgb(12,18,31),14,Color.rgb(48,62,91))); pad(e,14,9,14,9);
@@ -85,11 +94,28 @@ public class MainActivity extends Activity {
         root=column();pad(root,20,22,20,28);scroll.addView(root);setContentView(scroll);
         LinearLayout hero=column();pad(hero,2,8,2,20);root.addView(hero);
         TextView eyebrow=label("YOUR PERSONAL AI COMPANION",11,ACCENT,true);hero.addView(eyebrow);
-        TextView title=label("NIC",38,TEXT,true);hero.addView(title);
-        TextView sub=label("Neural Intelligence Companion",15,MUTED,false);hero.addView(sub);gap(hero,14);
+        TextView title=label("NIC",42,TEXT,true);hero.addView(title);
+        TextView sub=label("Your personal AI command center",15,MUTED,false);hero.addView(sub);gap(hero,14);
         LinearLayout statusCard=column();statusCard.setBackground(shape(Color.rgb(24,35,54),18,Color.rgb(55,76,116)));pad(statusCard,16,13,16,13);hero.addView(statusCard);
         status=label("●  Backend not connected · setup required",13,Color.rgb(255,205,112),true);statusCard.addView(status);
         TextView setupNote=label("Your app is installed. NIC's secure cloud service still needs deployment.",12,MUTED,false);statusCard.addView(setupNote);
+        LinearLayout workspace=card();
+        workspace.addView(label("YOUR NIC WORKSPACE",11,ACCENT,true)); gap(workspace,4);
+        workspace.addView(label("One companion. Multiple capabilities.",19,TEXT,true));
+        workspace.addView(label("A clear view of what is available now and what is still being built.",12,MUTED,false));
+        LinearLayout rowOne=new LinearLayout(this); rowOne.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2); rp.topMargin=14; workspace.addView(rowOne,rp);
+        featureTile(rowOne,"✦","Assistant","Secure chat bridge",true);
+        featureTile(rowOne,"▣","Workspace","Browser and files",false);
+        LinearLayout rowTwo=new LinearLayout(this); rowTwo.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams r2=new LinearLayout.LayoutParams(-1,-2); r2.topMargin=8; workspace.addView(rowTwo,r2);
+        featureTile(rowTwo,"◇","Specialists","Dynamic agent tools",false);
+        featureTile(rowTwo,"↗","Creator Studio","Research and rewards",false);
+        LinearLayout design=column(); design.setBackground(shape(Color.rgb(25,35,57),18,Color.rgb(68,85,128))); pad(design,15,13,15,13);
+        LinearLayout.LayoutParams designP=new LinearLayout.LayoutParams(-1,-2); designP.topMargin=12; workspace.addView(design,designP);
+        design.addView(label("NIC DESIGN LAB",10,ACCENT,true));
+        TextView designText=label("Design Intelligence is being built to propose, preview and test improvements. Production changes stay under your approval.",12,MUTED,false);
+        LinearLayout.LayoutParams dt=new LinearLayout.LayoutParams(-1,-2); dt.topMargin=5; design.addView(designText,dt);
         LinearLayout connection=card();
         connection.addView(label("01  CONNECTION",11,ACCENT,true));gap(connection,5);
         connection.addView(label("Connect your NIC server",19,TEXT,true));
