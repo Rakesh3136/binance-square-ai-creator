@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from src.nic_design_intelligence import get_design_guidelines
+
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS: dict[str, dict[str, Any]] = {
     "get_live_market_data": {
@@ -73,6 +75,10 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "list_creator_study_queue": {
         "description": "List a bounded sample of creator profiles NIC is studying, with public engagement clearly separated from earnings.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    "get_nic_design_guidelines": {
+        "description": "Read NIC's visual design system, product surfaces, accessibility principles, and owner-approval rules for safe self-improving UI proposals.",
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
     },
 }
@@ -466,6 +472,11 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str
             "creators": summaries,
             "attribution_policy": "Creator-period rewards are cohort-level evidence and are never assigned to individual posts.",
         }
+
+    if name == "get_nic_design_guidelines":
+        if args:
+            raise ToolExecutionError("tool_arguments_not_supported")
+        return get_design_guidelines()
 
     if name == "list_creator_study_queue":
         if args:
