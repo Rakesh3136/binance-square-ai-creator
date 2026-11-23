@@ -104,6 +104,29 @@ class NICControlAPITests(unittest.TestCase):
         self.assertEqual(status, 403)
         self.assertEqual(payload["error"], "origin_not_allowed")
 
+    def test_android_chat_contract_accepts_bounded_conversation_history(self):
+        history = [
+            {"role": "user", "content": "Earlier question"},
+            {"role": "assistant", "content": "Earlier answer"},
+        ]
+        with patch("src.nic_assistant_chat.advisor_reply", return_value="NIC response") as advisor:
+            status, payload = self.request(
+                "/chat", "chat-test-token", method="POST",
+                payload={"message": "Continue this", "history": history},
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["reply"], "NIC response")
+        advisor.assert_called_once_with("Continue this", history)
+
+    def test_android_chat_contract_rejects_missing_or_wrong_chat_token(self):
+        payload = {"message": "Hello", "history": []}
+        status, response = self.request("/chat", method="POST", payload=payload)
+        self.assertEqual(status, 401)
+        self.assertEqual(response["error"], "unauthorized")
+        status, response = self.request("/chat", "incorrect-token", method="POST", payload=payload)
+        self.assertEqual(status, 401)
+        self.assertEqual(response["error"], "unauthorized")
+
     def test_transparency_journal_is_owner_authenticated_and_excludes_hidden_reasoning(self):
         status, payload = self.request("/journal")
         self.assertEqual(status, 401)
