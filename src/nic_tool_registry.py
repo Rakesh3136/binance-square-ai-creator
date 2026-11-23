@@ -301,6 +301,23 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str
             }
         }
 
+    if name == "build_nic_design_preview":
+        if set(args) != {"goal", "surface"}:
+            raise ToolExecutionError("design_preview_arguments_invalid")
+        try:
+            brief = build_design_brief(args["goal"], args["surface"])
+            preview = render_design_preview(brief)
+        except (TypeError, ValueError) as exc:
+            raise ToolExecutionError(str(exc)) from exc
+        return {
+            "surface": brief["surface"]["id"],
+            "goal": brief["goal"],
+            "content_type": "text/html",
+            "preview_html": preview,
+            "production_changed": False,
+            "owner_approval_required": True,
+        }
+
     if args:
         raise ToolExecutionError("tool_arguments_not_supported")
 
