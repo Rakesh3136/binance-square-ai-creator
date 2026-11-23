@@ -1,0 +1,33 @@
+name: NIC Backend Container
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'requirements.txt'
+      - 'src/**'
+      - 'agents/**'
+      - '.github/workflows/nic-backend-container.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'requirements.txt'
+      - 'src/**'
+      - 'agents/**'
+      - '.github/workflows/nic-backend-container.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build NIC backend container
+        run: docker build --tag nic-assistant:ci .
