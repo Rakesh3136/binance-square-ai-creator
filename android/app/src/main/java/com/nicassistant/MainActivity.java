@@ -123,7 +123,22 @@ public class MainActivity extends Activity {
         server=field(connection,"https://your-secure-nic-server",false);server.setText(BuildConfig.DEFAULT_SERVER_URL);
         chatToken=field(connection,"Chat access token · session only",true);
         ownerToken=field(connection,"Owner control token · session only",true);
-        button(connection,"Check connection",()->{if(configured())work("Checking server",()->request("/healthz",null,null));});
+        button(connection,"Check connection",()->{if(configured())work("Checking server",()->{
+            JSONObject health=new JSONObject(request("/healthz",null,null));
+            boolean model=health.optBoolean("model_configured",false);
+            boolean chat=health.optBoolean("chat_token_configured",false);
+            boolean owner=health.optBoolean("owner_control_token_configured",false);
+            StringBuilder report=new StringBuilder();
+            report.append("NIC backend responded successfully.\\n");
+            report.append("Service: ").append(health.optString("service","unknown")).append("\\n");
+            report.append("AI provider key: ").append(model?"configured":"MISSING").append("\\n");
+            report.append("Chat access token: ").append(chat?"configured":"MISSING").append("\\n");
+            report.append("Owner activity access: ").append(owner?"configured":"not configured").append("\\n");
+            report.append("External actions: ").append(health.optString("external_action_execution","unknown")).append("\\n\\n");
+            report.append(model&&chat?"Chat service configuration looks ready. Send a test message.":"Backend is reachable, but chat is not launch-ready. Configure the missing server settings.");
+            runOnUiThread(()->status.setText(model&&chat?"Backend reachable · chat configured":"Backend reachable · setup incomplete"));
+            return report.toString();
+        });});
         LinearLayout chat=card();
         chat.addView(label("02  CONVERSATION",11,ACCENT,true));gap(chat,5);
         chat.addView(label("Talk to NIC",21,TEXT,true));
