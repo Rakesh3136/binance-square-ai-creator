@@ -40,4 +40,33 @@ async function activity(request,env){
  const at=new Date().toISOString(),saved=await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id").bind(at,e.task_id||null,e.actor.trim(),e.action.trim(),e.status.trim(),e.summary.trim(),e.error_code||null).first();
  return json({event:{id:saved.id,created_at:at,...e},source:"nic_activity_journal"},201);
 }
-export default {async fetch(request,env){const u=new URL(request.url);if(request.method==="GET"&&u.pathname==="/healthz")return json({status:"ok",service:"nic-edge-chat",model_configured:Boolean(env.AI),model_provider:"cloudflare_workers_ai",model:env.NIC_CHAT_MODEL||DEFAULT_MODEL,chat_token_configured:Boolean(env.NIC_CHAT_ACCESS_TOKEN),owner_control_token_configured:Boolean(env.NIC_OWNER_CONTROL_TOKEN),activity_database_bound:Boolean(env.DB),conversation_memory:Boolean(env.DB),capability_mode:"edge_chat_with_persistent_memory",publishing_enabled:false});if(u.pathname==="/chat"&&request.method==="POST")return chat(request,env);if(u.pathname==="/activity"&&(request.method==="GET"||request.method==="POST")){if(!env.DB)return json({error:"activity_database_unavailable"},503);try{return await activity(request,env);}catch{return json({error:"activity_journal_unavailable"},503);}}return json({error:"not_found"},404);}};
+
+const VIRTUAL_DEVICE_TYPES=["android","windows"];
+async function virtualDevices(request,env){
+ if(!(await authorized(request,env.NIC_OWNER_CONTROL_TOKEN)))return json({error:"owner_unauthorized"},401);
+ if(!env.DB)return json({error:"virtual_device_database_unavailable"},503);
+ if(request.method==="GET"){
+  try{
+   const now=new Date().toISOString();
+   for(const type of VIRTUAL_DEVICE_TYPES){
+    const id="nic-"+type;
+    await env.DB.prepare("INSERT INTO nic_virtual_devices (id, device_type, display_name, lifecycle_state, provider_state, created_at, updated_at) VALUES (?, ?, ?, 'not_provisioned', 'no_provider', ?, ?) ON CONFLICT(id) DO NOTHING").bind(id,type,type==="android"?"NIC Virtual Android":"NIC Virtual Windows",now,now).run();
+   }
+   const r=await env.DB.prepare("SELECT id, device_type, display_name, lifecycle_state, provider_state, provider_name, external_instance_id, created_at, updated_at FROM nic_virtual_devices ORDER BY device_type").all();
+   return json({devices:r.results||[],source:"nic_virtual_device_registry",virtualization_live:false,screen_streaming_live:false,remote_input_live:false});
+  }catch{return json({error:"virtual_device_registry_unavailable"},503);}
+ }
+ const match=new URL(request.url).pathname.match(/^\/virtual-devices\/(android|windows)\/actions$/);
+ if(!match)return json({error:"not_found"},404);
+ let p;try{p=await readBody(request);}catch(e){return json({error:e.message},400);}
+ if(Object.keys(p).some(k=>k!=="action")||!["start","stop","restart"].includes(p.action))return json({error:"device_action_invalid"},400);
+ const type=match[1],id="nic-"+type,now=new Date().toISOString(),requestId=crypto.randomUUID();
+ try{
+  const device=await env.DB.prepare("SELECT id, lifecycle_state, provider_state FROM nic_virtual_devices WHERE id=?").bind(id).first();
+  if(!device)return json({error:"virtual_device_not_registered"},404);
+  const saved=await env.DB.prepare("INSERT INTO nic_device_action_requests (id, device_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, 'blocked_no_provider', 'vm_provider_not_configured') RETURNING id").bind(requestId,id,p.action,now).first();
+  await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, 'blocked', ?, 'vm_provider_not_configured')").bind(now,requestId,"virtual_device_"+p.action,"Request recorded; no VM provider is connected, so no machine action was performed.").run();
+  return json({request_id:saved.id,device_id:id,action:p.action,status:"blocked_no_provider",performed:false,message:"No Android or Windows VM provider is connected. This request was recorded but no virtual machine was started, stopped, or restarted."},202);
+ }catch{return json({error:"virtual_device_action_record_failed"},503);}
+}
+export default {async fetch(request,env){const u=new URL(request.url);if(request.method==="GET"&&u.pathname==="/healthz")return json({status:"ok",service:"nic-edge-chat",model_configured:Boolean(env.AI),model_provider:"cloudflare_workers_ai",model:env.NIC_CHAT_MODEL||DEFAULT_MODEL,chat_token_configured:Boolean(env.NIC_CHAT_ACCESS_TOKEN),owner_control_token_configured:Boolean(env.NIC_OWNER_CONTROL_TOKEN),activity_database_bound:Boolean(env.DB),conversation_memory:Boolean(env.DB),capability_mode:"edge_chat_with_persistent_memory",publishing_enabled:false});if(u.pathname==="/virtual-devices"&&(request.method==="GET"||request.method==="POST"))return virtualDevices(request,env);if(u.pathname==="/chat"&&request.method==="POST")return chat(request,env);if(u.pathname==="/activity"&&(request.method==="GET"||request.method==="POST")){if(!env.DB)return json({error:"activity_database_unavailable"},503);try{return await activity(request,env);}catch{return json({error:"activity_journal_unavailable"},503);}}return json({error:"not_found"},404);}};
