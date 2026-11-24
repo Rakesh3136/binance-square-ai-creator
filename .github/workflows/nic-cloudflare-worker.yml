@@ -1,0 +1,35 @@
+name: NIC Cloudflare Worker Checks
+
+on:
+  pull_request:
+    paths:
+      - "cloudflare/nic-worker/**"
+      - ".github/workflows/nic-cloudflare-worker.yml"
+  push:
+    branches: [main]
+    paths:
+      - "cloudflare/nic-worker/**"
+      - ".github/workflows/nic-cloudflare-worker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-dry-run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare/nic-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cloudflare/nic-worker/package-lock.json
+      - name: Install dependencies
+        run: npm install --package-lock-only && npm ci
+      - name: Run Worker route tests
+        run: npm test
+      - name: Validate Worker bundle without deploying
+        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
