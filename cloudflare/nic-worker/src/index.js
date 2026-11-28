@@ -54,6 +54,8 @@ async function callDeviceHost(env,path,options={}){
  let body;try{body=await response.json();}catch{body=null;}
  return {configured:true,response,body};
 }
+function dbLifecycleState(state){return state==="failed"?"error":state==="stopping"?"provisioning":state==="blocked_no_provider"?"not_provisioned":state;}
+function dbProviderState(state){if(["connected","healthy"].includes(state))return "connected";if(["disconnected","unreachable"].includes(state))return "disconnected";if(state==="no_provider")return "no_provider";return "configured";}
 function hostDeviceIsValid(d){
  return d&&VIRTUAL_DEVICE_TYPES.includes(d.device_type)&&typeof d.lifecycle_state==="string"&&["not_provisioned","provisioning","running","stopping","stopped","failed","blocked_no_provider"].includes(d.lifecycle_state)&&typeof d.provider_state==="string"&&typeof d.screen_streaming_live==="boolean"&&typeof d.remote_input_live==="boolean";
 }
@@ -68,7 +70,7 @@ async function virtualDevices(request,env){
    if(host.configured&&host.response?.ok&&Array.isArray(host.body?.devices)&&host.body.devices.length===2&&VIRTUAL_DEVICE_TYPES.every(t=>host.body.devices.filter(d=>d.device_type===t).length===1)&&host.body.devices.every(hostDeviceIsValid)){
     for(const d of host.body.devices){
      const id="nic-"+d.device_type;
-     await env.DB.prepare("UPDATE nic_virtual_devices SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(d.lifecycle_state,d.provider_state,d.provider_name||"external-linux-host",d.external_instance_id||null,now,id).run();
+     await env.DB.prepare("UPDATE nic_virtual_devices SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(dbLifecycleState(d.lifecycle_state),dbProviderState(d.provider_state),d.provider_name||"external-linux-host",d.external_instance_id||null,now,id).run();
     }
     const r=await env.DB.prepare("SELECT id, device_type, display_name, lifecycle_state, provider_state, provider_name, external_instance_id, created_at, updated_at FROM nic_virtual_devices ORDER BY device_type").all();
     return json({devices:r.results||[],source:"nic_virtual_device_registry",provider_connected:true,virtualization_live:(r.results||[]).some(d=>d.lifecycle_state==="running"),screen_streaming_live:host.body.devices.some(d=>d.screen_streaming_live),remote_input_live:host.body.devices.some(d=>d.remote_input_live)});
@@ -92,8 +94,8 @@ async function virtualDevices(request,env){
    await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, 'blocked', ?, ?)").bind(now,requestId,"virtual_device_"+p.action,"No verified VM host action was performed.",code).run();
    return json({request_id:requestId,device_id:id,action:p.action,status:code==="vm_provider_not_configured"?"blocked_no_provider":"provider_unavailable",performed:false,message:"No verified VM host action was completed. Check the NIC device-host connection and health before retrying."},202);
   }
-  await env.DB.prepare("INSERT INTO nic_device_action_requests (id, device_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, ?, ?)").bind(requestId,id,p.action,now,host.body.lifecycle_state,host.body.result_code||null).run();
-  await env.DB.prepare("UPDATE nic_virtual_devices SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(host.body.lifecycle_state,host.body.provider_state||"connected",host.body.provider_name||"external-linux-host",host.body.external_instance_id||null,new Date().toISOString(),id).run();
+  await env.DB.prepare("INSERT INTO nic_device_action_requests (id, device_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, ?, ?)").bind(requestId,id,p.action,now,host.body.performed?"succeeded":host.body.lifecycle_state==="failed"?"failed":"accepted",host.body.result_code||null).run();
+  await env.DB.prepare("UPDATE nic_virtual_devices SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(dbLifecycleState(host.body.lifecycle_state),dbProviderState(host.body.provider_state||"connected"),host.body.provider_name||"external-linux-host",host.body.external_instance_id||null,new Date().toISOString(),id).run();
   await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, ?, ?, ?)").bind(now,requestId,"virtual_device_"+p.action,host.body.performed?"completed":"blocked",host.body.message||"Host adapter returned an action result.",host.body.result_code||null).run();
   return json({request_id:requestId,device_id:id,action:p.action,status:host.body.lifecycle_state,performed:host.body.performed,message:host.body.message||"Host adapter response recorded."},host.body.performed?200:202);
  }catch{return json({error:"virtual_device_action_record_failed"},503);}
