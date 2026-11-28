@@ -42,18 +42,39 @@ async function activity(request,env){
 }
 
 const VIRTUAL_DEVICE_TYPES=["android","windows"];
+function validHostBase(value){try{const u=new URL(value);return u.protocol==="https:"&&u.username===""&&u.password===""?u.toString().replace(/\/$/,""):null;}catch{return null;}}
+async function callDeviceHost(env,path,options={}){
+ const base=validHostBase(env.NIC_DEVICE_HOST_URL||"");
+ if(!base||!env.NIC_DEVICE_HOST_TOKEN)return {configured:false,response:null,body:null};
+ const headers=new Headers(options.headers||{});
+ headers.set("authorization","Bearer "+env.NIC_DEVICE_HOST_TOKEN);
+ headers.set("accept","application/json");
+ if(options.body)headers.set("content-type","application/json");
+ let response;try{response=await fetch(base+path,{...options,headers,signal:AbortSignal.timeout(12000)});}catch{return {configured:true,unavailable:true,response:null,body:null};}
+ let body;try{body=await response.json();}catch{body=null;}
+ return {configured:true,response,body};
+}
+function hostDeviceIsValid(d){
+ return d&&VIRTUAL_DEVICE_TYPES.includes(d.device_type)&&typeof d.lifecycle_state==="string"&&["not_provisioned","provisioning","running","stopping","stopped","failed","blocked_no_provider"].includes(d.lifecycle_state)&&typeof d.provider_state==="string"&&typeof d.screen_streaming_live==="boolean"&&typeof d.remote_input_live==="boolean";
+}
 async function virtualDevices(request,env){
  if(!(await authorized(request,env.NIC_OWNER_CONTROL_TOKEN)))return json({error:"owner_unauthorized"},401);
  if(!env.DB)return json({error:"virtual_device_database_unavailable"},503);
  if(request.method==="GET"){
   try{
    const now=new Date().toISOString();
-   for(const type of VIRTUAL_DEVICE_TYPES){
-    const id="nic-"+type;
-    await env.DB.prepare("INSERT INTO nic_virtual_devices (id, device_type, display_name, lifecycle_state, provider_state, created_at, updated_at) VALUES (?, ?, ?, 'not_provisioned', 'no_provider', ?, ?) ON CONFLICT(id) DO NOTHING").bind(id,type,type==="android"?"NIC Virtual Android":"NIC Virtual Windows",now,now).run();
+   for(const type of VIRTUAL_DEVICE_TYPES){const id="nic-"+type;await env.DB.prepare("INSERT INTO nic_virtual_devices (id, device_type, display_name, lifecycle_state, provider_state, created_at, updated_at) VALUES (?, ?, ?, 'not_provisioned', 'no_provider', ?, ?) ON CONFLICT(id) DO NOTHING").bind(id,type,type==="android"?"NIC Virtual Android":"NIC Virtual Windows",now,now).run();}
+   const host=await callDeviceHost(env,"/v1/devices",{method:"GET"});
+   if(host.configured&&host.response?.ok&&Array.isArray(host.body?.devices)&&host.body.devices.every(hostDeviceIsValid)){
+    for(const d of host.body.devices){
+     const id="nic-"+d.device_type;
+     await env.DB.prepare("UPDATE nic_virtual_devices SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(d.lifecycle_state,d.provider_state,d.provider_name||"external-linux-host",d.external_instance_id||null,now,id).run();
+    }
+    const r=await env.DB.prepare("SELECT id, device_type, display_name, lifecycle_state, provider_state, provider_name, external_instance_id, created_at, updated_at FROM nic_virtual_devices ORDER BY device_type").all();
+    return json({devices:r.results||[],source:"nic_virtual_device_registry",provider_connected:true,virtualization_live:(r.results||[]).some(d=>d.lifecycle_state==="running"),screen_streaming_live:host.body.devices.some(d=>d.screen_streaming_live),remote_input_live:host.body.devices.some(d=>d.remote_input_live)});
    }
    const r=await env.DB.prepare("SELECT id, device_type, display_name, lifecycle_state, provider_state, provider_name, external_instance_id, created_at, updated_at FROM nic_virtual_devices ORDER BY device_type").all();
-   return json({devices:r.results||[],source:"nic_virtual_device_registry",virtualization_live:false,screen_streaming_live:false,remote_input_live:false});
+   return json({devices:r.results||[],source:"nic_virtual_device_registry",provider_connected:false,virtualization_live:false,screen_streaming_live:false,remote_input_live:false,provider_status:host.configured?(host.unavailable?"unreachable":"invalid_or_unhealthy_response"):"not_configured"});
   }catch{return json({error:"virtual_device_registry_unavailable"},503);}
  }
  const match=new URL(request.url).pathname.match(/^\/virtual-devices\/(android|windows)\/actions$/);
@@ -64,9 +85,17 @@ async function virtualDevices(request,env){
  try{
   const device=await env.DB.prepare("SELECT id, lifecycle_state, provider_state FROM nic_virtual_devices WHERE id=?").bind(id).first();
   if(!device)return json({error:"virtual_device_not_registered"},404);
-  const saved=await env.DB.prepare("INSERT INTO nic_device_action_requests (id, device_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, 'blocked_no_provider', 'vm_provider_not_configured') RETURNING id").bind(requestId,id,p.action,now).first();
-  await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, 'blocked', ?, 'vm_provider_not_configured')").bind(now,requestId,"virtual_device_"+p.action,"Request recorded; no VM provider is connected, so no machine action was performed.").run();
-  return json({request_id:saved.id,device_id:id,action:p.action,status:"blocked_no_provider",performed:false,message:"No Android or Windows VM provider is connected. This request was recorded but no virtual machine was started, stopped, or restarted."},202);
+  const host=await callDeviceHost(env,"/v1/devices/"+type+"/actions",{method:"POST",body:JSON.stringify({action:p.action,request_id:requestId})});
+  if(!host.configured||!host.response?.ok||!host.body||host.body.device_type!==type||host.body.request_id!==requestId||!["provisioning","running","stopping","stopped","failed"].includes(host.body.lifecycle_state)||typeof host.body.performed!=="boolean"){
+   const code=!host.configured?"vm_provider_not_configured":host.unavailable?"vm_provider_unreachable":"vm_provider_response_invalid";
+   await env.DB.prepare("INSERT INTO nic_device_action_requests (id, device_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, 'blocked_no_provider', ?)").bind(requestId,id,p.action,now,code).run();
+   await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, 'blocked', ?, ?)").bind(now,requestId,"virtual_device_"+p.action,"No verified VM host action was performed.",code).run();
+   return json({request_id:requestId,device_id:id,action:p.action,status:code==="vm_provider_not_configured"?"blocked_no_provider":"provider_unavailable",performed:false,message:"No verified VM host action was completed. Check the NIC device-host connection and health before retrying."},202);
+  }
+  await env.DB.prepare("INSERT INTO nic_device_action_requests (id, device_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, ?, ?)").bind(requestId,id,p.action,now,host.body.lifecycle_state,host.body.result_code||null).run();
+  await env.DB.prepare("UPDATE nic_virtual_devices SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(host.body.lifecycle_state,host.body.provider_state||"connected",host.body.provider_name||"external-linux-host",host.body.external_instance_id||null,new Date().toISOString(),id).run();
+  await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, ?, ?, ?)").bind(now,requestId,"virtual_device_"+p.action,host.body.performed?"completed":"blocked",host.body.message||"Host adapter returned an action result.",host.body.result_code||null).run();
+  return json({request_id:requestId,device_id:id,action:p.action,status:host.body.lifecycle_state,performed:host.body.performed,message:host.body.message||"Host adapter response recorded."},host.body.performed?200:202);
  }catch{return json({error:"virtual_device_action_record_failed"},503);}
 }
 export default {async fetch(request,env){const u=new URL(request.url);if(request.method==="GET"&&u.pathname==="/healthz")return json({status:"ok",service:"nic-edge-chat",model_configured:Boolean(env.AI),model_provider:"cloudflare_workers_ai",model:env.NIC_CHAT_MODEL||DEFAULT_MODEL,chat_token_configured:Boolean(env.NIC_CHAT_ACCESS_TOKEN),owner_control_token_configured:Boolean(env.NIC_OWNER_CONTROL_TOKEN),activity_database_bound:Boolean(env.DB),conversation_memory:Boolean(env.DB),capability_mode:"edge_chat_with_persistent_memory",publishing_enabled:false});if((u.pathname==="/virtual-devices"||/^\/virtual-devices\/(android|windows)\/actions$/.test(u.pathname))&&(request.method==="GET"||request.method==="POST"))return virtualDevices(request,env);if(u.pathname==="/chat"&&request.method==="POST")return chat(request,env);if(u.pathname==="/activity"&&(request.method==="GET"||request.method==="POST")){if(!env.DB)return json({error:"activity_database_unavailable"},503);try{return await activity(request,env);}catch{return json({error:"activity_journal_unavailable"},503);}}return json({error:"not_found"},404);}};
