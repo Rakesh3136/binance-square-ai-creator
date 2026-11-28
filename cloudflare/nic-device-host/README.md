@@ -4,6 +4,18 @@
 
 Cloudflare Worker calls a separately deployed NIC device-host service over HTTPS. The host is the only component allowed to call a hypervisor/container runtime. The browser never receives host credentials or direct Docker/KVM access.
 
+## First real device: NIC Linux laptop
+
+The first target is an isolated, persistent Linux desktop (not a Windows guest). It needs a real browser-visible display, bidirectional mouse/keyboard input, and a durable home volume. Worker owner routes:
+- `GET /virtual-devices/laptop`
+- `POST /virtual-devices/laptop/actions` with `{"action":"start|stop|restart"}`
+
+The Worker maps this device to host type `linux_desktop` at:
+- `GET /v1/devices/linux_desktop`
+- `POST /v1/devices/linux_desktop/actions`
+
+A start is reported as completed only when the host confirms the guest is running and both screen streaming and remote input are live. The legacy Android and Windows registry remains separate; Linux laptop is not mislabeled as Windows.
+
 ## Authentication and transport
 - HTTPS is mandatory. The Worker refuses non-HTTPS host URLs.
 - Every request carries `Authorization: Bearer <NIC_DEVICE_HOST_TOKEN>` from a Cloudflare Worker secret.
@@ -12,50 +24,31 @@ Cloudflare Worker calls a separately deployed NIC device-host service over HTTPS
 - The host must validate request IDs, enforce per-owner/device authorization, rate limits, idempotency and action timeouts.
 
 ## `GET /v1/devices`
-Return JSON:
+Return one record per registered legacy device type (`android`, `windows`) in a `devices` array. Each record has `device_type`, `lifecycle_state`, `provider_state`, `provider_name`, `external_instance_id`, `screen_streaming_live`, and `remote_input_live`.
+
+## `GET /v1/devices/linux_desktop`
+Return one JSON object:
 ```json
 {
-  "devices": [
-    {
-      "device_type": "android",
-      "lifecycle_state": "stopped",
-      "provider_state": "healthy",
-      "provider_name": "nic-linux-host",
-      "external_instance_id": "stable-provider-id",
-      "screen_streaming_live": false,
-      "remote_input_live": false
-    }
-  ]
-}
-```
-Return one record per registered device type (`android`, `windows`). Lifecycle state must be one of `not_provisioned`, `provisioning`, `running`, `stopping`, `stopped`, `failed`, or `blocked_no_provider`. A device is `running` only after guest boot and required health checks pass. Screen/input booleans must describe real, currently working channels, never intended or mocked capabilities.
-
-## `POST /v1/devices/{android|windows}/actions`
-Request:
-```json
-{ "action": "start", "request_id": "uuid-from-worker" }
-```
-Allowed actions: `start`, `stop`, `restart`.
-
-Successful, verified response:
-```json
-{
-  "request_id": "same-request-id",
-  "device_type": "android",
-  "lifecycle_state": "running",
+  "device_type": "linux_desktop",
+  "lifecycle_state": "stopped",
   "provider_state": "healthy",
   "provider_name": "nic-linux-host",
   "external_instance_id": "stable-provider-id",
-  "performed": true,
-  "screen_streaming_live": true,
-  "remote_input_live": true,
-  "message": "Guest boot and screen/input health checks passed."
+  "screen_streaming_live": false,
+  "remote_input_live": false
 }
 ```
-Echo the exact request ID and device type. `performed: true` means the requested state transition actually completed and was verified. For asynchronous transitions, return the actual transitional state (`provisioning` or `stopping`) with `performed: false`; never claim a completed start before health checks pass. Reject mismatched IDs, unsupported actions, stale requests and cross-owner IDs.
+
+## Action endpoint
+`POST /v1/devices/{android|windows|linux_desktop}/actions` accepts:
+```json
+{ "action": "start", "request_id": "uuid-from-worker" }
+```
+Allowed actions: `start`, `stop`, `restart`. Echo the exact request ID and device type. A completed start/restart response must include `lifecycle_state: "running"`, `performed: true`, `screen_streaming_live: true`, and `remote_input_live: true`. A completed stop must be `stopped` with remote input false. For asynchronous transitions, return the actual transitional state with `performed: false`; never claim a completed start before health checks pass.
 
 ## Device runtime requirements
-- First device: isolated persistent Linux desktop environment, browser-rendered remote display, bidirectional mouse/keyboard, durable home volume.
+- Linux desktop: isolated persistent guest/container, browser-rendered remote display, bidirectional mouse/keyboard, durable home volume.
 - Android device: genuine Android Emulator on a host where KVM availability has been tested; persistent AVD/data volume; authenticated display and touch/key input.
 - Windows guest: only after a compatible hypervisor and properly licensed image are approved.
 - Owner screen and NIC computer-use agent must attach to the same session and share a serialized input lock. Owner takeover suspends NIC input.
@@ -65,5 +58,5 @@ Echo the exact request ID and device type. `performed: true` means the requested
 ## Cloudflare Worker configuration
 - `NIC_DEVICE_HOST_URL`: HTTPS base URL for the host API (non-secret Worker variable).
 - `NIC_DEVICE_HOST_TOKEN`: dedicated secret set with Wrangler/Cloudflare dashboard.
-- If either is missing, the Worker must continue to report `not_configured` and block lifecycle actions.
+- If either is missing, the Worker reports the host as not configured and blocks lifecycle actions.
 - No host is provisioned by setting these values alone; deployment and end-to-end verification are separate steps.
