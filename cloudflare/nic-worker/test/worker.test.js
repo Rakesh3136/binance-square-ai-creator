@@ -26,18 +26,18 @@ test("virtual device host URL must use HTTPS; untrusted HTTP host is never calle
   const headers={authorization:"Bearer owner","content-type":"application/json"};
   await worker.fetch(new Request("https://nic.test/virtual-devices",{headers:{authorization:"Bearer owner"}}),{DB,NIC_OWNER_CONTROL_TOKEN:"owner",NIC_DEVICE_HOST_URL:"http://127.0.0.1:8080",NIC_DEVICE_HOST_TOKEN:"host-secret"});
   const r=await worker.fetch(new Request("https://nic.test/virtual-devices/android/actions",{method:"POST",headers,body:'{"action":"start"}'}),{DB,NIC_OWNER_CONTROL_TOKEN:"owner",NIC_DEVICE_HOST_URL:"http://127.0.0.1:8080",NIC_DEVICE_HOST_TOKEN:"host-secret"});
-  const b=await r.json();assert.equal(called,false);assert.equal(r.status,202);assert.equal(b.performed,false);assert.equal(b.status,"provider_unavailable");
+  const b=await r.json();assert.equal(called,false);assert.equal(r.status,202);assert.equal(b.performed,false);assert.equal(b.status,"blocked_no_provider");
  }finally{globalThis.fetch=original;}
 });
 test("virtual device action is forwarded only to an HTTPS host and records its receipt",async()=>{
  const DB=makeVirtualDb(),original=globalThis.fetch,calls=[];
- globalThis.fetch=async(url,options)=>{calls.push({url:String(url),options});return new Response(JSON.stringify({request_id:JSON.parse(options.body).request_id,device_type:"android",lifecycle_state:"running",provider_state:"healthy",provider_name:"test-host",external_instance_id:"android-01",performed:true,screen_streaming_live:true,remote_input_live:true,message:"Emulator boot confirmed."}),{status:200,headers:{"content-type":"application/json"}});};
+ globalThis.fetch=async(url,options)=>{calls.push({url:String(url),options});if(options.method==="GET")return new Response(JSON.stringify({devices:[{device_type:"android",lifecycle_state:"stopped",provider_state:"healthy",screen_streaming_live:false,remote_input_live:false},{device_type:"windows",lifecycle_state:"stopped",provider_state:"healthy",screen_streaming_live:false,remote_input_live:false}]}),{status:200,headers:{"content-type":"application/json"}});return new Response(JSON.stringify({request_id:JSON.parse(options.body).request_id,device_type:"android",lifecycle_state:"running",provider_state:"healthy",provider_name:"test-host",external_instance_id:"android-01",performed:true,screen_streaming_live:true,remote_input_live:true,message:"Emulator boot confirmed."}),{status:200,headers:{"content-type":"application/json"}});};
  try{
   const env={DB,NIC_OWNER_CONTROL_TOKEN:"owner",NIC_DEVICE_HOST_URL:"https://device-host.example.test",NIC_DEVICE_HOST_TOKEN:"host-secret"};
   const headers={authorization:"Bearer owner","content-type":"application/json"};
   await worker.fetch(new Request("https://nic.test/virtual-devices",{headers:{authorization:"Bearer owner"}}),env);
   const r=await worker.fetch(new Request("https://nic.test/virtual-devices/android/actions",{method:"POST",headers,body:'{"action":"start"}'}),env);
-  const b=await r.json();assert.equal(r.status,200);assert.equal(b.performed,true);assert.equal(b.status,"running");assert.equal(calls.length,1);assert.equal(calls[0].url,"https://device-host.example.test/v1/devices/android/actions");assert.equal(calls[0].options.headers.get("authorization"),"Bearer host-secret");assert.equal(DB.actions.length,1);assert.equal(DB.events.length,1);
+  const b=await r.json();assert.equal(r.status,200);assert.equal(b.performed,true);assert.equal(b.status,"running");assert.equal(calls.length,2);assert.equal(calls[1].url,"https://device-host.example.test/v1/devices/android/actions");assert.equal(calls[1].options.headers.get("authorization"),"Bearer host-secret");assert.equal(DB.actions.length,1);assert.equal(DB.events.length,1);
  }finally{globalThis.fetch=original;}
 });
 test("virtual device host response with mismatched request ID is rejected",async()=>{
