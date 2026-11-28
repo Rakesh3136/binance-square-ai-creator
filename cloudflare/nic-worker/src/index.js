@@ -1,4 +1,4 @@
-const SYSTEM_INSTRUCTIONS = `You are NIC, the user's general-purpose personal AI assistant across Android and Windows. Help with research, writing, coding, planning, documents, files, and supported app or desktop workflows. Be honest about which tools and device integrations are actually connected; never claim to have clicked, changed, sent, installed, or executed anything unless a tool confirms it. Ask for explicit approval before consequential actions such as sending messages, purchases, deleting or overwriting files, installing software, changing security settings, or publishing externally. Never bypass operating-system permissions, authentication, security controls, or user consent. Treat 'do anything' as broad task assistance within the user's permissions and the tools actually available, not unrestricted access. This edge service currently provides authenticated AI chat and persistent D1 conversation memory only; it does not yet control Android or Windows, access local files, operate a browser, or execute desktop actions. Never pretend those capabilities are live.`
+const SYSTEM_INSTRUCTIONS = `You are NIC, the user's general-purpose personal AI assistant across a Linux laptop and Android phone. Help with research, writing, coding, planning, documents, files, and supported app or desktop workflows. Be honest about which tools and device integrations are actually connected; never claim to have clicked, changed, sent, installed, or executed anything unless a tool confirms it. Ask for explicit approval before consequential actions such as sending messages, purchases, deleting or overwriting files, installing software, changing security settings, or publishing externally. Never bypass operating-system permissions, authentication, security controls, or user consent. Treat 'do anything' as broad task assistance within the user's permissions and the tools actually available, not unrestricted access. This edge service currently provides authenticated AI chat and persistent D1 conversation memory only; it does not yet control the Linux laptop or Android phone, access local files, operate a browser, or execute desktop actions. Never pretend those capabilities are live.`
 const DEFAULT_MODEL="@cf/zai-org/glm-4.7-flash";
 function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});}
 async function authorized(request,expected){if(!expected)return false;const supplied=request.headers.get("authorization")||"";const candidate=supplied.startsWith("Bearer ")?supplied.slice(7):"";if(!candidate||candidate.length>512)return false;const enc=new TextEncoder();const[a,b]=await Promise.all([crypto.subtle.digest("SHA-256",enc.encode(candidate)),crypto.subtle.digest("SHA-256",enc.encode(expected))]);const x=new Uint8Array(a),y=new Uint8Array(b);let diff=0;for(let i=0;i<x.length;i++)diff|=x[i]^y[i];return diff===0;}
@@ -40,4 +40,105 @@ async function activity(request,env){
  const at=new Date().toISOString(),saved=await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id").bind(at,e.task_id||null,e.actor.trim(),e.action.trim(),e.status.trim(),e.summary.trim(),e.error_code||null).first();
  return json({event:{id:saved.id,created_at:at,...e},source:"nic_activity_journal"},201);
 }
-export default {async fetch(request,env){const u=new URL(request.url);if(request.method==="GET"&&u.pathname==="/healthz")return json({status:"ok",service:"nic-edge-chat",model_configured:Boolean(env.AI),model_provider:"cloudflare_workers_ai",model:env.NIC_CHAT_MODEL||DEFAULT_MODEL,chat_token_configured:Boolean(env.NIC_CHAT_ACCESS_TOKEN),owner_control_token_configured:Boolean(env.NIC_OWNER_CONTROL_TOKEN),activity_database_bound:Boolean(env.DB),conversation_memory:Boolean(env.DB),capability_mode:"edge_chat_with_persistent_memory",publishing_enabled:false});if(u.pathname==="/chat"&&request.method==="POST")return chat(request,env);if(u.pathname==="/activity"&&(request.method==="GET"||request.method==="POST")){if(!env.DB)return json({error:"activity_database_unavailable"},503);try{return await activity(request,env);}catch{return json({error:"activity_journal_unavailable"},503);}}return json({error:"not_found"},404);}};
+
+const VIRTUAL_DEVICE_TYPES=["android","windows"];
+function validHostBase(value){try{const u=new URL(value);return u.protocol==="https:"&&u.username===""&&u.password===""?u.toString().replace(/\/$/,""):null;}catch{return null;}}
+async function callDeviceHost(env,path,options={}){
+ const base=validHostBase(env.NIC_DEVICE_HOST_URL||"");
+ if(!base||!env.NIC_DEVICE_HOST_TOKEN)return {configured:false,response:null,body:null};
+ const headers=new Headers(options.headers||{});
+ headers.set("authorization","Bearer "+env.NIC_DEVICE_HOST_TOKEN);
+ headers.set("accept","application/json");
+ if(options.body)headers.set("content-type","application/json");
+ let response;try{response=await fetch(base+path,{...options,headers,signal:AbortSignal.timeout(12000)});}catch{return {configured:true,unavailable:true,response:null,body:null};}
+ let body;try{body=await response.json();}catch{body=null;}
+ return {configured:true,response,body};
+}
+function dbLifecycleState(state){return state==="failed"?"error":state==="stopping"?"provisioning":state==="blocked_no_provider"?"not_provisioned":state;}
+function dbProviderState(state){if(["connected","healthy"].includes(state))return "connected";if(["disconnected","unreachable"].includes(state))return "disconnected";if(state==="no_provider")return "no_provider";return "configured";}
+function hostDeviceIsValid(d){
+ return d&&VIRTUAL_DEVICE_TYPES.includes(d.device_type)&&typeof d.lifecycle_state==="string"&&["not_provisioned","provisioning","running","stopping","stopped","failed","blocked_no_provider"].includes(d.lifecycle_state)&&typeof d.provider_state==="string"&&typeof d.screen_streaming_live==="boolean"&&typeof d.remote_input_live==="boolean";
+}
+async function virtualDevices(request,env){
+ if(!(await authorized(request,env.NIC_OWNER_CONTROL_TOKEN)))return json({error:"owner_unauthorized"},401);
+ if(!env.DB)return json({error:"virtual_device_database_unavailable"},503);
+ if(request.method==="GET"){
+  try{
+   const now=new Date().toISOString();
+   for(const type of VIRTUAL_DEVICE_TYPES){const id="nic-"+type;await env.DB.prepare("INSERT INTO nic_virtual_devices (id, device_type, display_name, lifecycle_state, provider_state, created_at, updated_at) VALUES (?, ?, ?, 'not_provisioned', 'no_provider', ?, ?) ON CONFLICT(id) DO NOTHING").bind(id,type,type==="android"?"NIC Virtual Android":"NIC Virtual Windows",now,now).run();}
+   const host=await callDeviceHost(env,"/v1/devices",{method:"GET"});
+   if(host.configured&&host.response?.ok&&Array.isArray(host.body?.devices)&&host.body.devices.length===2&&VIRTUAL_DEVICE_TYPES.every(t=>host.body.devices.filter(d=>d.device_type===t).length===1)&&host.body.devices.every(hostDeviceIsValid)){
+    for(const d of host.body.devices){
+     const id="nic-"+d.device_type;
+     await env.DB.prepare("UPDATE nic_virtual_devices SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(dbLifecycleState(d.lifecycle_state),dbProviderState(d.provider_state),d.provider_name||"external-linux-host",d.external_instance_id||null,now,id).run();
+    }
+    const r=await env.DB.prepare("SELECT id, device_type, display_name, lifecycle_state, provider_state, provider_name, external_instance_id, created_at, updated_at FROM nic_virtual_devices ORDER BY device_type").all();
+    return json({devices:r.results||[],source:"nic_virtual_device_registry",provider_connected:true,virtualization_live:(r.results||[]).some(d=>d.lifecycle_state==="running"),screen_streaming_live:host.body.devices.some(d=>d.screen_streaming_live),remote_input_live:host.body.devices.some(d=>d.remote_input_live)});
+   }
+   const r=await env.DB.prepare("SELECT id, device_type, display_name, lifecycle_state, provider_state, provider_name, external_instance_id, created_at, updated_at FROM nic_virtual_devices ORDER BY device_type").all();
+   return json({devices:r.results||[],source:"nic_virtual_device_registry",provider_connected:false,virtualization_live:false,screen_streaming_live:false,remote_input_live:false,provider_status:host.configured?(host.unavailable?"unreachable":"invalid_or_unhealthy_response"):"not_configured"});
+  }catch{return json({error:"virtual_device_registry_unavailable"},503);}
+ }
+ const match=new URL(request.url).pathname.match(/^\/virtual-devices\/(android|windows)\/actions$/);
+ if(!match)return json({error:"not_found"},404);
+ let p;try{p=await readBody(request);}catch(e){return json({error:e.message},400);}
+ if(Object.keys(p).some(k=>k!=="action")||!["start","stop","restart"].includes(p.action))return json({error:"device_action_invalid"},400);
+ const type=match[1],id="nic-"+type,now=new Date().toISOString(),requestId=crypto.randomUUID();
+ try{
+  const device=await env.DB.prepare("SELECT id, lifecycle_state, provider_state FROM nic_virtual_devices WHERE id=?").bind(id).first();
+  if(!device)return json({error:"virtual_device_not_registered"},404);
+  const host=await callDeviceHost(env,"/v1/devices/"+type+"/actions",{method:"POST",body:JSON.stringify({action:p.action,request_id:requestId})});
+  if(!host.configured||!host.response?.ok||!host.body||host.body.device_type!==type||host.body.request_id!==requestId||!["provisioning","running","stopping","stopped","failed"].includes(host.body.lifecycle_state)||typeof host.body.performed!=="boolean"||typeof host.body.screen_streaming_live!=="boolean"||typeof host.body.remote_input_live!=="boolean"||(host.body.performed&&p.action==="start"&&(host.body.lifecycle_state!=="running"||!host.body.screen_streaming_live||!host.body.remote_input_live))||(host.body.performed&&p.action==="restart"&&(host.body.lifecycle_state!=="running"||!host.body.screen_streaming_live||!host.body.remote_input_live))||(host.body.performed&&p.action==="stop"&&(host.body.lifecycle_state!=="stopped"||host.body.remote_input_live))){
+   const code=!host.configured?"vm_provider_not_configured":host.unavailable?"vm_provider_unreachable":"vm_provider_response_invalid";
+   await env.DB.prepare("INSERT INTO nic_device_action_requests (id, device_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, 'blocked_no_provider', ?)").bind(requestId,id,p.action,now,code).run();
+   await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, 'blocked', ?, ?)").bind(now,requestId,"virtual_device_"+p.action,"No verified VM host action was performed.",code).run();
+   return json({request_id:requestId,device_id:id,action:p.action,status:code==="vm_provider_not_configured"?"blocked_no_provider":"provider_unavailable",performed:false,message:"No verified VM host action was completed. Check the NIC device-host connection and health before retrying."},202);
+  }
+  await env.DB.prepare("INSERT INTO nic_device_action_requests (id, device_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, ?, ?)").bind(requestId,id,p.action,now,host.body.performed?"succeeded":host.body.lifecycle_state==="failed"?"failed":"accepted",host.body.result_code||null).run();
+  await env.DB.prepare("UPDATE nic_virtual_devices SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(dbLifecycleState(host.body.lifecycle_state),dbProviderState(host.body.provider_state||"connected"),host.body.provider_name||"external-linux-host",host.body.external_instance_id||null,new Date().toISOString(),id).run();
+  await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, ?, ?, ?)").bind(now,requestId,"virtual_device_"+p.action,host.body.performed?"completed":"blocked",host.body.message||"Host adapter returned an action result.",host.body.result_code||null).run();
+  return json({request_id:requestId,device_id:id,action:p.action,status:host.body.lifecycle_state,performed:host.body.performed,message:host.body.message||"Host adapter response recorded."},host.body.performed?200:202);
+ }catch{return json({error:"virtual_device_action_record_failed"},503);}
+}
+
+async function linuxLaptop(request,env){
+ if(!(await authorized(request,env.NIC_OWNER_CONTROL_TOKEN)))return json({error:"owner_unauthorized"},401);
+ if(!env.DB)return json({error:"virtual_device_database_unavailable"},503);
+ const id="nic-linux-laptop",now=new Date().toISOString();
+ if(request.method==="GET"){
+  try{
+   await env.DB.prepare("INSERT INTO nic_linux_laptop (id, display_name, lifecycle_state, provider_state, created_at, updated_at) VALUES (?, 'NIC Virtual Linux Laptop', 'not_provisioned', 'no_provider', ?, ?) ON CONFLICT(id) DO NOTHING").bind(id,now,now).run();
+   const host=await callDeviceHost(env,"/v1/devices/linux_desktop",{method:"GET"});
+   if(host.configured&&host.response?.ok&&host.body?.device_type==="linux_desktop"&&["not_provisioned","provisioning","running","stopping","stopped","failed","blocked_no_provider"].includes(host.body.lifecycle_state)&&typeof host.body.screen_streaming_live==="boolean"&&typeof host.body.remote_input_live==="boolean"&&typeof host.body.provider_state==="string"){
+    await env.DB.prepare("UPDATE nic_linux_laptop SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(dbLifecycleState(host.body.lifecycle_state),dbProviderState(host.body.provider_state),host.body.provider_name||"external-linux-host",host.body.external_instance_id||null,new Date().toISOString(),id).run();
+   }
+   const d=await env.DB.prepare("SELECT id, display_name, lifecycle_state, provider_state, provider_name, external_instance_id, created_at, updated_at FROM nic_linux_laptop WHERE id=?").bind(id).first();
+   const healthy=Boolean(host.configured&&host.response?.ok&&host.body?.device_type==="linux_desktop"&&host.body.lifecycle_state==="running"&&host.body.screen_streaming_live===true&&host.body.remote_input_live===true);
+   return json({device:d,device_type:"linux_desktop",provider_connected:Boolean(host.configured&&host.response?.ok),virtualization_live:d?.lifecycle_state==="running",screen_streaming_live:healthy,remote_input_live:healthy,provider_status:host.configured?(host.unavailable?"unreachable":host.response?.ok?"connected":"invalid_or_unhealthy_response"):"not_configured"});
+  }catch{return json({error:"linux_laptop_registry_unavailable"},503);}
+ }
+ if(new URL(request.url).pathname!=="/virtual-devices/laptop/actions")return json({error:"not_found"},404);
+ let p;try{p=await readBody(request);}catch(e){return json({error:e.message},400);}
+ if(Object.keys(p).some(k=>k!=="action")||!["start","stop","restart"].includes(p.action))return json({error:"device_action_invalid"},400);
+ const requestId=crypto.randomUUID();
+ try{
+  const registered=await env.DB.prepare("SELECT id FROM nic_linux_laptop WHERE id=?").bind(id).first();
+  if(!registered)return json({error:"virtual_device_not_registered"},404);
+  const host=await callDeviceHost(env,"/v1/devices/linux_desktop/actions",{method:"POST",body:JSON.stringify({action:p.action,request_id:requestId})});
+  const valid=host.configured&&host.response?.ok&&host.body?.device_type==="linux_desktop"&&host.body.request_id===requestId&&["provisioning","running","stopping","stopped","failed"].includes(host.body.lifecycle_state)&&typeof host.body.performed==="boolean"&&typeof host.body.screen_streaming_live==="boolean"&&typeof host.body.remote_input_live==="boolean";
+  const completed=valid&&host.body.performed&&((p.action==="stop"&&host.body.lifecycle_state==="stopped"&&!host.body.remote_input_live)||(["start","restart"].includes(p.action)&&host.body.lifecycle_state==="running"&&host.body.screen_streaming_live&&host.body.remote_input_live));
+  if(!valid||(host.body.performed&&!completed)){
+   const code=!host.configured?"vm_provider_not_configured":host.unavailable?"vm_provider_unreachable":"vm_provider_response_invalid";
+   await env.DB.prepare("INSERT INTO nic_linux_laptop_actions (id, laptop_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, 'blocked_no_provider', ?)").bind(requestId,id,p.action,now,code).run();
+   await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, 'blocked', ?, ?)").bind(now,requestId,"linux_laptop_"+p.action,"No verified Linux laptop action was performed.",code).run();
+   return json({request_id:requestId,device_type:"linux_desktop",status:"provider_unavailable",performed:false,error:code},202);
+  }
+  const state=host.body.lifecycle_state;
+  await env.DB.prepare("INSERT INTO nic_linux_laptop_actions (id, laptop_id, action, requested_at, request_state, result_code) VALUES (?, ?, ?, ?, ?, ?)").bind(requestId,id,p.action,now,completed?"succeeded":state==="failed"?"failed":"accepted",host.body.result_code||null).run();
+  await env.DB.prepare("UPDATE nic_linux_laptop SET lifecycle_state=?, provider_state=?, provider_name=?, external_instance_id=?, updated_at=? WHERE id=?").bind(dbLifecycleState(state),dbProviderState(host.body.provider_state||"connected"),host.body.provider_name||"external-linux-host",host.body.external_instance_id||null,new Date().toISOString(),id).run();
+  await env.DB.prepare("INSERT INTO activity_events (created_at, task_id, actor, action, status, summary, error_code) VALUES (?, ?, 'owner', ?, ?, ?, ?)").bind(now,requestId,"linux_laptop_"+p.action,completed?"completed":"accepted",host.body.message||"Linux laptop host response recorded.",host.body.result_code||null).run();
+  return json({request_id:requestId,device_type:"linux_desktop",status:state,performed:completed,message:host.body.message||"Host adapter response recorded."},completed?200:202);
+ }catch{return json({error:"linux_laptop_action_record_failed"},503);}
+}
+
+export default {async fetch(request,env){const u=new URL(request.url);if(request.method==="GET"&&u.pathname==="/healthz")return json({status:"ok",service:"nic-edge-chat",model_configured:Boolean(env.AI),model_provider:"cloudflare_workers_ai",model:env.NIC_CHAT_MODEL||DEFAULT_MODEL,chat_token_configured:Boolean(env.NIC_CHAT_ACCESS_TOKEN),owner_control_token_configured:Boolean(env.NIC_OWNER_CONTROL_TOKEN),device_host_configured:Boolean(validHostBase(env.NIC_DEVICE_HOST_URL||"")&&env.NIC_DEVICE_HOST_TOKEN),activity_database_bound:Boolean(env.DB),conversation_memory:Boolean(env.DB),capability_mode:"edge_chat_with_persistent_memory",publishing_enabled:false});if((u.pathname==="/virtual-devices/laptop"||u.pathname==="/virtual-devices/laptop/actions")&&(request.method==="GET"||request.method==="POST"))return linuxLaptop(request,env);if((u.pathname==="/virtual-devices"||/^\/virtual-devices\/(android|windows)\/actions$/.test(u.pathname))&&(request.method==="GET"||request.method==="POST"))return virtualDevices(request,env);if(u.pathname==="/chat"&&request.method==="POST")return chat(request,env);if(u.pathname==="/activity"&&(request.method==="GET"||request.method==="POST")){if(!env.DB)return json({error:"activity_database_unavailable"},503);try{return await activity(request,env);}catch{return json({error:"activity_journal_unavailable"},503);}}return json({error:"not_found"},404);}};
