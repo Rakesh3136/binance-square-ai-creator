@@ -18,3 +18,36 @@ test("virtual device registry is owner-authenticated",async()=>{const DB=makeVir
 test("virtual device registry creates persistent Android and Windows slots without claiming VMs are live",async()=>{const DB=makeVirtualDb(),headers={authorization:"Bearer owner"};const r=await worker.fetch(new Request("https://nic.test/virtual-devices",{headers}),{DB,NIC_OWNER_CONTROL_TOKEN:"owner"});const b=await r.json();assert.equal(r.status,200);assert.deepEqual(b.devices.map(d=>d.device_type),["android","windows"]);assert.equal(b.virtualization_live,false);assert.equal(b.screen_streaming_live,false);assert.equal(b.remote_input_live,false);assert.equal(DB.devices.size,2);});
 test("virtual device start request is safely blocked when no VM provider exists",async()=>{const DB=makeVirtualDb(),headers={authorization:"Bearer owner","content-type":"application/json"};await worker.fetch(new Request("https://nic.test/virtual-devices",{headers:{authorization:"Bearer owner"}}),{DB,NIC_OWNER_CONTROL_TOKEN:"owner"});const r=await worker.fetch(new Request("https://nic.test/virtual-devices/android/actions",{method:"POST",headers,body:'{"action":"start"}'}),{DB,NIC_OWNER_CONTROL_TOKEN:"owner"});const b=await r.json();assert.equal(r.status,202);assert.equal(b.status,"blocked_no_provider");assert.equal(b.performed,false);assert.equal(DB.actions.length,1);assert.equal(DB.events.length,1);assert.equal(DB.devices.get("nic-android").lifecycle_state,"not_provisioned");});
 test("virtual device actions reject invalid commands",async()=>{const DB=makeVirtualDb(),headers={authorization:"Bearer owner","content-type":"application/json"};const r=await worker.fetch(new Request("https://nic.test/virtual-devices/android/actions",{method:"POST",headers,body:'{"action":"shell"}'}),{DB,NIC_OWNER_CONTROL_TOKEN:"owner"});assert.equal(r.status,400);assert.equal(DB.actions.length,0);});
+
+test("virtual device host URL must use HTTPS; untrusted HTTP host is never called",async()=>{
+ const DB=makeVirtualDb(),original=globalThis.fetch;let called=false;
+ globalThis.fetch=async()=>{called=true;return new Response("{}");};
+ try{
+  const headers={authorization:"Bearer owner","content-type":"application/json"};
+  await worker.fetch(new Request("https://nic.test/virtual-devices",{headers:{authorization:"Bearer owner"}}),{DB,NIC_OWNER_CONTROL_TOKEN:"owner",NIC_DEVICE_HOST_URL:"http://127.0.0.1:8080",NIC_DEVICE_HOST_TOKEN:"host-secret"});
+  const r=await worker.fetch(new Request("https://nic.test/virtual-devices/android/actions",{method:"POST",headers,body:'{"action":"start"}'}),{DB,NIC_OWNER_CONTROL_TOKEN:"owner",NIC_DEVICE_HOST_URL:"http://127.0.0.1:8080",NIC_DEVICE_HOST_TOKEN:"host-secret"});
+  const b=await r.json();assert.equal(called,false);assert.equal(r.status,202);assert.equal(b.performed,false);assert.equal(b.status,"provider_unavailable");
+ }finally{globalThis.fetch=original;}
+});
+test("virtual device action is forwarded only to an HTTPS host and records its receipt",async()=>{
+ const DB=makeVirtualDb(),original=globalThis.fetch,calls=[];
+ globalThis.fetch=async(url,options)=>{calls.push({url:String(url),options});return new Response(JSON.stringify({request_id:JSON.parse(options.body).request_id,device_type:"android",lifecycle_state:"running",provider_state:"healthy",provider_name:"test-host",external_instance_id:"android-01",performed:true,screen_streaming_live:true,remote_input_live:true,message:"Emulator boot confirmed."}),{status:200,headers:{"content-type":"application/json"}});};
+ try{
+  const env={DB,NIC_OWNER_CONTROL_TOKEN:"owner",NIC_DEVICE_HOST_URL:"https://device-host.example.test",NIC_DEVICE_HOST_TOKEN:"host-secret"};
+  const headers={authorization:"Bearer owner","content-type":"application/json"};
+  await worker.fetch(new Request("https://nic.test/virtual-devices",{headers:{authorization:"Bearer owner"}}),env);
+  const r=await worker.fetch(new Request("https://nic.test/virtual-devices/android/actions",{method:"POST",headers,body:'{"action":"start"}'}),env);
+  const b=await r.json();assert.equal(r.status,200);assert.equal(b.performed,true);assert.equal(b.status,"running");assert.equal(calls.length,1);assert.equal(calls[0].url,"https://device-host.example.test/v1/devices/android/actions");assert.equal(calls[0].options.headers.get("authorization"),"Bearer host-secret");assert.equal(DB.actions.length,1);assert.equal(DB.events.length,1);
+ }finally{globalThis.fetch=original;}
+});
+test("virtual device host response with mismatched request ID is rejected",async()=>{
+ const DB=makeVirtualDb(),original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({request_id:"wrong",device_type:"android",lifecycle_state:"running",performed:true}),{status:200});
+ try{
+  const env={DB,NIC_OWNER_CONTROL_TOKEN:"owner",NIC_DEVICE_HOST_URL:"https://device-host.example.test",NIC_DEVICE_HOST_TOKEN:"host-secret"};
+  const headers={authorization:"Bearer owner","content-type":"application/json"};
+  await worker.fetch(new Request("https://nic.test/virtual-devices",{headers:{authorization:"Bearer owner"}}),env);
+  const r=await worker.fetch(new Request("https://nic.test/virtual-devices/android/actions",{method:"POST",headers,body:'{"action":"start"}'}),env);
+  const b=await r.json();assert.equal(r.status,202);assert.equal(b.performed,false);assert.equal(b.status,"provider_unavailable");
+ }finally{globalThis.fetch=original;}
+});
