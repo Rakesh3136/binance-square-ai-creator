@@ -11,6 +11,8 @@ Workers AI Free currently includes 10,000 Neurons per day. On Workers Free, requ
 - `GET /healthz`: reports configuration booleans and model identity, never secret values.
 - `POST /chat`: requires `Authorization: Bearer <NIC_CHAT_ACCESS_TOKEN>`; invokes Workers AI and stores user/assistant messages in D1. Pass returned `conversation_id` on later messages to resume; omit it to start a new conversation.
 - `GET /activity`: requires separate owner token; returns last 100 append-only activity summaries.
+- `GET /virtual-devices`: requires owner token; returns registered Android/Windows device state and whether the separately hosted device provider is reachable.
+- `POST /virtual-devices/{android|windows}/actions`: requires owner token; requests start/stop/restart through the authenticated HTTPS device-host adapter. Without a configured and verified provider, actions are safely blocked.
 - `POST /activity`: requires owner token; appends a bounded activity summary.
 
 Conversation messages live in `nic_messages`; the activity journal remains separate and append-only. Only user and assistant messages are persisted, not hidden reasoning. The chat token authorizes the single-owner chat service; do not distribute it to untrusted clients.
@@ -19,7 +21,11 @@ Conversation messages live in `nic_messages`; the activity journal remains separ
 Set through Wrangler or Cloudflare dashboard; never commit them:
 - `NIC_CHAT_ACCESS_TOKEN`
 - `NIC_OWNER_CONTROL_TOKEN` (different random token)
+- `NIC_DEVICE_HOST_TOKEN` (only when a separately deployed HTTPS device host is ready)
 There is no AI-provider API key. Do not add an OpenAI key.
+
+## Virtual device host bridge
+Set `NIC_DEVICE_HOST_URL` as a Worker variable and `NIC_DEVICE_HOST_TOKEN` as a Worker secret only after deploying a compatible host adapter. The Worker requires HTTPS, forwards owner-authenticated lifecycle actions with a dedicated host credential, validates the echoed request ID/device type/state, and records action receipts. A missing, unreachable, or malformed host never produces a successful device state. See [`../nic-device-host/README.md`](../nic-device-host/README.md) for the host API contract. This bridge is not itself a VM host and does not create Android or Windows machines.
 
 ## Bindings
 - Workers AI binding `AI`
@@ -35,6 +41,6 @@ npx wrangler deploy
 The database points to the account's APAC D1 database. No paid upgrade is configured or authorized.
 
 ## Capability boundary
-This adapter does not import or execute the Python NIC orchestrator. Existing Python API uses `http.server`, local SQLite, filesystem artifacts, and packages that are not a drop-in Workers runtime. This adapter currently offers authenticated model chat, D1-backed conversation memory, and owner activity journal only. It does not yet have live research tools, dynamic specialist tool execution, Binance publishing, reward ingestion, scheduled creator loop, browser automation, or full owner autonomy controls. Do not call NIC fully live or production-complete on this basis.
+This adapter does not import or execute the Python NIC orchestrator. Existing Python API uses `http.server`, local SQLite, filesystem artifacts, and packages that are not a drop-in Workers runtime. This adapter currently offers authenticated model chat, D1-backed conversation memory, owner activity journal, and an optional authenticated virtual-device host bridge. No real host is currently connected; Android/Windows virtualization, live screen streaming and remote input are not yet available. It does not yet have live research tools, dynamic specialist tool execution, Binance publishing, reward ingestion, scheduled creator loop, browser automation, or full owner autonomy controls. Do not call NIC fully live or production-complete on this basis.
 
 Next work: port read-only research tools to Workers-compatible code, then add a bounded dynamic specialist executor with explicit permissions. Publishing remains disabled until authorization, originality, eligibility, duplicate-prevention, and publication-proof gates are connected and tested.
